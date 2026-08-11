@@ -78,14 +78,15 @@ class RetroAdapter(EnvAdapter):
             env.unwrapped.load_state(state)
         return env.reset()
 
-    def capture(self, env, obs, info) -> FrameState:
+    def capture(self, env, obs, info, want_blob=True) -> FrameState:
         u = env.unwrapped
         u.data.update_ram()
         variables = {"ram": u.get_ram().copy()}
         # Surface the game's decoded integration variables (score/lives/...).
         for k, v in (info or {}).items():
             variables[f"info_{k}"] = v
-        blob = u.em.get_state()
+        # em.get_state() is ~1 MB for Genesis; only snapshot on stride frames.
+        blob = u.em.get_state() if want_blob else None
         return FrameState(blob=blob, variables=variables)
 
     def restore(self, env, blob):

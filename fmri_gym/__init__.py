@@ -25,4 +25,7 @@ def get_adapter(backend, **kwargs):
     if backend == "gym":
         from .adapters.default import DefaultAdapter
         return DefaultAdapter(**kwargs)
+    if backend == "vgdl":
+        from .adapters.vgdl import VGDLAdapter
+        return VGDLAdapter(**kwargs)
     raise ValueError(f"unknown backend: {backend!r}")

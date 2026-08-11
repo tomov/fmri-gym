@@ -7,3 +7,7 @@ numpy
 ale-py            # Atari backend
 stable-retro      # NES/SNES/Genesis/... backend
 shimmy            # run old-`gym` envs through the gym backend
+
+# The `vgdl` backend runs in the SEPARATE `language_and_experience` conda env
+# (old gym + numpy<2 + setuptools<81); do NOT install it here. The fmri_gym
+# core needs only pygame+numpy and imports fine in that env too.

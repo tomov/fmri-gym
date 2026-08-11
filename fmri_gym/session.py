@@ -150,6 +150,12 @@ class Session:
         n_episodes = phase.get("n_episodes", 1)
         fps = phase.get("fps", 30)
         base_seed = phase.get("seed", 1000 + index)
+        # Save a full savestate every `state_stride` frames (and always at each
+        # episode's first frame, the replay anchor). 1 = every frame (default);
+        # larger values trade savestate density for disk -- important for retro,
+        # whose states are ~1 MB/frame. Between anchors, frames are still
+        # reconstructable by restoring the last anchor and replaying actions.
+        state_stride = max(1, int(phase.get("state_stride", 1)))
         dt = 1.0 / fps
         cap = duration if mode == "duration" else phase.get("max_duration", 300.0)
 
@@ -174,6 +180,7 @@ class Session:
             obs, info = adapter.reset(env, seed, phase)
             frames["episode_seeds"].append(seed)
             terminated = truncated = False
+            ep_frame = 0
             next_t = time.perf_counter()
             while not (terminated or truncated):
                 now = time.perf_counter()
@@ -186,9 +193,12 @@ class Session:
 
                 held = held_key_names(pygame)
                 action = keyspec.resolve(held)
-                obs, reward, terminated, truncated, info = env.step(action)
+                obs, reward, terminated, truncated, info = adapter.step(env, action)
                 total_reward += float(reward)
-                fs = adapter.capture(env, obs, info)
+                # Anchor a full savestate at episode start and every stride.
+                want_blob = (ep_frame % state_stride == 0)
+                ep_frame += 1
+                fs = adapter.capture(env, obs, info, want_blob=want_blob)
 
                 frames["action"].append(action)
                 frames["reward"].append(reward)
@@ -200,7 +210,7 @@ class Session:
                 for k, v in fs.variables.items():
                     frames["variables"].setdefault(k, []).append(v)
 
-                self.display.draw_frame(env.render())
+                self.display.draw_frame(adapter.render(env))
                 if time.perf_counter() >= block_end:
                     break
             episode_id += 1

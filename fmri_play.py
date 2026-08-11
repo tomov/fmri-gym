@@ -64,6 +64,8 @@ def main():
     p.add_argument("--dummy-trigger", action="store_true")
     p.add_argument("--save-pixels", action="store_true",
                    help="ALE only: also store lossless pixels (large; warns).")
+    p.add_argument("--vgdl-repo", default=os.environ.get("VGDL_REPO"),
+                   help="path to the language_and_experience checkout (vgdl backend)")
     args = p.parse_args()
 
     curriculum = (load_curriculum(args.curriculum) if args.curriculum
@@ -77,7 +79,12 @@ def main():
                 if ph.get("type") == "game"}
     adapters = {}
     for b in backends:
-        kwargs = {"save_pixels": args.save_pixels} if b == "ale" else {}
+        if b == "ale":
+            kwargs = {"save_pixels": args.save_pixels}
+        elif b == "vgdl":
+            kwargs = {"repo": args.vgdl_repo}
+        else:
+            kwargs = {}
         adapters[b] = get_adapter(b, **kwargs)
 
     display = Display(size=(w, h), fullscreen=args.fullscreen)

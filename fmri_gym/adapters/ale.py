@@ -54,7 +54,7 @@ class ALEAdapter(EnvAdapter):
         return KeySpec(combos=combos, noop=0,
                        help="Arrow keys move, SPACE fires.")
 
-    def capture(self, env, obs, info) -> FrameState:
+    def capture(self, env, obs, info, want_blob=True) -> FrameState:
         ale = env.unwrapped.ale
         variables = {"ram": ale.getRAM().copy()}
         if self.save_pixels:
@@ -67,7 +67,8 @@ class ALEAdapter(EnvAdapter):
                     self._palette[i] = flat_c[flat_i == i][0]
                     self._palette_seen[i] = True
             variables["screen_index"] = idx.copy()
-        blob = pickle.dumps(env.unwrapped.clone_state(include_rng=True))
+        blob = (pickle.dumps(env.unwrapped.clone_state(include_rng=True))
+                if want_blob else None)
         return FrameState(blob=blob, variables=variables)
 
     def restore(self, env, blob):

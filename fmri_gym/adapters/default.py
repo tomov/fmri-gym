@@ -65,7 +65,7 @@ class DefaultAdapter(EnvAdapter):
                             "provide a custom adapter.")
         return KeySpec(combos=combos, noop=noop, help=help_txt)
 
-    def capture(self, env, obs, info) -> FrameState:
+    def capture(self, env, obs, info, want_blob=True) -> FrameState:
         # No universal savestate: blob=None -> reconstruction is via seed+replay.
         # The observation is the analysis state for most gym envs.
         variables = {"obs": np.asarray(obs)}

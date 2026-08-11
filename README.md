@@ -7,11 +7,21 @@ uniform display, scanner-trigger sync, a declarative curriculum of phases, and
 compact reconstructable per-frame logging — and works across game engines
 through small pluggable **adapters**. Ships with three:
 
-| Backend (`"backend"`) | Games | Engine |
-|---|---|---|
-| `ale`   | Atari 2600 (`ALE/Pong-v5`, …) | ALE / Stella |
-| `retro` | NES / SNES / Genesis / GB / … (`Airstriker-Genesis-v0`, …) | stable-retro / libretro |
-| `gym`   | **any** Gymnasium env (`CartPole-v1`, MuJoCo, Box2D, toy_text, …) and old-`gym` envs via shimmy | various |
+| Backend (`"backend"`) | Games | Engine | conda env |
+|---|---|---|---|
+| `ale`   | Atari 2600 (`ALE/Pong-v5`, …) | ALE / Stella | `fmri-gym` |
+| `retro` | NES / SNES / Genesis / GB / … (`Airstriker-Genesis-v0`, …) | stable-retro / libretro | `fmri-gym` |
+| `gym`   | **any** Gymnasium env (`CartPole-v1`, MuJoCo, Box2D, toy_text, …); old-`gym` envs via shimmy | various | `fmri-gym` |
+| `vgdl`  | VGDL games (`aliens`, `beesAndBirds`, …) from ccolas/language_and_experience | py-vgdl / pygame | `language_and_experience` |
+
+> **One framework, sometimes several conda envs.** The `ale`/`retro`/`gym`
+> backends coexist in one env (`fmri-gym`, numpy 2). The `vgdl` backend is built
+> on *old* `gym` and requires `numpy<2` + `setuptools<81`, which is
+> irreconcilable with that — so VGDL curricula run in the separate
+> `language_and_experience` env. This is a dependency reality, not a design
+> split: the framework *core* needs only `pygame`+`numpy` and imports cleanly in
+> both envs; adapters are imported lazily, so each env only needs the backends
+> it uses. Same code, same curriculum schema, same output format everywhere.
 
 It is the generalization of two single-engine siblings — `../ALE-examples`
 (Atari) and `../stable-retro-examples` (retro) — and mirrors the fMRI/MEG tasks
@@ -29,6 +39,7 @@ fmri_gym/
     ale.py          # clone_state, getRAM, lossless indexed pixels
     retro.py        # em.get_state, get_ram, decoded info vars, console-button keymap
     default.py      # ANY gym env: rgb frames, seed+replay, obs-as-state
+    vgdl.py         # VGDLEnv: get_state/set_state, symbolic grid + events
 fmri_play.py        # CLI entry point
 configs/            # example curricula
 ```
@@ -81,6 +92,11 @@ python fmri_play.py --subject sub-01 --dummy-trigger
 
 # Your own curriculum:
 python fmri_play.py --subject sub-01 --curriculum configs/demo_mixed.json
+
+# VGDL games run in their own conda env (numpy<2):
+conda activate language_and_experience
+VGDL_REPO=~/Documents/projects/DBP/language_and_experience \
+  python fmri_play.py --subject sub-01 --curriculum configs/demo_vgdl.json
 ```
 
 Runtime flow: experimenter screen (**SPACE**) → "Waiting for scanner..." →
@@ -106,8 +122,10 @@ An ordered JSON list of **phases** (bare list or `{"curriculum": [...]}`):
  "max_duration": 300.0,         // hard wall-clock safety cap (episode mode)
  "fps": 30,                     // target game frames/second
  "seed": 1234,                  // base RNG seed (optional)
+ "state_stride": 1,             // save a full savestate every K frames (see below)
  "state": "Level1",             // retro: named savestate/level (optional)
  "scenario": null,              // retro: scenario name (optional)
+ "level": 0,                    // vgdl: level index; also uses "game","block_size"
  "keys": {"LEFT": 0, "RIGHT": 1}, // override keyboard->action map (see below)
  "save_pixels": false}          // ALE: also store lossless pixels (see warning)
 ```
@@ -164,12 +182,15 @@ r = retro.make(str(d["game"]), render_mode="rgb_array"); r.reset()
 r.unwrapped.em.set_state(d["states"][10]); r.unwrapped.data.update_ram()
 ```
 
-> ⚠️ **Storage note.** Per-frame savestates are cheap for ALE (~0.4 KB/frame)
-> but large for retro consoles: a Genesis state is ~1 MB/frame, so a 20 s block
-> at 60 fps is ~800 MB compressed. For retro, prefer **duration/episode caps**
-> plus **bk2 movie recording** (in the sibling `stable-retro-examples`) for long
-> runs, or store states every K frames. A future flag will make state stride
-> configurable — see TODO.
+> ⚠️ **Storage note & `state_stride`.** Per-frame savestates are cheap for ALE
+> (~0.4 KB/frame) but large for retro consoles: a Genesis state is ~1 MB/frame.
+> Set **`"state_stride": K`** on a game phase to snapshot a full savestate only
+> every K frames (always including each episode's first frame, the replay
+> anchor); frames between anchors stay reconstructable by restoring the last
+> anchor and replaying the logged actions (retro/ALE/VGDL are deterministic).
+> Measured on Airstriker-Genesis: a 1.5 s @60 fps block drops from **780 KB →
+> 86 KB with `state_stride: 15`** (~9×). Analysis variables (RAM, `info_*`) are
+> always logged every frame regardless of stride.
 >
 > ⚠️ **`--save-pixels` (ALE)** stores the screen every frame. It's lossless
 > (indexed palette; `palette[screen_index] == RGB`) and zlib-friendly
@@ -179,16 +200,26 @@ r.unwrapped.em.set_state(d["states"][10]); r.unwrapped.data.update_ram()
 ## Migrating your game list
 
 Of the games in the DBP survey, ~15 already expose a Gymnasium API and drop
-straight into the `gym` backend; 5 are old-`gym` and load via **shimmy**
-(`"legacy_gym": true` in the phase, routed through `GymV21Environment-v0`).
-stable-retro titles (the platformers/adventures built on libretro) use the
-`retro` backend. Each new game typically needs only a per-game **keymap** and,
-if its `Discrete` actions aren't self-evident, a `keys` override.
+straight into the `gym` backend; stable-retro titles use the `retro` backend;
+and the VGDL games use the `vgdl` backend. Each new game typically needs only a
+per-game **keymap** and, if its `Discrete` actions aren't self-evident, a `keys`
+override.
+
+**old-`gym` games (chess, hanoi, Sokoban, Baba, NetHack).** These load through
+**shimmy** with `"legacy_gym": true` (routed via `GymV21Environment-v0`). One
+caveat learned the hard way: shimmy's v0.21 compat calls the removed `.seed()`
+method, and `gym==0.26` itself is incompatible with `numpy>=2`. So, like VGDL,
+these are best run in a dedicated `numpy<2` env with the matching `gym`/game
+package installed. The `legacy_gym` code path exists in `default.py`; wire up a
+specific game once its package is installed in such an env.
 
 ## Future work / TODO
 
-- [ ] Configurable **state stride** (`save_state_every: K`) and per-backend
-      state-storage policy (retro states are large).
+- [x] Configurable **state stride** (`"state_stride": K`) — done.
+- [x] **VGDL backend** (ccolas/language_and_experience) — done.
+- [ ] Finish the **old-`gym` / shimmy** path against a real game (Sokoban,
+      chess) in a `numpy<2` env; currently the code path exists but is untested
+      end-to-end (blocked on installing a game package).
 - [ ] **Photodiode sync square** and **LSL / parallel-port markers** for
       MEG/EEG-grade timing (see `../mario_task/markers.py`); fMRI's slow HRF
       makes the `=`-anchored software clock adequate.

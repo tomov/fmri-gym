@@ -90,17 +90,37 @@ class EnvAdapter:
         """
         return env.reset(seed=seed)
 
-    def capture(self, env, obs, info) -> FrameState:
+    def step(self, env, action):
+        """Advance one frame. Return (obs, reward, terminated, truncated, info).
+
+        Default is the Gymnasium contract; adapters with non-standard
+        signatures (e.g. VGDL's step(a, with_img=)) override this.
+        """
+        return env.step(action)
+
+    def capture(self, env, obs, info, want_blob: bool = True) -> FrameState:
         """Return the FrameState to log for the current frame.
 
         Called once per step. `obs`/`info` are the latest step() outputs so
         adapters can fold observation-derived state in without re-querying.
+        When `want_blob` is False the caller does not need the (often expensive)
+        savestate this frame, so adapters SHOULD skip computing blob and leave
+        it None -- the cheap analysis variables should still be filled.
         """
         return FrameState()
 
     def restore(self, env, blob: bytes) -> None:
         """Inverse of capture().blob. Raise if the backend has no savestate."""
         raise NotImplementedError(f"{self.name} adapter has no in-memory savestate")
+
+    def render(self, env):
+        """Return the current RGB frame (H,W,3) uint8 for display.
+
+        Default assumes the Gymnasium contract (env.render() with the env made
+        using render_mode="rgb_array"). Adapters for non-standard envs override
+        this (e.g. old-gym's env.render(mode="rgb_array")).
+        """
+        return env.render()
 
     def close(self, env) -> None:
         env.close()
