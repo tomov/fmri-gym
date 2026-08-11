@@ -1,0 +1,9 @@
+# Core (engine-agnostic)
+gymnasium>=1.0
+pygame
+numpy
+
+# Backends (install what you need)
+ale-py            # Atari backend
+stable-retro      # NES/SNES/Genesis/... backend
+shimmy            # run old-`gym` envs through the gym backend

@@ -1,0 +1,7 @@
+# Session data written by fmri_play.py
+data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
