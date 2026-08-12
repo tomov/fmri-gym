@@ -1,10 +1,11 @@
 """VGDL adapter (Video Game Description Language games).
 
 Wraps the VGDLEnv from ccolas/language_and_experience behind the standard
-EnvAdapter interface. VGDL is built on OLD gym (0.26) and needs numpy<2, so it
-CANNOT share an env with the gymnasium/numpy-2 backends -- run VGDL curricula in
-the `language_and_experience` conda env. The fmri_gym core imports fine there
-(it needs only pygame + numpy), which is the whole point of the adapter split.
+EnvAdapter interface. The VGDL source has been ported from old gym to
+gymnasium (see that repo's `dbp` branch), so it runs in the SAME numpy-2 env as
+the ale/retro/gym backends -- no separate conda env needed. Point the adapter
+at the checkout via the phase "repo" field or the VGDL_REPO env var, and add it
+to PYTHONPATH so `src.vgdl...` is importable.
 
 VGDL specifics handled here:
 - construction is by file paths, not an env id:

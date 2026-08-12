@@ -7,21 +7,20 @@ uniform display, scanner-trigger sync, a declarative curriculum of phases, and
 compact reconstructable per-frame logging — and works across game engines
 through small pluggable **adapters**. Ships with three:
 
-| Backend (`"backend"`) | Games | Engine | conda env |
-|---|---|---|---|
-| `ale`   | Atari 2600 (`ALE/Pong-v5`, …) | ALE / Stella | `fmri-gym` |
-| `retro` | NES / SNES / Genesis / GB / … (`Airstriker-Genesis-v0`, …) | stable-retro / libretro | `fmri-gym` |
-| `gym`   | **any** Gymnasium env (`CartPole-v1`, MuJoCo, Box2D, toy_text, …); old-`gym` envs via shimmy | various | `fmri-gym` |
-| `vgdl`  | VGDL games (`aliens`, `beesAndBirds`, …) from ccolas/language_and_experience | py-vgdl / pygame | `language_and_experience` |
+| Backend (`"backend"`) | Games | Engine |
+|---|---|---|
+| `ale`   | Atari 2600 (`ALE/Pong-v5`, …) | ALE / Stella |
+| `retro` | NES / SNES / Genesis / GB / … (`Airstriker-Genesis-v0`, …) | stable-retro / libretro |
+| `gym`   | **any** Gymnasium env (`CartPole-v1`, MuJoCo, Box2D, toy_text, …); old-`gym` envs via shimmy | various |
+| `vgdl`  | VGDL games (`aliens`, `beesAndBirds`, …) from ccolas/language_and_experience | py-vgdl / pygame |
 
-> **One framework, sometimes several conda envs.** The `ale`/`retro`/`gym`
-> backends coexist in one env (`fmri-gym`, numpy 2). The `vgdl` backend is built
-> on *old* `gym` and requires `numpy<2` + `setuptools<81`, which is
-> irreconcilable with that — so VGDL curricula run in the separate
-> `language_and_experience` env. This is a dependency reality, not a design
-> split: the framework *core* needs only `pygame`+`numpy` and imports cleanly in
-> both envs; adapters are imported lazily, so each env only needs the backends
-> it uses. Same code, same curriculum schema, same output format everywhere.
+> **All four backends run in ONE env and ONE process.** Verified: a single
+> session with ALE + retro + gym + VGDL blocks back-to-back. VGDL originally
+> required *old* `gym` + `numpy<2`, which conflicted with the numpy-2 backends;
+> that's now resolved by porting the VGDL source to gymnasium (see
+> `../language_and_experience`, `dbp` branch). Adapters are still imported
+> lazily, so an env only needs the backends a curriculum actually uses. Same
+> code, same curriculum schema, same output format everywhere.
 
 It is the generalization of two single-engine siblings — `../ALE-examples`
 (Atari) and `../stable-retro-examples` (retro) — and mirrors the fMRI/MEG tasks
@@ -93,9 +92,9 @@ python fmri_play.py --subject sub-01 --dummy-trigger
 # Your own curriculum:
 python fmri_play.py --subject sub-01 --curriculum configs/demo_mixed.json
 
-# VGDL games run in their own conda env (numpy<2):
-conda activate language_and_experience
+# VGDL games (same env; point VGDL_REPO at the language_and_experience checkout):
 VGDL_REPO=~/Documents/projects/DBP/language_and_experience \
+PYTHONPATH=~/Documents/projects/DBP/language_and_experience \
   python fmri_play.py --subject sub-01 --curriculum configs/demo_vgdl.json
 ```
 
@@ -201,25 +200,33 @@ r.unwrapped.em.set_state(d["states"][10]); r.unwrapped.data.update_ram()
 
 Of the games in the DBP survey, ~15 already expose a Gymnasium API and drop
 straight into the `gym` backend; stable-retro titles use the `retro` backend;
-and the VGDL games use the `vgdl` backend. Each new game typically needs only a
-per-game **keymap** and, if its `Discrete` actions aren't self-evident, a `keys`
-override.
+and the VGDL games use the `vgdl` backend (their source was ported from old
+`gym` to gymnasium so they run in the same numpy-2 env — see below).
 
-**old-`gym` games (chess, hanoi, Sokoban, Baba, NetHack).** These load through
-**shimmy** with `"legacy_gym": true` (routed via `GymV21Environment-v0`). One
-caveat learned the hard way: shimmy's v0.21 compat calls the removed `.seed()`
-method, and `gym==0.26` itself is incompatible with `numpy>=2`. So, like VGDL,
-these are best run in a dedicated `numpy<2` env with the matching `gym`/game
-package installed. The `legacy_gym` code path exists in `default.py`; wire up a
-specific game once its package is installed in such an env.
+**old-`gym` games (chess, hanoi, Sokoban, Baba, NetHack).** Two options: (a)
+**port the source to gymnasium**, as done for VGDL — usually a small mechanical
+diff (swap `gym`→`gymnasium`, fix removed `np.*` aliases and `pkg_resources`);
+or (b) run them via **shimmy** with `"legacy_gym": true` (routed via
+`GymV21Environment-v0`) in a dedicated `numpy<2` env. Note shimmy's v0.21 compat
+calls the removed `.seed()` and `gym==0.26` is incompatible with `numpy>=2`, so
+(a) is usually cleaner. The `legacy_gym` code path exists in `default.py`.
+
+**Porting an old-`gym` game to gymnasium (the VGDL recipe).** For
+`language_and_experience` the whole change was: `import gym`→`import gymnasium
+as gym` across the env/registration/play files; skip `Space.__init__` in a
+custom variable-length space; replace removed `np.float` with `float`; and drop
+`pkg_resources` (gone in setuptools≥81) by resolving data dirs relative to
+`__file__`. Result: VGDL runs under gymnasium 1.3 + numpy 2.4 in the same env as
+every other backend.
 
 ## Future work / TODO
 
 - [x] Configurable **state stride** (`"state_stride": K`) — done.
-- [x] **VGDL backend** (ccolas/language_and_experience) — done.
+- [x] **VGDL backend** (ccolas/language_and_experience), ported to gymnasium so
+      it runs in the same env as the other backends — done.
 - [ ] Finish the **old-`gym` / shimmy** path against a real game (Sokoban,
-      chess) in a `numpy<2` env; currently the code path exists but is untested
-      end-to-end (blocked on installing a game package).
+      chess) — either port its source (VGDL recipe above) or run via shimmy in a
+      `numpy<2` env; code path exists but is untested end-to-end.
 - [ ] **Photodiode sync square** and **LSL / parallel-port markers** for
       MEG/EEG-grade timing (see `../mario_task/markers.py`); fMRI's slow HRF
       makes the `=`-anchored software clock adequate.
