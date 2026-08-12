@@ -50,7 +50,6 @@ For the `vgdl` backend see [Running VGDL games](#running-vgdl-games).
 python fmri_play.py --subject sub-01 --dummy-trigger
 
 # --- per-family demo curricula (all tested end-to-end; ~15 s per block) ---
-python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_mixed.json   # Pong + Airstriker + Crafter + MiniHack
 python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_atari.json    # 10 popular Atari games
 python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_classic.json  # all 5 classic-control
 python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_text.json     # all 5 toy_text (render RGB; turn-based, arrow keys)
@@ -58,6 +57,12 @@ python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_b
 MUJOCO_GL=egl python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_mujoco.json   # 10 MuJoCo tasks  (pip install "gymnasium[mujoco]")
 VGDL_REPO=../language_and_experience PYTHONPATH=../language_and_experience \
   python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_vgdl_all.json   # all 10 VGDL games (see below)
+
+# demo_mixed spans EVERY backend in one session (Pong/ale, Airstriker/retro,
+# Crafter, MiniHack, Aliens/vgdl, MountainCar/classic, FrozenLake/toy_text,
+# CarRacing/box2d) -- so it needs the VGDL repo (+ box2d-py, crafter, minihack):
+VGDL_REPO=../language_and_experience PYTHONPATH=../language_and_experience \
+  python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_mixed.json
 
 # A single-game demo (one JSON per candidate game, see configs/dbp_games/):
 python fmri_play.py --subject sub-01 --curriculum configs/dbp_games/atari.json
