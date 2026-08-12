@@ -1,4 +1,5 @@
 {
+  "_note": "Mixed backends in one session. VGDL (Aliens) needs VGDL_REPO=../language_and_experience + PYTHONPATH; Box2D (CarRacing) needs box2d-py; Crafter/MiniHack need their packages.",
   "curriculum": [
     {"type": "message", "text": "Pong (Atari)", "duration": 2.0},
     {"type": "fixation", "duration": 2.0},
@@ -12,6 +13,18 @@
     {"type": "message", "text": "MiniHack", "duration": 2.0},
     {"type": "fixation", "duration": 2.0},
     {"type": "game", "backend": "minihack", "game": "MiniHack-Room-5x5-v0", "mode": "episode", "n_episodes": 3, "max_duration": 15.0, "fps": 15},
+    {"type": "message", "text": "Aliens (VGDL)", "duration": 2.0},
+    {"type": "fixation", "duration": 2.0},
+    {"type": "game", "backend": "vgdl", "game": "aliens", "level": 0, "block_size": 25, "mode": "duration", "duration": 15.0, "fps": 15},
+    {"type": "message", "text": "MountainCar (classic-control)", "duration": 2.0},
+    {"type": "fixation", "duration": 2.0},
+    {"type": "game", "backend": "gym", "game": "MountainCar-v0", "mode": "episode", "n_episodes": 1, "max_duration": 15.0, "fps": 30, "keys": {"LEFT": 0, "RIGHT": 2}},
+    {"type": "message", "text": "FrozenLake (toy_text)", "duration": 2.0},
+    {"type": "fixation", "duration": 2.0},
+    {"type": "game", "backend": "gym", "game": "FrozenLake-v1", "make_kwargs": {"is_slippery": false}, "mode": "episode", "n_episodes": 2, "max_duration": 15.0, "fps": 5, "turn_based": true, "keys": {"LEFT": 0, "DOWN": 1, "RIGHT": 2, "UP": 3}},
+    {"type": "message", "text": "CarRacing (Box2D)", "duration": 2.0},
+    {"type": "fixation", "duration": 2.0},
+    {"type": "game", "backend": "gym", "game": "CarRacing-v3", "mode": "episode", "n_episodes": 1, "max_duration": 15.0, "fps": 30},
     {"type": "fixation", "duration": 4.0},
     {"type": "survey", "questions": ["I was fully absorbed in the games.", "The games were too difficult."]}
   ]

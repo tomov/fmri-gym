@@ -56,7 +56,7 @@ python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_c
 python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_text.json     # all 5 toy_text (render RGB; turn-based, arrow keys)
 python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_box2d.json     # LunarLander, BipedalWalker, CarRacing  (pip install swig box2d-py)
 MUJOCO_GL=egl python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_mujoco.json   # 10 MuJoCo tasks  (pip install "gymnasium[mujoco]")
-VGDL_REPO=/path/to/language_and_experience PYTHONPATH=/path/to/language_and_experience \
+VGDL_REPO=../language_and_experience PYTHONPATH=../language_and_experience \
   python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_vgdl_all.json   # all 10 VGDL games (see below)
 
 # A single-game demo (one JSON per candidate game, see configs/dbp_games/):
@@ -157,18 +157,19 @@ The `vgdl` backend drives the VGDL games from a gymnasium-ported fork:
 Because it runs under gymnasium + numpy 2, no separate conda env is needed — the
 same `fmri-gym` env works.
 
-1. Clone the fork (the `dbp` branch has the gymnasium port):
+1. Clone the fork (the `dbp` branch has the gymnasium port) **as an adjacent
+   repo** — the commands below assume it sits next to `fmri-gym`:
 
    ```bash
-   git clone -b dbp https://github.com/tomov/language_and_experience.git
+   git clone -b dbp https://github.com/tomov/language_and_experience.git ../language_and_experience
    ```
 
 2. Point the framework at the checkout and add it to `PYTHONPATH` (so
    `src.vgdl...` is importable), then run a VGDL curriculum:
 
    ```bash
-   VGDL_REPO=/path/to/language_and_experience \
-   PYTHONPATH=/path/to/language_and_experience \
+   VGDL_REPO=../language_and_experience \
+   PYTHONPATH=../language_and_experience \
      python fmri_play.py --subject sub-01 --curriculum configs/demo_vgdl_all.json
    ```
 
