@@ -26,7 +26,10 @@ def build_demo_curriculum():
     return [
         {"type": "message", "text": "Pong (Atari)", "duration": 2.0},
         {"type": "fixation", "duration": 2.0},
-        {"type": "game", "backend": "ale", "game": "ALE/Pong-v5", "mode": "duration", "duration": 10.0, "fps": 30},
+        # Pong's paddle actions are RIGHT=2 / LEFT=3; remap them onto the
+        # up/down arrows, which read more naturally for a vertical paddle.
+        {"type": "game", "backend": "ale", "game": "ALE/Pong-v5", "mode": "duration",
+         "duration": 10.0, "fps": 30, "keys": {"UP": 2, "DOWN": 3}},
 
         {"type": "message", "text": "Airstriker (Genesis)", "duration": 2.0},
         {"type": "fixation", "duration": 2.0},

@@ -154,7 +154,10 @@ def _COMMON_KEYS(pygame_module) -> dict:
     names += [chr(c) for c in range(ord("A"), ord("Z") + 1)]
     names += [str(d) for d in range(10)]
     for n in names:
-        attr = "K_" + (n.lower() if len(n) == 1 else n.lower())
+        # pygame constants: single letters are lowercase (K_a), everything else
+        # is uppercase (K_UP, K_SPACE, K_RETURN, K_0). Getting this wrong makes
+        # arrows/space undetectable -> every arrow/space action becomes NOOP.
+        attr = "K_" + (n.lower() if (len(n) == 1 and n.isalpha()) else n)
         code = getattr(pygame_module, attr, None)
         if code is not None:
             _COMMON_CACHE[code] = n

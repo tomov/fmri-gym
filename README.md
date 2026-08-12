@@ -39,8 +39,9 @@ pip install -r requirements.txt
 > If your default pip index is a private registry, add
 > `--index-url https://pypi.org/simple`.
 
-stable-retro needs game ROMs imported once (see the stable-retro docs); Atari
-ROMs ship with `ale-py`. For the `vgdl` backend see [Running VGDL games](#running-vgdl-games).
+Atari ROMs ship with `ale-py`. For the `retro` backend you must supply and
+import game ROMs once — see [Running stable-retro games](#running-stable-retro-games).
+For the `vgdl` backend see [Running VGDL games](#running-vgdl-games).
 
 ## Quick start
 
@@ -95,6 +96,46 @@ Runtime flow: experimenter screen (**SPACE**) → "Waiting for scanner..." →
 scanner **trigger `=`** (anchors the session clock) → curriculum phases → done.
 `ESC` quits early but still saves. Flags: `--size 1280x1024`, `--fullscreen`,
 `--save-pixels` (ALE only; see below).
+
+## Running stable-retro games
+
+stable-retro only exposes a game once it has an **integration** and the game's
+**ROM** has been imported. ROMs are matched by their SHA-1 checksum and copied
+into a data directory *inside the installed `stable_retro` package* — that's
+where they must live; there is no ROM folder in this repo, and ROM binaries
+should never be committed.
+
+- **Where ROMs go.** Import them into the package's `stable/` data dir with:
+
+  ```bash
+  python -m retro.import /path/to/dir_of_roms/
+  ```
+
+  This scans the directory, checksums each ROM, and installs the ones that
+  match a known integration into
+  `…/site-packages/stable_retro/data/stable/<Game>/rom.<ext>`. Airstriker
+  (used by the demos) ships with stable-retro, so it needs no import.
+
+- **Games without a built-in integration** (the homebrew titles on the DBP
+  list — Tobu Tobu Girl DX, Nomolos, Anguna) need an integration created first.
+  The companion `stable-retro-examples` repo has an `add_game.py` that, given a
+  ROM, picks the platform from the extension (`.gb`→GameBoy, `.gbc`→GbColor,
+  `.nes`→Nes, `.md`→Genesis, `.sfc`→Snes, …), copies the ROM into the package
+  data dir, and writes a minimal `data.json`/`metadata.json` so the env can be
+  created. It prints the exact `<Name>-<Platform>` id to use.
+
+Once imported, reference the env id in a game phase and it plays like any other
+backend:
+
+```jsonc
+{"type": "game", "backend": "retro", "game": "TobuTobuGirlDX-GameBoy",
+ "mode": "duration", "duration": 30.0, "fps": 60, "state_stride": 15}
+```
+
+The `configs/games/{tobutobugirldx,nomolos,anguna}.json` demos are marked
+`needs-ROM` for exactly this reason: the `retro` backend itself is verified
+(with Airstriker), but those titles won't run until you import their ROMs and
+confirm the integration name.
 
 ## Running VGDL games
 
@@ -199,13 +240,42 @@ An ordered JSON list of **phases** (bare list or `{"curriculum": [...]}`):
 
 ### Keymaps
 
+Each backend builds a default keyboard→action map:
+
 - **ale**: built from the game's action meanings (arrows move, SPACE fires).
 - **retro**: keyboard → console buttons (arrows move; Z/X/C = A/B/C; ENTER =
   start); multiple held keys combine (e.g. RIGHT+Z).
 - **gym**: a generic default (arrows → first Discrete actions, or ±limits on
   Box dims). Because a bare `Discrete(n)` has no inherent meaning, **specify
-  `keys` per game** for anything non-obvious, e.g. `{"LEFT": 0, "RIGHT": 1}` for
-  CartPole. Combos use `"LEFT+SPACE"`.
+  `keys` per game** for anything non-obvious.
+
+### Remapping keys (the `keys` field)
+
+Any game phase can override the mapping with a `keys` dict of
+`"<key(s)>": <action>`. The keys are pygame names (`UP`, `DOWN`, `LEFT`,
+`RIGHT`, `SPACE`, `RETURN`, letters `A`–`Z`, digits) and `<action>` is the
+action the env expects — an **integer** for a `Discrete` space (ale, gym,
+vgdl, …). Combine keys with `+` (e.g. `"UP+SPACE"`). The most specific fully-held
+combo wins, so a combo overrides its parts.
+
+To find the action indices for an Atari game, read its meanings:
+
+```python
+import gymnasium as gym, ale_py; gym.register_envs(ale_py)
+gym.make("ALE/Pong-v5").unwrapped.get_action_meanings()
+# ['NOOP', 'FIRE', 'RIGHT', 'LEFT', 'RIGHTFIRE', 'LEFTFIRE']  -> RIGHT=2, LEFT=3
+```
+
+**Example — Pong on up/down arrows** (its paddle is `RIGHT`=2 / `LEFT`=3):
+
+```jsonc
+{"type": "game", "backend": "ale", "game": "ALE/Pong-v5",
+ "mode": "duration", "duration": 30.0,
+ "keys": {"UP": 2, "DOWN": 3}}      // UP = paddle up, DOWN = paddle down; SPACE still serves (FIRE=1)
+```
+
+`configs/games/atari.json` and the built-in demo both use this Pong mapping.
+CartPole similarly uses `{"LEFT": 0, "RIGHT": 1}`.
 
 ## Output & data format
 
