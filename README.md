@@ -49,34 +49,22 @@ For the `vgdl` backend see [Running VGDL games](#running-vgdl-games).
 # Built-in mixed demo: Pong, Airstriker, and Crafter, back to back
 python fmri_play.py --subject sub-01 --dummy-trigger
 
-# Your own curriculum:
-python fmri_play.py --subject sub-01 --curriculum configs/demo_mixed.json
+# --- per-family demo curricula (all tested end-to-end; ~10 s per block) ---
+python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_mixed.json   # Pong + Airstriker + Crafter + MiniHack
+python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_atari.json    # 10 popular Atari games
+python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_classic.json  # all 5 classic-control
+python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_text.json     # all 5 toy_text (they DO render)
+python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_box2d.json     # LunarLander, BipedalWalker, CarRacing  (pip install swig box2d-py)
+MUJOCO_GL=egl python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_mujoco.json   # 10 MuJoCo tasks  (pip install "gymnasium[mujoco]")
+VGDL_REPO=/path/to/language_and_experience PYTHONPATH=/path/to/language_and_experience \
+  python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_vgdl_all.json   # all 10 VGDL games (see below)
 
 # A single-game demo (one JSON per candidate game, see configs/dbp_games/):
 python fmri_play.py --subject sub-01 --curriculum configs/dbp_games/atari.json
 ```
 
-For VGDL games see [Running VGDL games](#running-vgdl-games) below.
-
-### Per-family demo curricula
-
-Ready-made curricula that loop through a whole family of games (all tested
-end-to-end; each block ~10 s):
-
-| curriculum | contents | extra setup |
-|---|---|---|
-| `configs/demo_mixed.json` | Pong + Airstriker + Crafter + MiniHack | crafter, minihack |
-| `configs/dbp_games/demo_atari.json` | 10 popular Atari games | — (ships with `ale-py`) |
-| `configs/dbp_games/demo_classic.json` | all 5 classic-control | — |
-| `configs/dbp_games/demo_text.json` | all 5 toy_text (they **do** render) | — |
-| `configs/dbp_games/demo_box2d.json` | LunarLander, BipedalWalker, CarRacing | `pip install swig box2d-py` |
-| `configs/dbp_games/demo_mujoco.json` | 10 MuJoCo tasks | `pip install "gymnasium[mujoco]"`; set `MUJOCO_GL=egl` |
-| `configs/dbp_games/demo_vgdl.json` | all 10 VGDL games | `VGDL_REPO` + `PYTHONPATH` (see below) |
-
-```bash
-python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/dbp_games/demo_atari.json
-MUJOCO_GL=egl python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/dbp_games/demo_mujoco.json
-```
+Drop `--dummy-trigger` for a real session (then press SPACE, then wait for the
+`=` scanner trigger). For VGDL setup see [Running VGDL games](#running-vgdl-games).
 
 Note: **MuJoCo and Box2D use continuous (`Box`) action spaces** — the default
 keymap pushes arrows to each dim's limit, so they render and log fine but aren't
@@ -181,7 +169,7 @@ same `fmri-gym` env works.
    ```bash
    VGDL_REPO=/path/to/language_and_experience \
    PYTHONPATH=/path/to/language_and_experience \
-     python fmri_play.py --subject sub-01 --curriculum configs/dbp_games/demo_vgdl.json
+     python fmri_play.py --subject sub-01 --curriculum configs/demo_vgdl_all.json
    ```
 
    `VGDL_REPO` locates the game/level/sprite files; a phase can also override it
