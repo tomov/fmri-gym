@@ -1,8 +1,13 @@
 """MiniHack adapter (facebookresearch/minihack, NetHack Learning Environment).
 
 MiniHack's default observation is ASCII/tty and env.render() returns None, so we
-request a "pixel" observation and display that. Actions are 8 compass directions
-(N,E,S,W,NE,SE,SW,NW -> Discrete(8)); arrows map to the cardinal ones.
+request a pixel observation and display that. By default we show `pixel_crop` --
+a 144x144 square window centered on the agent -- because the full `pixel`
+observation is the entire 80-column NetHack terminal (336x1264, ~3.8:1) in which
+a small room fills only a few percent of the frame, so aspect-fitting it makes
+the game look tiny. Set the phase field "full_screen": true to display the whole
+`pixel` frame instead. Actions are 8 compass directions (N,E,S,W,NE,SE,SW,NW ->
+Discrete(8)); arrows map to the cardinal ones.
 
 No savestate API -> reconstruction is via seed + action replay (deterministic
 under reset(seed=)). The full obs dict (glyphs, blstats, message, ...) is the
@@ -21,7 +26,6 @@ from .base import EnvAdapter, FrameState, KeySpec
 
 # Cardinal arrows -> compass action indices (N=0, E=1, S=2, W=3).
 _KEYS = {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3}
-_PIXEL_KEY = "pixel"
 
 
 class MiniHackAdapter(EnvAdapter):
@@ -29,10 +33,13 @@ class MiniHackAdapter(EnvAdapter):
 
     def make(self, spec):
         import minihack  # noqa: F401  (registers MiniHack-* env ids)
+        # Prefer the agent-centered square crop for display; the full terminal
+        # ("pixel") only looks good with "full_screen": true.
+        self._pixel_key = "pixel" if spec.get("full_screen") else "pixel_crop"
         keys = tuple(spec.get("observation_keys",
-                              ("pixel", "glyphs", "blstats", "message")))
-        if _PIXEL_KEY not in keys:
-            keys = (_PIXEL_KEY,) + keys
+                              (self._pixel_key, "glyphs", "blstats", "message")))
+        if self._pixel_key not in keys:
+            keys = (self._pixel_key,) + keys
         env = gym.make(spec["game"], observation_keys=keys)
         self._last = None
         return env
@@ -50,7 +57,7 @@ class MiniHackAdapter(EnvAdapter):
 
     def render(self, env):
         # Display the pixel observation (env.render() is None for MiniHack).
-        return np.asarray(self._last[_PIXEL_KEY])
+        return np.asarray(self._last[self._pixel_key])
 
     def capture(self, env, obs, info, want_blob=True) -> FrameState:
         self._last = obs
