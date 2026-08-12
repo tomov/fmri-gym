@@ -68,8 +68,25 @@ class VGDLAdapter(EnvAdapter):
             repo, "games", f"{game}_v0", f"{game}_lvl{level}.txt")
         env = self._VGDLEnv(game_file=game_file, level_file=level_file,
                             obs_type="objects", block_size=block_size)
-        env.render(mode="rgb_array")  # lazily init the renderer before reset
+        # VGDL's own renderer calls pygame.display.set_mode(), which would
+        # HIJACK and shrink our shared fMRI window to the game's tiny size
+        # (the "upper-left crop" bug). Instead attach an OFFSCREEN renderer that
+        # draws to a plain Surface; we read the frame from it and never touch
+        # the display. (The display must already be initialised by our Display,
+        # which it is by the time a game phase runs, so sprite convert_alpha
+        # works.)
+        self._attach_offscreen_renderer(env)
         return env
+
+    def _attach_offscreen_renderer(self, env):
+        import pygame
+        from src.vgdl.render import PygameRenderer
+        r = PygameRenderer(env.game, env.render_block_size)
+        r.headless = True
+        r.screen = pygame.Surface(r.screen_dims)   # offscreen draw target
+        r.screen.fill((255, 255, 255))
+        r.background = r.screen.copy()
+        env.renderer = r
 
     def keymap(self, env) -> KeySpec:
         combos = {frozenset([k]): idx for k, idx in _KEYS.items()}
@@ -82,7 +99,15 @@ class VGDLAdapter(EnvAdapter):
         return env.reset(with_img=False)
 
     def render(self, env):
-        return env.render(mode="rgb_array")
+        import numpy as np
+        import pygame
+        # Draw to the offscreen surface and read it directly. We deliberately do
+        # NOT call env.render()/update_display(), which would push to (and
+        # resize) the display surface.
+        r = env.renderer
+        r.draw_all()
+        return np.flipud(np.rot90(
+            pygame.surfarray.array3d(r.screen).astype(np.uint8)))
 
     def capture(self, env, obs, info, want_blob=True) -> FrameState:
         variables = {}
