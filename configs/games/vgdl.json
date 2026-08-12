@@ -1,0 +1,33 @@
+{
+  "_game": "VGDL (Aliens)",
+  "_source": "https://github.com/tomov/language_and_experience/tree/dbp",
+  "_status": "verified",
+  "curriculum": [
+    {
+      "type": "message",
+      "text": "VGDL (Aliens)",
+      "duration": 2.0
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    },
+    {
+      "type": "game",
+      "backend": "vgdl",
+      "game": "aliens",
+      "level": 0,
+      "block_size": 25,
+      "mode": "duration",
+      "duration": 30.0,
+      "fps": 15,
+      "_source": "https://github.com/tomov/language_and_experience/tree/dbp",
+      "_status": "verified",
+      "_note": "Set VGDL_REPO + PYTHONPATH to the fork checkout. Games: aliens, beesAndBirds, avoidGeorge, jaws, missile_command, plaqueAttack, portals, preconditions, pushBoulders, relational."
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    }
+  ]
+}

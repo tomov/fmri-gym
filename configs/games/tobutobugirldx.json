@@ -1,0 +1,32 @@
+{
+  "_game": "Tobu Tobu Girl DX",
+  "_source": "https://github.com/Farama-Foundation/stable-retro/",
+  "_status": "unverified",
+  "curriculum": [
+    {
+      "type": "message",
+      "text": "Tobu Tobu Girl DX",
+      "duration": 2.0
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    },
+    {
+      "type": "game",
+      "backend": "retro",
+      "game": "tobutobugirldx-GbColor",
+      "mode": "duration",
+      "duration": 30.0,
+      "fps": 60,
+      "state_stride": 15,
+      "_source": "https://github.com/Farama-Foundation/stable-retro/",
+      "_status": "unverified",
+      "_note": "stable-retro GBC homebrew. Confirm the integration name and import the ROM (python -m retro.import). Keymap = GBC buttons (arrows + Z/X)."
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    }
+  ]
+}

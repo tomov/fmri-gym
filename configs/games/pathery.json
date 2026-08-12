@@ -1,0 +1,32 @@
+{
+  "_game": "Pathery",
+  "_source": "https://github.com/SandSnip3r/PatheryEnv",
+  "_status": "unsupported-text-only",
+  "_verified": "pip install git+.../PatheryEnv. 3 ids (pathery_env/Pathery-*). render_mode='rgb_array' raises AssertionError -- only 'ansi' text. action_space MultiDiscrete([9,17]) (place a wall). No pixel frame + placement actions -> needs a text->image renderer and a selection input. Not runnable in the visual framework as-is.",
+  "curriculum": [
+    {
+      "type": "message",
+      "text": "Pathery",
+      "duration": 2.0
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    },
+    {
+      "backend": "gym",
+      "game": "pathery_env/Pathery-RandomNormal",
+      "import_module": "pathery_env",
+      "mode": "episode",
+      "n_episodes": 3,
+      "max_duration": 120.0,
+      "fps": 5,
+      "_note": "NOT visually runnable: ansi-only render, MultiDiscrete placement actions. Kept for reference; would need a custom text-render + selection adapter.",
+      "type": "game"
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    }
+  ]
+}

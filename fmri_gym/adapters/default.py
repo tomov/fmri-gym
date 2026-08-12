@@ -23,6 +23,13 @@ class DefaultAdapter(EnvAdapter):
     name = "gym"
 
     def make(self, spec):
+        # Many third-party envs only register their ids as a side effect of
+        # importing their package (crafter, minihack, tile_match_gym, ...).
+        # A curriculum can name that module via "import_module".
+        import_mod = spec.get("import_module")
+        if import_mod:
+            import importlib
+            importlib.import_module(import_mod)
         kwargs = dict(spec.get("make_kwargs", {}))
         kwargs.setdefault("render_mode", "rgb_array")
         if spec.get("legacy_gym"):

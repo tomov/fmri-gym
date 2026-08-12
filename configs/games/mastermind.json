@@ -1,0 +1,31 @@
+{
+  "_game": "Mastermind",
+  "_source": "https://github.com/JensBosch/MastermindGymnasiumEnvironment",
+  "_status": "cannot-install",
+  "_verified": "Requires Python>=3.13; fmri-gym is 3.11 -> pip refuses. Also a turn-based guessing game (would need custom input). Revisit in a py3.13 env if needed.",
+  "curriculum": [
+    {
+      "type": "message",
+      "text": "Mastermind",
+      "duration": 2.0
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    },
+    {
+      "backend": "gym",
+      "game": "Mastermind-v0",
+      "mode": "episode",
+      "n_episodes": 5,
+      "max_duration": 120.0,
+      "fps": 5,
+      "_note": "Blocked on Python>=3.13. Not installed/verified.",
+      "type": "game"
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    }
+  ]
+}

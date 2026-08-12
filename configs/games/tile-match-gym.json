@@ -1,0 +1,41 @@
+{
+  "_game": "Tile Match",
+  "_source": "https://github.com/akshilpatel/tile-match-gym",
+  "_status": "verified-display",
+  "_verified": "pip install tile-match-gym. Runs via the default gym backend for display+logging. NOT naturally keyboard-playable: action_space is Discrete(84) (choose a tile swap), so there is no arrow-key mapping -- a human would need a pointer/selection input mode.",
+  "curriculum": [
+    {
+      "type": "message",
+      "text": "Tile Match",
+      "duration": 2.0
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    },
+    {
+      "type": "game",
+      "backend": "gym",
+      "game": "TileMatch-v0",
+      "import_module": "tile_match_gym",
+      "mode": "episode",
+      "n_episodes": 3,
+      "max_duration": 120.0,
+      "fps": 10,
+      "make_kwargs": {
+        "num_rows": 7,
+        "num_cols": 7,
+        "num_colours": 4,
+        "num_moves": 20,
+        "colourless_specials": [],
+        "colour_specials": [],
+        "render_mode": "rgb_array"
+      },
+      "_note": "Constructor requires board kwargs (passed via make_kwargs). render_mode=rgb_array -> (324,273,3). obs is an OrderedDict. Discrete(84) swap actions -> no keyboard keymap."
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    }
+  ]
+}

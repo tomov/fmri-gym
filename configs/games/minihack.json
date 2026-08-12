@@ -1,0 +1,31 @@
+{
+  "_game": "MiniHack",
+  "_source": "https://github.com/facebookresearch/minihack",
+  "_status": "verified",
+  "_verified": "pip install minihack (needs setuptools<81 for pkg_resources; downgrades gymnasium to 1.2). Runs via the 'minihack' backend: pixel observation displayed, Discrete(8) compass (arrows=N/E/S/W), blstats/glyphs/message logged. No savestate (seed+replay).",
+  "curriculum": [
+    {
+      "type": "message",
+      "text": "MiniHack",
+      "duration": 2.0
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    },
+    {
+      "backend": "minihack",
+      "game": "MiniHack-Room-5x5-v0",
+      "mode": "episode",
+      "n_episodes": 3,
+      "max_duration": 120.0,
+      "fps": 15,
+      "_note": "Many env ids (MiniHack-Room-*, MiniHack-MazeWalk-*, MiniHack-River-*, ...). Diagonals via a keys override (NE=4,SE=5,SW=6,NW=7).",
+      "type": "game"
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    }
+  ]
+}

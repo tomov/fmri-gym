@@ -1,13 +1,22 @@
 # Core (engine-agnostic)
-gymnasium>=1.0
+gymnasium
 pygame
 numpy
+setuptools<81          # some backends (minihack) import pkg_resources
 
 # Backends (install what you need)
-ale-py            # Atari backend
-stable-retro      # NES/SNES/Genesis/... backend
-shimmy            # run old-`gym` envs through the gym backend
+ale-py                 # Atari backend
+stable-retro           # NES/SNES/Genesis/... backend
+shimmy                 # run old-`gym` envs through the gym backend
+crafter                # `crafter` backend
+minihack               # `minihack` backend (pulls nle; pins gymnasium 1.2)
+tile-match-gym         # `gym` backend, display+logging only (pulls numba->numpy<2)
 
-# The `vgdl` backend runs in the SEPARATE `language_and_experience` conda env
-# (old gym + numpy<2 + setuptools<81); do NOT install it here. The fmri_gym
-# core needs only pygame+numpy and imports fine in that env too.
+# VGDL (`vgdl` backend) runs from a gymnasium-ported fork; clone it and set
+# VGDL_REPO + PYTHONPATH (see README "Running VGDL games"):
+#   https://github.com/tomov/language_and_experience/tree/dbp
+
+# NOTE on pins observed in one shared env: minihack pins gymnasium==1.2 and
+# tile-match-gym (numba) pins numpy==1.26. All backends (ale/retro/gym/vgdl/
+# crafter/minihack) were verified to run together under those versions. If you
+# only need a subset, install fewer backends and the pins relax.

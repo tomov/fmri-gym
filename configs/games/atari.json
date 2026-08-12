@@ -1,0 +1,31 @@
+{
+  "_game": "Atari (Pong)",
+  "_source": "https://ale.farama.org/environments/",
+  "_status": "verified",
+  "curriculum": [
+    {
+      "type": "message",
+      "text": "Atari (Pong)",
+      "duration": 2.0
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    },
+    {
+      "type": "game",
+      "backend": "ale",
+      "game": "ALE/Pong-v5",
+      "mode": "duration",
+      "duration": 30.0,
+      "fps": 30,
+      "_source": "https://ale.farama.org/environments/",
+      "_status": "verified",
+      "_note": "Any ALE/* env id works. Keymap auto-derived from action meanings."
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    }
+  ]
+}

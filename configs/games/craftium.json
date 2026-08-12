@@ -1,0 +1,31 @@
+{
+  "_game": "Craftium",
+  "_source": "https://github.com/mikelma/craftium",
+  "_status": "deferred-heavy-engine",
+  "_verified": "Needs the Luanti/Minetest engine built. Env ids Craftium/<Task>-v0; Box/dict actions likely need a custom adapter. Not attempted here.",
+  "curriculum": [
+    {
+      "type": "message",
+      "text": "Craftium",
+      "duration": 2.0
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    },
+    {
+      "backend": "gym",
+      "game": "Craftium/ChopTree-v0",
+      "import_module": "craftium",
+      "mode": "duration",
+      "duration": 30.0,
+      "fps": 20,
+      "_note": "Requires building Luanti/Minetest. Deferred; likely needs a custom adapter for its action space.",
+      "type": "game"
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    }
+  ]
+}

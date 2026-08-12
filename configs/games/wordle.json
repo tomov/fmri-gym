@@ -1,0 +1,32 @@
+{
+  "_game": "Wordle",
+  "_source": "https://github.com/Mohinem/wordle-gym-environment",
+  "_status": "unsupported-text-only",
+  "_verified": "pip install git+.../wordle-gym-environment (installs top-level envs/utils; import envs.wordle_env). action_space Text(5) (type a 5-letter word); ANSI/text render only, no rgb_array. Typed-word game -> needs a bespoke text input+render, not held-key play.",
+  "curriculum": [
+    {
+      "type": "message",
+      "text": "Wordle",
+      "duration": 2.0
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    },
+    {
+      "backend": "gym",
+      "game": "Wordle-v0",
+      "import_module": "envs.wordle_env",
+      "mode": "episode",
+      "n_episodes": 6,
+      "max_duration": 180.0,
+      "fps": 5,
+      "_note": "NOT visually runnable: Text(5) action space, text render. Registration entrypoint is also fragile; use WordleEnv class directly. Kept for reference.",
+      "type": "game"
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    }
+  ]
+}

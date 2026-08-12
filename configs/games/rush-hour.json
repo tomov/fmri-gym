@@ -1,0 +1,31 @@
+{
+  "_game": "Rush Hour",
+  "_source": "https://github.com/chrplr/Rush-Hour",
+  "_status": "not-packaged",
+  "_verified": "Repo has no setup.py/pyproject -> not pip-installable. Sliding-block puzzle; would need vendoring + a custom adapter and selection input even then.",
+  "curriculum": [
+    {
+      "type": "message",
+      "text": "Rush Hour",
+      "duration": 2.0
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    },
+    {
+      "backend": "gym",
+      "game": "RushHour-v0",
+      "mode": "episode",
+      "n_episodes": 3,
+      "max_duration": 120.0,
+      "fps": 5,
+      "_note": "Not pip-installable (no packaging). Not verified.",
+      "type": "game"
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    }
+  ]
+}

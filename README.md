@@ -9,15 +9,18 @@ through small pluggable **adapters**. Ships with four:
 
 | Backend (`"backend"`) | Games | Engine |
 |---|---|---|
-| `ale`   | Atari 2600 (`ALE/Pong-v5`, …) | ALE / Stella |
-| `retro` | NES / SNES / Genesis / GB / … (`Airstriker-Genesis-v0`, …) | stable-retro / libretro |
-| `gym`   | **any** Gymnasium env (`CartPole-v1`, MuJoCo, Box2D, toy_text, …); old-`gym` envs via shimmy | various |
-| `vgdl`  | VGDL games (`aliens`, `beesAndBirds`, …) | py-vgdl / pygame |
+| `ale`      | Atari 2600 (`ALE/Pong-v5`, …) | ALE / Stella |
+| `retro`    | NES / SNES / Genesis / GB / … (`Airstriker-Genesis-v0`, …) | stable-retro / libretro |
+| `gym`      | **any** Gymnasium env (`CartPole-v1`, MuJoCo, Box2D, toy_text, …); old-`gym` envs via shimmy | various |
+| `vgdl`     | VGDL games (`aliens`, `beesAndBirds`, …) | py-vgdl / pygame |
+| `crafter`  | Crafter (open-world survival) | crafter |
+| `minihack` | MiniHack / NetHack tasks | minihack / NLE |
 
-> **All four backends run in ONE env and ONE process.** Verified: a single
-> session with ALE + retro + gym + VGDL blocks back-to-back. VGDL originally
-> required *old* `gym` + `numpy<2`, which conflicted with the numpy-2 backends;
-> that's resolved by a fork whose VGDL source is ported to gymnasium
+> **All backends run in ONE env and ONE process.** Verified: a single session
+> with ALE + retro + gym + VGDL blocks back-to-back, and each of Crafter /
+> MiniHack in turn. VGDL originally required *old* `gym` + `numpy<2`, which
+> conflicted with the numpy-2 backends; that's resolved by a fork whose VGDL
+> source is ported to gymnasium
 > ([tomov/language_and_experience @ dbp](https://github.com/tomov/language_and_experience/tree/dbp)).
 > Adapters are imported lazily, so an env only needs the backends a curriculum
 > actually uses. Same code, same curriculum schema, same output format everywhere.
@@ -58,25 +61,35 @@ For VGDL games see [Running VGDL games](#running-vgdl-games) below.
 
 There is one demo curriculum per candidate game that exposes a Gymnasium API
 (15 games). Each is a minimal `message → fixation → game → fixation` block and
-carries `_source` / `_status` / `_note` fields (extra keys the loader ignores)
-documenting its origin and what still needs confirming.
-
-Only the configs whose **backend we've run end-to-end** are `_status:
-"verified"` — `atari` (ale) and `vgdl`. The rest are `"unverified"`
-**scaffolds**: the backend is right but the exact env id, action semantics, and
-keymap must be confirmed once that third-party package is installed (its `_note`
-says how). Install the package, fix the `game` id / `keys` if needed, then run:
+carries `_source` / `_status` / `_note` fields (extra keys the loader ignores).
+Run one with:
 
 ```bash
 python fmri_play.py --subject sub-01 --curriculum configs/games/<name>.json
 ```
 
+Each was actually installed and tried in the `fmri-gym` env. Results
+(`_status` in each JSON):
+
 | config | backend | status | notes |
 |---|---|---|---|
 | `atari` | ale | ✅ verified | any `ALE/*` id |
-| `vgdl` | vgdl | ✅ verified | needs the fork checkout (see below) |
-| `tobutobugirldx`, `nomolos`, `anguna` | retro | ⚠️ scaffold | confirm integration name; import ROM |
-| `crafter`, `craftium`, `tile-match-gym`, `pathery`, `mastermind`, `2048`, `rush-hour`, `wordle`, `minihack`, `coom` | gym | ⚠️ scaffold | confirm env id / action semantics; some (COOM, craftium, mastermind, wordle, rush-hour, tile-match) likely need a custom adapter rather than the default keymap |
+| `vgdl` | vgdl | ✅ verified | needs the fork checkout (see [below](#running-vgdl-games)) |
+| `crafter` | crafter | ✅ verified | dedicated adapter (old-gym API wrapped); obs is the frame |
+| `minihack` | minihack | ✅ verified | dedicated adapter; pixel obs + 8-way compass |
+| `tile-match-gym` | gym | 🟡 display-only | runs & logs, but `Discrete(84)` swaps → no keyboard play |
+| `tobutobugirldx`, `nomolos`, `anguna` | retro | ⚠️ needs ROM | backend proven (Airstriker); import the ROM + confirm integration name |
+| `2048` | gym | ❌ broken upstream | package's own `reset()` crashes (numpy bug); no render |
+| `pathery`, `wordle` | gym | ❌ text-only | ANSI render + placement/typed actions → not a visual real-time game |
+| `mastermind` | gym | ❌ can't install | requires Python ≥3.13 (env is 3.11) |
+| `rush-hour` | gym | ❌ not packaged | repo has no `setup.py`/`pyproject` |
+| `coom`, `craftium` | gym | ⏸️ deferred | heavy engines (ViZDoom / Luanti); each needs a custom adapter |
+
+Takeaway: everything that is a **real-time visual game with a pixel frame**
+works (Atari, VGDL, Crafter, MiniHack, stable-retro, plus tile-match for
+display). The ones that don't fit are **turn-based / text / typed-input** games
+(2048-package-bug aside), which need a different input+render model than a
+scanner game loop — not a framework limitation so much as a genre mismatch.
 
 Runtime flow: experimenter screen (**SPACE**) → "Waiting for scanner..." →
 scanner **trigger `=`** (anchors the session clock) → curriculum phases → done.
@@ -129,6 +142,8 @@ fmri_gym/
     retro.py        # em.get_state, get_ram, decoded info vars, console-button keymap
     default.py      # ANY gym env: rgb frames, seed+replay, obs-as-state
     vgdl.py         # VGDLEnv: get_state/set_state, symbolic grid + events
+    crafter.py      # old-gym-API wrapper; obs is the frame; achievements
+    minihack.py     # pixel obs + compass keymap; blstats/glyphs/message
 fmri_play.py        # CLI entry point
 configs/            # example curricula
 ```

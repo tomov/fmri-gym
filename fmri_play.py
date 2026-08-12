@@ -26,19 +26,15 @@ def build_demo_curriculum():
     return [
         {"type": "message", "text": "Pong (Atari)", "duration": 2.0},
         {"type": "fixation", "duration": 2.0},
-        {"type": "game", "backend": "ale", "game": "ALE/Pong-v5",
-         "mode": "duration", "duration": 20.0, "fps": 30},
+        {"type": "game", "backend": "ale", "game": "ALE/Pong-v5", "mode": "duration", "duration": 10.0, "fps": 30},
 
         {"type": "message", "text": "Airstriker (Genesis)", "duration": 2.0},
         {"type": "fixation", "duration": 2.0},
-        {"type": "game", "backend": "retro", "game": "Airstriker-Genesis-v0",
-         "mode": "duration", "duration": 20.0, "fps": 60},
+        {"type": "game", "backend": "retro", "game": "Airstriker-Genesis-v0", "mode": "duration", "duration": 10.0, "fps": 60},
 
         {"type": "message", "text": "CartPole", "duration": 2.0},
         {"type": "fixation", "duration": 2.0},
-        {"type": "game", "backend": "gym", "game": "CartPole-v1",
-         "mode": "episode", "n_episodes": 3, "max_duration": 30.0, "fps": 30,
-         "keys": {"LEFT": 0, "RIGHT": 1}},
+        {"type": "game", "backend": "gym", "game": "CartPole-v1", "mode": "episode", "n_episodes": 3, "max_duration": 30.0, "fps": 30, "keys": {"LEFT": 0, "RIGHT": 1}},
 
         {"type": "fixation", "duration": 4.0},
         {"type": "survey", "questions": [

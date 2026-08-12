@@ -1,0 +1,30 @@
+{
+  "_game": "COOM",
+  "_source": "https://github.com/TTomilin/COOM",
+  "_status": "deferred-needs-adapter",
+  "_verified": "ViZDoom-based continual-RL suite with its own env factory (not gymnasium.make). Needs a dedicated adapter + ViZDoom + Doom WADs. Not attempted here.",
+  "curriculum": [
+    {
+      "type": "message",
+      "text": "COOM",
+      "duration": 2.0
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    },
+    {
+      "backend": "gym",
+      "game": "COOM-see-note",
+      "mode": "duration",
+      "duration": 30.0,
+      "fps": 35,
+      "_note": "Needs a custom COOM adapter (its own make API) + ViZDoom + scenario WADs. Deferred.",
+      "type": "game"
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    }
+  ]
+}

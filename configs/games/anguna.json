@@ -1,0 +1,32 @@
+{
+  "_game": "Anguna",
+  "_source": "https://github.com/Farama-Foundation/stable-retro/",
+  "_status": "unverified",
+  "curriculum": [
+    {
+      "type": "message",
+      "text": "Anguna",
+      "duration": 2.0
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    },
+    {
+      "type": "game",
+      "backend": "retro",
+      "game": "Anguna-GbAdvance",
+      "mode": "duration",
+      "duration": 30.0,
+      "fps": 60,
+      "state_stride": 15,
+      "_source": "https://github.com/Farama-Foundation/stable-retro/",
+      "_status": "unverified",
+      "_note": "stable-retro homebrew. Confirm the integration name/platform and import the ROM."
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    }
+  ]
+}

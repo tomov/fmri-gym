@@ -1,0 +1,32 @@
+{
+  "_game": "Crafter",
+  "_source": "https://github.com/danijar/crafter",
+  "_status": "verified",
+  "_verified": "pip install crafter; runs via the dedicated 'crafter' backend (old-gym API wrapped to gymnasium). obs is the 64x64x3 RGB frame; achievements logged as analysis var; no savestate (seed+replay).",
+  "curriculum": [
+    {
+      "type": "message",
+      "text": "Crafter",
+      "duration": 2.0
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    },
+    {
+      "type": "game",
+      "backend": "crafter",
+      "game": "crafter",
+      "mode": "episode",
+      "n_episodes": 1,
+      "max_duration": 300.0,
+      "fps": 15,
+      "seed": 0,
+      "_note": "Arrows move, SPACE=interact, S=sleep. Other actions (place/make) reachable via a 'keys' override onto crafter's 17-action Discrete space."
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    }
+  ]
+}

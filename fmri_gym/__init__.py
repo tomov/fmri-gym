@@ -28,4 +28,10 @@ def get_adapter(backend, **kwargs):
     if backend == "vgdl":
         from .adapters.vgdl import VGDLAdapter
         return VGDLAdapter(**kwargs)
+    if backend == "crafter":
+        from .adapters.crafter import CrafterAdapter
+        return CrafterAdapter(**kwargs)
+    if backend == "minihack":
+        from .adapters.minihack import MiniHackAdapter
+        return MiniHackAdapter(**kwargs)
     raise ValueError(f"unknown backend: {backend!r}")

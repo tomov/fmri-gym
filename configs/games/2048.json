@@ -1,0 +1,39 @@
+{
+  "_game": "2048",
+  "_source": "https://github.com/rgal/gym-2048",
+  "_status": "broken-upstream",
+  "_verified": "pip install --no-deps gym-2048 (it pins numpy~=1.14). reset() crashes in the package's own _place_random_tiles (numpy shape-mismatch bug), under both gym and gymnasium. No render(). Would need upstream patch + a custom render. Use a different 2048 env or fix the package.",
+  "curriculum": [
+    {
+      "type": "message",
+      "text": "2048",
+      "duration": 2.0
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    },
+    {
+      "type": "game",
+      "backend": "gym",
+      "game": "2048-v0",
+      "mode": "episode",
+      "n_episodes": 3,
+      "max_duration": 120.0,
+      "fps": 5,
+      "keys": {
+        "UP": 0,
+        "RIGHT": 1,
+        "DOWN": 2,
+        "LEFT": 3
+      },
+      "_source": "https://github.com/rgal/gym-2048",
+      "_status": "unverified",
+      "_note": "pip install gym-2048; `import gym_2048` registers 2048-v0. Discrete(4): 0=up,1=right,2=down,3=left. Verify mapping (older gym; may need shimmy / source port)."
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+"""MiniHack adapter (facebookresearch/minihack, NetHack Learning Environment).
+
+MiniHack's default observation is ASCII/tty and env.render() returns None, so we
+request a "pixel" observation and display that. Actions are 8 compass directions
+(N,E,S,W,NE,SE,SW,NW -> Discrete(8)); arrows map to the cardinal ones.
+
+No savestate API -> reconstruction is via seed + action replay (deterministic
+under reset(seed=)). The full obs dict (glyphs, blstats, message, ...) is the
+analysis state; we log the compact non-pixel fields and keep the pixel frame
+for display only.
+
+Requires `pkg_resources` (install setuptools<81) as minihack imports it.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import gymnasium as gym
+
+from .base import EnvAdapter, FrameState, KeySpec
+
+# Cardinal arrows -> compass action indices (N=0, E=1, S=2, W=3).
+_KEYS = {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3}
+_PIXEL_KEY = "pixel"
+
+
+class MiniHackAdapter(EnvAdapter):
+    name = "minihack"
+
+    def make(self, spec):
+        import minihack  # noqa: F401  (registers MiniHack-* env ids)
+        keys = tuple(spec.get("observation_keys",
+                              ("pixel", "glyphs", "blstats", "message")))
+        if _PIXEL_KEY not in keys:
+            keys = (_PIXEL_KEY,) + keys
+        env = gym.make(spec["game"], observation_keys=keys)
+        self._last = None
+        return env
+
+    def keymap(self, env) -> KeySpec:
+        combos = {frozenset([k]): v for k, v in _KEYS.items()}
+        return KeySpec(combos=combos, noop=0,
+                       help="Arrow keys move (N/E/S/W). Diagonals via a keys "
+                            "override (NE=4,SE=5,SW=6,NW=7).")
+
+    def reset(self, env, seed, spec):
+        obs, info = env.reset(seed=seed)
+        self._last = obs
+        return obs, info
+
+    def render(self, env):
+        # Display the pixel observation (env.render() is None for MiniHack).
+        return np.asarray(self._last[_PIXEL_KEY])
+
+    def capture(self, env, obs, info, want_blob=True) -> FrameState:
+        self._last = obs
+        variables = {}
+        # Compact symbolic fields make good analysis regressors; skip the big
+        # pixel array (it's reconstructable via seed + action replay).
+        for k in ("blstats", "glyphs", "message"):
+            if isinstance(obs, dict) and k in obs:
+                variables[k] = np.asarray(obs[k])
+        return FrameState(blob=None, variables=variables)
