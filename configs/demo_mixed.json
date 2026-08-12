@@ -2,30 +2,17 @@
   "curriculum": [
     {"type": "message", "text": "Pong (Atari)", "duration": 2.0},
     {"type": "fixation", "duration": 2.0},
-    {"type": "game", "backend": "ale", "game": "ALE/Pong-v5",
-     "mode": "duration", "duration": 20.0, "fps": 30,
-     "keys": {"UP": 2, "DOWN": 3}},
-
+    {"type": "game", "backend": "ale", "game": "ALE/Pong-v5", "mode": "duration", "duration": 10.0, "fps": 30, "keys": {"UP": 2, "DOWN": 3}},
     {"type": "message", "text": "Airstriker (Genesis)", "duration": 2.0},
     {"type": "fixation", "duration": 2.0},
-    {"type": "game", "backend": "retro", "game": "Airstriker-Genesis-v0",
-     "mode": "duration", "duration": 20.0, "fps": 60},
-
+    {"type": "game", "backend": "retro", "game": "Airstriker-Genesis-v0", "mode": "duration", "duration": 10.0, "fps": 60},
     {"type": "message", "text": "Crafter", "duration": 2.0},
     {"type": "fixation", "duration": 2.0},
-    {"type": "game", "backend": "crafter", "game": "crafter",
-     "mode": "episode", "n_episodes": 1, "max_duration": 30.0, "fps": 15,
-     "seed": 0},
-
+    {"type": "game", "backend": "crafter", "game": "crafter", "mode": "episode", "n_episodes": 1, "max_duration": 10.0, "fps": 15, "seed": 0},
     {"type": "message", "text": "MiniHack", "duration": 2.0},
     {"type": "fixation", "duration": 2.0},
-    {"type": "game", "backend": "minihack", "game": "MiniHack-Room-5x5-v0",
-     "mode": "episode", "n_episodes": 3, "max_duration": 30.0, "fps": 15},
-
+    {"type": "game", "backend": "minihack", "game": "MiniHack-Room-5x5-v0", "mode": "episode", "n_episodes": 3, "max_duration": 10.0, "fps": 15},
     {"type": "fixation", "duration": 4.0},
-    {"type": "survey", "questions": [
-      "I was fully absorbed in the games.",
-      "The games were too difficult."
-    ]}
+    {"type": "survey", "questions": ["I was fully absorbed in the games.", "The games were too difficult."]}
   ]
 }
