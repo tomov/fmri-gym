@@ -3,7 +3,7 @@
 Status of every game in the DBP survey that exposes a **Gymnasium** API (15
 games), after installing each in the `fmri-gym` conda env and actually running
 it through the framework. One demo curriculum per game lives in
-`configs/games/<name>.json`; each carries a matching `_status` / `_verified` /
+`configs/dbp_games/<name>.json`; each carries a matching `_status` / `_verified` /
 `_note`.
 
 Legend: ✅ verified · 🟡 runs, display-only · ⚠️ needs assets · ❌ doesn't fit · ⏸️ deferred

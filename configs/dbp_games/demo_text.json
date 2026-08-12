@@ -1,0 +1,99 @@
+{
+  "_demo": "All toy_text games, 2 episodes each. They DO render RGB (gymnasium pygame renderers).",
+  "curriculum": [
+    {
+      "type": "message",
+      "text": "FrozenLake",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "gym",
+      "game": "FrozenLake-v1",
+      "mode": "episode",
+      "fps": 5,
+      "n_episodes": 2,
+      "max_duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "FrozenLake8x8",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "gym",
+      "game": "FrozenLake8x8-v1",
+      "mode": "episode",
+      "fps": 5,
+      "n_episodes": 2,
+      "max_duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "CliffWalking",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "gym",
+      "game": "CliffWalking-v1",
+      "mode": "episode",
+      "fps": 5,
+      "n_episodes": 2,
+      "max_duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "Taxi",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "gym",
+      "game": "Taxi-v3",
+      "mode": "episode",
+      "fps": 5,
+      "n_episodes": 2,
+      "max_duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "Blackjack",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "gym",
+      "game": "Blackjack-v1",
+      "mode": "episode",
+      "fps": 5,
+      "n_episodes": 2,
+      "max_duration": 10.0
+    },
+    {
+      "type": "fixation",
+      "duration": 3.0
+    }
+  ]
+}

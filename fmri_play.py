@@ -22,7 +22,11 @@ from fmri_gym import Display, Session, get_adapter
 
 
 def build_demo_curriculum():
-    """Mixed-backend demo: an Atari game, a retro game, and a plain gym env."""
+    """Mixed-backend demo: an Atari game, a retro game, and a survival game.
+
+    All three are forgiving, free-roaming games (no instant game-over), so a
+    first-time human can actually play them.
+    """
     return [
         {"type": "message", "text": "Pong (Atari)", "duration": 2.0},
         {"type": "fixation", "duration": 2.0},
@@ -35,9 +39,13 @@ def build_demo_curriculum():
         {"type": "fixation", "duration": 2.0},
         {"type": "game", "backend": "retro", "game": "Airstriker-Genesis-v0", "mode": "duration", "duration": 10.0, "fps": 60},
 
-        {"type": "message", "text": "CartPole", "duration": 2.0},
+        # Crafter: an open-world survival game. You wander freely (arrows move,
+        # SPACE interacts) with no instant death -- friendlier than CartPole,
+        # which topples in ~2 s. Needs `pip install crafter`.
+        {"type": "message", "text": "Crafter", "duration": 2.0},
         {"type": "fixation", "duration": 2.0},
-        {"type": "game", "backend": "gym", "game": "CartPole-v1", "mode": "episode", "n_episodes": 3, "max_duration": 30.0, "fps": 30, "keys": {"LEFT": 0, "RIGHT": 1}},
+        {"type": "game", "backend": "crafter", "game": "crafter", "mode": "episode",
+         "n_episodes": 1, "max_duration": 20.0, "fps": 15, "seed": 0},
 
         {"type": "fixation", "duration": 4.0},
         {"type": "survey", "questions": [

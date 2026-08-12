@@ -1,0 +1,190 @@
+{
+  "_demo": "Top 10 MuJoCo tasks, up to 10s each. Set MUJOCO_GL=egl for headless.",
+  "curriculum": [
+    {
+      "type": "message",
+      "text": "Ant",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "gym",
+      "game": "Ant-v5",
+      "mode": "episode",
+      "fps": 30,
+      "n_episodes": 1,
+      "max_duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "HalfCheetah",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "gym",
+      "game": "HalfCheetah-v5",
+      "mode": "episode",
+      "fps": 30,
+      "n_episodes": 1,
+      "max_duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "Hopper",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "gym",
+      "game": "Hopper-v5",
+      "mode": "episode",
+      "fps": 30,
+      "n_episodes": 1,
+      "max_duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "Humanoid",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "gym",
+      "game": "Humanoid-v5",
+      "mode": "episode",
+      "fps": 30,
+      "n_episodes": 1,
+      "max_duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "Walker2d",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "gym",
+      "game": "Walker2d-v5",
+      "mode": "episode",
+      "fps": 30,
+      "n_episodes": 1,
+      "max_duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "Swimmer",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "gym",
+      "game": "Swimmer-v5",
+      "mode": "episode",
+      "fps": 30,
+      "n_episodes": 1,
+      "max_duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "Reacher",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "gym",
+      "game": "Reacher-v5",
+      "mode": "episode",
+      "fps": 30,
+      "n_episodes": 1,
+      "max_duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "InvertedPendulum",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "gym",
+      "game": "InvertedPendulum-v5",
+      "mode": "episode",
+      "fps": 30,
+      "n_episodes": 1,
+      "max_duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "InvertedDoublePendulum",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "gym",
+      "game": "InvertedDoublePendulum-v5",
+      "mode": "episode",
+      "fps": 30,
+      "n_episodes": 1,
+      "max_duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "Pusher",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "gym",
+      "game": "Pusher-v5",
+      "mode": "episode",
+      "fps": 30,
+      "n_episodes": 1,
+      "max_duration": 10.0
+    },
+    {
+      "type": "fixation",
+      "duration": 3.0
+    }
+  ],
+  "_note": "Continuous Box actions; the default keymap pushes arrows to action-dim limits (not really human-playable, but renders/logs)."
+}

@@ -12,6 +12,11 @@ crafter                # `crafter` backend
 minihack               # `minihack` backend (pulls nle; pins gymnasium 1.2)
 tile-match-gym         # `gym` backend, display+logging only (pulls numba->numpy<2)
 
+# Standard Gymnasium families (all via the `gym` backend; all verified to render):
+#   classic_control, toy_text  -> included with `gymnasium` above
+#   box2d   -> pip install swig box2d-py   (swig via conda is more reliable)
+#   mujoco  -> pip install "gymnasium[mujoco]"   (run with MUJOCO_GL=egl headless)
+
 # VGDL (`vgdl` backend) runs from a gymnasium-ported fork; clone it and set
 # VGDL_REPO + PYTHONPATH (see README "Running VGDL games"):
 #   https://github.com/tomov/language_and_experience/tree/dbp

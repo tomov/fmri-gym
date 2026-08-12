@@ -46,19 +46,44 @@ For the `vgdl` backend see [Running VGDL games](#running-vgdl-games).
 ## Quick start
 
 ```bash
-# Built-in mixed demo: an Atari game, a Genesis game, and CartPole, back to back
+# Built-in mixed demo: Pong, Airstriker, and Crafter, back to back
 python fmri_play.py --subject sub-01 --dummy-trigger
 
 # Your own curriculum:
 python fmri_play.py --subject sub-01 --curriculum configs/demo_mixed.json
 
-# A single-game demo (one JSON per candidate game, see configs/games/):
-python fmri_play.py --subject sub-01 --curriculum configs/games/2048.json
+# A single-game demo (one JSON per candidate game, see configs/dbp_games/):
+python fmri_play.py --subject sub-01 --curriculum configs/dbp_games/atari.json
 ```
 
 For VGDL games see [Running VGDL games](#running-vgdl-games) below.
 
-### Per-game demo configs (`configs/games/`)
+### Per-family demo curricula
+
+Ready-made curricula that loop through a whole family of games (all tested
+end-to-end; each block ~10 s):
+
+| curriculum | contents | extra setup |
+|---|---|---|
+| `configs/demo_mixed.json` | Pong + Airstriker + Crafter + MiniHack | crafter, minihack |
+| `configs/dbp_games/demo_atari.json` | 10 popular Atari games | — (ships with `ale-py`) |
+| `configs/dbp_games/demo_classic.json` | all 5 classic-control | — |
+| `configs/dbp_games/demo_text.json` | all 5 toy_text (they **do** render) | — |
+| `configs/dbp_games/demo_box2d.json` | LunarLander, BipedalWalker, CarRacing | `pip install swig box2d-py` |
+| `configs/dbp_games/demo_mujoco.json` | 10 MuJoCo tasks | `pip install "gymnasium[mujoco]"`; set `MUJOCO_GL=egl` |
+| `configs/dbp_games/demo_vgdl.json` | all 10 VGDL games | `VGDL_REPO` + `PYTHONPATH` (see below) |
+
+```bash
+python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/dbp_games/demo_atari.json
+MUJOCO_GL=egl python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/dbp_games/demo_mujoco.json
+```
+
+Note: **MuJoCo and Box2D use continuous (`Box`) action spaces** — the default
+keymap pushes arrows to each dim's limit, so they render and log fine but aren't
+really human-playable without a per-game control scheme. Everything else in
+these families is keyboard-playable.
+
+### Per-game demo configs (`configs/dbp_games/`)
 
 There is one demo curriculum per candidate game that exposes a Gymnasium API
 (15 games). Each is a minimal `message → fixation → game → fixation` block and
@@ -66,7 +91,7 @@ carries `_source` / `_status` / `_note` fields (extra keys the loader ignores).
 Run one with:
 
 ```bash
-python fmri_play.py --subject sub-01 --curriculum configs/games/<name>.json
+python fmri_play.py --subject sub-01 --curriculum configs/dbp_games/<name>.json
 ```
 
 Each was actually installed and tried in the `fmri-gym` env. Results
@@ -132,7 +157,7 @@ backend:
  "mode": "duration", "duration": 30.0, "fps": 60, "state_stride": 15}
 ```
 
-The `configs/games/{tobutobugirldx,nomolos,anguna}.json` demos are marked
+The `configs/dbp_games/{tobutobugirldx,nomolos,anguna}.json` demos are marked
 `needs-ROM` for exactly this reason: the `retro` backend itself is verified
 (with Airstriker), but those titles won't run until you import their ROMs and
 confirm the integration name.
@@ -156,7 +181,7 @@ same `fmri-gym` env works.
    ```bash
    VGDL_REPO=/path/to/language_and_experience \
    PYTHONPATH=/path/to/language_and_experience \
-     python fmri_play.py --subject sub-01 --curriculum configs/demo_vgdl.json
+     python fmri_play.py --subject sub-01 --curriculum configs/dbp_games/demo_vgdl.json
    ```
 
    `VGDL_REPO` locates the game/level/sprite files; a phase can also override it
@@ -274,7 +299,7 @@ gym.make("ALE/Pong-v5").unwrapped.get_action_meanings()
  "keys": {"UP": 2, "DOWN": 3}}      // UP = paddle up, DOWN = paddle down; SPACE still serves (FIRE=1)
 ```
 
-`configs/games/atari.json` and the built-in demo both use this Pong mapping.
+`configs/dbp_games/atari.json` and the built-in demo both use this Pong mapping.
 CartPole similarly uses `{"LEFT": 0, "RIGHT": 1}`.
 
 ## Output & data format

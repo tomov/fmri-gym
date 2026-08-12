@@ -1,0 +1,179 @@
+{
+  "_demo": "10 popular Atari games, 10s each.",
+  "curriculum": [
+    {
+      "type": "message",
+      "text": "Breakout",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "ale",
+      "game": "ALE/Breakout-v5",
+      "mode": "duration",
+      "fps": 30,
+      "duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "Pong",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "ale",
+      "game": "ALE/Pong-v5",
+      "mode": "duration",
+      "fps": 30,
+      "duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "SpaceInvaders",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "ale",
+      "game": "ALE/SpaceInvaders-v5",
+      "mode": "duration",
+      "fps": 30,
+      "duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "MsPacman",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "ale",
+      "game": "ALE/MsPacman-v5",
+      "mode": "duration",
+      "fps": 30,
+      "duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "Seaquest",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "ale",
+      "game": "ALE/Seaquest-v5",
+      "mode": "duration",
+      "fps": 30,
+      "duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "Qbert",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "ale",
+      "game": "ALE/Qbert-v5",
+      "mode": "duration",
+      "fps": 30,
+      "duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "Asterix",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "ale",
+      "game": "ALE/Asterix-v5",
+      "mode": "duration",
+      "fps": 30,
+      "duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "BeamRider",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "ale",
+      "game": "ALE/BeamRider-v5",
+      "mode": "duration",
+      "fps": 30,
+      "duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "Enduro",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "ale",
+      "game": "ALE/Enduro-v5",
+      "mode": "duration",
+      "fps": 30,
+      "duration": 10.0
+    },
+    {
+      "type": "message",
+      "text": "Boxing",
+      "duration": 1.5
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "ale",
+      "game": "ALE/Boxing-v5",
+      "mode": "duration",
+      "fps": 30,
+      "duration": 10.0
+    },
+    {
+      "type": "fixation",
+      "duration": 3.0
+    }
+  ]
+}

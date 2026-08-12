@@ -3,18 +3,24 @@
     {"type": "message", "text": "Pong (Atari)", "duration": 2.0},
     {"type": "fixation", "duration": 2.0},
     {"type": "game", "backend": "ale", "game": "ALE/Pong-v5",
-     "mode": "duration", "duration": 20.0, "fps": 30},
+     "mode": "duration", "duration": 20.0, "fps": 30,
+     "keys": {"UP": 2, "DOWN": 3}},
 
     {"type": "message", "text": "Airstriker (Genesis)", "duration": 2.0},
     {"type": "fixation", "duration": 2.0},
     {"type": "game", "backend": "retro", "game": "Airstriker-Genesis-v0",
      "mode": "duration", "duration": 20.0, "fps": 60},
 
-    {"type": "message", "text": "CartPole", "duration": 2.0},
+    {"type": "message", "text": "Crafter", "duration": 2.0},
     {"type": "fixation", "duration": 2.0},
-    {"type": "game", "backend": "gym", "game": "CartPole-v1",
-     "mode": "episode", "n_episodes": 3, "max_duration": 30.0, "fps": 30,
-     "keys": {"LEFT": 0, "RIGHT": 1}},
+    {"type": "game", "backend": "crafter", "game": "crafter",
+     "mode": "episode", "n_episodes": 1, "max_duration": 30.0, "fps": 15,
+     "seed": 0},
+
+    {"type": "message", "text": "MiniHack", "duration": 2.0},
+    {"type": "fixation", "duration": 2.0},
+    {"type": "game", "backend": "minihack", "game": "MiniHack-Room-5x5-v0",
+     "mode": "episode", "n_episodes": 3, "max_duration": 30.0, "fps": 15},
 
     {"type": "fixation", "duration": 4.0},
     {"type": "survey", "questions": [
