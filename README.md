@@ -53,7 +53,7 @@ python fmri_play.py --subject sub-01 --dummy-trigger
 python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_mixed.json   # Pong + Airstriker + Crafter + MiniHack
 python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_atari.json    # 10 popular Atari games
 python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_classic.json  # all 5 classic-control
-python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_text.json     # all 5 toy_text (they DO render)
+python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_text.json     # all 5 toy_text (render RGB; turn-based, arrow keys)
 python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_box2d.json     # LunarLander, BipedalWalker, CarRacing  (pip install swig box2d-py)
 MUJOCO_GL=egl python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_mujoco.json   # 10 MuJoCo tasks  (pip install "gymnasium[mujoco]")
 VGDL_REPO=/path/to/language_and_experience PYTHONPATH=/path/to/language_and_experience \
@@ -242,6 +242,7 @@ An ordered JSON list of **phases** (bare list or `{"curriculum": [...]}`):
  "n_episodes": 1,               // episodes (episode mode)
  "max_duration": 300.0,         // hard wall-clock safety cap (episode mode)
  "fps": 30,                     // target game frames/second
+ "turn_based": false,           // step only on a key PRESS, not per frame (grid/toy_text games)
  "seed": 1234,                  // base RNG seed (optional)
  "state_stride": 1,             // save a full savestate every K frames (see below)
  "state": "Level1",             // retro: named savestate/level (optional)

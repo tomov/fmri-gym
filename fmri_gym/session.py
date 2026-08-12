@@ -14,7 +14,7 @@ import time
 
 import pygame
 
-from .adapters.base import held_key_names
+from .adapters.base import held_key_names, key_name as _key_name
 from .display import Display
 from .logging import Logger
 
@@ -158,11 +158,20 @@ class Session:
         state_stride = max(1, int(phase.get("state_stride", 1)))
         dt = 1.0 / fps
         cap = duration if mode == "duration" else phase.get("max_duration", 300.0)
+        # Turn-based games (grid worlds: FrozenLake, CliffWalking, Taxi, ...) must
+        # advance ONE step per deliberate key PRESS, not once per frame. In a
+        # real-time loop they'd auto-step every frame with the noop action (which
+        # for e.g. FrozenLake is action 0 = LEFT), so the agent "moves on its own"
+        # and a single held key fires many times. turn_based fixes both.
+        turn_based = bool(phase.get("turn_based", False))
 
         env = adapter.make(phase)
         keyspec = adapter.keymap(env)
         # Allow the curriculum to override the mapping explicitly.
         keyspec = _apply_key_overrides(keyspec, phase.get("keys"))
+        # For turn-based play, map single pressed KEY -> action via key names.
+        key_to_action = {next(iter(ks)): a for ks, a in keyspec.combos.items()
+                         if len(ks) == 1}
 
         frames = {k: [] for k in ("action", "reward", "terminal",
                                   "episode_id", "t_rel", "t_epoch", "state_blob")}
@@ -182,17 +191,35 @@ class Session:
             terminated = truncated = False
             ep_frame = 0
             next_t = time.perf_counter()
+            self.display.draw_frame(adapter.render(env))   # show initial state
             while not (terminated or truncated):
                 now = time.perf_counter()
                 if now < next_t:
                     time.sleep(next_t - now)
                 next_t += dt
-                if _check_quit():
-                    user_quit = True
-                    break
 
-                held = held_key_names(pygame)
-                action = keyspec.resolve(held)
+                if turn_based:
+                    # Advance only on a fresh keydown that maps to an action.
+                    action = None
+                    for event in pygame.event.get():
+                        if event.type == pygame.QUIT or (
+                                event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                            user_quit = True
+                            break
+                        if event.type == pygame.KEYDOWN:
+                            name = _key_name(pygame, event.key)
+                            if name in key_to_action:
+                                action = key_to_action[name]
+                    if user_quit:
+                        break
+                    if action is None:
+                        continue                    # no press -> don't step
+                else:
+                    if _check_quit():
+                        user_quit = True
+                        break
+                    action = keyspec.resolve(held_key_names(pygame))
+
                 obs, reward, terminated, truncated, info = adapter.step(env, action)
                 total_reward += float(reward)
                 # Anchor a full savestate at episode start and every stride.

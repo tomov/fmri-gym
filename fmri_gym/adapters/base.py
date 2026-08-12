@@ -143,6 +143,15 @@ def held_key_names(pygame_module, keys=None) -> frozenset[str]:
     return frozenset(out)
 
 
+def key_name(pygame_module, keycode) -> str | None:
+    """Reverse of the name->code map: a pygame keycode -> its NAME ("LEFT",...).
+
+    Used for turn-based games, which step on discrete KEYDOWN events rather than
+    polling held keys.
+    """
+    return _COMMON_KEYS(pygame_module).get(keycode)
+
+
 _COMMON_CACHE: dict = {}
 
 
