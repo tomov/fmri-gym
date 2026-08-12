@@ -1,21 +1,21 @@
 {
-  "_demo": "All classic-control games, up to 10s each.",
+  "_demo": "All classic-control games, up to 15s each.",
   "curriculum": [
     {"type": "message", "text": "CartPole", "duration": 1.5},
     {"type": "fixation", "duration": 1.0},
-    {"type": "game", "backend": "gym", "game": "CartPole-v1", "mode": "episode", "fps": 30, "n_episodes": 1, "max_duration": 10.0, "keys": {"LEFT": 0, "RIGHT": 1}},
+    {"type": "game", "backend": "gym", "game": "CartPole-v1", "mode": "episode", "fps": 30, "n_episodes": 1, "max_duration": 15.0, "keys": {"LEFT": 0, "RIGHT": 1}},
     {"type": "message", "text": "MountainCar", "duration": 1.5},
     {"type": "fixation", "duration": 1.0},
-    {"type": "game", "backend": "gym", "game": "MountainCar-v0", "mode": "episode", "fps": 30, "n_episodes": 1, "max_duration": 10.0, "keys": {"LEFT": 0, "RIGHT": 2}},
+    {"type": "game", "backend": "gym", "game": "MountainCar-v0", "mode": "episode", "fps": 30, "n_episodes": 1, "max_duration": 15.0, "keys": {"LEFT": 0, "RIGHT": 2}},
     {"type": "message", "text": "Acrobot", "duration": 1.5},
     {"type": "fixation", "duration": 1.0},
-    {"type": "game", "backend": "gym", "game": "Acrobot-v1", "mode": "episode", "fps": 30, "n_episodes": 1, "max_duration": 10.0, "keys": {"LEFT": 0, "RIGHT": 2}},
+    {"type": "game", "backend": "gym", "game": "Acrobot-v1", "mode": "episode", "fps": 30, "n_episodes": 1, "max_duration": 15.0, "keys": {"LEFT": 0, "RIGHT": 2}},
     {"type": "message", "text": "MountainCarContinuous", "duration": 1.5},
     {"type": "fixation", "duration": 1.0},
-    {"type": "game", "backend": "gym", "game": "MountainCarContinuous-v0", "mode": "episode", "fps": 30, "n_episodes": 1, "max_duration": 10.0},
+    {"type": "game", "backend": "gym", "game": "MountainCarContinuous-v0", "mode": "episode", "fps": 30, "n_episodes": 1, "max_duration": 15.0},
     {"type": "message", "text": "Pendulum", "duration": 1.5},
     {"type": "fixation", "duration": 1.0},
-    {"type": "game", "backend": "gym", "game": "Pendulum-v1", "mode": "episode", "fps": 30, "n_episodes": 1, "max_duration": 10.0},
+    {"type": "game", "backend": "gym", "game": "Pendulum-v1", "mode": "episode", "fps": 30, "n_episodes": 1, "max_duration": 15.0},
     {"type": "fixation", "duration": 3.0}
   ]
 }

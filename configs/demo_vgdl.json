@@ -2,10 +2,10 @@
   "curriculum": [
     {"type": "message", "text": "Aliens", "duration": 2.0},
     {"type": "fixation", "duration": 2.0},
-    {"type": "game", "backend": "vgdl", "game": "aliens", "level": 0, "block_size": 25, "mode": "duration", "duration": 10.0, "fps": 15},
+    {"type": "game", "backend": "vgdl", "game": "aliens", "level": 0, "block_size": 25, "mode": "duration", "duration": 15.0, "fps": 15},
     {"type": "message", "text": "Bees and Birds", "duration": 2.0},
     {"type": "fixation", "duration": 2.0},
-    {"type": "game", "backend": "vgdl", "game": "beesAndBirds", "level": 0, "block_size": 25, "mode": "duration", "duration": 10.0, "fps": 15},
+    {"type": "game", "backend": "vgdl", "game": "beesAndBirds", "level": 0, "block_size": 25, "mode": "duration", "duration": 15.0, "fps": 15},
     {"type": "fixation", "duration": 4.0},
     {"type": "survey", "questions": ["I was fully absorbed in the games.", "The games were too difficult."]}
   ]

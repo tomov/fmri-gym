@@ -3,13 +3,13 @@
   "curriculum": [
     {"type": "message", "text": "LunarLander", "duration": 1.5},
     {"type": "fixation", "duration": 1.0},
-    {"type": "game", "backend": "gym", "game": "LunarLander-v3", "mode": "episode", "fps": 30, "n_episodes": 1, "max_duration": 10.0, "keys": {"SPACE": 2, "LEFT": 1, "RIGHT": 3}},
+    {"type": "game", "backend": "gym", "game": "LunarLander-v3", "mode": "episode", "fps": 30, "n_episodes": 1, "max_duration": 15.0, "keys": {"SPACE": 2, "LEFT": 1, "RIGHT": 3}},
     {"type": "message", "text": "BipedalWalker", "duration": 1.5},
     {"type": "fixation", "duration": 1.0},
-    {"type": "game", "backend": "gym", "game": "BipedalWalker-v3", "mode": "episode", "fps": 30, "n_episodes": 1, "max_duration": 10.0},
+    {"type": "game", "backend": "gym", "game": "BipedalWalker-v3", "mode": "episode", "fps": 30, "n_episodes": 1, "max_duration": 15.0},
     {"type": "message", "text": "CarRacing", "duration": 1.5},
     {"type": "fixation", "duration": 1.0},
-    {"type": "game", "backend": "gym", "game": "CarRacing-v3", "mode": "episode", "fps": 30, "n_episodes": 1, "max_duration": 10.0},
+    {"type": "game", "backend": "gym", "game": "CarRacing-v3", "mode": "episode", "fps": 30, "n_episodes": 1, "max_duration": 15.0},
     {"type": "fixation", "duration": 3.0}
   ]
 }

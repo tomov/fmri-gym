@@ -49,7 +49,7 @@ For the `vgdl` backend see [Running VGDL games](#running-vgdl-games).
 # Built-in mixed demo: Pong, Airstriker, and Crafter, back to back
 python fmri_play.py --subject sub-01 --dummy-trigger
 
-# --- per-family demo curricula (all tested end-to-end; ~10 s per block) ---
+# --- per-family demo curricula (all tested end-to-end; ~15 s per block) ---
 python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_mixed.json   # Pong + Airstriker + Crafter + MiniHack
 python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_atari.json    # 10 popular Atari games
 python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_classic.json  # all 5 classic-control
