@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-2L9YH85489"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-2L9YH85489');
+    </script>
+    <meta charset="UTF-8" />
+    <title>Battle Zone - Replay Viewer</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      html, body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #222;
+        font-family: Arial, sans-serif;
+      }
+      
+      body {
+        display: flex;
+        flex-direction: row;
+        justify-content: flex-start;
+        align-items: flex-start;
+        padding: 10px;
+        gap: 10px;
+      }
+      
+      .container {
+        display: flex;
+        flex-direction: row;
+        width: 100%;
+        height: 100vh;
+        gap: 10px;
+      }
+      
+      .file-input-section {
+        background: #333;
+        padding: 15px;
+        border-radius: 8px;
+        width: 300px;
+        max-height: calc(100vh - 20px);
+        overflow-y: auto;
+        flex-shrink: 0;
+      }
+      
+      .file-input-section h2 {
+        color: #fff;
+        margin-bottom: 10px;
+        font-size: 14px;
+      }
+      
+      .file-input-group {
+        margin-bottom: 10px;
+      }
+      
+      .file-input-group label {
+        display: block;
+        color: #ccc;
+        margin-bottom: 3px;
+        font-size: 11px;
+      }
+      
+      .file-input-group input[type="file"] {
+        width: 100%;
+        padding: 5px;
+        background: #444;
+        color: #fff;
+        border: 1px solid #555;
+        border-radius: 4px;
+        font-size: 10px;
+      }
+      
+      .file-input-group input[type="text"] {
+        width: 100%;
+        padding: 5px;
+        background: #444;
+        color: #fff;
+        border: 1px solid #555;
+        border-radius: 4px;
+        font-size: 10px;
+      }
+      
+      .load-button {
+        padding: 6px 12px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: bold;
+        width: 100%;
+      }
+      
+      .load-button:hover {
+        background: #0056b3;
+      }
+      
+      .load-button:disabled {
+        background: #555;
+        cursor: not-allowed;
+      }
+      
+      .game-container {
+        position: relative;
+        border: 4px solid #444;
+        box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-width: 0;
+      }
+      
+      .status-message {
+        padding: 8px;
+        background: #444;
+        color: #fff;
+        border-radius: 4px;
+        margin-top: 8px;
+        font-size: 10px;
+        text-align: center;
+      }
+      
+      .status-message.error {
+        background: #ff4444;
+      }
+      
+      .status-message.success {
+        background: #44ff44;
+        color: #000;
+      }
+      
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="file-input-section">
+        <h2>Load Replay Data</h2>
+        
+        <div class="file-input-group">
+          <label for="inputs-file">Inputs JSON File (inputs.json):</label>
+          <input type="file" id="inputs-file" accept=".json" />
+        </div>
+        
+        <div class="file-input-group">
+          <label for="logs-file">Logs JSON File (logs.json):</label>
+          <input type="file" id="logs-file" accept=".json" />
+        </div>
+        
+        <button id="load-replay-btn" class="load-button">Load Replay</button>
+        
+        <div id="status-message" class="status-message" style="display: none;"></div>
+      </div>
+      
+      <div class="game-container" id="game-container" style="display: flex;">
+        <div id="game-wrapper" style="width: 1200px; height: 800px; position: relative; max-width: 100%; max-height: 100%;">
+          <iframe id="game-iframe" src="index.html" style="width: 100%; height: 100%; border: none;"></iframe>
+          <div id="server-warning" style="display: none; position: absolute; top: 10px; left: 10px; background: rgba(255, 0, 0, 0.8); color: white; padding: 10px; border-radius: 5px; z-index: 1000; max-width: 500px;">
+            <strong>⚠️ CORS Error Detected</strong><br>
+            You need to run a local web server. Open terminal in the <code>frontend</code> directory and run:<br>
+            <code style="background: rgba(0,0,0,0.3); padding: 2px 5px; border-radius: 3px;">python3 -m http.server 8000</code><br>
+            Then open: <code>http://localhost:8000/public/games_pilot/battle-zone/replay.html</code>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://unpkg.com/p5.collide2d@0.7.3/p5.collide2d.js"></script>
+    <script type="module">
+      let gameIframe = null;
+      
+      // Check for URL parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const replayInputsUrl = urlParams.get('replay_inputs');
+      const replayLogsUrl = urlParams.get('replay_logs');
+      
+      if (replayInputsUrl && replayLogsUrl) {
+        loadReplayFromUrls(replayInputsUrl, replayLogsUrl);
+      }
+      
+      // File input handlers
+      const inputsFileInput = document.getElementById('inputs-file');
+      const logsFileInput = document.getElementById('logs-file');
+      const loadButton = document.getElementById('load-replay-btn');
+      const statusMessage = document.getElementById('status-message');
+      const gameContainer = document.getElementById('game-container');
+      
+      loadButton.addEventListener('click', async () => {
+        if (inputsFileInput.files.length === 0 || logsFileInput.files.length === 0) {
+          showStatus('Please select both files', 'error');
+          return;
+        }
+        
+        try {
+          const inputsData = await inputsFileInput.files[0].text().then(t => JSON.parse(t));
+          const logsData = await logsFileInput.files[0].text().then(t => JSON.parse(t));
+          await loadReplay(inputsData, logsData);
+        } catch (error) {
+          showStatus('Error reading files: ' + error.message, 'error');
+        }
+      });
+      
+      async function loadReplayFromUrls(inputsUrl, logsUrl) {
+        try {
+          showStatus('Loading replay data...', '');
+          
+          const [inputsResponse, logsResponse] = await Promise.all([
+            fetch(inputsUrl),
+            fetch(logsUrl)
+          ]);
+          
+          if (!inputsResponse.ok || !logsResponse.ok) {
+            throw new Error('Failed to fetch replay data');
+          }
+          
+          const inputsData = await inputsResponse.json();
+          const logsData = await logsResponse.json();
+          
+          await loadReplay(inputsData, logsData);
+        } catch (error) {
+          showStatus('Error loading replay: ' + error.message, 'error');
+        }
+      }
+      
+      async function loadReplay(inputsData, logsData) {
+        try {
+          showStatus('Initializing replay...', '');
+          
+          // Get or create iframe for game
+          gameIframe = document.getElementById('game-iframe');
+          if (!gameIframe) {
+            gameIframe = document.createElement('iframe');
+            gameIframe.id = 'game-iframe';
+            gameIframe.style.cssText = 'width: 100%; height: 100%; border: none;';
+            gameIframe.src = 'index.html';
+            const gameWrapper = document.getElementById('game-wrapper');
+            if (gameWrapper) {
+              gameWrapper.appendChild(gameIframe);
+            } else {
+              gameContainer.appendChild(gameIframe);
+            }
+          }
+          
+          gameContainer.style.display = 'block';
+          
+          // Wait for iframe to load
+          await new Promise((resolve) => {
+            if (gameIframe.contentDocument && gameIframe.contentDocument.readyState === 'complete') {
+              resolve();
+            } else {
+              gameIframe.onload = resolve;
+            }
+          });
+          
+          // Wait for game to initialize
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Check for CORS errors
+          try {
+            const gameWindow = gameIframe.contentWindow;
+            if (!gameWindow || !gameWindow.document) {
+              throw new Error('Cannot access iframe content - CORS issue');
+            }
+          } catch (error) {
+            const warning = document.getElementById('server-warning');
+            if (warning) {
+              warning.style.display = 'block';
+            }
+            showStatus('CORS Error: Please run a local web server. See warning in game area.', 'error');
+            console.error('CORS Error:', error);
+            return;
+          }
+          
+          // Initialize replay in the game
+          const gameWindow = gameIframe.contentWindow;
+          
+          // Pass data directly - the game's initReplay expects URLs, but we can pass data directly
+          // Create a helper function that accepts data objects
+          if (gameWindow.initReplay) {
+            // Convert data to blob URLs
+            const inputsBlob = new Blob([JSON.stringify(inputsData)], { type: 'application/json' });
+            const logsBlob = new Blob([JSON.stringify(logsData)], { type: 'application/json' });
+            
+            const inputsUrl = URL.createObjectURL(inputsBlob);
+            const logsUrl = URL.createObjectURL(logsBlob);
+            
+            // Initialize replay
+            try {
+              const success = await gameWindow.initReplay(inputsUrl, logsUrl);
+              
+              if (success) {
+                showStatus('Replay loaded successfully! Use controls in top-right corner.', 'success');
+              } else {
+                showStatus('Failed to initialize replay', 'error');
+              }
+            } catch (err) {
+              console.error('Error calling initReplay:', err);
+              showStatus('Error initializing replay: ' + err.message, 'error');
+            }
+          } else {
+            showStatus('Error: Game replay system not available. Make sure game.js is loaded.', 'error');
+            console.error('initReplay function not found on game window');
+          }
+        } catch (error) {
+          showStatus('Error: ' + error.message, 'error');
+          console.error('Replay load error:', error);
+        }
+      }
+      
+      function showStatus(message, type) {
+        statusMessage.textContent = message;
+        statusMessage.className = 'status-message ' + (type || '');
+        statusMessage.style.display = 'block';
+      }
+    </script>
+  </body>
+</html>

@@ -34,4 +34,7 @@ def get_adapter(backend, **kwargs):
     if backend == "minihack":
         from .adapters.minihack import MiniHackAdapter
         return MiniHackAdapter(**kwargs)
+    if backend in ("aigamestore", "p5"):
+        from .adapters.aigamestore import AIGameStoreAdapter
+        return AIGameStoreAdapter(**kwargs)
     raise ValueError(f"unknown backend: {backend!r}")

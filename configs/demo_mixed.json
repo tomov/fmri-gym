@@ -1,5 +1,5 @@
 {
-  "_note": "Mixed backends in one session. VGDL (Aliens) needs VGDL_REPO=../language_and_experience + PYTHONPATH; Box2D (CarRacing) needs box2d-py; Crafter/MiniHack need their packages.",
+  "_note": "Mixed backends in one session. VGDL (Aliens) needs VGDL_REPO=../language_and_experience + PYTHONPATH; Box2D (CarRacing) needs box2d-py; Crafter/MiniHack need their packages; AI GameStore (Water Sort) needs playwright + system Chrome.",
   "curriculum": [
     {"type": "message", "text": "Pong (Atari)", "duration": 2.0},
     {"type": "fixation", "duration": 2.0},
@@ -25,6 +25,9 @@
     {"type": "message", "text": "CarRacing (Box2D)", "duration": 2.0},
     {"type": "fixation", "duration": 2.0},
     {"type": "game", "backend": "gym", "game": "CarRacing-v3", "mode": "episode", "n_episodes": 1, "max_duration": 15.0, "fps": 30},
+    {"type": "message", "text": "Water Sort (AI GameStore, p5.js)", "duration": 2.0},
+    {"type": "fixation", "duration": 2.0},
+    {"type": "game", "backend": "aigamestore", "game": "game1", "mode": "duration", "duration": 15.0, "fps": 10},
     {"type": "fixation", "duration": 4.0},
     {"type": "survey", "questions": ["I was fully absorbed in the games.", "The games were too difficult."]}
   ]

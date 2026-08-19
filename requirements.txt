@@ -11,6 +11,9 @@ shimmy                 # run old-`gym` envs through the gym backend
 crafter                # `crafter` backend
 minihack               # `minihack` backend (pulls nle; pins gymnasium 1.2)
 tile-match-gym         # `gym` backend, display+logging only (pulls numba->numpy<2)
+playwright             # `aigamestore` backend (p5.js/browser games); + a browser:
+                       #   uses system Chrome by default; or `playwright install chromium`
+pillow                 # `aigamestore` backend: PNG canvas screenshot -> RGB frame
 
 # Standard Gymnasium families (all via the `gym` backend; all verified to render):
 #   classic_control, toy_text  -> included with `gymnasium` above

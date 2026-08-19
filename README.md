@@ -5,16 +5,17 @@
 A proof-of-concept framework that turns games into neuroimaging tasks — fixed
 uniform display, scanner-trigger sync, a declarative curriculum of phases, and
 compact reconstructable per-frame logging — and works across game engines
-through small pluggable **adapters**. Ships with four:
+through small pluggable **adapters**:
 
 | Backend (`"backend"`) | Games | Engine |
 |---|---|---|
-| `ale`      | Atari 2600 (`ALE/Pong-v5`, …) | ALE / Stella |
-| `retro`    | NES / SNES / Genesis / GB / … (`Airstriker-Genesis-v0`, …) | stable-retro / libretro |
-| `gym`      | **any** Gymnasium env (`CartPole-v1`, MuJoCo, Box2D, toy_text, …); old-`gym` envs via shimmy | various |
-| `vgdl`     | VGDL games (`aliens`, `beesAndBirds`, …) | py-vgdl / pygame |
-| `crafter`  | Crafter (open-world survival) | crafter |
-| `minihack` | MiniHack / NetHack tasks | minihack / NLE |
+| `ale`         | Atari 2600 (`ALE/Pong-v5`, …) | ALE / Stella |
+| `retro`       | NES / SNES / Genesis / GB / … (`Airstriker-Genesis-v0`, …) | stable-retro / libretro |
+| `gym`         | **any** Gymnasium env (`CartPole-v1`, MuJoCo, Box2D, toy_text, …); old-`gym` envs via shimmy | various |
+| `vgdl`        | VGDL games (`aliens`, `beesAndBirds`, …) | py-vgdl / pygame |
+| `crafter`     | Crafter (open-world survival) | crafter |
+| `minihack`    | MiniHack / NetHack tasks | minihack / NLE |
+| `aigamestore` | AI GameStore p5.js/browser games (`game1`…`game10`) | p5.js via headless browser |
 
 > **All backends run in ONE env and ONE process.** Verified: a single session
 > with ALE + retro + gym + VGDL blocks back-to-back, and each of Crafter /
@@ -55,12 +56,14 @@ python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_c
 python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_text.json     # all 5 toy_text (render RGB; turn-based, arrow keys)
 python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_box2d.json     # LunarLander, BipedalWalker, CarRacing  (pip install swig box2d-py)
 MUJOCO_GL=egl python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_mujoco.json   # 10 MuJoCo tasks  (pip install "gymnasium[mujoco]")
+python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_aigamestore.json  # 10 AI GameStore p5.js games (pip install playwright; see below)
 VGDL_REPO=../language_and_experience PYTHONPATH=../language_and_experience \
   python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_vgdl_all.json   # all 10 VGDL games (see below)
 
 # demo_mixed spans EVERY backend in one session (Pong/ale, Airstriker/retro,
 # Crafter, MiniHack, Aliens/vgdl, MountainCar/classic, FrozenLake/toy_text,
-# CarRacing/box2d) -- so it needs the VGDL repo (+ box2d-py, crafter, minihack):
+# CarRacing/box2d, WaterSort/aigamestore) -- needs the VGDL repo + box2d-py +
+# crafter + minihack + playwright:
 VGDL_REPO=../language_and_experience PYTHONPATH=../language_and_experience \
   python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_mixed.json
 
@@ -189,6 +192,45 @@ VGDL blocks log a symbolic per-cell object grid (`symbolic_state`) and collision
 `events` as analysis variables, plus a per-frame exact savestate (get/set_state)
 for determinism-free reconstruction.
 
+## Running AI GameStore games
+
+[AI GameStore](https://aigamestore.org) is a benchmark of LLM-generated
+**browser games** (plain HTML + JavaScript + p5.js). There's no standard
+p5.js↔Gymnasium bridge, so the `aigamestore` backend builds one with a headless
+(or headed) browser via **Playwright**:
+
+- a tiny local HTTP server serves the vendored games (`vendor/aigamestore/`; ES
+  modules need `http://`, not `file://`);
+- currently-held keyboard keys are pressed/released in the page each step;
+- the game's `<canvas>` is screenshotted → the RGB frame for display;
+- each game exposes `window.getGameState()` with a `score` and a `gamePhase`
+  (START / PLAYING / GAMEOVER …), mapped to reward (score delta) and done, and
+  logged (scalar fields as `state_*` analysis variables).
+
+Setup — needs Playwright and a browser (uses the **system Chrome** by default):
+
+```bash
+pip install playwright pillow
+# then either rely on system Chrome (default), or install the bundled one:
+# playwright install chromium   # and set "browser_channel": null in the phase
+```
+
+Run the 10 vendored public games (each keyboard-controlled — arrows + SPACE/Z/
+ENTER; `game1` = Water Sort, `game2` ≈ Angry Birds, …):
+
+```bash
+python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_aigamestore.json
+```
+
+Phase fields: `game` (`"game1"`…`"game10"`, or an `http(s)://…/index.html`
+URL), `games_dir` (override the vendored dir), `headed` (show the window),
+`browser_channel` (`"chrome"` default, or `null` for bundled Chromium),
+`start_key` (default `Enter`, pressed once to leave the START screen).
+
+> Note: a browser step (screenshot + `getGameState`) costs ~0.1–0.5 s, so
+> effective fps is lower than the emulator backends — fine for these
+> puzzle/casual games, and the framework paces to whatever it can sustain.
+
 ## Design: the experiment loop never knows the engine
 
 ```
@@ -204,8 +246,10 @@ fmri_gym/
     vgdl.py         # VGDLEnv: get_state/set_state, symbolic grid + events
     crafter.py      # old-gym-API wrapper; obs is the frame; achievements
     minihack.py     # pixel obs + compass keymap; blstats/glyphs/message
+    aigamestore.py  # p5.js browser games via Playwright: canvas->RGB, getGameState
 fmri_play.py        # CLI entry point
 configs/            # example curricula
+vendor/aigamestore/ # the 10 public AI GameStore games (p5.js/HTML/JS)
 ```
 
 The loop (`session.py`) only ever calls the adapter — never `env.unwrapped`, an
