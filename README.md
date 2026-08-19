@@ -112,12 +112,12 @@ Each config carries `_game` / `_note` (per-game setup reminders). Games use
 play; `ESC` quits. The `_note` flags class-specific requirements (VGDL repo,
 playwright, box2d-py, MuJoCo GL, ROM import).
 
-> **Not covered** (each config's `_note` / the spreadsheet says why): games with
-> no real-time pixel interface — `2048` (upstream reset bug), `pathery`/`wordle`
-> (text/placement), `mastermind` (needs Python ≥3.13), `rush-hour` (unpackaged),
-> and heavy engines `coom` (ViZDoom) / `craftium` (Luanti) that need a dedicated
-> adapter. The older `_status`-annotated stubs for these remain in
-> `configs/dbp_games/` (single-word filenames) as documentation.
+> **Not covered** — configs live under `configs/dbp_games/unsupported/`, each
+> with a `_status`/`_note` explaining why: games with no real-time pixel
+> interface — `2048` (upstream reset bug), `pathery`/`wordle` (text/placement),
+> `tile-match-gym` (display-only, `Discrete(84)` swaps → no keyboard play),
+> `mastermind` (needs Python ≥3.13), `rush-hour` (unpackaged), and heavy engines
+> `coom` (ViZDoom) / `craftium` (Luanti) that need a dedicated adapter.
 
 Runtime flow: experimenter screen (**SPACE**) → "Waiting for scanner..." →
 scanner **trigger `=`** (anchors the session clock) → curriculum phases → done.
