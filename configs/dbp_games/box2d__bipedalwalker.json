@@ -1,0 +1,10 @@
+{
+  "_game": "Box2D: BipedalWalker-v3",
+  "_note": "pip install swig box2d-py. Continuous; renders/logs, not keyboard-playable.",
+  "curriculum": [
+    {"type": "message", "text": "Box2D: BipedalWalker-v3", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"backend": "gym", "game": "BipedalWalker-v3", "fps": 30, "type": "game", "mode": "duration", "duration": 300.0},
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

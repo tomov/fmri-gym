@@ -1,0 +1,9 @@
+{
+  "_game": "Classic control: CartPole-v1",
+  "curriculum": [
+    {"type": "message", "text": "Classic control: CartPole-v1", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"backend": "gym", "game": "CartPole-v1", "fps": 30, "keys": {"LEFT": 0, "RIGHT": 1}, "type": "game", "mode": "duration", "duration": 300.0},
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

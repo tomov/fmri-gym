@@ -1,0 +1,10 @@
+{
+  "_game": "stable-retro: TobuTobuGirlDX-GameBoy",
+  "_note": "Needs the ROM imported (python -m retro.import) + integration name confirmed.",
+  "curriculum": [
+    {"type": "message", "text": "stable-retro: TobuTobuGirlDX-GameBoy", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"backend": "retro", "game": "TobuTobuGirlDX-GameBoy", "fps": 60, "state_stride": 15, "type": "game", "mode": "duration", "duration": 300.0},
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

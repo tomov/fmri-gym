@@ -1,0 +1,10 @@
+{
+  "_game": "AI GameStore game1 (Water Sort)",
+  "_note": "pip install playwright (uses system Chrome).",
+  "curriculum": [
+    {"type": "message", "text": "AI GameStore game1 (Water Sort)", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"backend": "aigamestore", "game": "game1", "fps": 10, "type": "game", "mode": "duration", "duration": 300.0},
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

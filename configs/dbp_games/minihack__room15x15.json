@@ -1,0 +1,10 @@
+{
+  "_game": "MiniHack: MiniHack-Room-15x15-v0",
+  "_note": "pip install minihack (needs setuptools<81).",
+  "curriculum": [
+    {"type": "message", "text": "MiniHack: MiniHack-Room-15x15-v0", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"backend": "minihack", "game": "MiniHack-Room-15x15-v0", "fps": 15, "type": "game", "mode": "duration", "duration": 300.0},
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

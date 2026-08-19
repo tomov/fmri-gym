@@ -1,0 +1,10 @@
+{
+  "_game": "Crafter",
+  "_note": "pip install crafter.",
+  "curriculum": [
+    {"type": "message", "text": "Crafter", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"backend": "crafter", "game": "crafter", "fps": 15, "seed": 0, "type": "game", "mode": "duration", "duration": 300.0},
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

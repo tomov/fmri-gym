@@ -1,0 +1,10 @@
+{
+  "_game": "VGDL: avoidGeorge",
+  "_note": "Needs VGDL_REPO=../language_and_experience + PYTHONPATH set.",
+  "curriculum": [
+    {"type": "message", "text": "VGDL: avoidGeorge", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"backend": "vgdl", "game": "avoidGeorge", "level": 0, "block_size": 25, "fps": 15, "type": "game", "mode": "duration", "duration": 300.0},
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

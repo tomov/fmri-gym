@@ -1,0 +1,9 @@
+{
+  "_game": "Atari: Breakout",
+  "curriculum": [
+    {"type": "message", "text": "Atari: Breakout", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"backend": "ale", "game": "ALE/Breakout-v5", "fps": 30, "type": "game", "mode": "duration", "duration": 300.0},
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

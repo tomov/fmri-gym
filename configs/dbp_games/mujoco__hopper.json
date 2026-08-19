@@ -1,0 +1,10 @@
+{
+  "_game": "MuJoCo: Hopper-v5",
+  "_note": "pip install \"gymnasium[mujoco]\"; run with MUJOCO_GL=egl. Continuous action space (renders/logs, not keyboard-playable).",
+  "curriculum": [
+    {"type": "message", "text": "MuJoCo: Hopper-v5", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"backend": "gym", "game": "Hopper-v5", "fps": 30, "type": "game", "mode": "duration", "duration": 300.0},
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

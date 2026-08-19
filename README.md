@@ -67,8 +67,8 @@ VGDL_REPO=../language_and_experience PYTHONPATH=../language_and_experience \
 VGDL_REPO=../language_and_experience PYTHONPATH=../language_and_experience \
   python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/demo_mixed.json
 
-# A single-game demo (one JSON per candidate game, see configs/dbp_games/):
-python fmri_play.py --subject sub-01 --curriculum configs/dbp_games/atari.json
+# Play ONE game on its own, for a long stretch (see configs/dbp_games/):
+python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/dbp_games/atari__pong.json
 ```
 
 Drop `--dummy-trigger` for a real session (then press SPACE, then wait for the
@@ -79,39 +79,45 @@ keymap pushes arrows to each dim's limit, so they render and log fine but aren't
 really human-playable without a per-game control scheme. Everything else in
 these families is keyboard-playable.
 
-### Per-game demo configs (`configs/dbp_games/`)
+### Per-game configs (`configs/dbp_games/`)
 
-There is one demo curriculum per candidate game that exposes a Gymnasium API
-(15 games). Each is a minimal `message → fixation → game → fixation` block and
-carries `_source` / `_status` / `_note` fields (extra keys the loader ignores).
-Run one with:
+There is **one config per individual supported game** (63 of them), sourced from
+the DBP game spreadsheet, so you can play any single game on its own for a long
+stretch with a one-line command. Filenames are `<class>__<game>.json`:
 
 ```bash
-python fmri_play.py --subject sub-01 --curriculum configs/dbp_games/<name>.json
+python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/dbp_games/atari__pong.json
+python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/dbp_games/text__frozenlake.json
+python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/dbp_games/aigamestore__game1.json
 ```
 
-Each was actually installed and tried in the `fmri-gym` env. Results
-(`_status` in each JSON):
+Each is a minimal `message → fixation → game (300 s) → fixation` curriculum with
+the right per-game keymap/settings baked in. Coverage by class:
 
-| config | backend | status | notes |
-|---|---|---|---|
-| `atari` | ale | ✅ verified | any `ALE/*` id |
-| `vgdl` | vgdl | ✅ verified | needs the fork checkout (see [below](#running-vgdl-games)) |
-| `crafter` | crafter | ✅ verified | dedicated adapter (old-gym API wrapped); obs is the frame |
-| `minihack` | minihack | ✅ verified | dedicated adapter; pixel obs + 8-way compass |
-| `tile-match-gym` | gym | 🟡 display-only | runs & logs, but `Discrete(84)` swaps → no keyboard play |
-| `tobutobugirldx`, `nomolos`, `anguna` | retro | ⚠️ needs ROM | backend proven (Airstriker); import the ROM + confirm integration name |
-| `2048` | gym | ❌ broken upstream | package's own `reset()` crashes (numpy bug); no render |
-| `pathery`, `wordle` | gym | ❌ text-only | ANSI render + placement/typed actions → not a visual real-time game |
-| `mastermind` | gym | ❌ can't install | requires Python ≥3.13 (env is 3.11) |
-| `rush-hour` | gym | ❌ not packaged | repo has no `setup.py`/`pyproject` |
-| `coom`, `craftium` | gym | ⏸️ deferred | heavy engines (ViZDoom / Luanti); each needs a custom adapter |
+| class prefix | count | games |
+|---|---|---|
+| `atari__` | 10 | pong, breakout, spaceinvaders, mspacman, seaquest, qbert, asterix, beamrider, enduro, boxing |
+| `vgdl__` | 10 | aliens, beesAndBirds, … (needs the VGDL fork checkout) |
+| `minihack__` | 6 | room5x5/15x15, mazewalk9x9, river, corridor, eat |
+| `aigamestore__` | 10 | game1…game10 (p5.js; needs playwright) |
+| `classic__` | 5 | cartpole, mountaincar, acrobot, pendulum, mountaincarcontinuous |
+| `box2d__` | 3 | lunarlander, bipedalwalker, carracing (needs box2d-py) |
+| `mujoco__` | 10 | ant, halfcheetah, hopper, humanoid, … (`MUJOCO_GL=egl`) |
+| `text__` | 5 | frozenlake, frozenlake8x8, cliffwalking, taxi, blackjack (turn-based) |
+| `crafter__` | 1 | crafter |
+| `retro__` | 3 | tobutobugirldx, nomolos, anguna (need ROMs imported) |
 
-Takeaway: everything that is a **real-time visual game with a pixel frame**
-works (Atari, VGDL, Crafter, MiniHack, stable-retro, plus tile-match for
-display). The ones that don't fit are **turn-based / text / typed-input** games
-(2048-package-bug aside), which need a different input+render model than a
-scanner game loop — not a framework limitation so much as a genre mismatch.
+Each config carries `_game` / `_note` (per-game setup reminders). Games use
+`mode: "duration"` (300 s) so they auto-restart on game-over for continuous
+play; `ESC` quits. The `_note` flags class-specific requirements (VGDL repo,
+playwright, box2d-py, MuJoCo GL, ROM import).
+
+> **Not covered** (each config's `_note` / the spreadsheet says why): games with
+> no real-time pixel interface — `2048` (upstream reset bug), `pathery`/`wordle`
+> (text/placement), `mastermind` (needs Python ≥3.13), `rush-hour` (unpackaged),
+> and heavy engines `coom` (ViZDoom) / `craftium` (Luanti) that need a dedicated
+> adapter. The older `_status`-annotated stubs for these remain in
+> `configs/dbp_games/` (single-word filenames) as documentation.
 
 Runtime flow: experimenter screen (**SPACE**) → "Waiting for scanner..." →
 scanner **trigger `=`** (anchors the session clock) → curriculum phases → done.
@@ -153,8 +159,8 @@ backend:
  "mode": "duration", "duration": 30.0, "fps": 60, "state_stride": 15}
 ```
 
-The `configs/dbp_games/{tobutobugirldx,nomolos,anguna}.json` demos are marked
-`needs-ROM` for exactly this reason: the `retro` backend itself is verified
+The `configs/dbp_games/retro__{tobutobugirldx,nomolos,anguna}.json` configs
+need ROMs for exactly this reason: the `retro` backend itself is verified
 (with Airstriker), but those titles won't run until you import their ROMs and
 confirm the integration name.
 
@@ -338,7 +344,7 @@ gym.make("ALE/Pong-v5").unwrapped.get_action_meanings()
  "keys": {"UP": 2, "DOWN": 3}}      // UP = paddle up, DOWN = paddle down; SPACE still serves (FIRE=1)
 ```
 
-`configs/dbp_games/atari.json` and the built-in demo both use this Pong mapping.
+`configs/dbp_games/atari__pong.json` and the built-in demo both use this mapping.
 CartPole similarly uses `{"LEFT": 0, "RIGHT": 1}`.
 
 ## Output & data format

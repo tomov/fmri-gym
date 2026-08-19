@@ -1,0 +1,10 @@
+{
+  "_game": "Classic control: MountainCarContinuous-v0",
+  "_note": "Continuous action space; renders/logs but not keyboard-playable.",
+  "curriculum": [
+    {"type": "message", "text": "Classic control: MountainCarContinuous-v0", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"backend": "gym", "game": "MountainCarContinuous-v0", "fps": 30, "type": "game", "mode": "duration", "duration": 300.0},
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

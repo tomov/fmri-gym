@@ -1,0 +1,9 @@
+{
+  "_game": "toy_text: Taxi-v3",
+  "curriculum": [
+    {"type": "message", "text": "toy_text: Taxi-v3", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"backend": "gym", "game": "Taxi-v3", "fps": 5, "turn_based": true, "keys": {"DOWN": 0, "UP": 1, "RIGHT": 2, "LEFT": 3, "SPACE": 4, "RETURN": 5}, "type": "game", "mode": "duration", "duration": 300.0},
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "_game": "Box2D: LunarLander-v3",
+  "_note": "pip install swig box2d-py.",
+  "curriculum": [
+    {"type": "message", "text": "Box2D: LunarLander-v3", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"backend": "gym", "game": "LunarLander-v3", "fps": 30, "keys": {"SPACE": 2, "LEFT": 1, "RIGHT": 3}, "type": "game", "mode": "duration", "duration": 300.0},
+    {"type": "fixation", "duration": 2.0}
+  ]
+}
