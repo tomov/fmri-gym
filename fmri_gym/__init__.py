@@ -34,6 +34,9 @@ def get_adapter(backend, **kwargs):
     if backend == "minihack":
         from .adapters.minihack import MiniHackAdapter
         return MiniHackAdapter(**kwargs)
+    if backend == "nethack":
+        from .adapters.nethack import NetHackAdapter
+        return NetHackAdapter(**kwargs)
     if backend in ("aigamestore", "p5"):
         from .adapters.aigamestore import AIGameStoreAdapter
         return AIGameStoreAdapter(**kwargs)

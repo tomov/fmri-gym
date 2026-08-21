@@ -10,6 +10,7 @@ stable-retro           # NES/SNES/Genesis/... backend
 shimmy                 # run old-`gym` envs through the gym backend
 crafter                # `crafter` backend
 minihack               # `minihack` backend (pulls nle; pins gymnasium 1.2)
+nle                     # `nethack` backend (base NetHack; also pulled in by minihack)
 tile-match-gym         # `gym` backend, display+logging only (pulls numba->numpy<2)
 playwright             # `aigamestore` backend (p5.js/browser games); + a browser:
                        #   uses system Chrome by default; or `playwright install chromium`

@@ -14,7 +14,8 @@ through small pluggable **adapters**:
 | `gym`         | **any** Gymnasium env (`CartPole-v1`, MuJoCo, Box2D, toy_text, …); old-`gym` envs via shimmy | various |
 | `vgdl`        | VGDL games (`aliens`, `beesAndBirds`, …) | py-vgdl / pygame |
 | `crafter`     | Crafter (open-world survival) | crafter |
-| `minihack`    | MiniHack / NetHack tasks | minihack / NLE |
+| `minihack`    | MiniHack tasks (pixel obs) | minihack / NLE |
+| `nethack`     | NetHack (`NetHack*-v0`; TTY rendered to pixels) | nle |
 | `aigamestore` | AI GameStore p5.js/browser games (`game1`…`game10`) | p5.js via headless browser |
 
 > **All backends run in ONE env and ONE process.** Verified: a single session
@@ -99,6 +100,7 @@ the right per-game keymap/settings baked in. Coverage by class:
 | `atari__` | 10 | pong, breakout, spaceinvaders, mspacman, seaquest, qbert, asterix, beamrider, enduro, boxing |
 | `vgdl__` | 10 | aliens, beesAndBirds, … (needs the VGDL fork checkout) |
 | `minihack__` | 6 | room5x5/15x15, mazewalk9x9, river, corridor, eat |
+| `nethack__` | 1 | score (base NetHack; TTY rendered to a pixel frame) |
 | `aigamestore__` | 10 | game1…game10 (p5.js; needs playwright) |
 | `classic__` | 5 | cartpole, mountaincar, acrobot, pendulum, mountaincarcontinuous |
 | `box2d__` | 3 | lunarlander, bipedalwalker, carracing (needs box2d-py) |
@@ -252,6 +254,7 @@ fmri_gym/
     vgdl.py         # VGDLEnv: get_state/set_state, symbolic grid + events
     crafter.py      # old-gym-API wrapper; obs is the frame; achievements
     minihack.py     # pixel obs + compass keymap; blstats/glyphs/message
+    nethack.py      # base NLE: TTY grid -> RGB; vi-key movement; blstats
     aigamestore.py  # p5.js browser games via Playwright: canvas->RGB, getGameState
 fmri_play.py        # CLI entry point
 configs/            # example curricula
