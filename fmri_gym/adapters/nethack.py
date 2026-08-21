@@ -60,8 +60,9 @@ class NetHackAdapter(EnvAdapter):
         combos = {frozenset([k]): v for k, v in self._key_to_action.items()}
         # noop: NLE has no true no-op; default to the first action.
         return KeySpec(combos=combos, noop=0,
-                       help="Arrow keys move (NetHack vi-keys N/E/S/W); "
-                            "ENTER confirms prompts.")
+                       help="NetHack vi-keys under the hood (k/l/j/h)",
+                       controls=[("UP/DOWN/LEFT/RIGHT", "move N/S/W/E"),
+                                 ("ENTER", "confirm prompt")])
 
     def reset(self, env, seed, spec):
         obs, info = env.reset(seed=seed)

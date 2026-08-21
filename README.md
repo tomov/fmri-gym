@@ -126,6 +126,12 @@ scanner **trigger `=`** (anchors the session clock) → curriculum phases → do
 `ESC` quits early but still saves. Flags: `--size 1280x1024`, `--fullscreen`,
 `--save-pixels` (ALE only; see below).
 
+**Controls screen.** Before each game block, a screen shows the game name and
+its buttons + what they do (derived automatically from the adapter's keymap —
+e.g. ALE labels come from the game's action meanings), then waits for any key.
+Set `"show_controls": false` on a game phase to skip it, or
+`"controls_seconds": N` to auto-advance after N seconds.
+
 ## Running stable-retro games
 
 stable-retro only exposes a game once it has an **integration** and the game's

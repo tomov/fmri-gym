@@ -49,6 +49,67 @@ def _check_quit():
     return False
 
 
+# ASCII names (the default pygame font has no arrow glyphs -> tofu boxes).
+_ARROW_GLYPH = {"UP": "UP", "DOWN": "DOWN", "LEFT": "LEFT", "RIGHT": "RIGHT"}
+_KEY_ORDER = ["UP", "DOWN", "LEFT", "RIGHT", "SPACE", "Z", "X", "RETURN", "LSHIFT"]
+
+
+def _controls_from_keyspec(keyspec, adapter, env):
+    """Return ordered (keys, meaning) pairs for the controls screen.
+
+    Uses the adapter's explicit `controls` if provided; otherwise derives them
+    from the (already override-applied) combos, labelling each action via
+    adapter.describe_action so backends like ALE show real meanings
+    (RIGHT->'RIGHT', SPACE->'FIRE', ...).
+    """
+    if keyspec.controls:
+        return list(keyspec.controls)
+
+    def canon(keys):
+        return "+".join(_ARROW_GLYPH.get(k, k) for k in
+                        sorted(keys, key=lambda x: (_KEY_ORDER.index(x)
+                               if x in _KEY_ORDER else 99, x)))
+
+    def order(label):
+        first = label.split("+")[0]
+        name = {v: k for k, v in _ARROW_GLYPH.items()}.get(first, first)
+        return (_KEY_ORDER.index(name) if name in _KEY_ORDER else 99, label)
+
+    # Collapse duplicate actions (a `keys` override may leave the default key
+    # for the same action in place): keep the canonically-first key per action.
+    best = {}   # meaning -> (order_key, label)
+    for keys, action in keyspec.combos.items():
+        label = canon(keys)
+        try:
+            meaning = adapter.describe_action(env, action)
+        except Exception:
+            meaning = str(action)
+        # Hide unhelpful meanings: identical to the key label, or a bare action
+        # index (e.g. "3") that adds nothing over the key name.
+        if meaning == label or meaning.lstrip("-").isdigit():
+            meaning = ""
+        key = meaning or label
+        cand = (order(label), label)
+        if key not in best or cand < best[key]:
+            best[key] = cand
+    rows = [(label, meaning if meaning != label else "")
+            for meaning, (_, label) in best.items()]
+    return sorted(rows, key=lambda r: order(r[0]))
+
+
+def _wait_any_key():
+    """Block until any key is pressed (ESC raises to quit)."""
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                raise KeyboardInterrupt
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    raise KeyboardInterrupt
+                return
+        time.sleep(0.005)
+
+
 def _wait_for_char(char, dummy=False):
     if dummy:
         time.sleep(0.05)
@@ -108,6 +169,37 @@ class Session:
                 time.sleep(0.005)
         self.logger.log_phase({"index": index, "type": "message", "text": text,
                                "onset": onset, "offset": self.clock.rel()})
+
+    def _controls_screen(self, phase, keyspec, adapter, env):
+        """Show the game name + its buttons and what they do, before play.
+
+        Waits for any key press (experimenter/subject), or auto-advances after
+        `controls_seconds` if set. Skipped in dummy-trigger runs (headless).
+        """
+        title = phase.get("text") or phase.get("game", "Game")
+        lines = [str(title), ""]
+        controls = _controls_from_keyspec(keyspec, adapter, env)
+        if controls:
+            lines.append("Controls:")
+            width = max(len(k) for k, _ in controls)
+            for keys, meaning in controls:
+                lines.append(f"   {keys:<{width}}   {meaning}" if meaning
+                             else f"   {keys}")
+        elif keyspec.help:
+            lines += ["Controls:", "   " + keyspec.help]
+        lines += ["", "(press any key to start — ESC quits)"]
+        self.display.draw_text("\n".join(lines))
+        secs = phase.get("controls_seconds")
+        if self.dummy:
+            time.sleep(0.05)
+        elif secs is not None:
+            end = time.perf_counter() + secs
+            while time.perf_counter() < end:
+                if _check_quit():
+                    raise KeyboardInterrupt
+                time.sleep(0.005)
+        else:
+            _wait_any_key()
 
     def _survey(self, phase, index):
         questions = phase.get("questions", [])
@@ -177,6 +269,11 @@ class Session:
                                   "episode_id", "t_rel", "t_epoch", "state_blob")}
         frames["episode_seeds"] = []
         frames["variables"] = {}   # varname -> list, filled lazily
+
+        # Show a per-game controls screen: game name + which buttons do what.
+        # Skip with "show_controls": false; auto-advance with "controls_seconds".
+        if phase.get("show_controls", True):
+            self._controls_screen(phase, keyspec, adapter, env)
 
         onset = self.clock.rel()
         block_end = time.perf_counter() + cap

@@ -91,7 +91,8 @@ class VGDLAdapter(EnvAdapter):
     def keymap(self, env) -> KeySpec:
         combos = {frozenset([k]): idx for k, idx in _KEYS.items()}
         return KeySpec(combos=combos, noop=_VGDL_ACTIONS.index("NO_OP"),
-                       help="Arrow keys move, SPACE acts.")
+                       controls=[("LEFT/RIGHT/UP/DOWN", "move"),
+                                 ("SPACE", "act / use")])
 
     def reset(self, env, seed, spec):
         if seed is not None:
