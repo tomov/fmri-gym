@@ -90,8 +90,13 @@ def _tty_to_rgb(obs, cell):
     chars = np.asarray(obs["tty_chars"])
     colors = np.asarray(obs["tty_colors"])
     rows, cols = chars.shape
-    font = pygame.font.SysFont("monospace", int(cell * 1.4))
-    surf = pygame.Surface((cols * cell, rows * cell))
+    # Size a monospace font by cell height, then MEASURE its actual glyph box
+    # and lay the grid out on exactly that pitch -- so cells never overlap
+    # (the previous bug) and there are no gaps. Terminal cells are taller than
+    # wide, which the measured (gw, gh) naturally reproduces.
+    font = _mono_font(pygame, int(cell * 2))
+    gw, gh = font.size("W")
+    surf = pygame.Surface((cols * gw, rows * gh))
     surf.fill((0, 0, 0))
     for r in range(rows):
         for c in range(cols):
@@ -100,5 +105,18 @@ def _tty_to_rgb(obs, cell):
                 continue
             col = _TTY_PALETTE[int(colors[r, c]) & 0x0F]
             glyph = font.render(chr(ch), True, tuple(int(x) for x in col))
-            surf.blit(glyph, (c * cell, r * cell))
+            # center the glyph horizontally in its cell (glyph width may be < gw)
+            surf.blit(glyph, (c * gw + (gw - glyph.get_width()) // 2, r * gh))
     return pygame.surfarray.array3d(surf).transpose(1, 0, 2)
+
+
+def _mono_font(pygame, size):
+    """A real fixed-width font (falls back gracefully across systems)."""
+    for name in ("dejavusansmono", "liberationmono", "couriernew", "monospace"):
+        try:
+            f = pygame.font.SysFont(name, size)
+            if f is not None:
+                return f
+        except Exception:
+            continue
+    return pygame.font.Font(pygame.font.get_default_font(), size)
