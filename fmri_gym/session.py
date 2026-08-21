@@ -189,6 +189,11 @@ class Session:
             lines += ["Controls:", "   " + keyspec.help]
         lines += ["", "(press any key to start — ESC quits)"]
         self.display.draw_text("\n".join(lines))
+        # Drop any keypresses queued during the (possibly slow) make()/load, so
+        # they don't instantly dismiss this screen. Keep honoring ESC.
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT or (e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE):
+                raise KeyboardInterrupt
         secs = phase.get("controls_seconds")
         if self.dummy:
             time.sleep(0.05)
@@ -257,6 +262,11 @@ class Session:
         # and a single held key fires many times. turn_based fixes both.
         turn_based = bool(phase.get("turn_based", False))
 
+        # Some backends (nle, browser games) take several seconds to start;
+        # show a Loading screen so the previous fixation "+" doesn't freeze.
+        if phase.get("show_controls", True):
+            self.display.draw_text(
+                f"Loading {phase.get('text') or phase.get('game', 'game')} …")
         env = adapter.make(phase)
         keyspec = adapter.keymap(env)
         # Allow the curriculum to override the mapping explicitly.
