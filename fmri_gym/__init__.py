@@ -34,6 +34,9 @@ def get_adapter(backend, **kwargs):
     if backend == "minihack":
         from .adapters.minihack import MiniHackAdapter
         return MiniHackAdapter(**kwargs)
+    if backend == "baba":
+        from .adapters.baba import BabaAdapter
+        return BabaAdapter(**kwargs)
     if backend == "overcooked":
         from .adapters.overcooked import OvercookedAdapter
         return OvercookedAdapter(**kwargs)

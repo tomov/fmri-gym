@@ -1,0 +1,10 @@
+{
+  "_game": "Baba Is You: make_win (language / rule-manipulation puzzle)",
+  "_note": "pip install git+https://github.com/nacloos/baba-is-ai.git. Env ids: env/make_win, env/goto_win, env/you_win, and distractor variants. Push word blocks to rewrite the rules.",
+  "curriculum": [
+    {"type": "message", "text": "Baba Is You: make_win", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"type": "game", "backend": "baba", "game": "env/make_win", "mode": "duration", "duration": 300.0, "fps": 8},
+    {"type": "fixation", "duration": 2.0}
+  ]
+}
