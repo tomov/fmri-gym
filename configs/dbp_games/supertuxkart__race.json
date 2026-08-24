@@ -1,0 +1,10 @@
+{
+  "_game": "SuperTuxKart (sports/racing)",
+  "_note": "pip install pystk2-gymnasium (brings pysupertuxkart2). Renders the 3D scene via pystk2 -> needs a REAL GL context (a display or Xvfb+GLX); does NOT work under SDL_VIDEODRIVER=dummy. Controls: arrows steer/accelerate/brake, SPACE fire, Z drift, X nitro.",
+  "curriculum": [
+    {"type": "message", "text": "SuperTuxKart", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"type": "game", "backend": "supertuxkart", "game": "supertuxkart", "num_kart": 3, "laps": 3, "mode": "duration", "duration": 300.0, "fps": 30},
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

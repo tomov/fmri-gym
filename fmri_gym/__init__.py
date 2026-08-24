@@ -34,6 +34,9 @@ def get_adapter(backend, **kwargs):
     if backend == "minihack":
         from .adapters.minihack import MiniHackAdapter
         return MiniHackAdapter(**kwargs)
+    if backend in ("supertuxkart","stk"):
+        from .adapters.supertuxkart import SuperTuxKartAdapter
+        return SuperTuxKartAdapter(**kwargs)
     if backend == "rushhour":
         from .adapters.rushhour import RushHourAdapter
         return RushHourAdapter(**kwargs)
