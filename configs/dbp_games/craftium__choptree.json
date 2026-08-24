@@ -1,0 +1,9 @@
+{
+  "_game": "Craftium: ChopTree (open-world voxel; Luanti engine)",
+  "_note": "pip install the craftium wheel (github.com/mikelma/craftium releases). Uses the gym backend; import_module registers Craftium/* envs. obs IS the 64x64 frame. Env ids: Craftium/Room-v0, SmallRoom-v0, ChopTree-v0, Speleo-v0, SpidersAttack-v0, OpenWorld-v0, ProcDungeons-v0. Arrows map to the first movement actions; override with keys.",
+  "curriculum": [
+    {"type": "message", "text": "Craftium: ChopTree", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"type": "game", "backend": "gym", "game": "Craftium/ChopTree-v0", "import_module": "craftium", "mode": "duration", "duration": 300.0, "fps": 15}
+  ]
+}
