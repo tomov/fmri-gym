@@ -1,0 +1,10 @@
+{
+  "_game": "Overcooked: cramped_room (social / co-op cooking)",
+  "_note": "pip install overcooked-ai. You control cook 0; partner idles (set 'partner':'random' to move). Layouts: cramped_room, asymmetric_advantages, coordination_ring, forced_coordination, counter_circuit_o_1order.",
+  "curriculum": [
+    {"type": "message", "text": "Overcooked: cramped_room", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"type": "game", "backend": "overcooked", "game": "cramped_room", "mode": "duration", "duration": 300.0, "fps": 10},
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

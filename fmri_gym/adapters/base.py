@@ -148,7 +148,10 @@ class EnvAdapter:
         return env.render()
 
     def close(self, env) -> None:
-        env.close()
+        # Not every env exposes close() (e.g. overcooked's OvercookedEnv).
+        closer = getattr(env, "close", None)
+        if callable(closer):
+            closer()
 
 
 def held_key_names(pygame_module, keys=None) -> frozenset[str]:
