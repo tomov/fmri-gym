@@ -1,0 +1,10 @@
+{
+  "_game": "ViZDoom: Defend the Center (Doom action-shooter; COOM engine)",
+  "_note": "pip install vizdoom. Doom scenario via ViZDoom's gymnasium envs. Try other Vizdoom*-v1 ids (DeadlyCorridor, HealthGathering, TakeCover, Deathmatch, ...).",
+  "curriculum": [
+    {"type": "message", "text": "ViZDoom: Defend the Center", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"type": "game", "backend": "vizdoom", "game": "VizdoomDefendCenter-v1", "mode": "duration", "duration": 300.0, "fps": 20},
+    {"type": "fixation", "duration": 2.0}
+  ]
+}
