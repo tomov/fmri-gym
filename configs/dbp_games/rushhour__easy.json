@@ -1,0 +1,10 @@
+{
+  "_game": "Rush Hour (puzzle: slide cars to free the red car)",
+  "_note": "Setup: (1) pip install 'git+https://github.com/chrplr/Rush-Hour.git#subdirectory=python'; (2) clone the repo to vendor/rush-hour-src and build the Go engine: `git clone https://github.com/chrplr/Rush-Hour vendor/rush-hour-src && cd vendor/rush-hour-src && go build -o rushhour-env ./cmd/rushhour-env` (the adapter auto-finds it there, or set RUSHHOUR_ENV_BIN / the phase 'binary'). Turn-based; number keys 1-9,0 = moves. Env ids: RushHour-v0, RushHour-Easy-v0, RushHourFixed-v0.",
+  "curriculum": [
+    {"type": "message", "text": "Rush Hour (Easy)", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"type": "game", "backend": "rushhour", "game": "RushHour-Easy-v0", "mode": "duration", "duration": 300.0, "fps": 5, "turn_based": true},
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

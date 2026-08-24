@@ -5,3 +5,6 @@ data/
 __pycache__/
 *.pyc
 .venv/
+
+# Rush Hour: build-from-source Go engine (clone+build locally; see rushhour config _note)
+vendor/rush-hour-src/
