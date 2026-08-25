@@ -17,6 +17,11 @@ through small pluggable **adapters**:
 | `minihack`    | MiniHack tasks (pixel obs) | minihack / NLE |
 | `nethack`     | NetHack (`NetHack*-v0`; TTY rendered to pixels) | nle |
 | `aigamestore` | AI GameStore p5.js/browser games (`game1`…`game10`) | p5.js via headless browser |
+| `vizdoom`     | Doom action-shooter scenarios (COOM's engine) | ViZDoom |
+| `overcooked`  | Overcooked co-op cooking (social) | overcooked_ai |
+| `baba`        | Baba Is You (rule-manipulation puzzle) | baba-is-ai |
+| `rushhour`    | Rush Hour sliding-block puzzle | rushhour_gym + Go engine |
+| `supertuxkart`| SuperTuxKart 3D racing (needs a real GL display) | pystk2 |
 
 > **All backends run in ONE env and ONE process.** Verified: a single session
 > with ALE + retro + gym + VGDL blocks back-to-back, and each of Crafter /
@@ -107,6 +112,12 @@ the right per-game keymap/settings baked in. Coverage by class:
 | `mujoco__` | 10 | ant, halfcheetah, hopper, humanoid, … (`MUJOCO_GL=egl`) |
 | `text__` | 5 | frozenlake, frozenlake8x8, cliffwalking, taxi, blackjack (turn-based) |
 | `crafter__` | 1 | crafter |
+| `craftium__` | 1 | choptree (Luanti voxel; other ids: Room/Speleo/OpenWorld/…) |
+| `vizdoom__` | 1 | defend_center (Doom; COOM's engine; other Vizdoom*-v1 scenarios) |
+| `overcooked__` | 1 | cramped_room (co-op cooking; other layouts) |
+| `baba__` | 1 | make_win (rule-manipulation puzzle; other ids) |
+| `rushhour__` | 1 | easy (sliding-block puzzle; needs the Go engine built) |
+| `supertuxkart__` | 1 | race (3D racing; needs a real GL display) |
 | `retro__` | 3 | tobutobugirldx, nomolos, anguna (need ROMs imported) |
 
 Each config carries `_game` / `_note` (per-game setup reminders). Games use

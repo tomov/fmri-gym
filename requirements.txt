@@ -15,6 +15,17 @@ tile-match-gym         # `gym` backend, display+logging only (pulls numba->numpy
 playwright             # `aigamestore` backend (p5.js/browser games); + a browser:
                        #   uses system Chrome by default; or `playwright install chromium`
 pillow                 # `aigamestore` backend: PNG canvas screenshot -> RGB frame
+vizdoom                # `vizdoom` backend (Doom action-shooter; COOM's engine)
+overcooked-ai          # `overcooked` backend (co-op cooking, social)
+pystk2-gymnasium       # `supertuxkart` backend (3D racing; NEEDS a real GL display)
+
+# From non-PyPI sources / needing a toolchain (see each config's _note):
+#   baba       -> pip install "git+https://github.com/nacloos/baba-is-ai.git"
+#   rushhour   -> pip install "git+https://github.com/chrplr/Rush-Hour.git#subdirectory=python"
+#                 + build the Go engine: go build -o rushhour-env ./cmd/rushhour-env
+#   craftium   -> pip install the prebuilt wheel from github.com/mikelma/craftium releases
+#                 (pins gymnasium 0.29 but runs on 1.2)
+#   COOM proper pins gymnasium 0.28 (conflicts) -> we use `vizdoom` instead.
 
 # Standard Gymnasium families (all via the `gym` backend; all verified to render):
 #   classic_control, toy_text  -> included with `gymnasium` above
