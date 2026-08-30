@@ -48,8 +48,8 @@ class Logger:
             rewards=np.asarray(frames["reward"], dtype=np.float32),
             terminal=np.asarray(frames["terminal"], dtype=bool),
             episode_id=np.asarray(frames["episode_id"], dtype=np.int32),
-            t_rel=np.asarray(frames["t_rel"], dtype=np.float64),
-            t_epoch=np.asarray(frames["t_epoch"], dtype=np.float64),
+            session_time=np.asarray(frames["session_time"], dtype=np.float64),
+            wall_time=np.asarray(frames["wall_time"], dtype=np.float64),
             # Opaque per-frame savestate blobs (object array of bytes|None).
             states=np.array(frames["state_blob"], dtype=object),
             episode_seeds=np.asarray(frames["episode_seeds"], dtype=np.int64),

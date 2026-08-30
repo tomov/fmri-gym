@@ -23,20 +23,20 @@ EXPERIMENTER_KEY = " "
 
 
 class Clock:
-    """Anchored at the scanner trigger; gives trigger-relative + epoch time."""
+    """Anchored at the scanner trigger; gives session + wall-clock time."""
 
     def __init__(self):
         self.t0_perf = None
         self.t0_epoch = None
 
-    def anchor(self):
+    def trigger(self):
         self.t0_perf = time.perf_counter()
         self.t0_epoch = time.time()
 
-    def rel(self):
+    def session_time(self):
         return time.perf_counter() - self.t0_perf
 
-    def epoch(self):
+    def wall_time(self):
         return time.time()
 
 
@@ -126,6 +126,15 @@ def _wait_for_char(char, dummy=False):
         time.sleep(0.005)
 
 
+def _wait_duration(duration):
+    """Block for `duration` seconds (ESC/quit raises KeyboardInterrupt)."""
+    end = time.perf_counter() + duration
+    while time.perf_counter() < end:
+        if _check_quit():
+            raise KeyboardInterrupt
+        time.sleep(0.005)
+
+
 class Session:
     """Runs a curriculum for one subject, dispatching phases to handlers."""
 
@@ -144,51 +153,90 @@ class Session:
 
     def _fixation(self, phase, index):
         duration = phase.get("duration", 2.0)
-        onset = self.clock.rel()
+        onset = self.clock.session_time()
         self.display.draw_fixation()
-        end = time.perf_counter() + duration
-        while time.perf_counter() < end:
-            if _check_quit():
-                raise KeyboardInterrupt
-            time.sleep(0.005)
+        _wait_duration(duration)
         self.logger.log_phase({"index": index, "type": "fixation",
-                               "onset": onset, "offset": self.clock.rel()})
+                               "onset": onset, "offset": self.clock.session_time()})
 
     def _message(self, phase, index):
         text = phase.get("text", "")
         duration = phase.get("duration")
-        onset = self.clock.rel()
-        self.display.draw_text(text, align=phase.get("align", "center"))
+        onset = self.clock.session_time()
+        self.display.draw_text(text)
         if duration is None:
             _wait_for_char(phase.get("key", " "), dummy=self.dummy)
         else:
-            end = time.perf_counter() + duration
-            while time.perf_counter() < end:
-                if _check_quit():
-                    raise KeyboardInterrupt
-                time.sleep(0.005)
+            _wait_duration(duration)
         self.logger.log_phase({"index": index, "type": "message", "text": text,
-                               "onset": onset, "offset": self.clock.rel()})
+                               "onset": onset, "offset": self.clock.session_time()})
 
-    def _controls_screen(self, phase, keyspec, adapter, env):
-        """Show the game name + its buttons and what they do, before play.
+    @staticmethod
+    def _format_controls_rows(rows):
+        """Format [(keys, meaning), ...] into an aligned indented table."""
+        rows = [(str(k), str(m)) for k, m in rows]
+        width = max((len(k) for k, _ in rows), default=0)
+        return [f"   {k:<{width}}   {m}".rstrip() if m else f"   {k}"
+                for k, m in rows]
 
-        Waits for any key press (experimenter/subject), or auto-advances after
-        `controls_seconds` if set. Skipped in dummy-trigger runs (headless).
+    def _controls_text(self, phase, keyspec, adapter, env):
+        """Return (text, align) for the pre-game controls screen.
+
+        If the config supplies `controls_screen`, it fully drives the screen
+        (hardcoded, verbatim) so the experimenter controls exactly what's shown:
+          - a string            -> rendered as-is (align "center")
+          - {"title", "text"}    -> title + free text
+          - {"title", "lines":[...]}       -> title + verbatim lines
+          - {"title", "controls":[[k,m]]}  -> title + auto-aligned table
+          optional: "align" ("left"/"center"), "footer" (bool/str; the
+          "press any key" prompt, on by default).
+        Otherwise the screen is auto-derived from the (override-applied) keymap.
         """
+        cs = phase.get("controls_screen")
+        if cs is not None:
+            if isinstance(cs, str):
+                return cs, "center"
+            lines = []
+            title = cs.get("title", phase.get("text") or phase.get("game"))
+            if title:
+                lines += [str(title), ""]
+            if cs.get("text"):
+                lines += str(cs["text"]).split("\n")
+            if "lines" in cs:
+                lines += [str(x) for x in cs["lines"]]
+            if "controls" in cs:
+                if lines and lines[-1] != "":
+                    lines.append("")
+                lines.append("Controls:")
+                lines += self._format_controls_rows(cs["controls"])
+            footer = cs.get("footer", True)
+            if footer:
+                lines += ["", footer if isinstance(footer, str)
+                          else "(press any key to start — ESC quits)"]
+            return "\n".join(lines), cs.get("align", "left")
+
+        # Auto-derived from the keymap.
         title = phase.get("text") or phase.get("game", "Game")
         lines = [str(title), ""]
         controls = _controls_from_keyspec(keyspec, adapter, env)
         if controls:
             lines.append("Controls:")
-            width = max(len(k) for k, _ in controls)
-            for keys, meaning in controls:
-                lines.append(f"   {keys:<{width}}   {meaning}" if meaning
-                             else f"   {keys}")
+            lines += self._format_controls_rows(controls)
         elif keyspec.help:
             lines += ["Controls:", "   " + keyspec.help]
         lines += ["", "(press any key to start — ESC quits)"]
-        self.display.draw_text("\n".join(lines))
+        return "\n".join(lines), "left" if controls else "center"
+
+    def _controls_screen(self, phase, keyspec, adapter, env):
+        """Show the game name + its buttons and what they do, before play.
+
+        Content is either fully specified by the config (`controls_screen`) for
+        complete control over the visualization, or auto-derived from the
+        keymap. Waits for any key press (experimenter/subject), or auto-advances
+        after `controls_seconds` if set. Skipped in dummy-trigger runs.
+        """
+        text, align = self._controls_text(phase, keyspec, adapter, env)
+        self.display.draw_text(text, align=align)
         # Drop any keypresses queued during the (possibly slow) make()/load, so
         # they don't instantly dismiss this screen. Keep honoring ESC.
         for e in pygame.event.get():
@@ -198,18 +246,14 @@ class Session:
         if self.dummy:
             time.sleep(0.05)
         elif secs is not None:
-            end = time.perf_counter() + secs
-            while time.perf_counter() < end:
-                if _check_quit():
-                    raise KeyboardInterrupt
-                time.sleep(0.005)
+            _wait_duration(secs)
         else:
             _wait_any_key()
 
     def _survey(self, phase, index):
         questions = phase.get("questions", [])
         n_points = phase.get("n_points", 7)
-        onset = self.clock.rel()
+        onset = self.clock.session_time()
         responses = []
         for q in questions:
             value = (n_points + 1) // 2
@@ -234,9 +278,9 @@ class Session:
                             confirmed = True
                 time.sleep(0.005)
             responses.append({"question": q, "value": value,
-                              "t_rel": self.clock.rel()})
+                              "session_time": self.clock.session_time()})
         self.logger.log_phase({"index": index, "type": "survey",
-                               "onset": onset, "offset": self.clock.rel(),
+                               "onset": onset, "offset": self.clock.session_time(),
                                "responses": responses})
 
     def _game(self, phase, index):
@@ -276,7 +320,7 @@ class Session:
                          if len(ks) == 1}
 
         frames = {k: [] for k in ("action", "reward", "terminal",
-                                  "episode_id", "t_rel", "t_epoch", "state_blob")}
+                                  "episode_id", "session_time", "wall_time", "state_blob")}
         frames["episode_seeds"] = []
         frames["variables"] = {}   # varname -> list, filled lazily
 
@@ -285,7 +329,7 @@ class Session:
         if phase.get("show_controls", True):
             self._controls_screen(phase, keyspec, adapter, env)
 
-        onset = self.clock.rel()
+        onset = self.clock.session_time()
         block_end = time.perf_counter() + cap
         episode_id = 0
         total_reward = 0.0
@@ -338,8 +382,8 @@ class Session:
                 frames["reward"].append(reward)
                 frames["terminal"].append(bool(terminated or truncated))
                 frames["episode_id"].append(episode_id)
-                frames["t_rel"].append(self.clock.rel())
-                frames["t_epoch"].append(self.clock.epoch())
+                frames["session_time"].append(self.clock.session_time())
+                frames["wall_time"].append(self.clock.wall_time())
                 frames["state_blob"].append(fs.blob)
                 for k, v in fs.variables.items():
                     frames["variables"].setdefault(k, []).append(v)
@@ -361,7 +405,7 @@ class Session:
         self.logger.log_phase({
             "index": index, "type": "game", "backend": backend,
             "game": phase["game"], "mode": mode,
-            "onset": onset, "offset": self.clock.rel(),
+            "onset": onset, "offset": self.clock.session_time(),
             "n_episodes": episode_id, "n_frames": len(frames["action"]),
             "total_reward": total_reward, "data_file": path.split("/")[-1],
         })
@@ -381,7 +425,7 @@ class Session:
             self.display.draw_text("Waiting for scanner...")
             _wait_for_char(TRIGGER_KEY, dummy=self.dummy)
 
-            self.clock.anchor()
+            self.clock.trigger()
             self.logger.set_trigger_time()
 
             for index, phase in enumerate(self.curriculum):

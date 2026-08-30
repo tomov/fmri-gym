@@ -378,7 +378,7 @@ Each session writes `data/<subject>_<timestamp>/`:
   | key | meaning |
   |-----|---------|
   | `actions`, `rewards`, `terminal`, `episode_id` | per frame |
-  | `t_rel`, `t_epoch` | seconds since trigger; wall-clock epoch |
+  | `session_time`, `wall_time` | seconds since trigger; wall-clock Unix time |
   | `states` | per-frame savestate blob (object array; `None` if engine has none) |
   | `episode_seeds` | RNG seed per episode |
   | `backend`, `game` | provenance |
