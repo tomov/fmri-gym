@@ -21,7 +21,7 @@
     {"type": "game", "backend": "gym", "game": "MountainCar-v0", "mode": "episode", "n_episodes": 1, "max_duration": 15.0, "fps": 30, "keys": {"LEFT": 0, "RIGHT": 2}},
     {"type": "message", "text": "FrozenLake (toy_text)", "duration": 2.0},
     {"type": "fixation", "duration": 2.0},
-    {"type": "game", "backend": "gym", "game": "FrozenLake-v1", "make_kwargs": {"is_slippery": false}, "mode": "episode", "n_episodes": 2, "max_duration": 15.0, "fps": 5, "turn_based": true, "keys": {"LEFT": 0, "DOWN": 1, "RIGHT": 2, "UP": 3}},
+    {"type": "game", "backend": "gym", "game": "FrozenLake-v1", "env_kwargs": {"is_slippery": false}, "mode": "episode", "n_episodes": 2, "max_duration": 15.0, "fps": 5, "turn_based": true, "keys": {"LEFT": 0, "DOWN": 1, "RIGHT": 2, "UP": 3}},
     {"type": "message", "text": "CarRacing (Box2D)", "duration": 2.0},
     {"type": "fixation", "duration": 2.0},
     {"type": "game", "backend": "gym", "game": "CarRacing-v3", "mode": "episode", "n_episodes": 1, "max_duration": 15.0, "fps": 30},

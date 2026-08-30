@@ -32,7 +32,7 @@ class DefaultAdapter(EnvAdapter):
         if import_mod:
             import importlib
             importlib.import_module(import_mod)
-        kwargs = dict(spec.get("make_kwargs", {}))
+        kwargs = dict(spec.get("env_kwargs", {}))
         kwargs.setdefault("render_mode", "rgb_array")
         if spec.get("legacy_gym"):
             return _make_via_shimmy(spec["game"], **kwargs)

@@ -85,7 +85,7 @@ class VizDoomAdapter(EnvAdapter):
     def make(self, spec: dict) -> gym.Env:
         from vizdoom import gymnasium_wrapper  # noqa: F401  (registers Vizdoom*-v1)
         return gym.make(spec["game"], render_mode="rgb_array",
-                        **spec.get("make_kwargs", {}))
+                        **spec.get("env_kwargs", {}))
 
     def keymap(self, env: gym.Env) -> KeySpec:
         return _get_default_key_to_action_map(env)

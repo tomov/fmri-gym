@@ -64,7 +64,7 @@ override 4–7). No savestate → seed+replay. blstats/glyphs/message logged.
 
 ### 🟡 tile-match-gym (gym, display-only)
 `pip install tile-match-gym` (pulls numba → numpy 1.26). Import the package to
-register `TileMatch-v0`; constructor needs board kwargs (via `make_kwargs`).
+register `TileMatch-v0`; constructor needs board kwargs (via `env_kwargs`).
 5-tuple, `render_mode="rgb_array"` → (324,273,3). Runs & logs fine, but
 `action_space = Discrete(84)` (choose a tile swap) has no natural arrow-key
 mapping — a human would need a pointer/selection input mode.

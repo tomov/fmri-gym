@@ -3,7 +3,7 @@
   "curriculum": [
     {"type": "message", "text": "toy_text: FrozenLake-v1", "duration": 2.0},
     {"type": "fixation", "duration": 1.0},
-    {"backend": "gym", "game": "FrozenLake-v1", "fps": 5, "turn_based": true, "keys": {"LEFT": 0, "DOWN": 1, "RIGHT": 2, "UP": 3}, "make_kwargs": {"is_slippery": false}, "type": "game", "mode": "duration", "duration": 300.0},
+    {"backend": "gym", "game": "FrozenLake-v1", "fps": 5, "turn_based": true, "keys": {"LEFT": 0, "DOWN": 1, "RIGHT": 2, "UP": 3}, "env_kwargs": {"is_slippery": false}, "type": "game", "mode": "duration", "duration": 300.0},
     {"type": "fixation", "duration": 2.0}
   ]
 }
