@@ -35,11 +35,7 @@ class CrafterAdapter(EnvAdapter):
 
     def keymap(self, env) -> KeySpec:
         combos = {frozenset([k]): v for k, v in _KEYS.items()}
-        return KeySpec(combos=combos, noop=0,
-                       help="place/make actions via a keys override",
-                       controls=[("LEFT/RIGHT/UP/DOWN", "move"),
-                                 ("SPACE", "interact / do"),
-                                 ("S", "sleep")])
+        return KeySpec(combos=combos, noop=0)
 
     def reset(self, env, seed, spec):
         # Old-gym reset(): obs only. Re-seed per episode if supported.

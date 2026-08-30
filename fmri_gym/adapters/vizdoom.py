@@ -33,10 +33,6 @@ _KEY_BUTTONS = {
     "X": ["TURN_RIGHT"],
     "SPACE": ["ATTACK", "USE"],
 }
-_FRIENDLY = {"MOVE_FORWARD": "move forward", "MOVE_BACKWARD": "move back",
-             "MOVE_LEFT": "strafe left", "MOVE_RIGHT": "strafe right",
-             "TURN_LEFT": "turn left", "TURN_RIGHT": "turn right",
-             "ATTACK": "shoot", "USE": "use"}
 
 
 class VizDoomAdapter(EnvAdapter):
@@ -56,9 +52,6 @@ class VizDoomAdapter(EnvAdapter):
             on = [names[j] for j, v in enumerate(row) if v]
             if len(on) == 1 and on[0] not in out:   # single-button action
                 out[on[0]] = i
-        self._btn_meaning = {}  # action idx -> friendly label, for describe_action
-        for name, idx in out.items():
-            self._btn_meaning[idx] = _FRIENDLY.get(name, name.lower())
         return out
 
     def keymap(self, env) -> KeySpec:
@@ -69,17 +62,7 @@ class VizDoomAdapter(EnvAdapter):
                 if b in btn_idx:
                     combos[frozenset([key])] = btn_idx[b]
                     break
-        # controls list (key -> friendly meaning) for the auto screen
-        controls = []
-        for key in ["UP", "DOWN", "LEFT", "RIGHT", "SPACE", "Z", "X"]:
-            ks = frozenset([key])
-            if ks in combos:
-                controls.append((key, self._btn_meaning.get(combos[ks], "")))
-        return KeySpec(combos=combos, noop=0,
-                       help="", controls=controls)
-
-    def describe_action(self, env, action) -> str:
-        return getattr(self, "_btn_meaning", {}).get(int(action), str(action))
+        return KeySpec(combos=combos, noop=0)
 
     def render(self, env):
         return np.asarray(env.render())

@@ -41,10 +41,7 @@ class OvercookedAdapter(EnvAdapter):
         combos = {frozenset(["UP"]): (0, -1), frozenset(["DOWN"]): (0, 1),
                   frozenset(["LEFT"]): (-1, 0), frozenset(["RIGHT"]): (1, 0),
                   frozenset(["SPACE"]): "interact"}
-        return KeySpec(combos=combos, noop=(0, 0),
-                       help="you are cook 0; the partner idles by default",
-                       controls=[("LEFT/RIGHT/UP/DOWN", "move / face"),
-                                 ("SPACE", "interact (pick up / drop / serve)")])
+        return KeySpec(combos=combos, noop=(0, 0))
 
     def reset(self, env, seed, spec):
         env.reset()

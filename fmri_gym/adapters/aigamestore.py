@@ -109,15 +109,7 @@ class AIGameStoreAdapter(EnvAdapter):
 
     def keymap(self, env) -> KeySpec:
         combos = {frozenset([k]): k for k in _KEY_TO_PLAYWRIGHT}
-        ks = KeySpec(combos=combos, noop=frozenset(),
-                     help="keys are forwarded to the browser (hold several at once); "
-                          "exact actions vary per game",
-                     controls=[("ARROWS", "move / navigate"),
-                               ("SPACE", "primary action / select"),
-                               ("Z", "secondary action"),
-                               ("X / SHIFT", "extra actions"),
-                               ("ENTER", "start / confirm"),
-                               ("R", "restart")])
+        ks = KeySpec(combos=combos, noop=frozenset())
         # Override resolve to return the FULL set of held keys as a stable
         # "+"-joined string (keyboard games use simultaneous keys; a string logs
         # cleanly to npz, unlike a frozenset). "" == no keys held.

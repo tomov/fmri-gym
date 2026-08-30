@@ -46,9 +46,7 @@ class MiniHackAdapter(EnvAdapter):
 
     def keymap(self, env) -> KeySpec:
         combos = {frozenset([k]): v for k, v in _KEYS.items()}
-        return KeySpec(combos=combos, noop=0,
-                       help="diagonals via a keys override (NE=4,SE=5,SW=6,NW=7)",
-                       controls=[("UP/DOWN/LEFT/RIGHT", "move N/S/W/E")])
+        return KeySpec(combos=combos, noop=0)
 
     def reset(self, env, seed, spec):
         obs, info = env.reset(seed=seed)

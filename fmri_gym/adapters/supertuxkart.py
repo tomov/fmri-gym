@@ -55,11 +55,7 @@ class SuperTuxKartAdapter(EnvAdapter):
         # just declare which keys are meaningful (resolve returns the held set).
         keys = ["LEFT", "RIGHT", "UP", "DOWN", "SPACE", "Z", "X"]
         combos = {frozenset([k]): k for k in keys}
-        ks = KeySpec(combos=combos, noop=frozenset(),
-                     help="hold several keys at once",
-                     controls=[("LEFT/RIGHT", "steer"), ("UP", "accelerate"),
-                               ("DOWN", "brake"), ("SPACE", "fire item"),
-                               ("Z", "drift"), ("X", "nitro")])
+        ks = KeySpec(combos=combos, noop=frozenset())
         ks.resolve = lambda held: "+".join(sorted(held & set(keys)))
         return ks
 

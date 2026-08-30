@@ -49,67 +49,6 @@ def _check_quit():
     return False
 
 
-# ASCII names (the default pygame font has no arrow glyphs -> tofu boxes).
-_ARROW_GLYPH = {"UP": "UP", "DOWN": "DOWN", "LEFT": "LEFT", "RIGHT": "RIGHT"}
-_KEY_ORDER = ["UP", "DOWN", "LEFT", "RIGHT", "SPACE", "Z", "X", "RETURN", "LSHIFT"]
-
-
-def _controls_from_keyspec(keyspec, adapter, env):
-    """Return ordered (keys, meaning) pairs for the controls screen.
-
-    Uses the adapter's explicit `controls` if provided; otherwise derives them
-    from the (already override-applied) combos, labelling each action via
-    adapter.describe_action so backends like ALE show real meanings
-    (RIGHT->'RIGHT', SPACE->'FIRE', ...).
-    """
-    if keyspec.controls:
-        return list(keyspec.controls)
-
-    def canon(keys):
-        return "+".join(_ARROW_GLYPH.get(k, k) for k in
-                        sorted(keys, key=lambda x: (_KEY_ORDER.index(x)
-                               if x in _KEY_ORDER else 99, x)))
-
-    def order(label):
-        first = label.split("+")[0]
-        name = {v: k for k, v in _ARROW_GLYPH.items()}.get(first, first)
-        return (_KEY_ORDER.index(name) if name in _KEY_ORDER else 99, label)
-
-    # Collapse duplicate actions (a `keys` override may leave the default key
-    # for the same action in place): keep the canonically-first key per action.
-    best = {}   # meaning -> (order_key, label)
-    for keys, action in keyspec.combos.items():
-        label = canon(keys)
-        try:
-            meaning = adapter.describe_action(env, action)
-        except Exception:
-            meaning = str(action)
-        # Hide unhelpful meanings: identical to the key label, or a bare action
-        # index (e.g. "3") that adds nothing over the key name.
-        if meaning == label or meaning.lstrip("-").isdigit():
-            meaning = ""
-        key = meaning or label
-        cand = (order(label), label)
-        if key not in best or cand < best[key]:
-            best[key] = cand
-    rows = [(label, meaning if meaning != label else "")
-            for meaning, (_, label) in best.items()]
-    return sorted(rows, key=lambda r: order(r[0]))
-
-
-def _wait_any_key():
-    """Block until any key is pressed (ESC raises to quit)."""
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                raise KeyboardInterrupt
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    raise KeyboardInterrupt
-                return
-        time.sleep(0.005)
-
-
 def _wait_for_char(char, dummy=False):
     if dummy:
         time.sleep(0.05)
@@ -171,85 +110,6 @@ class Session:
         self.logger.log_phase({"index": index, "type": "message", "text": text,
                                "onset": onset, "offset": self.clock.session_time()})
 
-    @staticmethod
-    def _format_controls_rows(rows):
-        """Format [(keys, meaning), ...] into an aligned indented table."""
-        rows = [(str(k), str(m)) for k, m in rows]
-        width = max((len(k) for k, _ in rows), default=0)
-        return [f"   {k:<{width}}   {m}".rstrip() if m else f"   {k}"
-                for k, m in rows]
-
-    def _controls_text(self, phase, keyspec, adapter, env):
-        """Return (text, align) for the pre-game controls screen.
-
-        If the config supplies `controls_screen`, it fully drives the screen
-        (hardcoded, verbatim) so the experimenter controls exactly what's shown:
-          - a string            -> rendered as-is (align "center")
-          - {"title", "text"}    -> title + free text
-          - {"title", "lines":[...]}       -> title + verbatim lines
-          - {"title", "controls":[[k,m]]}  -> title + auto-aligned table
-          optional: "align" ("left"/"center"), "footer" (bool/str; the
-          "press any key" prompt, on by default).
-        Otherwise the screen is auto-derived from the (override-applied) keymap.
-        """
-        cs = phase.get("controls_screen")
-        if cs is not None:
-            if isinstance(cs, str):
-                return cs, "center"
-            lines = []
-            title = cs.get("title", phase.get("text") or phase.get("game"))
-            if title:
-                lines += [str(title), ""]
-            if cs.get("text"):
-                lines += str(cs["text"]).split("\n")
-            if "lines" in cs:
-                lines += [str(x) for x in cs["lines"]]
-            if "controls" in cs:
-                if lines and lines[-1] != "":
-                    lines.append("")
-                lines.append("Controls:")
-                lines += self._format_controls_rows(cs["controls"])
-            footer = cs.get("footer", True)
-            if footer:
-                lines += ["", footer if isinstance(footer, str)
-                          else "(press any key to start — ESC quits)"]
-            return "\n".join(lines), cs.get("align", "left")
-
-        # Auto-derived from the keymap.
-        title = phase.get("text") or phase.get("game", "Game")
-        lines = [str(title), ""]
-        controls = _controls_from_keyspec(keyspec, adapter, env)
-        if controls:
-            lines.append("Controls:")
-            lines += self._format_controls_rows(controls)
-        elif keyspec.help:
-            lines += ["Controls:", "   " + keyspec.help]
-        lines += ["", "(press any key to start — ESC quits)"]
-        return "\n".join(lines), "left" if controls else "center"
-
-    def _controls_screen(self, phase, keyspec, adapter, env):
-        """Show the game name + its buttons and what they do, before play.
-
-        Content is either fully specified by the config (`controls_screen`) for
-        complete control over the visualization, or auto-derived from the
-        keymap. Waits for any key press (experimenter/subject), or auto-advances
-        after `controls_seconds` if set. Skipped in dummy-trigger runs.
-        """
-        text, align = self._controls_text(phase, keyspec, adapter, env)
-        self.display.draw_text(text, align=align)
-        # Drop any keypresses queued during the (possibly slow) make()/load, so
-        # they don't instantly dismiss this screen. Keep honoring ESC.
-        for e in pygame.event.get():
-            if e.type == pygame.QUIT or (e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE):
-                raise KeyboardInterrupt
-        secs = phase.get("controls_seconds")
-        if self.dummy:
-            time.sleep(0.05)
-        elif secs is not None:
-            _wait_duration(secs)
-        else:
-            _wait_any_key()
-
     def _survey(self, phase, index):
         questions = phase.get("questions", [])
         n_points = phase.get("n_points", 7)
@@ -308,9 +168,8 @@ class Session:
 
         # Some backends (nle, browser games) take several seconds to start;
         # show a Loading screen so the previous fixation "+" doesn't freeze.
-        if phase.get("show_controls", True):
-            self.display.draw_text(
-                f"Loading {phase.get('text') or phase.get('game', 'game')} …")
+        self.display.draw_text(
+            f"Loading {phase.get('text') or phase.get('game', 'game')} …")
         env = adapter.make(phase)
         keyspec = adapter.keymap(env)
         # Allow the curriculum to override the mapping explicitly.
@@ -323,11 +182,6 @@ class Session:
                                   "episode_id", "session_time", "wall_time", "state_blob")}
         frames["episode_seeds"] = []
         frames["variables"] = {}   # varname -> list, filled lazily
-
-        # Show a per-game controls screen: game name + which buttons do what.
-        # Skip with "show_controls": false; auto-advance with "controls_seconds".
-        if phase.get("show_controls", True):
-            self._controls_screen(phase, keyspec, adapter, env)
 
         onset = self.clock.session_time()
         block_end = time.perf_counter() + cap
@@ -422,6 +276,7 @@ class Session:
         _wait_for_char(EXPERIMENTER_KEY, dummy=self.dummy)
         self.display.draw_text("Waiting for scanner...")
         _wait_for_char(TRIGGER_KEY, dummy=self.dummy)
+        
         self.clock.trigger()
         self.logger.set_trigger_time()
 

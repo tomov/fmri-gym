@@ -65,13 +65,7 @@ class RetroAdapter(EnvAdapter):
             if any(vec):
                 combos[frozenset([key])] = vec
         noop = [0] * len(buttons)
-        ks = KeySpec(combos=combos, noop=noop,
-                     help="hold several at once (e.g. RIGHT+Z)",
-                     controls=[("ARROWS", "move / d-pad"),
-                               ("Z / X / C", "buttons A / B / C"),
-                               ("A / S / D", "buttons X / Y / Z"),
-                               ("Q / W", "shoulder L / R"),
-                               ("ENTER", "start"), ("TAB", "select")])
+        ks = KeySpec(combos=combos, noop=noop)
         # Override resolve: OR together the button vectors of ALL held keys, so
         # e.g. holding RIGHT+Z fires while moving (multiple buttons at once).
         ks.resolve = _make_multi_resolver(combos, noop)

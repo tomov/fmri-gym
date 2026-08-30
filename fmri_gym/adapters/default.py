@@ -40,7 +40,7 @@ class DefaultAdapter(EnvAdapter):
         # Allow a curriculum to hand-specify a mapping: {"keys": {"LEFT": 0, ...}}
         # or {"keys": {"LEFT+SPACE": 2}} for combos.
         space = env.action_space
-        combos, noop, help_txt = {}, None, ""
+        combos, noop = {}, None
 
         if isinstance(space, spaces.Discrete):
             n = int(space.n)
@@ -51,7 +51,6 @@ class DefaultAdapter(EnvAdapter):
             for i, key in enumerate(arrows):
                 if i < n:
                     combos[frozenset([key])] = i
-            help_txt = f"Discrete({n}) actions; arrows -> actions 0..{min(n,4)-1}."
         elif isinstance(space, spaces.Box):
             # Map arrow keys to +/- on the first (up to 2) continuous dims.
             lo, hi = np.asarray(space.low), np.asarray(space.high)
@@ -66,11 +65,10 @@ class DefaultAdapter(EnvAdapter):
             if space.shape[0] >= 2:
                 combos[frozenset(["UP"])] = vec(1, +1)
                 combos[frozenset(["DOWN"])] = vec(1, -1)
-            help_txt = f"Box{space.shape}; arrows push continuous dims to limits."
         else:
             raise TypeError(f"DefaultAdapter can't map action space {space!r}; "
                             "provide a custom adapter.")
-        return KeySpec(combos=combos, noop=noop, help=help_txt)
+        return KeySpec(combos=combos, noop=noop)
 
     def capture(self, env, obs, info, want_blob=True) -> FrameState:
         # No universal savestate: blob=None -> reconstruction is via seed+replay.

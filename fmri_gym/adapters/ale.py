@@ -51,15 +51,7 @@ class ALEAdapter(EnvAdapter):
                 keys = keys + ("SPACE",)
             if keys:
                 combos[frozenset(keys)] = action
-        return KeySpec(combos=combos, noop=0,
-                       help="Arrow keys move, SPACE fires.")
-
-    def describe_action(self, env, action) -> str:
-        meanings = env.unwrapped.get_action_meanings()
-        try:
-            return meanings[int(action)]
-        except Exception:
-            return str(action)
+        return KeySpec(combos=combos, noop=0)
 
     def capture(self, env, obs, info, want_blob=True) -> FrameState:
         ale = env.unwrapped.ale

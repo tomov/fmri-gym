@@ -50,9 +50,7 @@ class RushHourAdapter(EnvAdapter):
     def keymap(self, env) -> KeySpec:
         n = int(getattr(env.action_space, "n", 10))
         combos = {frozenset([k]): i for i, k in enumerate(_NUM_KEYS) if i < n}
-        return KeySpec(combos=combos, noop=0,
-                       help=f"Discrete({n}) moves; extend beyond 10 via a keys override",
-                       controls=[("1-9, 0", "make move #1..#10 (each slides a car)")])
+        return KeySpec(combos=combos, noop=0)
 
     def reset(self, env, seed, spec):
         obs, info = env.reset(seed=seed)

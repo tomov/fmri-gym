@@ -29,9 +29,7 @@ class BabaAdapter(EnvAdapter):
 
     def keymap(self, env) -> KeySpec:
         combos = {frozenset([k]): v for k, v in _KEYS.items()}
-        return KeySpec(combos=combos, noop=4,
-                       help="push word blocks to change the rules",
-                       controls=[("LEFT/RIGHT/UP/DOWN", "move (push blocks)")])
+        return KeySpec(combos=combos, noop=4)
 
     def reset(self, env, seed, spec):
         try:

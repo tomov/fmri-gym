@@ -32,16 +32,10 @@ class KeySpec:
             "K_" prefix, upper-case: "LEFT", "SPACE", "Z", ...) to the action to
             send. The most specific fully-held combo wins (see resolve()).
     noop:   the action to send when no combo matches.
-    help:   optional one-line human-readable control description.
-    controls: optional ordered list of (keys, meaning) pairs shown on the
-            per-game controls screen, e.g. [("←/→", "move"), ("SPACE", "fire")].
-            If empty, the session derives a basic list from `combos`.
     """
 
     combos: dict[frozenset[str], Any]
     noop: Any
-    help: str = ""
-    controls: list = field(default_factory=list)
 
     def resolve(self, held: frozenset[str]) -> Any:
         best, best_len = self.noop, -1
@@ -49,19 +43,6 @@ class KeySpec:
             if keys <= held and len(keys) > best_len:
                 best, best_len = action, len(keys)
         return best
-
-    def control_lines(self) -> list:
-        """(keys, meaning) pairs for display; falls back to combo key names."""
-        if self.controls:
-            return list(self.controls)
-        # Fallback: list each combo's keys (meaning unknown at this layer).
-        seen, out = set(), []
-        for keys in self.combos:
-            label = "+".join(sorted(keys))
-            if label and label not in seen:
-                seen.add(label)
-                out.append((label, ""))
-        return out
 
 
 @dataclass
@@ -129,14 +110,6 @@ class EnvAdapter:
     def restore(self, env, blob: bytes) -> None:
         """Inverse of capture().blob. Raise if the backend has no savestate."""
         raise NotImplementedError(f"{self.name} adapter has no in-memory savestate")
-
-    def describe_action(self, env, action) -> str:
-        """Human-readable label for an action (shown on the controls screen).
-
-        Default stringifies the action; adapters that know richer semantics
-        (e.g. ALE action meanings) override this.
-        """
-        return str(action)
 
     def render(self, env):
         """Return the current RGB frame (H,W,3) uint8 for display.

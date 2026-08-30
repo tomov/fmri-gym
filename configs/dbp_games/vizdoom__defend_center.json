@@ -1,15 +1,14 @@
 {
   "_game": "ViZDoom: Defend the Center (Doom action-shooter; COOM engine)",
   "_note": "pip install vizdoom. Doom scenario via ViZDoom's gymnasium envs. Try other Vizdoom*-v1 ids (DeadlyCorridor, HealthGathering, TakeCover, Deathmatch, ...).",
-  "_keys_note": "Action indices are scenario-specific. For VizdoomDefendCenter-v1 the Discrete(4) map is 0=noop, 1=ATTACK, 2=TURN_RIGHT, 3=TURN_LEFT (verify with env.unwrapped.button_map). The controls the subject sees are a plain 'message' phase (hardcoded string, edit freely); keep its text in sync with 'keys' by hand. 'show_controls': false suppresses the framework's auto-generated controls screen so only this hardcoded one shows.",
+  "_keys_note": "Action indices are scenario-specific. For VizdoomDefendCenter-v1 the Discrete(4) map is 0=noop, 1=ATTACK, 2=TURN_RIGHT, 3=TURN_LEFT (verify with env.unwrapped.button_map). The controls the subject sees are a plain 'message' phase (hardcoded string, edit freely); keep its text in sync with 'keys' by hand.",
   "curriculum": [
     {"type": "message", "align": "left", "text": "Defend the Center\n\nYou're surrounded. Turn to face the monsters and\nshoot them before they reach you.\n\nControls:\n   LEFT    turn left\n   RIGHT   turn right\n   SPACE   shoot\n\n(press SPACE to start)"},
     {"type": "fixation", "duration": 1.0},
     {
       "type": "game", "backend": "vizdoom", "game": "VizdoomDefendCenter-v1",
       "mode": "duration", "duration": 300.0, "fps": 20,
-      "keys": {"LEFT": 3, "RIGHT": 2, "SPACE": 1},
-      "show_controls": false
+      "keys": {"LEFT": 3, "RIGHT": 2, "SPACE": 1}
     },
     {"type": "fixation", "duration": 2.0}
   ]
