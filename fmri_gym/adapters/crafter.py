@@ -5,9 +5,10 @@ Crafter uses the OLD gym API shape -- reset() returns obs only, step() returns a
 cleanly under gymnasium. We wrap crafter.Env directly and normalize it to the
 gymnasium contract the session loop expects.
 
-The observation IS the 64x64x3 RGB frame, so render() just returns obs. Crafter
-has no savestate API; reconstruction is via seed + action replay (deterministic
-given crafter.Env(seed=...)). The 17 discrete actions get a movement keymap;
+The observation IS the RGB frame (default 64x64x3; override with spec
+"size"), so render() just returns obs. Crafter has no savestate API;
+reconstruction is via seed + action replay (deterministic given
+crafter.Env(seed=...)). The 17 discrete actions get a movement keymap;
 the rest (do/place/make) are reachable via the curriculum "keys" override.
 """
 
@@ -35,9 +36,21 @@ class CrafterAdapter(EnvAdapter):
 
     def make(self, spec: dict) -> gym.Env:
         import crafter
-        seed = spec.get("seed")
-        # crafter.Env seeds at construction; area/length are optional tunables.
-        self._env = crafter.Env(seed=seed) if seed is not None else crafter.Env()
+        # crafter.Env seeds at construction; size/view/area/length are optional.
+        # Default size is 64x64 (RL-benchmark pixel art); bump size for a
+        # sharper on-screen render (textures are redrawn at the new tile size).
+        kwargs: dict[str, Any] = {}
+        if "seed" in spec and spec["seed"] is not None:
+            kwargs["seed"] = spec["seed"]
+        if "size" in spec:
+            kwargs["size"] = spec["size"]
+        if "view" in spec:
+            kwargs["view"] = spec["view"]
+        if "area" in spec:
+            kwargs["area"] = spec["area"]
+        if "length" in spec:
+            kwargs["length"] = spec["length"]
+        self._env = crafter.Env(**kwargs)
         self._last_obs = None
         return self._env
 

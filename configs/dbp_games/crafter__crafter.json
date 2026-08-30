@@ -22,7 +22,7 @@
       ]
     },
     {"type": "fixation", "duration": 1.0},
-    {"backend": "crafter", "game": "crafter", "fps": 15, "seed": 0, "type": "game", "mode": "duration", "duration": 300.0},
+    {"backend": "crafter", "game": "crafter", "fps": 15, "seed": 0, "size": [512, 512], "type": "game", "mode": "duration", "duration": 300.0},
     {"type": "fixation", "duration": 2.0}
   ]
 }
