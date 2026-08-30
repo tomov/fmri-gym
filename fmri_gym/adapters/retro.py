@@ -21,7 +21,8 @@ from typing import Any
 import gymnasium as gym
 import stable_retro as retro
 
-from .base import EnvAdapter, FrameState, MultiKeySpec
+from .keyspec import MultiKeySpec
+from .base import EnvAdapter, FrameState
 
 # Keyboard -> console button. Same scheme as the interactive retro player.
 # We map by button NAME; each game reports its own button ordering via

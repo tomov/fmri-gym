@@ -24,7 +24,8 @@ from typing import Any
 import numpy as np
 import gymnasium as gym
 
-from .base import EnvAdapter, FrameState, SingleKeySpec
+from .keyspec import SingleKeySpec
+from .base import EnvAdapter, FrameState
 
 # Cardinal arrows -> compass action indices (N=0, E=1, S=2, W=3).
 _KEYS = {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3}

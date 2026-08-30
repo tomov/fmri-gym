@@ -15,7 +15,8 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 
-from .base import EnvAdapter, FrameState, SingleKeySpec
+from .keyspec import SingleKeySpec
+from .base import EnvAdapter, FrameState
 
 _DIRECTIONS = {
     "UP": ("UP",), "DOWN": ("DOWN",), "LEFT": ("LEFT",), "RIGHT": ("RIGHT",),

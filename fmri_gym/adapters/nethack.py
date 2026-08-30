@@ -22,7 +22,8 @@ from typing import Any
 import numpy as np
 import gymnasium as gym
 
-from .base import EnvAdapter, FrameState, SingleKeySpec
+from .keyspec import SingleKeySpec
+from .base import EnvAdapter, FrameState
 
 # NetHack TTY palette (16 colors), indexed by tty_colors (0..15).
 _TTY_PALETTE = np.array([

@@ -21,7 +21,8 @@ from typing import Any
 
 import numpy as np
 
-from .base import EnvAdapter, FrameState, SingleKeySpec
+from .keyspec import SingleKeySpec
+from .base import EnvAdapter, FrameState
 
 # Distinct colors for car letters; 'A' (red player car) and exit are special.
 _PALETTE: list[tuple[int, int, int]] = [

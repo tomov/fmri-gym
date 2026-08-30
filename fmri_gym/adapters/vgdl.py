@@ -34,7 +34,8 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 
-from .base import EnvAdapter, FrameState, SingleKeySpec
+from .keyspec import SingleKeySpec
+from .base import EnvAdapter, FrameState
 
 # Fixed VGDL action order (verified from get_action_meanings / core.py).
 _VGDL_ACTIONS = ["UP", "DOWN", "LEFT", "RIGHT", "NO_OP", "SPACE"]

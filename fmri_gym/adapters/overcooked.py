@@ -16,7 +16,8 @@ from typing import Any
 
 import numpy as np
 
-from .base import EnvAdapter, FrameState, SingleKeySpec
+from .keyspec import SingleKeySpec
+from .base import EnvAdapter, FrameState
 
 
 class OvercookedAdapter(EnvAdapter):

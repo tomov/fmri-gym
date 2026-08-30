@@ -15,7 +15,8 @@ from typing import Any
 
 import numpy as np
 
-from .base import EnvAdapter, FrameState, SingleKeySpec
+from .keyspec import SingleKeySpec
+from .base import EnvAdapter, FrameState
 
 # baba.envs.ACTIONS order: up, down, left, right (idx 0..3); 4 = idle.
 _KEYS: dict[str, int] = {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3}

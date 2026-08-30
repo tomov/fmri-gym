@@ -21,7 +21,8 @@ from .keys import held_key_names, key_name
 from .logging import Logger
 
 if TYPE_CHECKING:
-    from .adapters.base import EnvAdapter, KeySpec
+    from .adapters.base import EnvAdapter
+    from .adapters.keyspec import KeySpec
 
 TRIGGER_KEY = "="
 EXPERIMENTER_KEY = " "
@@ -156,7 +157,7 @@ def _get_key_to_action_map(keyspec: KeySpec) -> dict:
 
     Resolving each key on its own (rather than reading ``combos`` directly)
     keeps the action in whatever shape the keymap flavour produces, e.g. a
-    button vector for a :class:`~.adapters.base.MultiKeySpec`.
+    button vector for a :class:`~.adapters.keyspec.MultiKeySpec`.
 
     :param keyspec: keymap whose length-1 combos become the press map.
     :return: ``{key_name: action}`` for single-key combos only.

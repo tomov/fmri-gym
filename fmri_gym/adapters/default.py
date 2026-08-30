@@ -18,7 +18,8 @@ import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 
-from .base import EnvAdapter, FrameState, SingleKeySpec
+from .keyspec import SingleKeySpec
+from .base import EnvAdapter, FrameState
 
 
 class DefaultAdapter(EnvAdapter):

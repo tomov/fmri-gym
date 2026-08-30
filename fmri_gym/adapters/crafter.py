@@ -19,7 +19,8 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 
-from .base import EnvAdapter, FrameState, SingleKeySpec
+from .keyspec import SingleKeySpec
+from .base import EnvAdapter, FrameState
 
 # Default keyboard mapping over crafter's Discrete(17) space:
 #   0=noop, 1=move_left, 2=move_right, 3=move_up, 4=move_down, 5=do,

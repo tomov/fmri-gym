@@ -20,7 +20,8 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from .base import EnvAdapter, FrameState, HeldKeysSpec
+from .keyspec import HeldKeysSpec
+from .base import EnvAdapter, FrameState
 
 if TYPE_CHECKING:
     import pystk2

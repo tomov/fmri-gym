@@ -27,7 +27,8 @@ from typing import Any
 import numpy as np
 import gymnasium as gym
 
-from .base import EnvAdapter, FrameState, KeySpec, MultiKeySpec, SingleKeySpec
+from .keyspec import KeySpec, MultiKeySpec, SingleKeySpec
+from .base import EnvAdapter, FrameState
 
 # Physical key -> preferred Doom button (first available for the scenario wins).
 # The gymnasium wrapper's Discrete action i presses the buttons set in
