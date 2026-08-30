@@ -18,9 +18,18 @@ if TYPE_CHECKING:
 
 
 class Logger:
+    """Writes ``manifest.json`` and per-block compressed ``.npz`` files."""
+
     def __init__(
         self, outdir: str, subject: str, curriculum: list[dict], clock: Clock
     ) -> None:
+        """Create the output directory and an empty session manifest.
+
+        :param outdir: directory for the manifest and game npz files.
+        :param subject: subject identifier stored in the manifest.
+        :param curriculum: full curriculum list stored in the manifest.
+        :param clock: session clock (used for trigger epoch / perf times).
+        """
         self.outdir = outdir
         self.clock = clock
         os.makedirs(outdir, exist_ok=True)
@@ -32,10 +41,15 @@ class Logger:
         }
 
     def set_trigger_time(self) -> None:
+        """Record the scanner-trigger wall and perf times on the manifest."""
         self.manifest["start_epoch"] = self.clock.t0_epoch
         self.manifest["trigger_perf"] = self.clock.t0_perf
 
     def log_phase(self, entry: dict) -> None:
+        """Append one phase summary entry to the manifest.
+
+        :param entry: phase dict (``index``, ``type``, onset/offset, …).
+        """
         self.manifest["phases"].append(entry)
 
     def save_game_block(
@@ -46,12 +60,19 @@ class Logger:
         frames: dict,
         extra: dict | None = None,
     ) -> str:
-        """Write one game block's per-frame arrays.
+        """Write one game block's per-frame arrays to a compressed ``.npz``.
 
-        `frames` holds parallel lists collected by the session loop. Backend-
+        ``frames`` holds parallel lists collected by the session loop. Backend-
         specific variables (ram, obs, screen_index, retro info vars, ...) are
-        stacked under their own keys. `extra` is a dict of block-level arrays
+        stacked under their own keys. ``extra`` is a dict of block-level arrays
         (e.g. an ALE palette) merged in verbatim.
+
+        :param block_index: zero-based curriculum index used in the filename.
+        :param backend: adapter name (e.g. ``"ale"``, ``"retro"``).
+        :param game: game id / path used in the filename and stored in the npz.
+        :param frames: parallel lists of per-frame fields from the session loop.
+        :param extra: optional block-level arrays merged into the npz.
+        :return: absolute path of the written ``.npz`` file.
         """
         safe_game = game.split("/")[-1].replace(":", "_")
         path = os.path.join(
@@ -82,6 +103,10 @@ class Logger:
         return path
 
     def save_manifest(self) -> str:
+        """Write ``manifest.json`` to the session output directory.
+
+        :return: absolute path of the written manifest file.
+        """
         path = os.path.join(self.outdir, "manifest.json")
         with open(path, "w") as f:
             json.dump(self.manifest, f, indent=2, default=_json_default)
@@ -89,7 +114,14 @@ class Logger:
 
 
 def _to_array(actions: list) -> np.ndarray:
-    """Actions may be ints (Discrete), arrays (Box), or button lists (retro)."""
+    """Stack a list of actions into a numpy array.
+
+    Actions may be ints (Discrete), arrays (Box), or button lists (retro);
+    heterogeneous types fall back to an object array.
+
+    :param actions: list of per-frame actions.
+    :return: stacked numpy array (or object array on failure).
+    """
     try:
         return np.asarray(actions)
     except Exception:
@@ -97,6 +129,11 @@ def _to_array(actions: list) -> np.ndarray:
 
 
 def _json_default(o: Any) -> Any:
+    """JSON serializer for numpy scalars/arrays used in the manifest.
+
+    :param o: object that the default ``json`` encoder could not handle.
+    :return: a JSON-serializable value.
+    """
     if isinstance(o, (np.integer,)):
         return int(o)
     if isinstance(o, (np.floating,)):

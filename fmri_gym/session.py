@@ -31,21 +31,35 @@ class Clock:
     """Anchored at the scanner trigger; gives session + wall-clock time."""
 
     def __init__(self) -> None:
+        """Create an untriggered clock (``t0_*`` are ``None`` until :meth:`trigger`)."""
         self.t0_perf = None
         self.t0_epoch = None
 
     def trigger(self) -> None:
+        """Anchor the clock at the current time (call on scanner trigger)."""
         self.t0_perf = time.perf_counter()
         self.t0_epoch = time.time()
 
     def session_time(self) -> float:
+        """Seconds since the scanner trigger (``perf_counter`` based).
+
+        :return: elapsed session time in seconds.
+        """
         return time.perf_counter() - self.t0_perf
 
     def wall_time(self) -> float:
+        """Current wall-clock epoch time.
+
+        :return: ``time.time()`` seconds since the Unix epoch.
+        """
         return time.time()
 
 
 def _check_quit() -> bool:
+    """Drain pygame events and report whether the user requested quit.
+
+    :return: ``True`` if the window was closed or ESC was pressed.
+    """
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             return True
@@ -55,7 +69,12 @@ def _check_quit() -> bool:
 
 
 def _get_action(key_to_action: dict) -> tuple[object | None, bool]:
-    """Drain events; return (mapped action or None, user_quit)."""
+    """Drain events; return the mapped action for a fresh keydown, if any.
+
+    :param key_to_action: map of single key NAMES to env actions.
+    :return: ``(action_or_None, user_quit)`` where ``user_quit`` is ``True``
+        on window close / ESC.
+    """
     action = None
     for event in pygame.event.get():
         if event.type == pygame.QUIT or (
@@ -69,6 +88,12 @@ def _get_action(key_to_action: dict) -> tuple[object | None, bool]:
 
 
 def _wait_for_char(char: str, dummy_trigger: bool = False) -> None:
+    """Block until ``char`` is typed (or briefly sleep in dummy mode).
+
+    :param char: the unicode character that unblocks the wait.
+    :param dummy_trigger: if ``True``, sleep briefly and return without waiting.
+    :raises KeyboardInterrupt: on window close or ESC.
+    """
     if dummy_trigger:
         time.sleep(0.05)
         return
@@ -85,7 +110,11 @@ def _wait_for_char(char: str, dummy_trigger: bool = False) -> None:
 
 
 def _wait_for_duration(duration: float) -> None:
-    """Block for `duration` seconds (ESC/quit raises KeyboardInterrupt)."""
+    """Block for ``duration`` seconds.
+
+    :param duration: seconds to wait.
+    :raises KeyboardInterrupt: on window close or ESC.
+    """
     end = time.perf_counter() + duration
     while time.perf_counter() < end:
         if _check_quit():
@@ -94,7 +123,13 @@ def _wait_for_duration(duration: float) -> None:
 
 
 def _apply_key_overrides(keyspec: KeySpec, overrides: dict | None) -> KeySpec:
-    """Merge curriculum-provided {"LEFT": action, "LEFT+SPACE": action} combos."""
+    """Merge curriculum-provided key combo overrides into a :class:`KeySpec`.
+
+    :param keyspec: base keymap from the adapter.
+    :param overrides: optional ``{"LEFT": action, "LEFT+SPACE": action}`` map
+        from the curriculum; ``None`` / empty leaves ``keyspec`` unchanged.
+    :return: the (possibly mutated) ``keyspec``.
+    """
     if not overrides:
         return keyspec
     combos = dict(keyspec.combos)
@@ -106,7 +141,11 @@ def _apply_key_overrides(keyspec: KeySpec, overrides: dict | None) -> KeySpec:
 
 
 def _get_key_to_action_map(keyspec: KeySpec) -> dict:
-    """Map single pressed KEY names -> actions (for turn-based play)."""
+    """Map single pressed KEY names to actions (for turn-based play).
+
+    :param keyspec: keymap whose length-1 combos become the press map.
+    :return: ``{key_name: action}`` for single-key combos only.
+    """
     return {next(iter(ks)): a for ks, a in keyspec.combos.items()
             if len(ks) == 1}
 
@@ -123,6 +162,15 @@ class Session:
         outdir: str,
         dummy_trigger: bool = False,
     ) -> None:
+        """Set up clock, logger, and phase dispatch for one subject.
+
+        :param subject: subject identifier used in log paths / manifest.
+        :param curriculum: ordered list of phase dicts (``type``, timings, …).
+        :param adapters: ``{backend_name: EnvAdapter}`` for game phases.
+        :param display: shared pygame display used by all phases.
+        :param outdir: directory for the session manifest and game npz files.
+        :param dummy_trigger: if ``True``, skip real experimenter/scanner waits.
+        """
         self.subject = subject
         self.curriculum = curriculum
         self.adapters = adapters              # {backend_name: EnvAdapter}
@@ -135,6 +183,11 @@ class Session:
     # -- phase handlers ------------------------------------------------------
 
     def _fixation(self, phase: dict, index: int) -> None:
+        """Show a fixation cross for ``phase["duration"]`` seconds.
+
+        :param phase: fixation-phase config (``duration``, default 2.0).
+        :param index: phase index in the curriculum (for the manifest).
+        """
         duration = phase.get("duration", 2.0)
         onset = self.clock.session_time()
 
@@ -145,6 +198,12 @@ class Session:
                                "onset": onset, "offset": self.clock.session_time()})
 
     def _message(self, phase: dict, index: int) -> None:
+        """Show on-screen text until a key press or timed duration.
+
+        :param phase: message-phase config (``text``, optional ``duration`` /
+            ``key``).
+        :param index: phase index in the curriculum (for the manifest).
+        """
         text = phase.get("text", "")
         duration = phase.get("duration")
         onset = self.clock.session_time()
@@ -159,6 +218,12 @@ class Session:
                                "onset": onset, "offset": self.clock.session_time()})
 
     def _survey(self, phase: dict, index: int) -> None:
+        """Run a Likert-style survey and log each confirmed response.
+
+        :param phase: survey-phase config (``questions``, optional ``n_points``).
+        :param index: phase index in the curriculum (for the manifest).
+        :raises KeyboardInterrupt: on window close or ESC.
+        """
         questions = phase.get("questions", [])
         n_points = phase.get("n_points", 7)
         onset = self.clock.session_time()
@@ -194,6 +259,17 @@ class Session:
                                "responses": responses})
 
     def _game(self, phase: dict, index: int) -> None:
+        """Run a game block (one or more episodes) and save frame-level data.
+
+        Creates the env via the phase's backend adapter, plays until duration /
+        episode count / quit, then writes an npz and a manifest phase entry.
+
+        :param phase: game-phase config (``backend``, ``game``, ``mode``,
+            ``duration`` / ``n_episodes``, ``fps``, ``seed``, ``state_stride``,
+            ``turn_based``, optional ``keys`` overrides, …).
+        :param index: phase index in the curriculum (for the manifest).
+        :raises KeyboardInterrupt: if the subject quits mid-block.
+        """
         ## Config
         backend = phase.get("backend", "gym")
         adapter = self.adapters[backend]
@@ -354,7 +430,11 @@ class Session:
         return False
 
     def _trigger(self) -> None:
-        """Wait for experimenter ready + scanner trigger, then start the clock."""
+        """Wait for experimenter ready + scanner trigger, then start the clock.
+
+        Draws readiness / waiting screens, then calls :meth:`Clock.trigger` and
+        records the trigger time on the logger.
+        """
         self.display.draw_text(
             "Please keep your head as still as possible.\n\n"
             "(experimenter: press SPACE when ready)")
@@ -366,6 +446,11 @@ class Session:
         self.logger.set_trigger_time()
 
     def run(self) -> None:
+        """Run the full curriculum: trigger wait, then each phase in order.
+
+        Always writes the session manifest in ``finally``, including after an
+        interrupt (partial data).
+        """
         handlers = {"fixation": self._fixation, "message": self._message,
                     "game": self._game, "survey": self._survey}
         try:

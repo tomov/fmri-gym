@@ -41,11 +41,11 @@ class KeySpec:
     def resolve(self, held: frozenset[str]) -> Any:
         """Map currently-held keys to an action.
 
-        Among combos whose keys are all present in `held`, pick the longest
-        (most specific). Return `noop` if none match.
+        Among combos whose keys are all present in ``held``, pick the longest
+        (most specific). Return ``noop`` if none match.
 
         :param held: frozenset of currently pressed key NAMES.
-        :return: the action for the most specific matching combo, or `noop`.
+        :return: the action for the most specific matching combo, or ``noop``.
         """
         best, best_len = self.noop, -1
         for keys, action in self.combos.items():
@@ -58,13 +58,13 @@ class KeySpec:
 class FrameState:
     """Everything an adapter exposes about the env at one frame.
 
-    blob:      opaque bytes that `restore()` can turn back into this exact state
-               (e.g. pickled ALE clone_state, retro em.get_state()). None if the
-               backend has no in-memory savestate -- then reconstruction relies
-               on seed + action replay instead.
-    variables: named, analysis-friendly scalars/arrays surfaced uniformly via
-               `info`, so the loop never calls getRAM()/get_ram() itself. Keys
-               are backend-defined but SHOULD include "ram" when available.
+    :ivar blob: opaque bytes that :meth:`EnvAdapter.restore` can turn back into
+        this exact state (e.g. pickled ALE ``clone_state``, retro
+        ``em.get_state()``). ``None`` if the backend has no in-memory savestate
+        -- then reconstruction relies on seed + action replay instead.
+    :ivar variables: named, analysis-friendly scalars/arrays surfaced uniformly
+        via ``info``, so the loop never calls ``getRAM()``/``get_ram()`` itself.
+        Keys are backend-defined but SHOULD include ``"ram"`` when available.
     """
 
     blob: bytes | None = None
@@ -80,59 +80,97 @@ class EnvAdapter:
     def make(self, spec: dict) -> gym.Env:
         """Return a gym-compatible env for one game block.
 
-        `spec` is the game phase dict from the curriculum (already validated for
-        the keys this adapter cares about). Must render RGB frames via
-        env.render() with render_mode="rgb_array".
+        ``spec`` is the game phase dict from the curriculum (already validated
+        for the keys this adapter cares about). Must render RGB frames via
+        ``env.render()`` with ``render_mode="rgb_array"``.
+
+        :param spec: game-phase config dict from the curriculum.
+        :return: a Gymnasium-compatible environment.
+        :raises NotImplementedError: always in the base class.
         """
         raise NotImplementedError
 
     def keymap(self, env: gym.Env) -> KeySpec:
-        """Return the keyboard->action mapping for this env."""
+        """Return the keyboard->action mapping for this env.
+
+        :param env: the live environment instance from :meth:`make`.
+        :return: a :class:`KeySpec` for held-key / combo resolution.
+        :raises NotImplementedError: always in the base class.
+        """
         raise NotImplementedError
 
     def reset(self, env: gym.Env, seed: int | None, spec: dict) -> tuple[Any, dict]:
-        """Reset the env for a new episode. Return (obs, info).
+        """Reset the env for a new episode.
 
-        Adapters may use `spec` for per-episode setup (e.g. retro load_state).
+        Adapters may use ``spec`` for per-episode setup (e.g. retro load_state).
+
+        :param env: the live environment instance.
+        :param seed: RNG seed for this episode, or ``None``.
+        :param spec: game-phase config dict (may carry load-state hints).
+        :return: ``(obs, info)`` from ``env.reset``.
         """
         return env.reset(seed=seed)
 
     def step(self, env: gym.Env, action: Any) -> tuple[Any, float, bool, bool, dict]:
-        """Advance one frame. Return (obs, reward, terminated, truncated, info).
+        """Advance one frame.
 
         Default is the Gymnasium contract; adapters with non-standard
-        signatures (e.g. VGDL's step(a, with_img=)) override this.
+        signatures (e.g. VGDL's ``step(a, with_img=)``) override this.
+
+        :param env: the live environment instance.
+        :param action: action to apply (type depends on the env).
+        :return: ``(obs, reward, terminated, truncated, info)``.
         """
         return env.step(action)
 
     def capture(
         self, env: gym.Env, obs: Any, info: dict, want_blob: bool = True
     ) -> FrameState:
-        """Return the FrameState to log for the current frame.
+        """Return the :class:`FrameState` to log for the current frame.
 
-        Called once per step. `obs`/`info` are the latest step() outputs so
-        adapters can fold observation-derived state in without re-querying.
-        When `want_blob` is False the caller does not need the (often expensive)
-        savestate this frame, so adapters SHOULD skip computing blob and leave
-        it None -- the cheap analysis variables should still be filled.
+        Called once per step. ``obs``/``info`` are the latest :meth:`step`
+        outputs so adapters can fold observation-derived state in without
+        re-querying. When ``want_blob`` is ``False`` the caller does not need
+        the (often expensive) savestate this frame, so adapters SHOULD skip
+        computing ``blob`` and leave it ``None`` -- the cheap analysis
+        variables should still be filled.
+
+        :param env: the live environment instance.
+        :param obs: observation from the latest step/reset.
+        :param info: info dict from the latest step/reset.
+        :param want_blob: if ``False``, skip expensive savestate capture.
+        :return: a :class:`FrameState` (default empty in the base class).
         """
         return FrameState()
 
     def restore(self, env: gym.Env, blob: bytes) -> None:
-        """Inverse of capture().blob. Raise if the backend has no savestate."""
+        """Inverse of :attr:`FrameState.blob`: restore a captured state.
+
+        :param env: the live environment instance.
+        :param blob: opaque bytes previously returned by :meth:`capture`.
+        :raises NotImplementedError: if the backend has no in-memory savestate.
+        """
         raise NotImplementedError(f"{self.name} adapter has no in-memory savestate")
 
     def render(self, env: gym.Env) -> np.ndarray:
-        """Return the current RGB frame (H,W,3) uint8 for display.
+        """Return the current RGB frame ``(H, W, 3)`` uint8 for display.
 
-        Default assumes the Gymnasium contract (env.render() with the env made
-        using render_mode="rgb_array"). Adapters for non-standard envs override
-        this (e.g. old-gym's env.render(mode="rgb_array")).
+        Default assumes the Gymnasium contract (``env.render()`` with the env
+        made using ``render_mode="rgb_array"``). Adapters for non-standard envs
+        override this (e.g. old-gym's ``env.render(mode="rgb_array")``).
+
+        :param env: the live environment instance.
+        :return: RGB frame as a numpy array.
         """
         return env.render()
 
     def close(self, env: gym.Env) -> None:
-        # Not every env exposes close() (e.g. overcooked's OvercookedEnv).
+        """Close the env if it exposes ``close()``.
+
+        Not every env exposes ``close()`` (e.g. overcooked's OvercookedEnv).
+
+        :param env: the live environment instance.
+        """
         closer = getattr(env, "close", None)
         if callable(closer):
             closer()

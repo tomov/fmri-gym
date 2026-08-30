@@ -60,10 +60,13 @@ _PYGAME_KEY_NAMES = {
 
 
 def held_key_names(keys: dict[int, str] | None = None) -> frozenset[str]:
-    """Return currently-held keys as upper-case names ("LEFT", "SPACE", ...).
+    """Return currently-held keys as upper-case names (``"LEFT"``, ``"SPACE"``, …).
 
     Kept here so every adapter/display shares one definition of "held keys".
-    `keys` optionally restricts polling to a set of pygame key codes (faster).
+
+    :param keys: optional ``{pygame_keycode: NAME}`` map to poll; defaults to
+        the shared game-key table (avoids scanning all 512 codes).
+    :return: frozenset of currently pressed key NAMES.
     """
     pressed = pygame.key.get_pressed()
     if keys is None:
@@ -77,9 +80,12 @@ def held_key_names(keys: dict[int, str] | None = None) -> frozenset[str]:
 
 
 def key_name(keycode: int) -> str | None:
-    """Reverse of the name->code map: a pygame keycode -> its NAME ("LEFT",...).
+    """Map a pygame keycode to its upper-case NAME (``"LEFT"``, …).
 
     Used for turn-based games, which step on discrete KEYDOWN events rather than
     polling held keys.
+
+    :param keycode: a ``pygame.K_*`` constant.
+    :return: the key NAME, or ``None`` if the code is not in the shared table.
     """
     return _PYGAME_KEY_NAMES.get(keycode)
