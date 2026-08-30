@@ -355,6 +355,10 @@ class Session:
             ep_frame += 1
             fs = adapter.capture(env, obs, info, want_blob=save_blob)
 
+            # Prefer env_action when an adapter translates UI meta-keys into a
+            # different logged action (e.g. Rush Hour select+move -> Discrete).
+            if isinstance(info, dict) and "env_action" in info:
+                frames["env_action"].append(info["env_action"])
             frames["action"].append(action)
             frames["reward"].append(reward)
             frames["terminated"].append(bool(terminated))

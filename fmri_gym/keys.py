@@ -56,6 +56,8 @@ _PYGAME_KEY_NAMES = {
     pygame.K_7: "7",
     pygame.K_8: "8",
     pygame.K_9: "9",
+    pygame.K_COMMA: "COMMA",
+    pygame.K_PERIOD: "PERIOD",
 }
 
 

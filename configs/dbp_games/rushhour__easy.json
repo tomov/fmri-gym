@@ -1,10 +1,38 @@
 {
   "_game": "Rush Hour (puzzle: slide cars to free the red car)",
-  "_note": "Setup: (1) pip install 'git+https://github.com/chrplr/Rush-Hour.git#subdirectory=python'; (2) clone the repo to vendor/rush-hour-src and build the Go engine: `git clone https://github.com/chrplr/Rush-Hour vendor/rush-hour-src && cd vendor/rush-hour-src && go build -o rushhour-env ./cmd/rushhour-env` (the adapter auto-finds it there, or set RUSHHOUR_ENV_BIN / the phase 'binary'). Turn-based; number keys 1-9,0 = moves. Env ids: RushHour-v0, RushHour-Easy-v0, RushHourFixed-v0.",
+  "_note": "Setup: (1) pip install 'git+https://github.com/chrplr/Rush-Hour.git#subdirectory=python'; (2) clone the repo to vendor/rush-hour-src and build the Go engine: `git clone https://github.com/chrplr/Rush-Hour vendor/rush-hour-src && cd vendor/rush-hour-src && go build -o rushhour-env ./cmd/rushhour-env` (the adapter auto-finds it there, or set RUSHHOUR_ENV_BIN / the phase 'binary'). Env ids: RushHour-v0, RushHour-Easy-v0, RushHourFixed-v0.",
+  "_keys_note": "Env Discrete(32) is action=slot*2+direction (0=left/up, 1=right/down); slot 0 is always the red car. Humans do not press those indices: curriculum 'keys' are the adapter's meta-actions (same as rushinput.DefaultMap) — 0..3=select up/down/left/right, 4/5=select prev/next, 6/7=move back/forward. Select does not call env.step; moves become Discrete and are logged as env_action (-1 for UI-only selects). Keep the message Controls text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/chrplr/Rush-Hour/blob/main/internal/rushinput/keymap.go",
   "curriculum": [
-    {"type": "message", "text": "Rush Hour (Easy)", "duration": 2.0},
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Rush Hour (Easy)",
+        "",
+        "Slide cars to free the RED car through",
+        "the exit on the right.",
+        "",
+        "Controls:",
+        "   ARROWS     select a neighbouring car",
+        "   3 / 4      previous / next car",
+        "   1 or ,     move selected left / up",
+        "   2 or .     move selected right / down",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
     {"type": "fixation", "duration": 1.0},
-    {"type": "game", "backend": "rushhour", "game": "RushHour-Easy-v0", "mode": "duration", "duration": 300.0, "fps": 5, "turn_based": true},
+    {
+      "type": "game", "backend": "rushhour", "game": "RushHour-Easy-v0",
+      "keys": {
+        "UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3,
+        "3": 4, "4": 5,
+        "1": 6, "2": 7,
+        "COMMA": 6, "PERIOD": 7
+      },
+      "mode": "duration", "duration": 300.0, "fps": 5, "turn_based": true
+    },
     {"type": "fixation", "duration": 2.0}
   ]
 }
