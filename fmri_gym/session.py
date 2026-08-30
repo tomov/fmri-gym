@@ -162,6 +162,7 @@ class Session:
                                "responses": responses})
 
     def _game(self, phase, index):
+        ## Config
         backend = phase.get("backend", "gym")
         adapter = self.adapters[backend]
         mode = phase.get("mode", "duration")
@@ -184,6 +185,7 @@ class Session:
         # and a single held key fires many times. turn_based fixes both.
         turn_based = bool(phase.get("turn_based", False))
 
+        ## Key mapping
         # Some backends (nle, browser games) take several seconds to start;
         # show a Loading screen so the previous fixation "+" doesn't freeze.
         self.display.draw_text(
@@ -196,17 +198,20 @@ class Session:
         key_to_action = {next(iter(ks)): a for ks, a in keyspec.combos.items()
                          if len(ks) == 1}
 
+        ## Frame logging
         frames = {k: [] for k in ("action", "reward", "terminal",
                                   "episode_id", "session_time", "wall_time", "state_blob")}
         frames["episode_seeds"] = []
         frames["variables"] = {}   # varname -> list, filled lazily
 
+        ## Init loop over episodes
         onset = self.clock.session_time()
         block_end = time.perf_counter() + cap
         episode_id = 0
         total_reward = 0.0
         user_quit = False
 
+        ## Loop over episodes within game block
         while not user_quit and time.perf_counter() < block_end:
             seed = base_seed + episode_id
             obs, info = adapter.reset(env, seed, phase)
@@ -214,12 +219,17 @@ class Session:
             terminated = truncated = False
             ep_frame = 0
             next_t = time.perf_counter()
+
             self.display.draw_frame(adapter.render(env))   # show initial state
+            
+            ## Loop over frames within episode
             while not (terminated or truncated):
+                # Wait until it's time for the next frame
                 now = time.perf_counter()
                 if now < next_t:
                     time.sleep(next_t - now)
                 next_t += dt
+
 
                 if turn_based:
                     # Advance only on a fresh keydown that maps to an action.

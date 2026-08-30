@@ -38,6 +38,11 @@ class KeySpec:
     noop: Any
 
     def resolve(self, held: frozenset[str]) -> Any:
+        """Map currently-held keys to an action.
+
+        Among combos whose keys are all present in `held`, pick the longest
+        (most specific). Return `noop` if none match.
+        """
         best, best_len = self.noop, -1
         for keys, action in self.combos.items():
             if keys <= held and len(keys) > best_len:
