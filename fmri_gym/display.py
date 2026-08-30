@@ -48,15 +48,50 @@ class Display:
         self.screen.blit(surf, rect.topleft)
         pygame.display.flip()
 
-    def draw_text(self, text, color=TEXT_COLOR, font=None):
+    def _wrap(self, font, line, max_w):
+        """Word-wrap one logical line so no rendered line exceeds max_w px.
+
+        Leading whitespace (used for indented controls tables) is preserved on
+        the first physical row. Very long single words are left intact.
+        """
+        if font.size(line)[0] <= max_w:
+            return [line]
+        indent = line[:len(line) - len(line.lstrip())]
+        words = line.split()
+        out, cur = [], indent
+        for w in words:
+            trial = (cur + " " + w) if cur.strip() else (indent + w)
+            if font.size(trial)[0] <= max_w or not cur.strip():
+                cur = trial
+            else:
+                out.append(cur)
+                cur = indent + w
+        out.append(cur)
+        return out
+
+    def draw_text(self, text, color=TEXT_COLOR, font=None, align="center"):
+        """Render multi-line text, block-centered vertically.
+
+        align="center" centers each line horizontally (default, for messages);
+        align="left" left-aligns all lines against a common left edge so the
+        whole block is horizontally centered (good for controls tables).
+        Long lines are word-wrapped to fit the window.
+        """
         font = font or self.font
         self.screen.fill(BG_COLOR)
-        lines = text.split("\n")
-        total_h = sum(font.size(ln)[1] for ln in lines)
+        max_w = int(self.size[0] * 0.92)
+        lines = []
+        for raw in text.split("\n"):
+            lines.extend(self._wrap(font, raw, max_w))
+        surfs = [font.render(ln, True, color) for ln in lines]
+        total_h = sum(s.get_height() for s in surfs)
         y = (self.size[1] - total_h) // 2
-        for ln in lines:
-            surf = font.render(ln, True, color)
-            rect = surf.get_rect(center=(self.size[0] // 2, y + surf.get_height() // 2))
+        block_left = (self.size[0] - max((s.get_width() for s in surfs), default=0)) // 2
+        for surf in surfs:
+            if align == "left":
+                rect = surf.get_rect(topleft=(block_left, y))
+            else:
+                rect = surf.get_rect(center=(self.size[0] // 2, y + surf.get_height() // 2))
             self.screen.blit(surf, rect)
             y += surf.get_height()
         pygame.display.flip()

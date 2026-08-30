@@ -1,10 +1,25 @@
 {
   "_game": "ViZDoom: Defend the Center (Doom action-shooter; COOM engine)",
   "_note": "pip install vizdoom. Doom scenario via ViZDoom's gymnasium envs. Try other Vizdoom*-v1 ids (DeadlyCorridor, HealthGathering, TakeCover, Deathmatch, ...).",
+  "_keys_note": "Action indices are scenario-specific. For VizdoomDefendCenter-v1 the Discrete(4) map is 0=noop, 1=ATTACK, 2=TURN_RIGHT, 3=TURN_LEFT (verify with env.unwrapped.button_map). 'keys' below hardcodes the mapping; 'controls_screen' hardcodes exactly what the pre-game screen shows.",
   "curriculum": [
     {"type": "message", "text": "ViZDoom: Defend the Center", "duration": 2.0},
     {"type": "fixation", "duration": 1.0},
-    {"type": "game", "backend": "vizdoom", "game": "VizdoomDefendCenter-v1", "mode": "duration", "duration": 300.0, "fps": 20},
+    {
+      "type": "game", "backend": "vizdoom", "game": "VizdoomDefendCenter-v1",
+      "mode": "duration", "duration": 300.0, "fps": 20,
+      "keys": {"LEFT": 3, "RIGHT": 2, "SPACE": 1},
+      "controls_screen": {
+        "title": "Defend the Center",
+        "text": "You're surrounded. Turn to face the monsters and shoot them before they reach you.",
+        "controls": [
+          ["LEFT", "turn left"],
+          ["RIGHT", "turn right"],
+          ["SPACE", "shoot"]
+        ],
+        "align": "left"
+      }
+    },
     {"type": "fixation", "duration": 2.0}
   ]
 }

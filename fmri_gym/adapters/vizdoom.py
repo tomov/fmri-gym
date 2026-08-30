@@ -21,7 +21,22 @@ import gymnasium as gym
 
 from .base import EnvAdapter, FrameState, KeySpec
 
-_KEYS = ["LEFT", "RIGHT", "UP", "DOWN", "SPACE", "Z"]
+# Physical key -> preferred Doom button (first available for the scenario wins).
+# The gymnasium wrapper's Discrete action i presses the buttons set in
+# env.unwrapped.button_map[i]; index 0 is the no-op (all buttons up).
+_KEY_BUTTONS = {
+    "UP": ["MOVE_FORWARD"],
+    "DOWN": ["MOVE_BACKWARD"],
+    "LEFT": ["MOVE_LEFT", "TURN_LEFT"],
+    "RIGHT": ["MOVE_RIGHT", "TURN_RIGHT"],
+    "Z": ["TURN_LEFT"],
+    "X": ["TURN_RIGHT"],
+    "SPACE": ["ATTACK", "USE"],
+}
+_FRIENDLY = {"MOVE_FORWARD": "move forward", "MOVE_BACKWARD": "move back",
+             "MOVE_LEFT": "strafe left", "MOVE_RIGHT": "strafe right",
+             "TURN_LEFT": "turn left", "TURN_RIGHT": "turn right",
+             "ATTACK": "shoot", "USE": "use"}
 
 
 class VizDoomAdapter(EnvAdapter):
@@ -32,16 +47,39 @@ class VizDoomAdapter(EnvAdapter):
         return gym.make(spec["game"], render_mode="rgb_array",
                         **spec.get("make_kwargs", {}))
 
+    def _button_index(self, env):
+        """Return {BUTTON_NAME: discrete action index} from the wrapper's button_map."""
+        u = env.unwrapped
+        names = [str(b).split(".")[-1] for b in u.game.get_available_buttons()]
+        out = {}
+        for i, row in enumerate(np.asarray(u.button_map)):
+            on = [names[j] for j, v in enumerate(row) if v]
+            if len(on) == 1 and on[0] not in out:   # single-button action
+                out[on[0]] = i
+        self._btn_meaning = {}  # action idx -> friendly label, for describe_action
+        for name, idx in out.items():
+            self._btn_meaning[idx] = _FRIENDLY.get(name, name.lower())
+        return out
+
     def keymap(self, env) -> KeySpec:
-        n = int(getattr(env.action_space, "n", 3))
-        # Best-effort: bind the first n keys to actions 0..n-1. Doom scenarios
-        # differ (turn/move/attack); override per game with a "keys" map.
-        combos = {frozenset([k]): i for i, k in enumerate(_KEYS[:n])}
+        btn_idx = self._button_index(env)
+        combos = {}
+        for key, prefs in _KEY_BUTTONS.items():
+            for b in prefs:
+                if b in btn_idx:
+                    combos[frozenset([key])] = btn_idx[b]
+                    break
+        # controls list (key -> friendly meaning) for the auto screen
+        controls = []
+        for key in ["UP", "DOWN", "LEFT", "RIGHT", "SPACE", "Z", "X"]:
+            ks = frozenset([key])
+            if ks in combos:
+                controls.append((key, self._btn_meaning.get(combos[ks], "")))
         return KeySpec(combos=combos, noop=0,
-                       help="arrows + SPACE map to this scenario's buttons "
-                            "(override with a per-phase 'keys' map)",
-                       controls=[("ARROWS / SPACE", "scenario buttons "
-                                  "(move / turn / attack, varies by scenario)")])
+                       help="", controls=controls)
+
+    def describe_action(self, env, action) -> str:
+        return getattr(self, "_btn_meaning", {}).get(int(action), str(action))
 
     def render(self, env):
         return np.asarray(env.render())

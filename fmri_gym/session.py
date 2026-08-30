@@ -170,25 +170,72 @@ class Session:
         self.logger.log_phase({"index": index, "type": "message", "text": text,
                                "onset": onset, "offset": self.clock.rel()})
 
-    def _controls_screen(self, phase, keyspec, adapter, env):
-        """Show the game name + its buttons and what they do, before play.
+    @staticmethod
+    def _format_controls_rows(rows):
+        """Format [(keys, meaning), ...] into an aligned indented table."""
+        rows = [(str(k), str(m)) for k, m in rows]
+        width = max((len(k) for k, _ in rows), default=0)
+        return [f"   {k:<{width}}   {m}".rstrip() if m else f"   {k}"
+                for k, m in rows]
 
-        Waits for any key press (experimenter/subject), or auto-advances after
-        `controls_seconds` if set. Skipped in dummy-trigger runs (headless).
+    def _controls_text(self, phase, keyspec, adapter, env):
+        """Return (text, align) for the pre-game controls screen.
+
+        If the config supplies `controls_screen`, it fully drives the screen
+        (hardcoded, verbatim) so the experimenter controls exactly what's shown:
+          - a string            -> rendered as-is (align "center")
+          - {"title", "text"}    -> title + free text
+          - {"title", "lines":[...]}       -> title + verbatim lines
+          - {"title", "controls":[[k,m]]}  -> title + auto-aligned table
+          optional: "align" ("left"/"center"), "footer" (bool/str; the
+          "press any key" prompt, on by default).
+        Otherwise the screen is auto-derived from the (override-applied) keymap.
         """
+        cs = phase.get("controls_screen")
+        if cs is not None:
+            if isinstance(cs, str):
+                return cs, "center"
+            lines = []
+            title = cs.get("title", phase.get("text") or phase.get("game"))
+            if title:
+                lines += [str(title), ""]
+            if cs.get("text"):
+                lines += str(cs["text"]).split("\n")
+            if "lines" in cs:
+                lines += [str(x) for x in cs["lines"]]
+            if "controls" in cs:
+                if lines and lines[-1] != "":
+                    lines.append("")
+                lines.append("Controls:")
+                lines += self._format_controls_rows(cs["controls"])
+            footer = cs.get("footer", True)
+            if footer:
+                lines += ["", footer if isinstance(footer, str)
+                          else "(press any key to start — ESC quits)"]
+            return "\n".join(lines), cs.get("align", "left")
+
+        # Auto-derived from the keymap.
         title = phase.get("text") or phase.get("game", "Game")
         lines = [str(title), ""]
         controls = _controls_from_keyspec(keyspec, adapter, env)
         if controls:
             lines.append("Controls:")
-            width = max(len(k) for k, _ in controls)
-            for keys, meaning in controls:
-                lines.append(f"   {keys:<{width}}   {meaning}" if meaning
-                             else f"   {keys}")
+            lines += self._format_controls_rows(controls)
         elif keyspec.help:
             lines += ["Controls:", "   " + keyspec.help]
         lines += ["", "(press any key to start — ESC quits)"]
-        self.display.draw_text("\n".join(lines))
+        return "\n".join(lines), "left" if controls else "center"
+
+    def _controls_screen(self, phase, keyspec, adapter, env):
+        """Show the game name + its buttons and what they do, before play.
+
+        Content is either fully specified by the config (`controls_screen`) for
+        complete control over the visualization, or auto-derived from the
+        keymap. Waits for any key press (experimenter/subject), or auto-advances
+        after `controls_seconds` if set. Skipped in dummy-trigger runs.
+        """
+        text, align = self._controls_text(phase, keyspec, adapter, env)
+        self.display.draw_text(text, align=align)
         # Drop any keypresses queued during the (possibly slow) make()/load, so
         # they don't instantly dismiss this screen. Keep honoring ESC.
         for e in pygame.event.get():
