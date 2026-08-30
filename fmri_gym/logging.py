@@ -46,7 +46,8 @@ class Logger:
         arrays = dict(
             actions=_to_array(frames["action"]),
             rewards=np.asarray(frames["reward"], dtype=np.float32),
-            terminal=np.asarray(frames["terminal"], dtype=bool),
+            terminated=np.asarray(frames["terminated"], dtype=bool),
+            truncated=np.asarray(frames["truncated"], dtype=bool),
             episode_id=np.asarray(frames["episode_id"], dtype=np.int32),
             session_time=np.asarray(frames["session_time"], dtype=np.float64),
             wall_time=np.asarray(frames["wall_time"], dtype=np.float64),

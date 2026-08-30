@@ -199,7 +199,7 @@ class Session:
                          if len(ks) == 1}
 
         ## Frame logging
-        frames = {k: [] for k in ("action", "reward", "terminal",
+        frames = {k: [] for k in ("action", "reward", "terminated", "truncated",
                                   "episode_id", "session_time", "wall_time", "state_blob")}
         frames["episode_seeds"] = []
         frames["variables"] = {}   # varname -> list, filled lazily
@@ -262,7 +262,8 @@ class Session:
 
                 frames["action"].append(action)
                 frames["reward"].append(reward)
-                frames["terminal"].append(bool(terminated or truncated))
+                frames["terminated"].append(bool(terminated))
+                frames["truncated"].append(bool(truncated))
                 frames["episode_id"].append(episode_id)
                 frames["session_time"].append(self.clock.session_time())
                 frames["wall_time"].append(self.clock.wall_time())
