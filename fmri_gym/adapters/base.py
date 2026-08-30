@@ -1,20 +1,4 @@
-"""EnvAdapter -- the seam that makes the fMRI loop engine-agnostic.
-
-The experiment loop (session.py) NEVER touches `env.unwrapped`, a specific
-emulator, or any engine-specific API. Everything engine-specific lives behind
-an EnvAdapter. To support a new backend you write one small adapter subclass;
-the rest of the framework is unchanged.
-
-An adapter is responsible for four things:
-
-    make(spec)         -> create the gym.Env for one game block
-    keymap(env)        -> how held keyboard keys become an env action
-    capture(env)       -> the per-frame state we log (opaque blob + named vars)
-    restore(env, blob) -> put the env back into a captured state (if supported)
-
-State is returned in a STANDARD shape (a FrameState) so the logger and any
-downstream analysis code are identical across ALE / stable-retro / plain gym.
-"""
+"""KeySpec, FrameState, and the EnvAdapter base class."""
 
 from __future__ import annotations
 
@@ -72,7 +56,24 @@ class FrameState:
 
 
 class EnvAdapter:
-    """Base class. Subclasses override the four hooks below."""
+    """The seam that makes the fMRI loop engine-agnostic.
+
+    The experiment loop (session.py) NEVER touches ``env.unwrapped``, a specific
+    emulator, or any engine-specific API. Everything engine-specific lives behind
+    an EnvAdapter. To support a new backend you write one small adapter subclass;
+    the rest of the framework is unchanged.
+
+    An adapter is responsible for four things:
+
+        make(spec)         -> create the gym.Env for one game block
+        keymap(env)        -> how held keyboard keys become an env action
+        capture(env)       -> the per-frame state we log (opaque blob + named vars)
+        restore(env, blob) -> put the env back into a captured state (if supported)
+
+    State is returned in a STANDARD shape (a :class:`FrameState`) so the logger
+    and any downstream analysis code are identical across ALE / stable-retro /
+    plain gym.
+    """
 
     #: short id used in filenames / manifest, e.g. "ale", "retro", "gym"
     name: str = "base"
