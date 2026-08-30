@@ -16,6 +16,10 @@ Notes verified against stable_retro 1.0.1:
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
+import gymnasium as gym
 import stable_retro as retro
 
 from .base import EnvAdapter, FrameState, KeySpec
@@ -33,23 +37,23 @@ _KEY_TO_BUTTON = {
 
 
 class RetroAdapter(EnvAdapter):
-    name = "retro"
+    name: str = "retro"
 
-    def __init__(self, save_pixels: bool = False):
+    def __init__(self, save_pixels: bool = False) -> None:
         # save_pixels accepted for interface symmetry; retro frames are already
         # reconstructable from the per-frame state, so pixels aren't stored.
         self.save_pixels = save_pixels
 
-    def make(self, spec):
+    def make(self, spec: dict) -> gym.Env:
         return retro.make(
             game=spec["game"], scenario=spec.get("scenario"),
             render_mode="rgb_array")
 
-    def keymap(self, env) -> KeySpec:
+    def keymap(self, env: gym.Env) -> KeySpec:
         buttons = list(env.unwrapped.buttons)   # e.g. ["B","A","MODE",...,"C"]
         btn_index = {b: i for i, b in enumerate(buttons)}
 
-        def action_for(held_key):
+        def action_for(held_key: str) -> list[int]:
             vec = [0] * len(buttons)
             for target in _KEY_TO_BUTTON.get(held_key, ()):
                 if target in btn_index:
@@ -71,13 +75,15 @@ class RetroAdapter(EnvAdapter):
         ks.resolve = _make_multi_resolver(combos, noop)
         return ks
 
-    def reset(self, env, seed, spec):
+    def reset(self, env: gym.Env, seed: int | None, spec: dict) -> tuple[Any, dict]:
         state = spec.get("state")
         if state:
             env.unwrapped.load_state(state)
         return env.reset()
 
-    def capture(self, env, obs, info, want_blob=True) -> FrameState:
+    def capture(
+        self, env: gym.Env, obs: Any, info: dict, want_blob: bool = True
+    ) -> FrameState:
         u = env.unwrapped
         u.data.update_ram()
         variables = {"ram": u.get_ram().copy()}
@@ -88,15 +94,17 @@ class RetroAdapter(EnvAdapter):
         blob = u.em.get_state() if want_blob else None
         return FrameState(blob=blob, variables=variables)
 
-    def restore(self, env, blob):
+    def restore(self, env: gym.Env, blob: bytes) -> None:
         u = env.unwrapped
         u.em.set_state(blob)
         u.data.update_ram()
 
 
-def _make_multi_resolver(combos, noop):
+def _make_multi_resolver(
+    combos: dict[frozenset[str], list[int]], noop: list[int]
+) -> Callable[[frozenset[str]], list[int]]:
     """Return a resolve(held) that ORs the button vectors of all held keys."""
-    def resolve(held):
+    def resolve(held: frozenset[str]) -> list[int]:
         vec = list(noop)
         for keys, action in combos.items():
             (key,) = tuple(keys)

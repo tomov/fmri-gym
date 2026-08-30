@@ -17,6 +17,8 @@ Requires: `pip install nle` (already present if minihack is installed) and
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import gymnasium as gym
 
@@ -36,9 +38,9 @@ _ARROW_TO_KEYCODE = {"UP": 107, "RIGHT": 108, "DOWN": 106, "LEFT": 104}
 
 
 class NetHackAdapter(EnvAdapter):
-    name = "nethack"
+    name: str = "nethack"
 
-    def make(self, spec):
+    def make(self, spec: dict) -> gym.Env:
         import nle  # noqa: F401  (registers NetHack*-v0 env ids)
         env = gym.make(spec.get("game", "NetHackScore-v0"))
         # Map each arrow's target keycode to its Discrete action index (the
@@ -56,20 +58,22 @@ class NetHackAdapter(EnvAdapter):
         self._last = None
         return env
 
-    def keymap(self, env) -> KeySpec:
+    def keymap(self, env: gym.Env) -> KeySpec:
         combos = {frozenset([k]): v for k, v in self._key_to_action.items()}
         # noop: NLE has no true no-op; default to the first action.
         return KeySpec(combos=combos, noop=0)
 
-    def reset(self, env, seed, spec):
+    def reset(self, env: gym.Env, seed: int | None, spec: dict) -> tuple[Any, dict]:
         obs, info = env.reset(seed=seed)
         self._last = obs
         return obs, info
 
-    def render(self, env):
+    def render(self, env: gym.Env) -> np.ndarray:
         return _tty_to_rgb(self._last, self._cell)
 
-    def capture(self, env, obs, info, want_blob=True) -> FrameState:
+    def capture(
+        self, env: gym.Env, obs: Any, info: dict, want_blob: bool = True
+    ) -> FrameState:
         self._last = obs
         variables = {}
         for k in ("blstats", "glyphs", "message"):
@@ -78,7 +82,7 @@ class NetHackAdapter(EnvAdapter):
         return FrameState(blob=None, variables=variables)
 
 
-def _tty_to_rgb(obs, cell):
+def _tty_to_rgb(obs: Any, cell: int) -> np.ndarray:
     """Render NLE's (24,80) tty_chars/tty_colors grid to an RGB image."""
     if not isinstance(obs, dict) or "tty_chars" not in obs:
         return np.zeros((240, 800, 3), dtype=np.uint8)
@@ -108,7 +112,7 @@ def _tty_to_rgb(obs, cell):
     return pygame.surfarray.array3d(surf).transpose(1, 0, 2)
 
 
-def _mono_font(pygame, size):
+def _mono_font(pygame: Any, size: int) -> Any:
     """A real fixed-width font (falls back gracefully across systems)."""
     for name in ("dejavusansmono", "liberationmono", "couriernew", "monospace"):
         try:

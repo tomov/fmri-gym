@@ -12,6 +12,8 @@ make_via_shimmy() -- and everything else here still applies.
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
@@ -20,9 +22,9 @@ from .base import EnvAdapter, FrameState, KeySpec
 
 
 class DefaultAdapter(EnvAdapter):
-    name = "gym"
+    name: str = "gym"
 
-    def make(self, spec):
+    def make(self, spec: dict) -> gym.Env:
         # Many third-party envs only register their ids as a side effect of
         # importing their package (crafter, minihack, tile_match_gym, ...).
         # A curriculum can name that module via "import_module".
@@ -36,7 +38,7 @@ class DefaultAdapter(EnvAdapter):
             return _make_via_shimmy(spec["game"], **kwargs)
         return gym.make(spec["game"], **kwargs)
 
-    def keymap(self, env) -> KeySpec:
+    def keymap(self, env: gym.Env) -> KeySpec:
         # Allow a curriculum to hand-specify a mapping: {"keys": {"LEFT": 0, ...}}
         # or {"keys": {"LEFT+SPACE": 2}} for combos.
         space = env.action_space
@@ -55,7 +57,7 @@ class DefaultAdapter(EnvAdapter):
             # Map arrow keys to +/- on the first (up to 2) continuous dims.
             lo, hi = np.asarray(space.low), np.asarray(space.high)
             noop = np.zeros(space.shape, dtype=space.dtype)
-            def vec(dim, sign):
+            def vec(dim: int, sign: int) -> np.ndarray:
                 v = np.zeros(space.shape, dtype=space.dtype)
                 v[dim] = (hi[dim] if sign > 0 else lo[dim])
                 return v
@@ -70,14 +72,16 @@ class DefaultAdapter(EnvAdapter):
                             "provide a custom adapter.")
         return KeySpec(combos=combos, noop=noop)
 
-    def capture(self, env, obs, info, want_blob=True) -> FrameState:
+    def capture(
+        self, env: gym.Env, obs: Any, info: dict, want_blob: bool = True
+    ) -> FrameState:
         # No universal savestate: blob=None -> reconstruction is via seed+replay.
         # The observation is the analysis state for most gym envs.
         variables = {"obs": np.asarray(obs)}
         return FrameState(blob=None, variables=variables)
 
 
-def _make_via_shimmy(game_id, **kwargs):
+def _make_via_shimmy(game_id: str, **kwargs: Any) -> gym.Env:
     """Wrap an old-`gym` env id as a Gymnasium env using shimmy."""
     import shimmy  # noqa: F401  (registers compatibility envs on import)
     # Gymnasium exposes the v0.21 compat entrypoint once shimmy is installed.

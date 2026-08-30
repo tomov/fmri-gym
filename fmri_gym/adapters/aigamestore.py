@@ -36,42 +36,53 @@ import threading
 import functools
 import http.server
 import socketserver
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from .base import EnvAdapter, FrameState, KeySpec
 
+if TYPE_CHECKING:
+    from playwright.sync_api import Browser, Page, Playwright
+
 # Physical keys we forward to the browser, and their Playwright key names.
-_KEY_TO_PLAYWRIGHT = {
+_KEY_TO_PLAYWRIGHT: dict[str, str] = {
     "LEFT": "ArrowLeft", "RIGHT": "ArrowRight", "UP": "ArrowUp", "DOWN": "ArrowDown",
     "SPACE": " ", "Z": "z", "X": "x", "RETURN": "Enter", "LSHIFT": "Shift",
     "R": "r", "ESCAPE": "Escape",
 }
-_VENDOR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+_VENDOR: str = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "vendor", "aigamestore")
 
 
 class _Session:
     """Holds the Playwright browser/page + local server for one game block."""
 
-    def __init__(self, playwright, browser, page, server, held):
+    def __init__(
+        self,
+        playwright: Playwright,
+        browser: Browser,
+        page: Page,
+        server: socketserver.TCPServer,
+        held: set[str],
+    ) -> None:
         self.pw = playwright
         self.browser = browser
         self.page = page
         self.server = server
         self.held = held           # currently-pressed keys (set of key names)
-        self.prev_score = 0.0
+        self.prev_score: float = 0.0
 
 
 class _QuietHandler(http.server.SimpleHTTPRequestHandler):
-    def log_message(self, *a):
+    def log_message(self, *a: Any) -> None:
         pass
 
 
 class AIGameStoreAdapter(EnvAdapter):
-    name = "aigamestore"
+    name: str = "aigamestore"
 
-    def make(self, spec):
+    def make(self, spec: dict) -> _Session:
         from playwright.sync_api import sync_playwright
 
         games_dir = spec.get("games_dir", _VENDOR)
@@ -107,7 +118,7 @@ class AIGameStoreAdapter(EnvAdapter):
         self._start_key = spec.get("start_key", "Enter")
         return _Session(pw, browser, page, server, set())
 
-    def keymap(self, env) -> KeySpec:
+    def keymap(self, env: _Session) -> KeySpec:
         combos = {frozenset([k]): k for k in _KEY_TO_PLAYWRIGHT}
         ks = KeySpec(combos=combos, noop=frozenset())
         # Override resolve to return the FULL set of held keys as a stable
@@ -117,7 +128,7 @@ class AIGameStoreAdapter(EnvAdapter):
         ks.resolve = lambda held: "+".join(sorted(held & known))
         return ks
 
-    def reset(self, env, seed, spec):
+    def reset(self, env: _Session, seed: int | None, spec: dict) -> tuple[Any, dict]:
         page = env.page
         # Try to (re)start a fresh episode: reload keeps things deterministic-ish.
         page.reload()
@@ -135,7 +146,7 @@ class AIGameStoreAdapter(EnvAdapter):
         env.prev_score = _score(page)
         return None, {}
 
-    def step(self, env, action):
+    def step(self, env: _Session, action: Any) -> tuple[Any, float, bool, bool, dict]:
         page = env.page
         # action is a "+"-joined key string (from resolve) or any iterable.
         if isinstance(action, str):
@@ -160,12 +171,14 @@ class AIGameStoreAdapter(EnvAdapter):
         env._last_state = st
         return None, reward, done, False, {"state": st}
 
-    def render(self, env):
+    def render(self, env: _Session) -> np.ndarray:
         cv = env.page.query_selector("canvas")
         png = cv.screenshot() if cv else env.page.screenshot()
         return _png_to_rgb(png)
 
-    def capture(self, env, obs, info, want_blob=True) -> FrameState:
+    def capture(
+        self, env: _Session, obs: Any, info: dict, want_blob: bool = True
+    ) -> FrameState:
         st = (info or {}).get("state")
         variables = {}
         if isinstance(st, dict):
@@ -176,7 +189,7 @@ class AIGameStoreAdapter(EnvAdapter):
                     variables[f"state_{k}"] = v
         return FrameState(blob=None, variables=variables)
 
-    def close(self, env) -> None:
+    def close(self, env: _Session) -> None:
         try:
             env.browser.close()
         finally:
@@ -189,26 +202,26 @@ class AIGameStoreAdapter(EnvAdapter):
 # --------------------------------------------------------------------------- #
 # helpers
 # --------------------------------------------------------------------------- #
-def _key(page, name, down):
+def _key(page: Page, name: str, down: bool) -> None:
     pw_key = _KEY_TO_PLAYWRIGHT.get(name)
     if not pw_key:
         return
     (page.keyboard.down if down else page.keyboard.up)(pw_key)
 
 
-def _state(page):
+def _state(page: Page) -> Any:
     try:
         return page.evaluate("window.getGameState ? window.getGameState() : null")
     except Exception:
         return None
 
 
-def _score(page):
+def _score(page: Page) -> float:
     st = _state(page)
     return float(st.get("score", 0.0) or 0.0) if isinstance(st, dict) else 0.0
 
 
-def _png_to_rgb(png_bytes):
+def _png_to_rgb(png_bytes: bytes) -> np.ndarray:
     import io
     try:
         from PIL import Image

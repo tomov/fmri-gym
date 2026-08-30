@@ -19,6 +19,8 @@ Requires `pkg_resources` (install setuptools<81) as minihack imports it.
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import gymnasium as gym
 
@@ -29,9 +31,9 @@ _KEYS = {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3}
 
 
 class MiniHackAdapter(EnvAdapter):
-    name = "minihack"
+    name: str = "minihack"
 
-    def make(self, spec):
+    def make(self, spec: dict) -> gym.Env:
         import minihack  # noqa: F401  (registers MiniHack-* env ids)
         # Prefer the agent-centered square crop for display; the full terminal
         # ("pixel") only looks good with "full_screen": true.
@@ -44,20 +46,22 @@ class MiniHackAdapter(EnvAdapter):
         self._last = None
         return env
 
-    def keymap(self, env) -> KeySpec:
+    def keymap(self, env: gym.Env) -> KeySpec:
         combos = {frozenset([k]): v for k, v in _KEYS.items()}
         return KeySpec(combos=combos, noop=0)
 
-    def reset(self, env, seed, spec):
+    def reset(self, env: gym.Env, seed: int | None, spec: dict) -> tuple[Any, dict]:
         obs, info = env.reset(seed=seed)
         self._last = obs
         return obs, info
 
-    def render(self, env):
+    def render(self, env: gym.Env) -> np.ndarray:
         # Display the pixel observation (env.render() is None for MiniHack).
         return np.asarray(self._last[self._pixel_key])
 
-    def capture(self, env, obs, info, want_blob=True) -> FrameState:
+    def capture(
+        self, env: gym.Env, obs: Any, info: dict, want_blob: bool = True
+    ) -> FrameState:
         self._last = obs
         variables = {}
         # Compact symbolic fields make good analysis regressors; skip the big

@@ -11,12 +11,16 @@ from __future__ import annotations
 
 import sys
 import time
+from typing import TYPE_CHECKING, Any
 
 import pygame
 
 from .display import Display
 from .keys import held_key_names, key_name as _key_name
 from .logging import Logger
+
+if TYPE_CHECKING:
+    from .adapters.base import EnvAdapter, KeySpec
 
 TRIGGER_KEY = "="
 EXPERIMENTER_KEY = " "
@@ -25,22 +29,22 @@ EXPERIMENTER_KEY = " "
 class Clock:
     """Anchored at the scanner trigger; gives session + wall-clock time."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.t0_perf = None
         self.t0_epoch = None
 
-    def trigger(self):
+    def trigger(self) -> None:
         self.t0_perf = time.perf_counter()
         self.t0_epoch = time.time()
 
-    def session_time(self):
+    def session_time(self) -> float:
         return time.perf_counter() - self.t0_perf
 
-    def wall_time(self):
+    def wall_time(self) -> float:
         return time.time()
 
 
-def _check_quit():
+def _check_quit() -> bool:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             return True
@@ -49,7 +53,7 @@ def _check_quit():
     return False
 
 
-def _wait_for_char(char, dummy_trigger=False):
+def _wait_for_char(char: str, dummy_trigger: bool = False) -> None:
     if dummy_trigger:
         time.sleep(0.05)
         return
@@ -65,7 +69,7 @@ def _wait_for_char(char, dummy_trigger=False):
         time.sleep(0.005)
 
 
-def _wait_for_duration(duration):
+def _wait_for_duration(duration: float) -> None:
     """Block for `duration` seconds (ESC/quit raises KeyboardInterrupt)."""
     end = time.perf_counter() + duration
     while time.perf_counter() < end:
@@ -74,7 +78,7 @@ def _wait_for_duration(duration):
         time.sleep(0.005)
 
 
-def _apply_key_overrides(keyspec, overrides):
+def _apply_key_overrides(keyspec: KeySpec, overrides: dict | None) -> KeySpec:
     """Merge curriculum-provided {"LEFT": action, "LEFT+SPACE": action} combos."""
     if not overrides:
         return keyspec
@@ -89,8 +93,15 @@ def _apply_key_overrides(keyspec, overrides):
 class Session:
     """Runs a curriculum for one subject, dispatching phases to handlers."""
 
-    def __init__(self, subject, curriculum, adapters, display, outdir,
-                 dummy_trigger=False):
+    def __init__(
+        self,
+        subject: str,
+        curriculum: list[dict],
+        adapters: dict[str, EnvAdapter],
+        display: Display,
+        outdir: str,
+        dummy_trigger: bool = False,
+    ) -> None:
         self.subject = subject
         self.curriculum = curriculum
         self.adapters = adapters              # {backend_name: EnvAdapter}
@@ -102,7 +113,7 @@ class Session:
 
     # -- phase handlers ------------------------------------------------------
 
-    def _fixation(self, phase, index):
+    def _fixation(self, phase: dict, index: int) -> None:
         duration = phase.get("duration", 2.0)
         onset = self.clock.session_time()
 
@@ -112,7 +123,7 @@ class Session:
         self.logger.log_phase({"index": index, "type": "fixation",
                                "onset": onset, "offset": self.clock.session_time()})
 
-    def _message(self, phase, index):
+    def _message(self, phase: dict, index: int) -> None:
         text = phase.get("text", "")
         duration = phase.get("duration")
         onset = self.clock.session_time()
@@ -126,7 +137,7 @@ class Session:
         self.logger.log_phase({"index": index, "type": "message", "text": text,
                                "onset": onset, "offset": self.clock.session_time()})
 
-    def _survey(self, phase, index):
+    def _survey(self, phase: dict, index: int) -> None:
         questions = phase.get("questions", [])
         n_points = phase.get("n_points", 7)
         onset = self.clock.session_time()
@@ -161,7 +172,7 @@ class Session:
                                "onset": onset, "offset": self.clock.session_time(),
                                "responses": responses})
 
-    def _game(self, phase, index):
+    def _game(self, phase: dict, index: int) -> None:
         ## Config
         backend = phase.get("backend", "gym")
         adapter = self.adapters[backend]
@@ -240,9 +251,22 @@ class Session:
         if user_quit:
             raise KeyboardInterrupt
 
-    def _episode(self, adapter, env, phase, frames, *, seed, episode_id,
-                 turn_based, key_to_action, keyspec, dt, state_stride,
-                 block_end):
+    def _episode(
+        self,
+        adapter: EnvAdapter,
+        env: Any,
+        phase: dict,
+        frames: dict,
+        *,
+        seed: int,
+        episode_id: int,
+        turn_based: bool,
+        key_to_action: dict,
+        keyspec: KeySpec,
+        dt: float,
+        state_stride: int,
+        block_end: float,
+    ) -> bool:
         """Run one episode, appending frame data to ``frames``.
 
         :param adapter: env adapter for reset/step/render/capture.
@@ -318,7 +342,7 @@ class Session:
 
     # -- top level -----------------------------------------------------------
 
-    def _trigger(self):
+    def _trigger(self) -> None:
         """Wait for experimenter ready + scanner trigger, then start the clock."""
         self.display.draw_text(
             "Please keep your head as still as possible.\n\n"
@@ -330,7 +354,7 @@ class Session:
         self.clock.trigger()
         self.logger.set_trigger_time()
 
-    def run(self):
+    def run(self) -> None:
         handlers = {"fixation": self._fixation, "message": self._message,
                     "game": self._game, "survey": self._survey}
         try:

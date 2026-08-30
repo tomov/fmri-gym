@@ -3,14 +3,21 @@
 The experiment loop is engine-agnostic; each game engine is a small EnvAdapter.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 from .session import Session, Clock
 from .display import Display
 from .logging import Logger
 
+if TYPE_CHECKING:
+    from .adapters.base import EnvAdapter
+
 __all__ = ["Session", "Clock", "Display", "Logger", "get_adapter"]
 
 
-def get_adapter(backend, **kwargs):
+def get_adapter(backend: str, **kwargs: Any) -> EnvAdapter:
     """Lazily construct an adapter by backend name.
 
     Lazy imports keep optional deps (ale_py, stable_retro) from being required

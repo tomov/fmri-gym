@@ -16,17 +16,22 @@ Z drift, X nitro. Reward = distance progress per step; kart finish -> done.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 import numpy as np
 
 from .base import EnvAdapter, FrameState, KeySpec
 
-_STARTED = {"init": False}
+if TYPE_CHECKING:
+    import pystk2
+
+_STARTED: dict[str, bool] = {"init": False}
 
 
 class SuperTuxKartAdapter(EnvAdapter):
-    name = "supertuxkart"
+    name: str = "supertuxkart"
 
-    def make(self, spec):
+    def make(self, spec: dict) -> pystk2.Race:
         import pystk2
         self._pystk2 = pystk2
         w = int(spec.get("width", 600))
@@ -50,7 +55,7 @@ class SuperTuxKartAdapter(EnvAdapter):
         self._prev_dist = 0.0
         return race
 
-    def keymap(self, env) -> KeySpec:
+    def keymap(self, env: pystk2.Race) -> KeySpec:
         # Actions are assembled from the held-key set in step(); the combos here
         # just declare which keys are meaningful (resolve returns the held set).
         keys = ["LEFT", "RIGHT", "UP", "DOWN", "SPACE", "Z", "X"]
@@ -59,7 +64,7 @@ class SuperTuxKartAdapter(EnvAdapter):
         ks.resolve = lambda held: "+".join(sorted(held & set(keys)))
         return ks
 
-    def reset(self, env, seed, spec):
+    def reset(self, env: pystk2.Race, seed: int | None, spec: dict) -> tuple[Any, dict]:
         # pystk2.Race has no reset(); restart the race for a fresh episode.
         try:
             env.restart()
@@ -69,7 +74,7 @@ class SuperTuxKartAdapter(EnvAdapter):
         self._prev_dist = 0.0
         return None, {}
 
-    def step(self, env, action):
+    def step(self, env: pystk2.Race, action: Any) -> tuple[Any, float, bool, bool, dict]:
         pystk2 = self._pystk2
         held = set(action.split("+")) if isinstance(action, str) and action else \
             (set(action) if action else set())
@@ -89,13 +94,15 @@ class SuperTuxKartAdapter(EnvAdapter):
         finished = bool(getattr(kart, "finished_laps", 0) >= self._race.config.laps) if kart else False
         return None, reward, finished, False, {"distance": dist}
 
-    def render(self, env):
+    def render(self, env: pystk2.Race) -> np.ndarray:
         return np.asarray(env.render_data[0].image)
 
-    def capture(self, env, obs, info, want_blob=True) -> FrameState:
+    def capture(
+        self, env: pystk2.Race, obs: Any, info: dict, want_blob: bool = True
+    ) -> FrameState:
         return FrameState(blob=None, variables={"distance": (info or {}).get("distance", 0.0)})
 
-    def close(self, env) -> None:
+    def close(self, env: pystk2.Race) -> None:
         try:
             env.stop()
         except Exception:

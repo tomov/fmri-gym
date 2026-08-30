@@ -16,6 +16,8 @@ Discrete(n) button set per scenario; arrows/space map to the first n actions.
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import gymnasium as gym
 
@@ -24,7 +26,7 @@ from .base import EnvAdapter, FrameState, KeySpec
 # Physical key -> preferred Doom button (first available for the scenario wins).
 # The gymnasium wrapper's Discrete action i presses the buttons set in
 # env.unwrapped.button_map[i]; index 0 is the no-op (all buttons up).
-_KEY_BUTTONS = {
+_KEY_BUTTONS: dict[str, list[str]] = {
     "UP": ["MOVE_FORWARD"],
     "DOWN": ["MOVE_BACKWARD"],
     "LEFT": ["MOVE_LEFT", "TURN_LEFT"],
@@ -36,25 +38,25 @@ _KEY_BUTTONS = {
 
 
 class VizDoomAdapter(EnvAdapter):
-    name = "vizdoom"
+    name: str = "vizdoom"
 
-    def make(self, spec):
+    def make(self, spec: dict) -> gym.Env:
         from vizdoom import gymnasium_wrapper  # noqa: F401  (registers Vizdoom*-v1)
         return gym.make(spec["game"], render_mode="rgb_array",
                         **spec.get("make_kwargs", {}))
 
-    def _button_index(self, env):
+    def _button_index(self, env: gym.Env) -> dict[str, int]:
         """Return {BUTTON_NAME: discrete action index} from the wrapper's button_map."""
         u = env.unwrapped
         names = [str(b).split(".")[-1] for b in u.game.get_available_buttons()]
-        out = {}
+        out: dict[str, int] = {}
         for i, row in enumerate(np.asarray(u.button_map)):
             on = [names[j] for j, v in enumerate(row) if v]
             if len(on) == 1 and on[0] not in out:   # single-button action
                 out[on[0]] = i
         return out
 
-    def keymap(self, env) -> KeySpec:
+    def keymap(self, env: gym.Env) -> KeySpec:
         btn_idx = self._button_index(env)
         combos = {}
         for key, prefs in _KEY_BUTTONS.items():
@@ -64,10 +66,12 @@ class VizDoomAdapter(EnvAdapter):
                     break
         return KeySpec(combos=combos, noop=0)
 
-    def render(self, env):
+    def render(self, env: gym.Env) -> np.ndarray:
         return np.asarray(env.render())
 
-    def capture(self, env, obs, info, want_blob=True) -> FrameState:
+    def capture(
+        self, env: gym.Env, obs: Any, info: dict, want_blob: bool = True
+    ) -> FrameState:
         variables = {}
         if isinstance(obs, dict) and "gamevariables" in obs:
             variables["gamevariables"] = np.asarray(obs["gamevariables"])

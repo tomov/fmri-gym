@@ -9,12 +9,18 @@ from __future__ import annotations
 
 import json
 import os
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+if TYPE_CHECKING:
+    from .session import Clock
+
 
 class Logger:
-    def __init__(self, outdir, subject, curriculum, clock):
+    def __init__(
+        self, outdir: str, subject: str, curriculum: list[dict], clock: Clock
+    ) -> None:
         self.outdir = outdir
         self.clock = clock
         os.makedirs(outdir, exist_ok=True)
@@ -25,14 +31,21 @@ class Logger:
             "phases": [],
         }
 
-    def set_trigger_time(self):
+    def set_trigger_time(self) -> None:
         self.manifest["start_epoch"] = self.clock.t0_epoch
         self.manifest["trigger_perf"] = self.clock.t0_perf
 
-    def log_phase(self, entry):
+    def log_phase(self, entry: dict) -> None:
         self.manifest["phases"].append(entry)
 
-    def save_game_block(self, block_index, backend, game, frames, extra=None):
+    def save_game_block(
+        self,
+        block_index: int,
+        backend: str,
+        game: str,
+        frames: dict,
+        extra: dict | None = None,
+    ) -> str:
         """Write one game block's per-frame arrays.
 
         `frames` holds parallel lists collected by the session loop. Backend-
@@ -68,14 +81,14 @@ class Logger:
         np.savez_compressed(path, **arrays)
         return path
 
-    def save_manifest(self):
+    def save_manifest(self) -> str:
         path = os.path.join(self.outdir, "manifest.json")
         with open(path, "w") as f:
             json.dump(self.manifest, f, indent=2, default=_json_default)
         return path
 
 
-def _to_array(actions):
+def _to_array(actions: list) -> np.ndarray:
     """Actions may be ints (Discrete), arrays (Box), or button lists (retro)."""
     try:
         return np.asarray(actions)
@@ -83,7 +96,7 @@ def _to_array(actions):
         return np.array(actions, dtype=object)
 
 
-def _json_default(o):
+def _json_default(o: Any) -> Any:
     if isinstance(o, (np.integer,)):
         return int(o)
     if isinstance(o, (np.floating,)):

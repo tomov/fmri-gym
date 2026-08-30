@@ -19,8 +19,9 @@ downstream analysis code are identical across ALE / stable-retro / plain gym.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
+import gymnasium as gym
 import numpy as np
 
 
@@ -66,7 +67,7 @@ class FrameState:
                are backend-defined but SHOULD include "ram" when available.
     """
 
-    blob: Optional[bytes] = None
+    blob: bytes | None = None
     variables: dict[str, Any] = field(default_factory=dict)
 
 
@@ -76,7 +77,7 @@ class EnvAdapter:
     #: short id used in filenames / manifest, e.g. "ale", "retro", "gym"
     name: str = "base"
 
-    def make(self, spec: dict):
+    def make(self, spec: dict) -> gym.Env:
         """Return a gym-compatible env for one game block.
 
         `spec` is the game phase dict from the curriculum (already validated for
@@ -85,18 +86,18 @@ class EnvAdapter:
         """
         raise NotImplementedError
 
-    def keymap(self, env) -> KeySpec:
+    def keymap(self, env: gym.Env) -> KeySpec:
         """Return the keyboard->action mapping for this env."""
         raise NotImplementedError
 
-    def reset(self, env, seed: Optional[int], spec: dict):
+    def reset(self, env: gym.Env, seed: int | None, spec: dict) -> tuple[Any, dict]:
         """Reset the env for a new episode. Return (obs, info).
 
         Adapters may use `spec` for per-episode setup (e.g. retro load_state).
         """
         return env.reset(seed=seed)
 
-    def step(self, env, action):
+    def step(self, env: gym.Env, action: Any) -> tuple[Any, float, bool, bool, dict]:
         """Advance one frame. Return (obs, reward, terminated, truncated, info).
 
         Default is the Gymnasium contract; adapters with non-standard
@@ -104,7 +105,9 @@ class EnvAdapter:
         """
         return env.step(action)
 
-    def capture(self, env, obs, info, want_blob: bool = True) -> FrameState:
+    def capture(
+        self, env: gym.Env, obs: Any, info: dict, want_blob: bool = True
+    ) -> FrameState:
         """Return the FrameState to log for the current frame.
 
         Called once per step. `obs`/`info` are the latest step() outputs so
@@ -115,11 +118,11 @@ class EnvAdapter:
         """
         return FrameState()
 
-    def restore(self, env, blob: bytes) -> None:
+    def restore(self, env: gym.Env, blob: bytes) -> None:
         """Inverse of capture().blob. Raise if the backend has no savestate."""
         raise NotImplementedError(f"{self.name} adapter has no in-memory savestate")
 
-    def render(self, env):
+    def render(self, env: gym.Env) -> np.ndarray:
         """Return the current RGB frame (H,W,3) uint8 for display.
 
         Default assumes the Gymnasium contract (env.render() with the env made
@@ -128,7 +131,7 @@ class EnvAdapter:
         """
         return env.render()
 
-    def close(self, env) -> None:
+    def close(self, env: gym.Env) -> None:
         # Not every env exposes close() (e.g. overcooked's OvercookedEnv).
         closer = getattr(env, "close", None)
         if callable(closer):

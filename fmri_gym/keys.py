@@ -59,7 +59,7 @@ _PYGAME_KEY_NAMES = {
 }
 
 
-def held_key_names(keys=None) -> frozenset[str]:
+def held_key_names(keys: dict[int, str] | None = None) -> frozenset[str]:
     """Return currently-held keys as upper-case names ("LEFT", "SPACE", ...).
 
     Kept here so every adapter/display shares one definition of "held keys".
@@ -76,7 +76,7 @@ def held_key_names(keys=None) -> frozenset[str]:
     return frozenset(out)
 
 
-def key_name(keycode) -> str | None:
+def key_name(keycode: int) -> str | None:
     """Reverse of the name->code map: a pygame keycode -> its NAME ("LEFT",...).
 
     Used for turn-based games, which step on discrete KEYDOWN events rather than

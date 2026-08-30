@@ -12,15 +12,17 @@ directly (old-style 4-tuple step, joint actions).
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from .base import EnvAdapter, FrameState, KeySpec
 
 
 class OvercookedAdapter(EnvAdapter):
-    name = "overcooked"
+    name: str = "overcooked"
 
-    def make(self, spec):
+    def make(self, spec: dict) -> Any:
         from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld
         from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
         from overcooked_ai_py.mdp.actions import Action
@@ -36,18 +38,18 @@ class OvercookedAdapter(EnvAdapter):
         self._partner = spec.get("partner", "stay")
         return self._env
 
-    def keymap(self, env) -> KeySpec:
+    def keymap(self, env: Any) -> KeySpec:
         A = self._Action
         combos = {frozenset(["UP"]): (0, -1), frozenset(["DOWN"]): (0, 1),
                   frozenset(["LEFT"]): (-1, 0), frozenset(["RIGHT"]): (1, 0),
                   frozenset(["SPACE"]): "interact"}
         return KeySpec(combos=combos, noop=(0, 0))
 
-    def reset(self, env, seed, spec):
+    def reset(self, env: Any, seed: int | None, spec: dict) -> tuple[Any, dict]:
         env.reset()
         return env.state, {}
 
-    def step(self, env, action):
+    def step(self, env: Any, action: Any) -> tuple[Any, float, bool, bool, dict]:
         A = self._Action
         partner = A.STAY
         if self._partner == "random":
@@ -56,12 +58,14 @@ class OvercookedAdapter(EnvAdapter):
         next_state, reward, done, info = env.step((action, partner))
         return next_state, float(reward), bool(done), False, info
 
-    def render(self, env):
+    def render(self, env: Any) -> np.ndarray:
         import pygame
         surf = self._viz.render_state(env.state, grid=self._mdp.terrain_mtx)
         return pygame.surfarray.array3d(surf).transpose(1, 0, 2)
 
-    def capture(self, env, obs, info, want_blob=True) -> FrameState:
+    def capture(
+        self, env: Any, obs: Any, info: dict, want_blob: bool = True
+    ) -> FrameState:
         variables = {}
         if isinstance(info, dict):
             shaped = info.get("shaped_r_by_agent")

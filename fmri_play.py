@@ -13,6 +13,8 @@ See configs/demo_mixed.json for a curriculum that mixes all three backends,
 and README.md for the curriculum schema.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import os
@@ -21,7 +23,7 @@ import time
 from fmri_gym import Display, Session, get_adapter
 
 
-def build_demo_curriculum():
+def build_demo_curriculum() -> list[dict]:
     """Mixed-backend demo: an Atari game, a retro game, and a survival game.
 
     All three are forgiving, free-roaming games (no instant game-over), so a
@@ -55,13 +57,13 @@ def build_demo_curriculum():
     ]
 
 
-def load_curriculum(path):
+def load_curriculum(path: str) -> list[dict]:
     with open(path) as f:
         data = json.load(f)
     return data["curriculum"] if isinstance(data, dict) else data
 
 
-def main():
+def main() -> None:
     p = argparse.ArgumentParser(description="Run any gym game as an fMRI task.")
     p.add_argument("--subject", default="sub-test")
     p.add_argument("--curriculum")

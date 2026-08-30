@@ -10,6 +10,7 @@ Exposes the Atari-specific bits behind the standard EnvAdapter interface:
 from __future__ import annotations
 
 import pickle
+from typing import Any
 
 import gymnasium as gym
 import numpy as np
@@ -24,9 +25,9 @@ _DIRECTIONS = {
 
 
 class ALEAdapter(EnvAdapter):
-    name = "ale"
+    name: str = "ale"
 
-    def __init__(self, save_pixels: bool = False):
+    def __init__(self, save_pixels: bool = False) -> None:
         self.save_pixels = save_pixels
         # Block-wide palette for lossless indexed-pixel logging.
         self._palette = np.zeros((256, 3), dtype=np.uint8)
@@ -34,12 +35,12 @@ class ALEAdapter(EnvAdapter):
         import ale_py
         gym.register_envs(ale_py)
 
-    def make(self, spec):
+    def make(self, spec: dict) -> gym.Env:
         return gym.make(
             spec["game"], render_mode="rgb_array",
             frameskip=1, repeat_action_probability=0.0)
 
-    def keymap(self, env) -> KeySpec:
+    def keymap(self, env: gym.Env) -> KeySpec:
         combos = {}
         for action, meaning in enumerate(env.unwrapped.get_action_meanings()):
             if meaning == "NOOP":
@@ -53,7 +54,9 @@ class ALEAdapter(EnvAdapter):
                 combos[frozenset(keys)] = action
         return KeySpec(combos=combos, noop=0)
 
-    def capture(self, env, obs, info, want_blob=True) -> FrameState:
+    def capture(
+        self, env: gym.Env, obs: Any, info: dict, want_blob: bool = True
+    ) -> FrameState:
         ale = env.unwrapped.ale
         variables = {"ram": ale.getRAM().copy()}
         if self.save_pixels:
@@ -70,10 +73,10 @@ class ALEAdapter(EnvAdapter):
                 if want_blob else None)
         return FrameState(blob=blob, variables=variables)
 
-    def restore(self, env, blob):
+    def restore(self, env: gym.Env, blob: bytes) -> None:
         env.unwrapped.restore_state(pickle.loads(blob))
 
-    def block_extra(self):
+    def block_extra(self) -> dict | None:
         """Block-level arrays merged into the npz (the palette, if save_pixels)."""
         if self.save_pixels:
             return {"palette": self._palette}

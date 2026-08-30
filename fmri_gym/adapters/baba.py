@@ -11,27 +11,29 @@ display the rendered frame. No savestate -> seed + action replay.
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from .base import EnvAdapter, FrameState, KeySpec
 
 # baba.envs.ACTIONS order: up, down, left, right (idx 0..3); 4 = idle.
-_KEYS = {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3}
+_KEYS: dict[str, int] = {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3}
 
 
 class BabaAdapter(EnvAdapter):
-    name = "baba"
+    name: str = "baba"
 
-    def make(self, spec):
+    def make(self, spec: dict) -> Any:
         import baba
         self._env = baba.make(spec.get("game", "env/make_win"))
         return self._env
 
-    def keymap(self, env) -> KeySpec:
+    def keymap(self, env: Any) -> KeySpec:
         combos = {frozenset([k]): v for k, v in _KEYS.items()}
         return KeySpec(combos=combos, noop=4)
 
-    def reset(self, env, seed, spec):
+    def reset(self, env: Any, seed: int | None, spec: dict) -> tuple[Any, dict]:
         try:
             out = env.reset(seed=seed)
         except TypeError:
@@ -39,12 +41,14 @@ class BabaAdapter(EnvAdapter):
         obs = out[0] if isinstance(out, tuple) else out
         return obs, {}
 
-    def step(self, env, action):
+    def step(self, env: Any, action: Any) -> tuple[Any, float, bool, bool, dict]:
         obs, reward, done, info = env.step(int(action))
         return obs, float(reward), bool(done), False, info
 
-    def render(self, env):
+    def render(self, env: Any) -> np.ndarray:
         return np.asarray(env.render("rgb_array"))
 
-    def capture(self, env, obs, info, want_blob=True) -> FrameState:
+    def capture(
+        self, env: Any, obs: Any, info: dict, want_blob: bool = True
+    ) -> FrameState:
         return FrameState(blob=None, variables={})

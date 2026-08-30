@@ -17,26 +17,27 @@ adapter also auto-finds the vendored copy under vendor/rush-hour-src/.
 from __future__ import annotations
 
 import os
+from typing import Any
 
 import numpy as np
 
 from .base import EnvAdapter, FrameState, KeySpec
 
 # Distinct colors for car letters; 'A' (red player car) and exit are special.
-_PALETTE = [
+_PALETTE: list[tuple[int, int, int]] = [
     (220, 60, 60), (70, 130, 220), (80, 190, 90), (230, 190, 60),
     (170, 90, 200), (230, 140, 60), (90, 200, 200), (230, 120, 170),
     (150, 110, 70), (120, 160, 90), (200, 200, 120), (110, 200, 160),
 ]
-_VENDOR_BIN = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+_VENDOR_BIN: str = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "vendor", "rush-hour-src", "rushhour-env")
-_NUM_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]
+_NUM_KEYS: list[str] = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]
 
 
 class RushHourAdapter(EnvAdapter):
-    name = "rushhour"
+    name: str = "rushhour"
 
-    def make(self, spec):
+    def make(self, spec: dict) -> Any:
         import gymnasium as gym
         import rushhour_gym  # noqa: F401  (registers RushHour*-v0)
         binary = spec.get("binary") or os.environ.get("RUSHHOUR_ENV_BIN")
@@ -47,25 +48,27 @@ class RushHourAdapter(EnvAdapter):
         self._last_ansi = ""
         return gym.make(spec.get("game", "RushHour-Easy-v0"), render_mode="ansi")
 
-    def keymap(self, env) -> KeySpec:
+    def keymap(self, env: Any) -> KeySpec:
         n = int(getattr(env.action_space, "n", 10))
         combos = {frozenset([k]): i for i, k in enumerate(_NUM_KEYS) if i < n}
         return KeySpec(combos=combos, noop=0)
 
-    def reset(self, env, seed, spec):
+    def reset(self, env: Any, seed: int | None, spec: dict) -> tuple[Any, dict]:
         obs, info = env.reset(seed=seed)
         self._last_ansi = env.render() or ""
         return obs, info
 
-    def step(self, env, action):
+    def step(self, env: Any, action: Any) -> tuple[Any, float, bool, bool, dict]:
         obs, reward, terminated, truncated, info = env.step(int(action))
         self._last_ansi = env.render() or ""
         return obs, float(reward), bool(terminated), bool(truncated), info
 
-    def render(self, env):
+    def render(self, env: Any) -> np.ndarray:
         return _board_to_rgb(self._last_ansi)
 
-    def capture(self, env, obs, info, want_blob=True) -> FrameState:
+    def capture(
+        self, env: Any, obs: Any, info: dict, want_blob: bool = True
+    ) -> FrameState:
         variables = {}
         if isinstance(info, dict) and "slot" in info:
             try:
@@ -75,7 +78,7 @@ class RushHourAdapter(EnvAdapter):
         return FrameState(blob=None, variables=variables)
 
 
-def _board_to_rgb(ansi, cell=64):
+def _board_to_rgb(ansi: str, cell: int = 64) -> np.ndarray:
     """Render the ANSI letter grid to a colored pixel board."""
     rows = [r for r in (ansi or "").split("\n") if r != ""]
     if not rows:

@@ -29,6 +29,10 @@ from __future__ import annotations
 import os
 import pickle
 import sys
+from typing import Any
+
+import gymnasium as gym
+import numpy as np
 
 from .base import EnvAdapter, FrameState, KeySpec
 
@@ -38,14 +42,14 @@ _KEYS = {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3, "SPACE": 5}
 
 
 class VGDLAdapter(EnvAdapter):
-    name = "vgdl"
+    name: str = "vgdl"
 
-    def __init__(self, repo=None, save_pixels=False):
+    def __init__(self, repo: str | None = None, save_pixels: bool = False) -> None:
         self.repo = repo or os.environ.get("VGDL_REPO")
         self.save_pixels = save_pixels
         self._VGDLEnv = None
 
-    def _load_env_class(self):
+    def _load_env_class(self) -> None:
         if self._VGDLEnv is not None:
             return
         if not self.repo:
@@ -57,7 +61,7 @@ class VGDLAdapter(EnvAdapter):
         from src.vgdl.interfaces.gym.env import VGDLEnv
         self._VGDLEnv = VGDLEnv
 
-    def make(self, spec):
+    def make(self, spec: dict) -> gym.Env:
         self._load_env_class()
         repo = spec.get("repo", self.repo)
         game = spec["game"]
@@ -78,7 +82,7 @@ class VGDLAdapter(EnvAdapter):
         self._attach_offscreen_renderer(env)
         return env
 
-    def _attach_offscreen_renderer(self, env):
+    def _attach_offscreen_renderer(self, env: gym.Env) -> None:
         import pygame
         from src.vgdl.render import PygameRenderer
         r = PygameRenderer(env.game, env.render_block_size)
@@ -88,16 +92,16 @@ class VGDLAdapter(EnvAdapter):
         r.background = r.screen.copy()
         env.renderer = r
 
-    def keymap(self, env) -> KeySpec:
+    def keymap(self, env: gym.Env) -> KeySpec:
         combos = {frozenset([k]): idx for k, idx in _KEYS.items()}
         return KeySpec(combos=combos, noop=_VGDL_ACTIONS.index("NO_OP"))
 
-    def reset(self, env, seed, spec):
+    def reset(self, env: gym.Env, seed: int | None, spec: dict) -> tuple[Any, dict]:
         if seed is not None:
             env.game.set_seed(int(seed))
         return env.reset(with_img=False)
 
-    def render(self, env):
+    def render(self, env: gym.Env) -> np.ndarray:
         import numpy as np
         import pygame
         # Draw to the offscreen surface and read it directly. We deliberately do
@@ -108,7 +112,9 @@ class VGDLAdapter(EnvAdapter):
         return np.flipud(np.rot90(
             pygame.surfarray.array3d(r.screen).astype(np.uint8)))
 
-    def capture(self, env, obs, info, want_blob=True) -> FrameState:
+    def capture(
+        self, env: gym.Env, obs: Any, info: dict, want_blob: bool = True
+    ) -> FrameState:
         variables = {}
         # Symbolic per-cell object grid + collision events, if present in info.
         if isinstance(info, dict):
@@ -120,10 +126,12 @@ class VGDLAdapter(EnvAdapter):
                 if want_blob else None)
         return FrameState(blob=blob, variables=variables)
 
-    def restore(self, env, blob):
+    def restore(self, env: gym.Env, blob: bytes) -> None:
         env.set_state(pickle.loads(blob))
 
-    def step(self, env, action):
+    def step(
+        self, env: gym.Env, action: Any
+    ) -> tuple[Any, float, bool, bool, dict]:
         # VGDL's step takes an int action plus a with_img kwarg (default frame
         # off; we render separately via render()).
         return env.step(action, with_img=False)
