@@ -1,10 +1,36 @@
 {
-  "_game": "AI GameStore game10",
-  "_note": "pip install playwright (uses system Chrome).",
+  "_game": "AI GameStore game10 (haunted mansion escape)",
+  "_note": "pip install playwright (uses system Chrome by default).",
+  "_keys_note": "HeldKeysSpec: curriculum 'keys' whitelist physical keys forwarded into the page (values are identity; the action is the held set, '+'-joined). Escape the mansion across 6 levels; hide from the monster. Keep the message Controls text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/tomov/fmri-gym/blob/main/vendor/aigamestore/game10/game.js",
   "curriculum": [
-    {"type": "message", "text": "AI GameStore game10", "duration": 2.0},
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Haunted Mansion",
+        "",
+        "Escape through 6 levels. Collect objectives,",
+        "unlock doors, and hide when the monster sees you.",
+        "",
+        "Controls:",
+        "   ARROWS   move",
+        "   SHIFT    sprint",
+        "   SPACE    interact (doors / items / hide)",
+        "   Z        toggle flashlight",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
     {"type": "fixation", "duration": 1.0},
-    {"backend": "aigamestore", "game": "game10", "fps": 10, "type": "game", "mode": "duration", "duration": 300.0},
+    {
+      "type": "game", "backend": "aigamestore", "game": "game10",
+      "keys": {
+        "LEFT": "LEFT", "RIGHT": "RIGHT", "UP": "UP", "DOWN": "DOWN",
+        "LSHIFT": "LSHIFT", "SPACE": "SPACE", "Z": "Z"
+      },
+      "mode": "duration", "duration": 300.0, "fps": 10
+    },
     {"type": "fixation", "duration": 2.0}
   ]
 }

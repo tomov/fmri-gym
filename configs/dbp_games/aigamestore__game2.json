@@ -1,10 +1,32 @@
 {
   "_game": "AI GameStore game2 (Angry-Birds-like)",
-  "_note": "pip install playwright (uses system Chrome).",
+  "_note": "pip install playwright (uses system Chrome by default).",
+  "_keys_note": "HeldKeysSpec: curriculum 'keys' whitelist physical keys forwarded into the page (values are identity; the action is the held set, '+'-joined). Aim the slingshot with held arrows, launch with SPACE, activate mid-flight abilities with Z. Keep the message Controls text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/tomov/fmri-gym/blob/main/vendor/aigamestore/game2/input.js",
   "curriculum": [
-    {"type": "message", "text": "AI GameStore game2 (Angry-Birds-like)", "duration": 2.0},
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Slingshot Birds",
+        "",
+        "Pull back the slingshot and launch birds",
+        "to topple structures and clear the pigs.",
+        "",
+        "Controls:",
+        "   ARROWS   hold to aim / pull",
+        "   SPACE    start aim / launch",
+        "   Z        bird special ability",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
     {"type": "fixation", "duration": 1.0},
-    {"backend": "aigamestore", "game": "game2", "fps": 10, "type": "game", "mode": "duration", "duration": 300.0},
+    {
+      "type": "game", "backend": "aigamestore", "game": "game2",
+      "keys": {"LEFT": "LEFT", "RIGHT": "RIGHT", "UP": "UP", "DOWN": "DOWN", "SPACE": "SPACE", "Z": "Z"},
+      "mode": "duration", "duration": 300.0, "fps": 10
+    },
     {"type": "fixation", "duration": 2.0}
   ]
 }

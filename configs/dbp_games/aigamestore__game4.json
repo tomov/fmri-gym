@@ -1,10 +1,30 @@
 {
-  "_game": "AI GameStore game4",
-  "_note": "pip install playwright (uses system Chrome).",
+  "_game": "AI GameStore game4 (jetpack runner)",
+  "_note": "pip install playwright (uses system Chrome by default).",
+  "_keys_note": "HeldKeysSpec: curriculum 'keys' whitelist physical keys forwarded into the page (values are identity; the action is the held set, '+'-joined). Hold SPACE or UP to thrust / fly; avoid zappers and missiles. Keep the message Controls text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/tomov/fmri-gym/blob/main/vendor/aigamestore/game4/input.js",
   "curriculum": [
-    {"type": "message", "text": "AI GameStore game4", "duration": 2.0},
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Jetpack Run",
+        "",
+        "Auto-scroll runner. Hold thrust to fly,",
+        "dodge zappers and missiles, grab coins.",
+        "",
+        "Controls:",
+        "   SPACE or UP   thrust / fly",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
     {"type": "fixation", "duration": 1.0},
-    {"backend": "aigamestore", "game": "game4", "fps": 10, "type": "game", "mode": "duration", "duration": 300.0},
+    {
+      "type": "game", "backend": "aigamestore", "game": "game4",
+      "keys": {"SPACE": "SPACE", "UP": "UP"},
+      "mode": "duration", "duration": 300.0, "fps": 10
+    },
     {"type": "fixation", "duration": 2.0}
   ]
 }

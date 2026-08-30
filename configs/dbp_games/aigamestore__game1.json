@@ -1,10 +1,32 @@
 {
   "_game": "AI GameStore game1 (Water Sort)",
-  "_note": "pip install playwright (uses system Chrome).",
+  "_note": "pip install playwright (uses system Chrome by default).",
+  "_keys_note": "HeldKeysSpec: curriculum 'keys' whitelist physical keys forwarded into the page (values are identity; the action is the held set, '+'-joined). Sort water by color into tubes. Keep the message Controls text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/tomov/fmri-gym/blob/main/vendor/aigamestore/game1/input.js",
   "curriculum": [
-    {"type": "message", "text": "AI GameStore game1 (Water Sort)", "duration": 2.0},
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Water Sort",
+        "",
+        "Sort colored water into matching tubes.",
+        "Pour until every tube is uniform (or empty).",
+        "",
+        "Controls:",
+        "   LEFT / RIGHT   highlight a tube",
+        "   SPACE          select / pour",
+        "   Z              undo",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
     {"type": "fixation", "duration": 1.0},
-    {"backend": "aigamestore", "game": "game1", "fps": 10, "type": "game", "mode": "duration", "duration": 300.0},
+    {
+      "type": "game", "backend": "aigamestore", "game": "game1",
+      "keys": {"LEFT": "LEFT", "RIGHT": "RIGHT", "SPACE": "SPACE", "Z": "Z"},
+      "mode": "duration", "duration": 300.0, "fps": 10
+    },
     {"type": "fixation", "duration": 2.0}
   ]
 }

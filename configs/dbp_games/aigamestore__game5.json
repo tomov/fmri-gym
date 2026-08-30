@@ -1,10 +1,31 @@
 {
-  "_game": "AI GameStore game5",
-  "_note": "pip install playwright (uses system Chrome).",
+  "_game": "AI GameStore game5 (mouse / cheese platformer)",
+  "_note": "pip install playwright (uses system Chrome by default).",
+  "_keys_note": "HeldKeysSpec: curriculum 'keys' whitelist physical keys forwarded into the page (values are identity; the action is the held set, '+'-joined). Collect cheese to open the mouse hole, then escape before the cats catch you. Keep the message Controls text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/tomov/fmri-gym/blob/main/vendor/aigamestore/game5/controls.js",
   "curriculum": [
-    {"type": "message", "text": "AI GameStore game5", "duration": 2.0},
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Cheese Run",
+        "",
+        "Collect all the cheese to open the mouse",
+        "hole, then escape before the cats catch you.",
+        "",
+        "Controls:",
+        "   LEFT / RIGHT   move",
+        "   UP             jump",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
     {"type": "fixation", "duration": 1.0},
-    {"backend": "aigamestore", "game": "game5", "fps": 10, "type": "game", "mode": "duration", "duration": 300.0},
+    {
+      "type": "game", "backend": "aigamestore", "game": "game5",
+      "keys": {"LEFT": "LEFT", "RIGHT": "RIGHT", "UP": "UP"},
+      "mode": "duration", "duration": 300.0, "fps": 10
+    },
     {"type": "fixation", "duration": 2.0}
   ]
 }

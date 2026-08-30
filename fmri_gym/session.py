@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Union
 
 import pygame
 
+from .adapters.keyspec import HeldKeysSpec
 from .display import Display
 from .keys import held_key_names, key_name
 from .logging import Logger
@@ -140,11 +141,16 @@ def _apply_key_overrides(keyspec: KeySpec, overrides: dict | None) -> KeySpec:
     :param keyspec: base keymap from the adapter.
     :param overrides: optional ``{"LEFT": action, "LEFT+SPACE": action}`` map
         from the curriculum; ``None`` / empty leaves ``keyspec`` unchanged.
+        For :class:`HeldKeysSpec` the overrides *replace* the adapter whitelist
+        (so a game phase lists exactly the keys it forwards); other flavors
+        merge so partial remaps keep adapter defaults for unmentioned keys.
     :return: the (possibly mutated) ``keyspec``.
     """
     if not overrides:
         return keyspec
-    combos = dict(keyspec.combos)
+    # HeldKeys: curriculum keys are the full whitelist. Discrete/MultiBinary:
+    # merge so e.g. Pong can remap UP/DOWN while keeping SPACE=FIRE.
+    combos: dict = {} if isinstance(keyspec, HeldKeysSpec) else dict(keyspec.combos)
     for combo_str, action in overrides.items():
         keys = frozenset(k.strip().upper() for k in combo_str.split("+"))
         combos[keys] = action

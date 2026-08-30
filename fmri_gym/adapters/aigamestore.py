@@ -47,10 +47,13 @@ if TYPE_CHECKING:
     from playwright.sync_api import Browser, Page, Playwright
 
 # Physical keys we forward to the browser, and their Playwright key names.
+# Cover the keys used across game1…game10 (arrows/WASD, SPACE/Z, Shift, 1–5).
 _KEY_TO_PLAYWRIGHT: dict[str, str] = {
     "LEFT": "ArrowLeft", "RIGHT": "ArrowRight", "UP": "ArrowUp", "DOWN": "ArrowDown",
+    "W": "w", "A": "a", "S": "s", "D": "d",
     "SPACE": " ", "Z": "z", "X": "x", "RETURN": "Enter", "LSHIFT": "Shift",
     "R": "r", "ESCAPE": "Escape",
+    "1": "1", "2": "2", "3": "3", "4": "4", "5": "5",
 }
 _VENDOR: str = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "vendor", "aigamestore")

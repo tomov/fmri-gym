@@ -1,10 +1,37 @@
 {
-  "_game": "AI GameStore game9",
-  "_note": "pip install playwright (uses system Chrome).",
+  "_game": "AI GameStore game9 (Mega Man-like action platformer)",
+  "_note": "pip install playwright (uses system Chrome by default).",
+  "_keys_note": "HeldKeysSpec: curriculum 'keys' whitelist physical keys forwarded into the page (values are identity; the action is the held set, '+'-joined). Fight robot masters across stages. Keep the message Controls text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/tomov/fmri-gym/blob/main/vendor/aigamestore/game9/input.js",
   "curriculum": [
-    {"type": "message", "text": "AI GameStore game9", "duration": 2.0},
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Robot Masters",
+        "",
+        "Action platformer. Fight through stages,",
+        "defeat bosses, and unlock their weapons.",
+        "",
+        "Controls:",
+        "   LEFT / RIGHT   move",
+        "   UP / DOWN      aim",
+        "   Z              jump",
+        "   SPACE          shoot",
+        "   SHIFT          cycle weapons",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
     {"type": "fixation", "duration": 1.0},
-    {"backend": "aigamestore", "game": "game9", "fps": 10, "type": "game", "mode": "duration", "duration": 300.0},
+    {
+      "type": "game", "backend": "aigamestore", "game": "game9",
+      "keys": {
+        "LEFT": "LEFT", "RIGHT": "RIGHT", "UP": "UP", "DOWN": "DOWN",
+        "Z": "Z", "SPACE": "SPACE", "LSHIFT": "LSHIFT"
+      },
+      "mode": "duration", "duration": 300.0, "fps": 10
+    },
     {"type": "fixation", "duration": 2.0}
   ]
 }

@@ -1,10 +1,38 @@
 {
-  "_game": "AI GameStore game3",
-  "_note": "pip install playwright (uses system Chrome).",
+  "_game": "AI GameStore game3 (twin-stick / top-down shooter)",
+  "_note": "pip install playwright (uses system Chrome by default). Three.js + canvas HUD.",
+  "_keys_note": "HeldKeysSpec: curriculum 'keys' whitelist physical keys forwarded into the page (values are identity; the action is the held set, '+'-joined). WASD move, arrows aim/shoot, SPACE dash, Z swap weapon, LSHIFT walk. Keep the message Controls text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/tomov/fmri-gym/blob/main/vendor/aigamestore/game3/input.js",
   "curriculum": [
-    {"type": "message", "text": "AI GameStore game3", "duration": 2.0},
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Floor Sweep",
+        "",
+        "Twin-stick shooter. Clear each floor",
+        "while dodging enemy fire.",
+        "",
+        "Controls:",
+        "   WASD           move",
+        "   ARROWS         aim / shoot",
+        "   SPACE          dash",
+        "   Z              swap weapon",
+        "   SHIFT          walk (slow)",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
     {"type": "fixation", "duration": 1.0},
-    {"backend": "aigamestore", "game": "game3", "fps": 10, "type": "game", "mode": "duration", "duration": 300.0},
+    {
+      "type": "game", "backend": "aigamestore", "game": "game3",
+      "keys": {
+        "W": "W", "A": "A", "S": "S", "D": "D",
+        "LEFT": "LEFT", "RIGHT": "RIGHT", "UP": "UP", "DOWN": "DOWN",
+        "SPACE": "SPACE", "Z": "Z", "LSHIFT": "LSHIFT"
+      },
+      "mode": "duration", "duration": 300.0, "fps": 10
+    },
     {"type": "fixation", "duration": 2.0}
   ]
 }
