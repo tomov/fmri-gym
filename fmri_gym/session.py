@@ -241,6 +241,7 @@ class Session:
 
         ## Loop over episodes within game block
         while not user_quit and time.perf_counter() < block_end:
+            ## Run one episode
             user_quit = self._episode(
                 adapter, env, phase, frames,
                 seed=base_seed + episode_id, episode_id=episode_id,
@@ -351,8 +352,6 @@ class Session:
             if time.perf_counter() >= block_end:
                 break
         return False
-
-    # -- top level -----------------------------------------------------------
 
     def _trigger(self) -> None:
         """Wait for experimenter ready + scanner trigger, then start the clock."""
