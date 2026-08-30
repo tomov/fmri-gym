@@ -11,12 +11,13 @@ from __future__ import annotations
 
 import sys
 import time
+from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
 import pygame
 
 from .display import Display
-from .keys import held_key_names, key_name as _key_name
+from .keys import held_key_names, key_name
 from .logging import Logger
 
 if TYPE_CHECKING:
@@ -51,6 +52,20 @@ def _check_quit() -> bool:
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             return True
     return False
+
+
+def _get_action(key_to_action: dict) -> tuple[object | None, bool]:
+    """Drain events; return (mapped action or None, user_quit)."""
+    action = None
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT or (
+                event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+            return None, True
+        if event.type == pygame.KEYDOWN:
+            name = key_name(event.key)
+            if name in key_to_action:
+                action = key_to_action[name]
+    return action, False
 
 
 def _wait_for_char(char: str, dummy_trigger: bool = False) -> None:
@@ -88,6 +103,12 @@ def _apply_key_overrides(keyspec: KeySpec, overrides: dict | None) -> KeySpec:
         combos[keys] = action
     keyspec.combos = combos
     return keyspec
+
+
+def _get_key_to_action_map(keyspec: KeySpec) -> dict:
+    """Map single pressed KEY names -> actions (for turn-based play)."""
+    return {next(iter(ks)): a for ks, a in keyspec.combos.items()
+            if len(ks) == 1}
 
 
 class Session:
@@ -206,14 +227,11 @@ class Session:
         # Allow the curriculum to override the mapping explicitly.
         keyspec = _apply_key_overrides(keyspec, phase.get("keys"))
         # For turn-based play, map single pressed KEY -> action via key names.
-        key_to_action = {next(iter(ks)): a for ks, a in keyspec.combos.items()
-                         if len(ks) == 1}
+        key_to_action = _get_key_to_action_map(keyspec)
 
         ## Frame logging
-        frames = {k: [] for k in ("action", "reward", "terminated", "truncated",
-                                  "episode_id", "session_time", "wall_time", "state_blob")}
-        frames["episode_seeds"] = []
-        frames["variables"] = {}   # varname -> list, filled lazily
+        frames = defaultdict(list)
+        frames["variables"] = defaultdict(list)  # varname -> list, filled lazily
 
         ## Init loop over episodes
         onset = self.clock.session_time()
@@ -302,15 +320,9 @@ class Session:
 
             if turn_based:
                 # Advance only on a fresh keydown that maps to an action.
-                action = None
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT or (
-                            event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
-                        return True
-                    if event.type == pygame.KEYDOWN:
-                        name = _key_name(event.key)
-                        if name in key_to_action:
-                            action = key_to_action[name]
+                action, user_quit = _get_action(key_to_action)
+                if user_quit:
+                    return True
                 if action is None:
                     continue                    # no press -> don't step
             else:
@@ -320,9 +332,9 @@ class Session:
 
             obs, reward, terminated, truncated, info = adapter.step(env, action)
             # Anchor a full savestate at episode start and every stride.
-            want_blob = (ep_frame % state_stride == 0)
+            save_blob = (ep_frame % state_stride == 0)
             ep_frame += 1
-            fs = adapter.capture(env, obs, info, want_blob=want_blob)
+            fs = adapter.capture(env, obs, info, want_blob=save_blob)
 
             frames["action"].append(action)
             frames["reward"].append(reward)
@@ -333,7 +345,7 @@ class Session:
             frames["wall_time"].append(self.clock.wall_time())
             frames["state_blob"].append(fs.blob)
             for k, v in fs.variables.items():
-                frames["variables"].setdefault(k, []).append(v)
+                frames["variables"][k].append(v)
 
             self.display.draw_frame(adapter.render(env))
             if time.perf_counter() >= block_end:
