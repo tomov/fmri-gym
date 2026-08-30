@@ -1,8 +1,26 @@
 {
   "_game": "Crafter",
   "_note": "pip install crafter.",
+  "_keys_note": "Crafter's Discrete(17) map is 0=noop, 1=move_left, 2=move_right, 3=move_up, 4=move_down, 5=do, 6=sleep, 7=place_stone, 8=place_table, 9=place_furnace, 10=place_plant, 11=make_wood_pickaxe, 12=make_stone_pickaxe, 13=make_iron_pickaxe, 14=make_wood_sword, 15=make_stone_sword, 16=make_iron_sword. Default subject keys (adapter): LEFT/RIGHT/UP/DOWN=move, SPACE=do, S=sleep; place/make via a 'keys' override.",
+  "_keys_reference": "https://github.com/danijar/crafter/blob/master/crafter/data.yaml",
   "curriculum": [
-    {"type": "message", "text": "Crafter", "duration": 2.0},
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Crafter",
+        "",
+        "Open-world survival. Gather materials, craft",
+        "tools, and stay alive.",
+        "",
+        "Controls:",
+        "   ARROWS   move",
+        "   SPACE    interact / attack / collect",
+        "   S        sleep",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
     {"type": "fixation", "duration": 1.0},
     {"backend": "crafter", "game": "crafter", "fps": 15, "seed": 0, "type": "game", "mode": "duration", "duration": 300.0},
     {"type": "fixation", "duration": 2.0}

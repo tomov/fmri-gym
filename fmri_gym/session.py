@@ -12,7 +12,7 @@ from __future__ import annotations
 import sys
 import time
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Union
 
 import pygame
 
@@ -107,6 +107,17 @@ def _wait_for_char(char: str, dummy_trigger: bool = False) -> None:
                 if event.unicode == char:
                     return
         time.sleep(0.005)
+
+
+def _join_multiline_text(text: Union[str, list, tuple]) -> str:
+    """Normalize message ``text`` to a single string.
+
+    Accepts a plain string or a list/tuple of lines (joined with ``\\n``), so
+    curriculum JSON can keep long instructions readable without ``\\n`` escapes.
+    """
+    if isinstance(text, (list, tuple)):
+        return "\n".join("" if line is None else str(line) for line in text)
+    return str(text)
 
 
 def _wait_for_duration(duration: float) -> None:
@@ -214,15 +225,15 @@ class Session:
     def _message(self, phase: dict, index: int) -> None:
         """Show on-screen text until a key press or timed duration.
 
-        :param phase: message-phase config (``text``, optional ``duration`` /
-            ``key``).
+        :param phase: message-phase config (``text`` as a string or list of
+            lines; optional ``duration`` / ``key`` / ``align``).
         :param index: phase index in the curriculum (for the manifest).
         """
-        text = phase.get("text", "")
+        text = _join_multiline_text(phase.get("text", ""))
         duration = phase.get("duration")
         onset = self.clock.session_time()
-        
-        self.display.draw_text(text)
+
+        self.display.draw_text(text, align=phase.get("align", "center"))
         if duration is None:
             _wait_for_char(phase.get("key", " "), dummy_trigger=self.dummy_trigger)
         else:

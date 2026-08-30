@@ -301,7 +301,7 @@ An ordered JSON list of **phases** (bare list or `{"curriculum": [...]}`):
 
 ```jsonc
 {"type": "fixation", "duration": 2.0}                 // "+" for N seconds
-{"type": "message", "text": "Get ready", "duration": 2.0}  // text; omit duration to wait for a key
+{"type": "message", "text": "Get ready", "duration": 2.0}  // text: string or list of lines; omit duration to wait for a key
 {"type": "survey", "n_points": 7, "questions": ["...","..."]}
 
 {"type": "game",

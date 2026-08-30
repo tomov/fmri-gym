@@ -20,9 +20,14 @@ import numpy as np
 
 from .base import EnvAdapter, FrameState, KeySpec
 
-# Default keyboard mapping over crafter's 17-action Discrete space.
-# 0 noop,1 move_left,2 move_right,3 move_up,4 move_down,5 do,6 sleep,...
-_KEYS = {"LEFT": 1, "RIGHT": 2, "UP": 3, "DOWN": 4, "SPACE": 5, "S": 6}
+# Default keyboard mapping over crafter's Discrete(17) space:
+#   0=noop, 1=move_left, 2=move_right, 3=move_up, 4=move_down, 5=do,
+#   6=sleep, 7=place_stone, 8=place_table, 9=place_furnace, 10=place_plant,
+#   11=make_wood_pickaxe, 12=make_stone_pickaxe, 13=make_iron_pickaxe,
+#   14=make_wood_sword, 15=make_stone_sword, 16=make_iron_sword.
+# Place/make actions are reachable via a curriculum "keys" override.
+# Source: https://github.com/danijar/crafter/blob/master/crafter/data.yaml
+_DEFAULT_KEYMAP = {"LEFT": 1, "RIGHT": 2, "UP": 3, "DOWN": 4, "SPACE": 5, "S": 6}
 
 
 class CrafterAdapter(EnvAdapter):
@@ -37,7 +42,7 @@ class CrafterAdapter(EnvAdapter):
         return self._env
 
     def keymap(self, env: gym.Env) -> KeySpec:
-        combos = {frozenset([k]): v for k, v in _KEYS.items()}
+        combos = {frozenset([k]): v for k, v in _DEFAULT_KEYMAP.items()}
         return KeySpec(combos=combos, noop=0)
 
     def reset(self, env: gym.Env, seed: int | None, spec: dict) -> tuple[Any, dict]:
