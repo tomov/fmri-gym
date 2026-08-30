@@ -330,7 +330,7 @@ class Session:
         self.display.draw_frame(adapter.render(env))
 
         ## Loop over frames within episode
-        while not (terminated or truncated):
+        while not (terminated or truncated) and time.perf_counter() < block_end:
             # Wait until it's time for the next frame
             now = time.perf_counter()
             if now < next_t:
@@ -367,8 +367,6 @@ class Session:
                 frames["variables"][k].append(v)
 
             self.display.draw_frame(adapter.render(env))
-            if time.perf_counter() >= block_end:
-                break
         return False
 
     def _game(self, phase: dict, index: int) -> None:
