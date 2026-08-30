@@ -2,6 +2,7 @@
   "_game": "ViZDoom: Deadly Corridor (Doom action-shooter; COOM engine) -- full movement",
   "_note": "pip install vizdoom. Fight down a corridor to the vest at the end; enemies attack from side alcoves. Unlike DefendCenter this scenario HAS move buttons, so you can walk forward/back and strafe.",
   "_keys_note": "For VizdoomDeadlyCorridor-v1 the Discrete(8) map is 0=noop, 1=TURN_RIGHT, 2=TURN_LEFT, 3=MOVE_BACKWARD, 4=MOVE_FORWARD, 5=ATTACK, 6=MOVE_RIGHT, 7=MOVE_LEFT (verify with env.unwrapped.button_map). The controls the subject sees are a plain 'message' phase (hardcoded string); keep its text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/Farama-Foundation/ViZDoom/blob/main/scenarios/deadly_corridor.cfg",
   "curriculum": [
     {"type": "message", "align": "left", "text": "Deadly Corridor\n\nFight your way down the corridor to the green\nvest at the far end. Enemies attack from alcoves\non both sides.\n\nControls:\n   UP / DOWN      move forward / back\n   LEFT / RIGHT   strafe left / right\n   Z / X          turn left / right\n   SPACE          shoot\n\n(press SPACE to start)"},
     {"type": "fixation", "duration": 1.0},
