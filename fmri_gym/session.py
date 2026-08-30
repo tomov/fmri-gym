@@ -14,8 +14,8 @@ import time
 
 import pygame
 
-from .adapters.base import held_key_names, key_name as _key_name
 from .display import Display
+from .keys import held_key_names, key_name as _key_name
 from .logging import Logger
 
 TRIGGER_KEY = "="
@@ -240,7 +240,7 @@ class Session:
                             user_quit = True
                             break
                         if event.type == pygame.KEYDOWN:
-                            name = _key_name(pygame, event.key)
+                            name = _key_name(event.key)
                             if name in key_to_action:
                                 action = key_to_action[name]
                     if user_quit:
@@ -251,7 +251,7 @@ class Session:
                     if _check_quit():
                         user_quit = True
                         break
-                    action = keyspec.resolve(held_key_names(pygame))
+                    action = keyspec.resolve(held_key_names())
 
                 obs, reward, terminated, truncated, info = adapter.step(env, action)
                 total_reward += float(reward)
