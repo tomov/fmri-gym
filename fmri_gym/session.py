@@ -65,13 +65,25 @@ def _wait_for_char(char, dummy=False):
         time.sleep(0.005)
 
 
-def _wait_duration(duration):
+def _wait_for_duration(duration):
     """Block for `duration` seconds (ESC/quit raises KeyboardInterrupt)."""
     end = time.perf_counter() + duration
     while time.perf_counter() < end:
         if _check_quit():
             raise KeyboardInterrupt
         time.sleep(0.005)
+
+
+def _apply_key_overrides(keyspec, overrides):
+    """Merge curriculum-provided {"LEFT": action, "LEFT+SPACE": action} combos."""
+    if not overrides:
+        return keyspec
+    combos = dict(keyspec.combos)
+    for combo_str, action in overrides.items():
+        keys = frozenset(k.strip().upper() for k in combo_str.split("+"))
+        combos[keys] = action
+    keyspec.combos = combos
+    return keyspec
 
 
 class Session:
@@ -93,8 +105,10 @@ class Session:
     def _fixation(self, phase, index):
         duration = phase.get("duration", 2.0)
         onset = self.clock.session_time()
+
         self.display.draw_fixation()
-        _wait_duration(duration)
+        _wait_for_duration(duration)
+
         self.logger.log_phase({"index": index, "type": "fixation",
                                "onset": onset, "offset": self.clock.session_time()})
 
@@ -102,11 +116,13 @@ class Session:
         text = phase.get("text", "")
         duration = phase.get("duration")
         onset = self.clock.session_time()
+        
         self.display.draw_text(text)
         if duration is None:
             _wait_for_char(phase.get("key", " "), dummy=self.dummy)
         else:
-            _wait_duration(duration)
+            _wait_for_duration(duration)
+
         self.logger.log_phase({"index": index, "type": "message", "text": text,
                                "onset": onset, "offset": self.clock.session_time()})
 
@@ -114,6 +130,7 @@ class Session:
         questions = phase.get("questions", [])
         n_points = phase.get("n_points", 7)
         onset = self.clock.session_time()
+        
         responses = []
         for q in questions:
             value = (n_points + 1) // 2
@@ -139,6 +156,7 @@ class Session:
                 time.sleep(0.005)
             responses.append({"question": q, "value": value,
                               "session_time": self.clock.session_time()})
+
         self.logger.log_phase({"index": index, "type": "survey",
                                "onset": onset, "offset": self.clock.session_time(),
                                "responses": responses})
@@ -300,15 +318,3 @@ class Session:
             manifest_path = self.logger.save_manifest()
             print(f"Saved session to: {self.outdir}")
             print(f"Manifest: {manifest_path}")
-
-
-def _apply_key_overrides(keyspec, overrides):
-    """Merge curriculum-provided {"LEFT": action, "LEFT+SPACE": action} combos."""
-    if not overrides:
-        return keyspec
-    combos = dict(keyspec.combos)
-    for combo_str, action in overrides.items():
-        keys = frozenset(k.strip().upper() for k in combo_str.split("+"))
-        combos[keys] = action
-    keyspec.combos = combos
-    return keyspec
