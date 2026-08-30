@@ -28,10 +28,10 @@ import numpy as np
 class KeySpec:
     """A keyboard->action mapping for one game.
 
-    combos: maps a frozenset of pressed key NAMES (pygame key names without the
-            "K_" prefix, upper-case: "LEFT", "SPACE", "Z", ...) to the action to
-            send. The most specific fully-held combo wins (see resolve()).
-    noop:   the action to send when no combo matches.
+    :ivar combos: maps a frozenset of pressed key NAMES (pygame key names
+        without the "K_" prefix, upper-case: "LEFT", "SPACE", "Z", ...) to the
+        action to send. The most specific fully-held combo wins (see resolve()).
+    :ivar noop: the action to send when no combo matches.
     """
 
     combos: dict[frozenset[str], Any]
@@ -42,6 +42,9 @@ class KeySpec:
 
         Among combos whose keys are all present in `held`, pick the longest
         (most specific). Return `noop` if none match.
+
+        :param held: frozenset of currently pressed key NAMES.
+        :return: the action for the most specific matching combo, or `noop`.
         """
         best, best_len = self.noop, -1
         for keys, action in self.combos.items():
