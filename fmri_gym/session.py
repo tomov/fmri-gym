@@ -208,72 +208,16 @@ class Session:
         onset = self.clock.session_time()
         block_end = time.perf_counter() + cap
         episode_id = 0
-        total_reward = 0.0
         user_quit = False
 
         ## Loop over episodes within game block
         while not user_quit and time.perf_counter() < block_end:
-            seed = base_seed + episode_id
-            obs, info = adapter.reset(env, seed, phase)
-            frames["episode_seeds"].append(seed)
-            terminated = truncated = False
-            ep_frame = 0
-            next_t = time.perf_counter()
-
-            self.display.draw_frame(adapter.render(env))   # show initial state
-            
-            ## Loop over frames within episode
-            while not (terminated or truncated):
-                # Wait until it's time for the next frame
-                now = time.perf_counter()
-                if now < next_t:
-                    time.sleep(next_t - now)
-                next_t += dt
-
-
-                if turn_based:
-                    # Advance only on a fresh keydown that maps to an action.
-                    action = None
-                    for event in pygame.event.get():
-                        if event.type == pygame.QUIT or (
-                                event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
-                            user_quit = True
-                            break
-                        if event.type == pygame.KEYDOWN:
-                            name = _key_name(event.key)
-                            if name in key_to_action:
-                                action = key_to_action[name]
-                    if user_quit:
-                        break
-                    if action is None:
-                        continue                    # no press -> don't step
-                else:
-                    if _check_quit():
-                        user_quit = True
-                        break
-                    action = keyspec.resolve(held_key_names())
-
-                obs, reward, terminated, truncated, info = adapter.step(env, action)
-                total_reward += float(reward)
-                # Anchor a full savestate at episode start and every stride.
-                want_blob = (ep_frame % state_stride == 0)
-                ep_frame += 1
-                fs = adapter.capture(env, obs, info, want_blob=want_blob)
-
-                frames["action"].append(action)
-                frames["reward"].append(reward)
-                frames["terminated"].append(bool(terminated))
-                frames["truncated"].append(bool(truncated))
-                frames["episode_id"].append(episode_id)
-                frames["session_time"].append(self.clock.session_time())
-                frames["wall_time"].append(self.clock.wall_time())
-                frames["state_blob"].append(fs.blob)
-                for k, v in fs.variables.items():
-                    frames["variables"].setdefault(k, []).append(v)
-
-                self.display.draw_frame(adapter.render(env))
-                if time.perf_counter() >= block_end:
-                    break
+            user_quit = self._episode(
+                adapter, env, phase, frames,
+                seed=base_seed + episode_id, episode_id=episode_id,
+                turn_based=turn_based, key_to_action=key_to_action,
+                keyspec=keyspec, dt=dt, state_stride=state_stride,
+                block_end=block_end)
             episode_id += 1
             if mode == "episode" and episode_id >= n_episodes:
                 break
@@ -290,10 +234,87 @@ class Session:
             "game": phase["game"], "mode": mode,
             "onset": onset, "offset": self.clock.session_time(),
             "n_episodes": episode_id, "n_frames": len(frames["action"]),
-            "total_reward": total_reward, "data_file": path.split("/")[-1],
+            "total_reward": sum(float(r) for r in frames["reward"]),
+            "data_file": path.split("/")[-1],
         })
         if user_quit:
             raise KeyboardInterrupt
+
+    def _episode(self, adapter, env, phase, frames, *, seed, episode_id,
+                 turn_based, key_to_action, keyspec, dt, state_stride,
+                 block_end):
+        """Run one episode, appending frame data to ``frames``.
+
+        :param adapter: env adapter for reset/step/render/capture.
+        :param env: the live environment instance.
+        :param phase: game-phase config dict (passed through to ``adapter.reset``).
+        :param frames: mutable frame-log dict; lists are appended in place.
+        :param seed: RNG seed for this episode's ``reset``.
+        :param episode_id: index of this episode within the game block.
+        :param turn_based: if True, advance only on mapped keydowns.
+        :param key_to_action: single-key name -> action map (turn-based only).
+        :param keyspec: keymap used to resolve held keys in real-time mode.
+        :param dt: target seconds per frame (``1 / fps``).
+        :param state_stride: save a full state blob every this many frames.
+        :param block_end: ``perf_counter`` deadline for the game block.
+        :return: ``True`` if the user quit (ESC/window close), else ``False``.
+        """
+        frames["episode_seeds"].append(seed)
+        terminated = truncated = False
+        ep_frame = 0
+        next_t = time.perf_counter()
+
+        ## Reset environment and show initial state
+        obs, info = adapter.reset(env, seed, phase)
+        self.display.draw_frame(adapter.render(env))
+
+        ## Loop over frames within episode
+        while not (terminated or truncated):
+            # Wait until it's time for the next frame
+            now = time.perf_counter()
+            if now < next_t:
+                time.sleep(next_t - now)
+            next_t += dt
+
+            if turn_based:
+                # Advance only on a fresh keydown that maps to an action.
+                action = None
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT or (
+                            event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                        return True
+                    if event.type == pygame.KEYDOWN:
+                        name = _key_name(event.key)
+                        if name in key_to_action:
+                            action = key_to_action[name]
+                if action is None:
+                    continue                    # no press -> don't step
+            else:
+                if _check_quit():
+                    return True
+                action = keyspec.resolve(held_key_names())
+
+            obs, reward, terminated, truncated, info = adapter.step(env, action)
+            # Anchor a full savestate at episode start and every stride.
+            want_blob = (ep_frame % state_stride == 0)
+            ep_frame += 1
+            fs = adapter.capture(env, obs, info, want_blob=want_blob)
+
+            frames["action"].append(action)
+            frames["reward"].append(reward)
+            frames["terminated"].append(bool(terminated))
+            frames["truncated"].append(bool(truncated))
+            frames["episode_id"].append(episode_id)
+            frames["session_time"].append(self.clock.session_time())
+            frames["wall_time"].append(self.clock.wall_time())
+            frames["state_blob"].append(fs.blob)
+            for k, v in fs.variables.items():
+                frames["variables"].setdefault(k, []).append(v)
+
+            self.display.draw_frame(adapter.render(env))
+            if time.perf_counter() >= block_end:
+                break
+        return False
 
     # -- top level -----------------------------------------------------------
 
