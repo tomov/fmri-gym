@@ -49,8 +49,8 @@ def _check_quit():
     return False
 
 
-def _wait_for_char(char, dummy=False):
-    if dummy:
+def _wait_for_char(char, dummy_trigger=False):
+    if dummy_trigger:
         time.sleep(0.05)
         return
     while True:
@@ -95,7 +95,7 @@ class Session:
         self.curriculum = curriculum
         self.adapters = adapters              # {backend_name: EnvAdapter}
         self.display = display
-        self.dummy = dummy_trigger
+        self.dummy_trigger = dummy_trigger
         self.clock = Clock()
         self.logger = Logger(outdir, subject, curriculum, self.clock)
         self.outdir = outdir
@@ -119,7 +119,7 @@ class Session:
         
         self.display.draw_text(text)
         if duration is None:
-            _wait_for_char(phase.get("key", " "), dummy=self.dummy)
+            _wait_for_char(phase.get("key", " "), dummy_trigger=self.dummy_trigger)
         else:
             _wait_for_duration(duration)
 
@@ -291,9 +291,9 @@ class Session:
         self.display.draw_text(
             "Please keep your head as still as possible.\n\n"
             "(experimenter: press SPACE when ready)")
-        _wait_for_char(EXPERIMENTER_KEY, dummy=self.dummy)
+        _wait_for_char(EXPERIMENTER_KEY, dummy_trigger=self.dummy_trigger)
         self.display.draw_text("Waiting for scanner...")
-        _wait_for_char(TRIGGER_KEY, dummy=self.dummy)
+        _wait_for_char(TRIGGER_KEY, dummy_trigger=self.dummy_trigger)
         
         self.clock.trigger()
         self.logger.set_trigger_time()
