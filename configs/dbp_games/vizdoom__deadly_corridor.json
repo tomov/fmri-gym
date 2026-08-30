@@ -8,7 +8,7 @@
     {
       "type": "game", "backend": "vizdoom", "game": "VizdoomDeadlyCorridor-v1",
       "mode": "duration", "duration": 300.0, "fps": 20,
-      "keys": {"UP": 4, "DOWN": 3, "LEFT": 7, "RIGHT": 6, "Z": 2, "X": 1, "SPACE": 5},
+      "keys": {"UP": 4, "DOWN": 3, "LEFT": 2, "RIGHT": 1, "Z": 6, "X": 7, "SPACE": 5},
       "show_controls": false
     },
     {"type": "fixation", "duration": 2.0}
