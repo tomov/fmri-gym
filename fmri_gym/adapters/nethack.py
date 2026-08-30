@@ -22,7 +22,7 @@ from typing import Any
 import numpy as np
 import gymnasium as gym
 
-from .base import EnvAdapter, FrameState, KeySpec
+from .base import EnvAdapter, FrameState, SingleKeySpec
 
 # NetHack TTY palette (16 colors), indexed by tty_colors (0..15).
 _TTY_PALETTE = np.array([
@@ -58,10 +58,10 @@ class NetHackAdapter(EnvAdapter):
         self._last = None
         return env
 
-    def keymap(self, env: gym.Env) -> KeySpec:
+    def keymap(self, env: gym.Env) -> SingleKeySpec:
         combos = {frozenset([k]): v for k, v in self._key_to_action.items()}
         # noop: NLE has no true no-op; default to the first action.
-        return KeySpec(combos=combos, noop=0)
+        return SingleKeySpec(combos=combos, noop=0)
 
     def reset(self, env: gym.Env, seed: int | None, spec: dict) -> tuple[Any, dict]:
         obs, info = env.reset(seed=seed)

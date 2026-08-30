@@ -24,7 +24,7 @@ from typing import Any
 import numpy as np
 import gymnasium as gym
 
-from .base import EnvAdapter, FrameState, KeySpec
+from .base import EnvAdapter, FrameState, SingleKeySpec
 
 # Cardinal arrows -> compass action indices (N=0, E=1, S=2, W=3).
 _KEYS = {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3}
@@ -46,9 +46,9 @@ class MiniHackAdapter(EnvAdapter):
         self._last = None
         return env
 
-    def keymap(self, env: gym.Env) -> KeySpec:
+    def keymap(self, env: gym.Env) -> SingleKeySpec:
         combos = {frozenset([k]): v for k, v in _KEYS.items()}
-        return KeySpec(combos=combos, noop=0)
+        return SingleKeySpec(combos=combos, noop=0)
 
     def reset(self, env: gym.Env, seed: int | None, spec: dict) -> tuple[Any, dict]:
         obs, info = env.reset(seed=seed)

@@ -16,13 +16,12 @@ Notes verified against stable_retro 1.0.1:
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Any
 
 import gymnasium as gym
 import stable_retro as retro
 
-from .base import EnvAdapter, FrameState, KeySpec
+from .base import EnvAdapter, FrameState, MultiKeySpec
 
 # Keyboard -> console button. Same scheme as the interactive retro player.
 # We map by button NAME; each game reports its own button ordering via
@@ -49,7 +48,7 @@ class RetroAdapter(EnvAdapter):
             game=spec["game"], scenario=spec.get("scenario"),
             render_mode="rgb_array")
 
-    def keymap(self, env: gym.Env) -> KeySpec:
+    def keymap(self, env: gym.Env) -> MultiKeySpec:
         buttons = list(env.unwrapped.buttons)   # e.g. ["B","A","MODE",...,"C"]
         btn_index = {b: i for i, b in enumerate(buttons)}
 
@@ -60,20 +59,15 @@ class RetroAdapter(EnvAdapter):
                     vec[btn_index[target]] = 1
             return vec
 
-        # Build single-key combos; the session's resolver ORs multiple held keys
-        # via most-specific match, but console buttons need true simultaneity, so
-        # we instead register per-key vectors and combine them in resolve() below.
+        # Console buttons need true simultaneity, so combo values are button
+        # vectors that MultiKeySpec ORs together: holding RIGHT+Z fires while
+        # moving. Combo values are vectors already, hence no button_map.
         combos = {}
         for key in _KEY_TO_BUTTON:
             vec = action_for(key)
             if any(vec):
                 combos[frozenset([key])] = vec
-        noop = [0] * len(buttons)
-        ks = KeySpec(combos=combos, noop=noop)
-        # Override resolve: OR together the button vectors of ALL held keys, so
-        # e.g. holding RIGHT+Z fires while moving (multiple buttons at once).
-        ks.resolve = _make_multi_resolver(combos, noop)
-        return ks
+        return MultiKeySpec(combos=combos, noop=[0] * len(buttons))
 
     def reset(self, env: gym.Env, seed: int | None, spec: dict) -> tuple[Any, dict]:
         state = spec.get("state")
@@ -98,19 +92,3 @@ class RetroAdapter(EnvAdapter):
         u = env.unwrapped
         u.em.set_state(blob)
         u.data.update_ram()
-
-
-def _make_multi_resolver(
-    combos: dict[frozenset[str], list[int]], noop: list[int]
-) -> Callable[[frozenset[str]], list[int]]:
-    """Return a resolve(held) that ORs the button vectors of all held keys."""
-    def resolve(held: frozenset[str]) -> list[int]:
-        vec = list(noop)
-        for keys, action in combos.items():
-            (key,) = tuple(keys)
-            if key in held:
-                for i, a in enumerate(action):
-                    if a:
-                        vec[i] = 1
-        return vec
-    return resolve

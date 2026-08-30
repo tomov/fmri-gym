@@ -21,7 +21,7 @@ from typing import Any
 
 import numpy as np
 
-from .base import EnvAdapter, FrameState, KeySpec
+from .base import EnvAdapter, FrameState, SingleKeySpec
 
 # Distinct colors for car letters; 'A' (red player car) and exit are special.
 _PALETTE: list[tuple[int, int, int]] = [
@@ -48,10 +48,10 @@ class RushHourAdapter(EnvAdapter):
         self._last_ansi = ""
         return gym.make(spec.get("game", "RushHour-Easy-v0"), render_mode="ansi")
 
-    def keymap(self, env: Any) -> KeySpec:
+    def keymap(self, env: Any) -> SingleKeySpec:
         n = int(getattr(env.action_space, "n", 10))
         combos = {frozenset([k]): i for i, k in enumerate(_NUM_KEYS) if i < n}
-        return KeySpec(combos=combos, noop=0)
+        return SingleKeySpec(combos=combos, noop=0)
 
     def reset(self, env: Any, seed: int | None, spec: dict) -> tuple[Any, dict]:
         obs, info = env.reset(seed=seed)

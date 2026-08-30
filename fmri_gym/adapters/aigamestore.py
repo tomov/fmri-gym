@@ -40,7 +40,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from .base import EnvAdapter, FrameState, KeySpec
+from .base import EnvAdapter, FrameState, HeldKeysSpec
 
 if TYPE_CHECKING:
     from playwright.sync_api import Browser, Page, Playwright
@@ -118,15 +118,11 @@ class AIGameStoreAdapter(EnvAdapter):
         self._start_key = spec.get("start_key", "Enter")
         return _Session(pw, browser, page, server, set())
 
-    def keymap(self, env: _Session) -> KeySpec:
+    def keymap(self, env: _Session) -> HeldKeysSpec:
+        # step() presses/releases the keys in the page itself, so the action is
+        # the FULL set of held keys; combos just whitelist the ones we know.
         combos = {frozenset([k]): k for k in _KEY_TO_PLAYWRIGHT}
-        ks = KeySpec(combos=combos, noop=frozenset())
-        # Override resolve to return the FULL set of held keys as a stable
-        # "+"-joined string (keyboard games use simultaneous keys; a string logs
-        # cleanly to npz, unlike a frozenset). "" == no keys held.
-        known = set(_KEY_TO_PLAYWRIGHT)
-        ks.resolve = lambda held: "+".join(sorted(held & known))
-        return ks
+        return HeldKeysSpec(combos=combos, noop="")
 
     def reset(self, env: _Session, seed: int | None, spec: dict) -> tuple[Any, dict]:
         page = env.page

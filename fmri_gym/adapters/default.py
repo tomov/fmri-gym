@@ -18,7 +18,7 @@ import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 
-from .base import EnvAdapter, FrameState, KeySpec
+from .base import EnvAdapter, FrameState, SingleKeySpec
 
 
 class DefaultAdapter(EnvAdapter):
@@ -38,7 +38,7 @@ class DefaultAdapter(EnvAdapter):
             return _make_via_shimmy(spec["game"], **kwargs)
         return gym.make(spec["game"], **kwargs)
 
-    def keymap(self, env: gym.Env) -> KeySpec:
+    def keymap(self, env: gym.Env) -> SingleKeySpec:
         # Allow a curriculum to hand-specify a mapping: {"keys": {"LEFT": 0, ...}}
         # or {"keys": {"LEFT+SPACE": 2}} for combos.
         space = env.action_space
@@ -70,7 +70,7 @@ class DefaultAdapter(EnvAdapter):
         else:
             raise TypeError(f"DefaultAdapter can't map action space {space!r}; "
                             "provide a custom adapter.")
-        return KeySpec(combos=combos, noop=noop)
+        return SingleKeySpec(combos=combos, noop=noop)
 
     def capture(
         self, env: gym.Env, obs: Any, info: dict, want_blob: bool = True

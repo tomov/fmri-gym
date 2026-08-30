@@ -154,10 +154,14 @@ def _apply_key_overrides(keyspec: KeySpec, overrides: dict | None) -> KeySpec:
 def _get_key_to_action_map(keyspec: KeySpec) -> dict:
     """Map single pressed KEY names to actions (for turn-based play).
 
+    Resolving each key on its own (rather than reading ``combos`` directly)
+    keeps the action in whatever shape the keymap flavour produces, e.g. a
+    button vector for a :class:`~.adapters.base.MultiKeySpec`.
+
     :param keyspec: keymap whose length-1 combos become the press map.
     :return: ``{key_name: action}`` for single-key combos only.
     """
-    return {next(iter(ks)): a for ks, a in keyspec.combos.items()
+    return {next(iter(ks)): keyspec.resolve(ks) for ks in keyspec.combos
             if len(ks) == 1}
 
 

@@ -258,7 +258,7 @@ fmri_gym/
   display.py        # pygame: fixed window, aspect-fit frame, fixation, text, survey
   logging.py        # manifest.json + one compressed .npz per game block
   adapters/
-    base.py         # EnvAdapter + KeySpec + FrameState (the seam)
+    base.py         # EnvAdapter + KeySpec flavors + FrameState (the seam)
     ale.py          # clone_state, getRAM, lossless indexed pixels
     retro.py        # em.get_state, get_ram, decoded info vars, console-button keymap
     default.py      # ANY gym env: rgb frames, seed+replay, obs-as-state
@@ -329,9 +329,22 @@ Each backend builds a default keyboard→action map:
 - **ale**: built from the game's action meanings (arrows move, SPACE fires).
 - **retro**: keyboard → console buttons (arrows move; Z/X/C = A/B/C; ENTER =
   start); multiple held keys combine (e.g. RIGHT+Z).
+- **vizdoom**: arrows move/turn, Z/X strafe, SPACE shoots. Held keys combine
+  when the scenario is made with `"env_kwargs": {"max_buttons_pressed": 0}`
+  (a `MultiBinary` space — walk forward while turning); `keys` are the
+  scenario's `Discrete` action indices either way.
 - **gym**: a generic default (arrows → first Discrete actions, or ±limits on
   Box dims). Because a bare `Discrete(n)` has no inherent meaning, **specify
   `keys` per game** for anything non-obvious.
+
+A backend picks one of three keymap flavors (`fmri_gym/adapters/base.py`),
+which differ only in how they combine the matching combos:
+
+| Flavor | Action sent | Used by |
+| --- | --- | --- |
+| `SingleKeySpec` | the most specific held combo | ale, gym, vgdl, crafter, nethack, … |
+| `MultiKeySpec` | OR of every held combo's buttons | retro, vizdoom (MultiBinary) |
+| `HeldKeysSpec` | the held key names, `"+"`-joined | aigamestore, supertuxkart |
 
 ### Remapping keys (the `keys` field)
 
@@ -339,8 +352,9 @@ Any game phase can override the mapping with a `keys` dict of
 `"<key(s)>": <action>`. The keys are pygame names (`UP`, `DOWN`, `LEFT`,
 `RIGHT`, `SPACE`, `RETURN`, letters `A`–`Z`, digits) and `<action>` is the
 action the env expects — an **integer** for a `Discrete` space (ale, gym,
-vgdl, …). Combine keys with `+` (e.g. `"UP+SPACE"`). The most specific fully-held
-combo wins, so a combo overrides its parts.
+vgdl, …). Combine keys with `+` (e.g. `"UP+SPACE"`). A combo overrides its
+parts: with `SingleKeySpec` the most specific fully-held combo wins, and with
+`MultiKeySpec` a held combo replaces (rather than ORs with) its own parts.
 
 To find the action indices for an Atari game, read its meanings:
 

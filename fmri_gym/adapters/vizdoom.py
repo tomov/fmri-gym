@@ -10,18 +10,24 @@ ViZDoom directly.
 
 The env's observation is a dict {"screen": (H,W,3) uint8, "gamevariables": ...};
 `env.render()` (rgb_array) returns the screen for display, and we log
-gamevariables (health, ammo, ...) as an analysis variable. Actions are a small
-Discrete(n) button set per scenario; arrows/space map to the first n actions.
+gamevariables (health, ammo, ...) as an analysis variable.
+
+Actions are the scenario's small Discrete(n) button set, and keymaps (both the
+default one below and curriculum `keys` overrides) are ALWAYS Discrete action
+indices. Setting `env_kwargs.max_buttons_pressed` to 0 switches the env to a
+MultiBinary action space so several buttons can be pressed at once; the keymap
+is unchanged, we just OR the buttons of every held key (e.g. forward + turn).
 """
 
 from __future__ import annotations
 
+import itertools
 from typing import Any
 
 import numpy as np
 import gymnasium as gym
 
-from .base import EnvAdapter, FrameState, KeySpec
+from .base import EnvAdapter, FrameState, KeySpec, MultiKeySpec, SingleKeySpec
 
 # Physical key -> preferred Doom button (first available for the scenario wins).
 # The gymnasium wrapper's Discrete action i presses the buttons set in
@@ -41,11 +47,29 @@ _DEFAULT_KEY_TO_BUTTON_MAP: dict[str, list[str]] = {
 }
 
 
+def _get_button_map(env: gym.Env) -> list[list[int]]:
+    """Return ``Discrete action index -> per-button 0/1 row`` for this scenario.
+
+    ViZDoom only builds ``env.unwrapped.button_map`` for a Discrete action
+    space; under MultiBinary (``max_buttons_pressed=0``) we rebuild the same
+    single-button table, so Discrete indices mean the same thing in both modes.
+
+    :param env: a ViZDoom Gymnasium environment.
+    :return: one 0/1 row per Discrete action index.
+    """
+    button_map = getattr(env.unwrapped, "button_map", None)
+    if button_map is not None:
+        return [[int(v) for v in row] for row in np.asarray(button_map)]
+    n = len(env.unwrapped.game.get_available_buttons())
+    return [list(row) for row in itertools.product((0, 1), repeat=n)
+            if sum(row) <= 1]
+
+
 def _get_button_to_action_map(env: gym.Env) -> dict[str, int]:
     """Map each available Doom button name to its Discrete action index.
 
-    Only single-button rows of ``env.unwrapped.button_map`` are included;
-    the first index for each button wins.
+    Only single-button rows of the button map are included; the first index
+    for each button wins.
 
     :param env: a ViZDoom Gymnasium environment.
     :return: ``{BUTTON_NAME: discrete_action_index}``.
@@ -53,7 +77,7 @@ def _get_button_to_action_map(env: gym.Env) -> dict[str, int]:
     u = env.unwrapped
     names = [str(b).split(".")[-1] for b in u.game.get_available_buttons()]
     out: dict[str, int] = {}
-    for i, row in enumerate(np.asarray(u.button_map)):
+    for i, row in enumerate(_get_button_map(env)):
         on = [names[j] for j, v in enumerate(row) if v]
         if len(on) == 1 and on[0] not in out:
             out[on[0]] = i
@@ -67,7 +91,9 @@ def _get_default_key_to_action_map(env: gym.Env) -> KeySpec:
     first preferred Doom button that exists in the env's button map.
 
     :param env: a ViZDoom Gymnasium environment.
-    :return: a :class:`KeySpec` with single-key combos and ``noop=0``.
+    :return: a :class:`KeySpec` with single-key combos and ``noop=0``, both
+        given as Discrete action indices. MultiBinary envs get a
+        :class:`MultiKeySpec` that ORs the buttons of every held key.
     """
     btn_idx = _get_button_to_action_map(env)
     combos: dict[frozenset[str], int] = {}
@@ -76,13 +102,21 @@ def _get_default_key_to_action_map(env: gym.Env) -> KeySpec:
             if b in btn_idx:
                 combos[frozenset([key])] = btn_idx[b]
                 break
-    return KeySpec(combos=combos, noop=0)
+    if isinstance(env.action_space, gym.spaces.MultiBinary):
+        return MultiKeySpec(combos=combos, noop=0,
+                            button_map=_get_button_map(env))
+    return SingleKeySpec(combos=combos, noop=0)
 
 
 class VizDoomAdapter(EnvAdapter):
     name: str = "vizdoom"
 
     def make(self, spec: dict) -> gym.Env:
+        """Create a ViZDoom Gymnasium environment for one game block.
+
+        :param spec: game-phase config dict from the curriculum.
+        :return: a ViZDoom Gymnasium environment.
+        """
         from vizdoom import gymnasium_wrapper  # noqa: F401  (registers Vizdoom*-v1)
         return gym.make(spec["game"], render_mode="rgb_array",
                         **spec.get("env_kwargs", {}))

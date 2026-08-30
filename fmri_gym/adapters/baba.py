@@ -15,7 +15,7 @@ from typing import Any
 
 import numpy as np
 
-from .base import EnvAdapter, FrameState, KeySpec
+from .base import EnvAdapter, FrameState, SingleKeySpec
 
 # baba.envs.ACTIONS order: up, down, left, right (idx 0..3); 4 = idle.
 _KEYS: dict[str, int] = {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3}
@@ -29,9 +29,9 @@ class BabaAdapter(EnvAdapter):
         self._env = baba.make(spec.get("game", "env/make_win"))
         return self._env
 
-    def keymap(self, env: Any) -> KeySpec:
+    def keymap(self, env: Any) -> SingleKeySpec:
         combos = {frozenset([k]): v for k, v in _KEYS.items()}
-        return KeySpec(combos=combos, noop=4)
+        return SingleKeySpec(combos=combos, noop=4)
 
     def reset(self, env: Any, seed: int | None, spec: dict) -> tuple[Any, dict]:
         try:

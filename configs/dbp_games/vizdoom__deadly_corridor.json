@@ -1,7 +1,7 @@
 {
   "_game": "ViZDoom: Deadly Corridor (Doom action-shooter; COOM engine) -- full movement",
   "_note": "pip install vizdoom. Fight down a corridor to the vest at the end; enemies attack from side alcoves. Unlike DefendCenter this scenario HAS move buttons, so you can walk forward/back and strafe.",
-  "_keys_note": "For VizdoomDeadlyCorridor-v1 the Discrete(8) map is 0=noop, 1=TURN_RIGHT, 2=TURN_LEFT, 3=MOVE_BACKWARD, 4=MOVE_FORWARD, 5=ATTACK, 6=MOVE_RIGHT, 7=MOVE_LEFT (verify with env.unwrapped.button_map). The controls the subject sees are a plain 'message' phase; keep its text in sync with 'keys' by hand.",
+  "_keys_note": "Action indices are scenario-specific. For VizdoomDeadlyCorridor-v1 the Discrete(8) map is 0=noop, 1=TURN_RIGHT, 2=TURN_LEFT, 3=MOVE_BACKWARD, 4=MOVE_FORWARD, 5=ATTACK, 6=MOVE_RIGHT, 7=MOVE_LEFT (verify with env.unwrapped.button_map). 'keys' are always these Discrete indices; env_kwargs.max_buttons_pressed picks how held keys combine: 0 = MultiBinary (keys OR together, e.g. move forward while turning), 1 = Discrete (one key wins). The controls the subject sees are a plain 'message' phase; keep its text in sync with 'keys' by hand.",
   "_keys_reference": "https://github.com/Farama-Foundation/ViZDoom/blob/main/scenarios/deadly_corridor.cfg",
   "curriculum": [
     {
@@ -26,8 +26,9 @@
     {"type": "fixation", "duration": 1.0},
     {
       "type": "game", "backend": "vizdoom", "game": "VizdoomDeadlyCorridor-v1",
-      "mode": "duration", "duration": 300.0, "fps": 20,
-      "keys": {"UP": 4, "DOWN": 3, "LEFT": 2, "RIGHT": 1, "Z": 6, "X": 7, "SPACE": 5}
+      "env_kwargs": {"max_buttons_pressed": 0},
+      "keys": {"UP": 4, "DOWN": 3, "LEFT": 2, "RIGHT": 1, "Z": 6, "X": 7, "SPACE": 5},
+      "mode": "duration", "duration": 300.0, "fps": 20
     },
     {"type": "fixation", "duration": 2.0}
   ]

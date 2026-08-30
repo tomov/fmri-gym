@@ -16,7 +16,7 @@ from typing import Any
 
 import numpy as np
 
-from .base import EnvAdapter, FrameState, KeySpec
+from .base import EnvAdapter, FrameState, SingleKeySpec
 
 
 class OvercookedAdapter(EnvAdapter):
@@ -38,12 +38,12 @@ class OvercookedAdapter(EnvAdapter):
         self._partner = spec.get("partner", "stay")
         return self._env
 
-    def keymap(self, env: Any) -> KeySpec:
+    def keymap(self, env: Any) -> SingleKeySpec:
         A = self._Action
         combos = {frozenset(["UP"]): (0, -1), frozenset(["DOWN"]): (0, 1),
                   frozenset(["LEFT"]): (-1, 0), frozenset(["RIGHT"]): (1, 0),
                   frozenset(["SPACE"]): "interact"}
-        return KeySpec(combos=combos, noop=(0, 0))
+        return SingleKeySpec(combos=combos, noop=(0, 0))
 
     def reset(self, env: Any, seed: int | None, spec: dict) -> tuple[Any, dict]:
         env.reset()

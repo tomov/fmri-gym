@@ -19,7 +19,7 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 
-from .base import EnvAdapter, FrameState, KeySpec
+from .base import EnvAdapter, FrameState, SingleKeySpec
 
 # Default keyboard mapping over crafter's Discrete(17) space:
 #   0=noop, 1=move_left, 2=move_right, 3=move_up, 4=move_down, 5=do,
@@ -43,9 +43,9 @@ class CrafterAdapter(EnvAdapter):
         self._last_obs = None
         return self._env
 
-    def keymap(self, env: gym.Env) -> KeySpec:
+    def keymap(self, env: gym.Env) -> SingleKeySpec:
         combos = {frozenset([k]): v for k, v in _DEFAULT_KEYMAP.items()}
-        return KeySpec(combos=combos, noop=0)
+        return SingleKeySpec(combos=combos, noop=0)
 
     def reset(self, env: gym.Env, seed: int | None, spec: dict) -> tuple[Any, dict]:
         # Old-gym reset(): obs only. Re-seed per episode if supported.

@@ -1,7 +1,7 @@
 {
   "_game": "ViZDoom: Defend the Center (Doom action-shooter; COOM engine)",
   "_note": "pip install vizdoom. Doom scenario via ViZDoom's gymnasium envs. Try other Vizdoom*-v1 ids (DeadlyCorridor, HealthGathering, TakeCover, Deathmatch, ...).",
-  "_keys_note": "Action indices are scenario-specific. For VizdoomDefendCenter-v1 the Discrete(4) map is 0=noop, 1=ATTACK, 2=TURN_RIGHT, 3=TURN_LEFT (verify with env.unwrapped.button_map). The controls the subject sees are a plain 'message' phase; keep its text in sync with 'keys' by hand.",
+  "_keys_note": "Action indices are scenario-specific. For VizdoomDefendCenter-v1 the Discrete(4) map is 0=noop, 1=ATTACK, 2=TURN_RIGHT, 3=TURN_LEFT (verify with env.unwrapped.button_map). 'keys' are always these Discrete indices; env_kwargs.max_buttons_pressed picks how held keys combine: 0 = MultiBinary (keys OR together, e.g. turn while shooting), 1 = Discrete (one key wins). The controls the subject sees are a plain 'message' phase; keep its text in sync with 'keys' by hand.",
   "curriculum": [
     {
       "type": "message",
@@ -23,8 +23,9 @@
     {"type": "fixation", "duration": 1.0},
     {
       "type": "game", "backend": "vizdoom", "game": "VizdoomDefendCenter-v1",
-      "mode": "duration", "duration": 300.0, "fps": 20,
-      "keys": {"LEFT": 3, "RIGHT": 2, "SPACE": 1}
+      "env_kwargs": {"max_buttons_pressed": 0},
+      "keys": {"LEFT": 3, "RIGHT": 2, "SPACE": 1},
+      "mode": "duration", "duration": 300.0, "fps": 20
     },
     {"type": "fixation", "duration": 2.0}
   ]

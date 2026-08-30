@@ -15,7 +15,7 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 
-from .base import EnvAdapter, FrameState, KeySpec
+from .base import EnvAdapter, FrameState, SingleKeySpec
 
 _DIRECTIONS = {
     "UP": ("UP",), "DOWN": ("DOWN",), "LEFT": ("LEFT",), "RIGHT": ("RIGHT",),
@@ -40,7 +40,7 @@ class ALEAdapter(EnvAdapter):
             spec["game"], render_mode="rgb_array",
             frameskip=1, repeat_action_probability=0.0)
 
-    def keymap(self, env: gym.Env) -> KeySpec:
+    def keymap(self, env: gym.Env) -> SingleKeySpec:
         combos = {}
         for action, meaning in enumerate(env.unwrapped.get_action_meanings()):
             if meaning == "NOOP":
@@ -52,7 +52,7 @@ class ALEAdapter(EnvAdapter):
                 keys = keys + ("SPACE",)
             if keys:
                 combos[frozenset(keys)] = action
-        return KeySpec(combos=combos, noop=0)
+        return SingleKeySpec(combos=combos, noop=0)
 
     def capture(
         self, env: gym.Env, obs: Any, info: dict, want_blob: bool = True

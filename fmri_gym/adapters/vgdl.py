@@ -34,7 +34,7 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 
-from .base import EnvAdapter, FrameState, KeySpec
+from .base import EnvAdapter, FrameState, SingleKeySpec
 
 # Fixed VGDL action order (verified from get_action_meanings / core.py).
 _VGDL_ACTIONS = ["UP", "DOWN", "LEFT", "RIGHT", "NO_OP", "SPACE"]
@@ -92,9 +92,9 @@ class VGDLAdapter(EnvAdapter):
         r.background = r.screen.copy()
         env.renderer = r
 
-    def keymap(self, env: gym.Env) -> KeySpec:
+    def keymap(self, env: gym.Env) -> SingleKeySpec:
         combos = {frozenset([k]): idx for k, idx in _KEYS.items()}
-        return KeySpec(combos=combos, noop=_VGDL_ACTIONS.index("NO_OP"))
+        return SingleKeySpec(combos=combos, noop=_VGDL_ACTIONS.index("NO_OP"))
 
     def reset(self, env: gym.Env, seed: int | None, spec: dict) -> tuple[Any, dict]:
         if seed is not None:
