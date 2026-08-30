@@ -11,9 +11,6 @@ conda activate fmri-gym
 pip install -r requirements.txt
 ```
 
-> If your default pip index is a private registry, add
-> `--index-url https://pypi.org/simple`.
-
 `requirements.txt` already pulls in the common backends (crafter, minihack,
 vizdoom, playwright, pystk2-gymnasium, …). Two games need an extra step:
 
@@ -24,7 +21,11 @@ pip install "git+https://github.com/nacloos/baba-is-ai.git"
 # Rush Hour — Python package + Go engine binary
 pip install "git+https://github.com/chrplr/Rush-Hour.git#subdirectory=python"
 git clone https://github.com/chrplr/Rush-Hour vendor/rush-hour-src
+# Build the binary in place; leave it at vendor/rush-hour-src/rushhour-env
+# (the adapter looks there automatically — do not move it):
 cd vendor/rush-hour-src && go build -o rushhour-env ./cmd/rushhour-env && cd ../..
+# Optional: if you built it elsewhere, point at it with:
+#   export RUSHHOUR_ENV_BIN=/absolute/path/to/rushhour-env
 ```
 
 AI GameStore uses Playwright + system Chrome by default. If you don't have
@@ -77,7 +78,10 @@ python fmri_play.py --subject sub-01 --curriculum configs/dbp_games/crafter__cra
 python fmri_play.py --subject sub-01 --curriculum configs/dbp_games/rushhour__easy.json
 ```
 
-Needs the Go binary from §1 (`vendor/rush-hour-src/rushhour-env`, or set `RUSHHOUR_ENV_BIN`).
+Needs the Go binary from §1. After the build step you should have
+`vendor/rush-hour-src/rushhour-env` in the repo — leave it there; the adapter
+auto-finds that path. If the binary lives somewhere else, set
+`export RUSHHOUR_ENV_BIN=/absolute/path/to/rushhour-env` before running.
 
 ### Baba is AI
 
