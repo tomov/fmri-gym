@@ -414,19 +414,22 @@ class Session:
 
     # -- top level -----------------------------------------------------------
 
+    def _trigger(self):
+        """Wait for experimenter ready + scanner trigger, then start the clock."""
+        self.display.draw_text(
+            "Please keep your head as still as possible.\n\n"
+            "(experimenter: press SPACE when ready)")
+        _wait_for_char(EXPERIMENTER_KEY, dummy=self.dummy)
+        self.display.draw_text("Waiting for scanner...")
+        _wait_for_char(TRIGGER_KEY, dummy=self.dummy)
+        self.clock.trigger()
+        self.logger.set_trigger_time()
+
     def run(self):
         handlers = {"fixation": self._fixation, "message": self._message,
                     "game": self._game, "survey": self._survey}
         try:
-            self.display.draw_text(
-                "Please keep your head as still as possible.\n\n"
-                "(experimenter: press SPACE when ready)")
-            _wait_for_char(EXPERIMENTER_KEY, dummy=self.dummy)
-            self.display.draw_text("Waiting for scanner...")
-            _wait_for_char(TRIGGER_KEY, dummy=self.dummy)
-
-            self.clock.trigger()
-            self.logger.set_trigger_time()
+            self._trigger()
 
             for index, phase in enumerate(self.curriculum):
                 handler = handlers.get(phase["type"])
