@@ -102,8 +102,10 @@ right. There is no test suite yet; a run against a real config is the test.
 
 ## Things that are easy to get wrong
 
-- **Key names are pygame names, upper-cased, without `K_`** (`"LEFT"`, `"SPACE"`, `"Z"`).
-  Add unlisted keys to `_PYGAME_KEY_NAMES` in `keys.py` rather than mapping keycodes yourself.
+- **Key names come from the vocabulary in `keys.py`**, upper-cased (`"LEFT"`, `"SPACE"`,
+  `"Z"`). They are ours, not the window backend's, so configs keep working if the backend
+  changes. An unlisted name raises at adapter construction (with a spelling suggestion);
+  to make a new key available, add a row to `_CODES` rather than mapping keycodes yourself.
 - **Pick the right `KeySpec`**: `SingleKeySpec` for `Discrete`, `MultiKeySpec` when held
   keys should combine (`MultiBinary`), `PassthroughKeySpec` when the env itself consumes the
   key set. Please avoid writing a fourth one unless the three don't fit.

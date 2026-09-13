@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
+from ..keys import validate_name
+
 
 @dataclass
 class KeySpec(ABC):
@@ -15,14 +17,23 @@ class KeySpec(ABC):
     action: :class:`SingleKeySpec` picks one, :class:`MultiKeySpec` ORs button
     vectors, :class:`PassthroughKeySpec` joins the held key names.
 
-    :ivar combos: maps a frozenset of pressed key NAMES (pygame key names
-        without the "K_" prefix, upper-case: "LEFT", "SPACE", "Z", ...) to the
+    :ivar combos: maps a frozenset of pressed key NAMES (upper-case, from the
+        vocabulary in :mod:`fmri_gym.keys`: "LEFT", "SPACE", "Z", ...) to the
         action to send. A combo overrides its parts (see :meth:`maximal`).
     :ivar noop: the action to send when no combo matches.
     """
 
     combos: dict[frozenset[str], Any]
     noop: Any
+
+    def __post_init__(self) -> None:
+        """Validate the adapter's own combo names (overrides are checked later)."""
+        self._validate_names()
+
+    def _validate_names(self) -> None:
+        """Reject combo keys outside the vocabulary, which could never match."""
+        for name in {key for combo in self.combos for key in combo}:
+            validate_name(name)
 
     @abstractmethod
     def resolve(self, held: frozenset[str]) -> Any:
@@ -59,12 +70,15 @@ class KeySpec(ABC):
 
         :param overrides: ``{"LEFT": action, "LEFT+SPACE": action}`` map from
             the curriculum (caller skips the call when empty / absent).
+        :raises ValueError: if a name is outside the :mod:`fmri_gym.keys`
+            vocabulary -- curriculum JSON is the usual place for a typo.
         """
         combos = self._combos_for_overrides()
         for combo_str, action in overrides.items():
             keys = frozenset(k.strip().upper() for k in combo_str.split("+"))
             combos[keys] = action
         self.combos = combos
+        self._validate_names()
 
     def key_to_action_map(self) -> dict:
         """Map single pressed KEY names to actions (for turn-based play).

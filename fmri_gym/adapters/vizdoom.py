@@ -42,7 +42,7 @@ _DEFAULT_KEY_TO_BUTTON_MAP: dict[str, list[str]] = {
     "Z": ["MOVE_LEFT"],
     "X": ["MOVE_RIGHT"],
     "SPACE": ["ATTACK"],
-    "ENTER": ["USE"],
+    "RETURN": ["USE"],
     "N": ["SELECT_PREV_WEAPON"],
     "M": ["SELECT_NEXT_WEAPON"],
 }
