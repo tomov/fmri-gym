@@ -5,6 +5,8 @@ Maps stable-retro behind the standard EnvAdapter interface:
 - per-frame exact savestate via em.get_state()/set_state() (bit-exact, verified);
 - state variables: the console RAM plus the game's decoded `info` variables
   (score/lives/... from the integration's data.json), surfaced uniformly.
+- native stereo PCM by default ("audio": false to mute); run at the emulator's screen rate
+  so audio production keeps pace with playback. No resampling is applied.
 
 Notes verified against stable_retro 1.0.1:
 - The emulator object is env.unwrapped.em; the libretro RAM view must be
@@ -19,10 +21,10 @@ from __future__ import annotations
 from typing import Any
 
 import gymnasium as gym
-import stable_retro as retro
+import numpy as np
 
-from .keyspec import MultiKeySpec
 from .base import EnvAdapter, FrameState
+from .keyspec import MultiKeySpec
 
 # Keyboard -> console button. Same scheme as the interactive retro player.
 # We map by button NAME; each game reports its own button ordering via
@@ -40,9 +42,12 @@ class RetroAdapter(EnvAdapter):
     name: str = "retro"
 
     def _make(self, spec: dict) -> gym.Env:
+        import stable_retro as retro
+
         # save_pixels accepted for interface symmetry; retro frames are already
         # reconstructable from the per-frame state, so pixels aren't stored.
         self.save_pixels = bool(spec.get("save_pixels", False))
+        self.has_audio = True
         return retro.make(
             game=spec["game"], scenario=spec.get("scenario"),
             render_mode="rgb_array")
@@ -73,6 +78,20 @@ class RetroAdapter(EnvAdapter):
         if state:
             self.env.unwrapped.load_state(state)
         return self.env.reset()
+
+    def get_audio_buffer(self) -> np.ndarray:
+        """Read the emulator's latest frame of native PCM.
+
+        :return: ``(samples, 2)`` int16 array owned by the caller.
+        """
+        return self.env.unwrapped.em.get_audio()
+
+    def get_audio_sampling_rate(self) -> float:
+        """Read the native sample rate without rounding fractional rates.
+
+        :return: samples per second reported by the libretro core.
+        """
+        return self.env.unwrapped.em.get_audio_rate()
 
     def capture(
         self, obs: Any, info: dict, want_blob: bool = True

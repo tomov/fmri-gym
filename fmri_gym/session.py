@@ -12,13 +12,14 @@ from __future__ import annotations
 import sys
 import time
 from collections import defaultdict
-from typing import TYPE_CHECKING, Union
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import pygame
 
 from .adapters import get_adapter
+from .audio import episode_audio
 from .display import Display
-from .audio import SoundDeviceGameBlockStream
 from .keys import held_key_names, key_name
 from .logging import Logger
 
@@ -112,7 +113,7 @@ def _wait_for_char(char: str, dummy_trigger: bool = False) -> None:
         time.sleep(0.005)
 
 
-def _join_multiline_text(text: Union[str, list, tuple]) -> str:
+def _join_multiline_text(text: str | list | tuple) -> str:
     """Normalize message ``text`` to a single string.
 
     Accepts a plain string or a list/tuple of lines (joined with ``\\n``), so
@@ -281,23 +282,26 @@ class Session:
         :return: ``True`` if the user quit (ESC/window close), else ``False``.
         """
         frames["episode_seeds"].append(seed)
+        next_t = time.perf_counter()
+        adapter.reset(seed)
+        with episode_audio(adapter) as play_audio:
+            self.display.draw_frame(adapter.render())
+            if getattr(adapter, "has_audio", False):
+                # Device/engine startup must not become a burst of queued audio.
+                next_t = time.perf_counter()
+            return self._episode_steps(
+                adapter, frames, play_audio, episode_id=episode_id, turn_based=turn_based,
+                dt=dt, state_stride=state_stride, block_end=block_end, next_t=next_t)
+
+    def _episode_steps(
+        self, adapter: EnvAdapter, frames: dict, play_audio: Callable[[], None], *,
+        episode_id: int, turn_based: bool, dt: float, state_stride: int, block_end: float,
+        next_t: float,
+    ) -> bool:
+        """Advance and log steps; the caller owns the episode's audio lifetime."""
         terminated = truncated = False
         ep_frame = 0
-        next_t = time.perf_counter()
         key_to_action = adapter.keyspec.key_to_action_map() if turn_based else {}
-
-        ## Reset environment and show initial state
-        obs, info = adapter.reset(seed)
-        if adapter.has_audio:
-            first_audio_buffer = adapter.get_audio_buffer()
-            self.audio_stream = SoundDeviceGameBlockStream(
-                adapter.get_audio_sampling_rate(),
-                first_audio_buffer.shape[0],
-                first_audio_buffer.shape[1],
-                dtype=first_audio_buffer.dtype,
-            )
-            self.audio_stream.play()
-        self.display.draw_frame(adapter.render())
 
         ## Loop over frames within episode
         while not (terminated or truncated) and time.perf_counter() < block_end:
@@ -320,8 +324,7 @@ class Session:
                 action = adapter.keyspec.resolve(held_key_names())
 
             obs, reward, terminated, truncated, info = adapter.step(action)
-            if adapter.has_audio:
-                self.audio_stream.put(adapter.get_audio_buffer())
+            play_audio()
             # Anchor a full savestate at episode start and every stride.
             save_blob = (ep_frame % state_stride == 0)
             ep_frame += 1
@@ -343,8 +346,6 @@ class Session:
                 frames["variables"][k].append(v)
 
             self.display.draw_frame(adapter.render())
-        if adapter.has_audio:
-            self.audio_stream.stop()
         return False
 
     def _game(self, phase: dict, index: int) -> None:

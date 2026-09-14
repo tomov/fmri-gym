@@ -85,6 +85,11 @@ python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/dbp_ga
 Drop `--dummy-trigger` for a real session (then press SPACE, then wait for the
 `=` scanner trigger). For VGDL setup see [Running VGDL games](#running-vgdl-games).
 
+Native audio plays automatically on supported backends (currently ViZDoom and
+stable-retro). Use `--no-audio` to mute the entire session, or `"audio": false`
+in a game phase to mute one block. [Audio support](AUDIO.md) explains the controls,
+timing requirements, and why some environments have no sound.
+
 Note: **MuJoCo and Box2D use continuous (`Box`) action spaces** — the default
 keymap pushes arrows to each dim's limit, so they render and log fine but aren't
 really human-playable without a per-game control scheme. Everything else in

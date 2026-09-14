@@ -28,7 +28,7 @@
       "type": "game", "backend": "vizdoom", "game": "VizdoomDeadlyCorridor-v1",
       "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true},
       "keys": {"UP": 4, "DOWN": 3, "LEFT": 2, "RIGHT": 1, "Z": 6, "X": 7, "SPACE": 5},
-      "mode": "duration", "duration": 300.0, "fps": 20
+      "mode": "duration", "duration": 300.0, "fps": 35
     },
     {"type": "fixation", "duration": 2.0}
   ]

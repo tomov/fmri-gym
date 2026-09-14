@@ -50,6 +50,8 @@ class EnvAdapter:
     :ivar env: the underlying engine environment (kept private to the wrapper).
     :ivar keyspec: keyboard->action mapping, with curriculum ``keys`` overrides
         already applied.
+    :ivar has_audio: whether native PCM playback is available and enabled.
+        Audio-capable backends play by default; ``spec["audio"] = False`` mutes them.
     """
 
     #: short id used in filenames / manifest, e.g. "ale", "retro", "gym"
@@ -64,6 +66,7 @@ class EnvAdapter:
         self.has_audio = False
         self.spec = spec
         self.env = self._make(spec)
+        self.has_audio = self.has_audio and bool(spec.get("audio", True))
         self.keyspec = self._keyspec()
         if spec.get("keys"):
             self.keyspec.apply_overrides(spec["keys"])
@@ -159,3 +162,19 @@ class EnvAdapter:
         closer = getattr(self.env, "close", None)
         if callable(closer):
             closer()
+
+    def get_audio_buffer(self) -> np.ndarray | None:
+        """Return native PCM for the latest reset/step, when ``has_audio`` is set.
+
+        :return: non-overlapping ``(samples, channels)`` PCM array, or None if
+            no new samples exist. The playback queue copies retained buffers.
+        """
+        return None
+
+    def get_audio_sampling_rate(self) -> float:
+        """Return the native audio rate for an adapter opting in to playback.
+
+        :return: samples per second; dtype and channels come from the buffer.
+        :raises NotImplementedError: if an audio-capable adapter omits this hook.
+        """
+        raise NotImplementedError(f"{self.name} adapter has no audio sampling rate")

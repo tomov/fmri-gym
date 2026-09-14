@@ -8,6 +8,7 @@ Usage:
     python fmri_play.py --subject sub-01                        # built-in demo
     python fmri_play.py --subject sub-01 --curriculum my.json
     python fmri_play.py --subject sub-01 --dummy-trigger        # testing
+    python fmri_play.py --subject sub-01 --no-audio             # mute all games
 
 See configs/demo_mixed.json for a curriculum that mixes all three backends,
 and README.md for the curriculum schema.
@@ -39,7 +40,8 @@ def build_demo_curriculum() -> list[dict]:
 
         {"type": "message", "text": "Airstriker (Genesis)", "duration": 2.0},
         {"type": "fixation", "duration": 2.0},
-        {"type": "game", "backend": "retro", "game": "Airstriker-Genesis-v0", "mode": "duration", "duration": 10.0, "fps": 60},
+        {"type": "game", "backend": "retro", "game": "Airstriker-Genesis-v0", "mode": "duration",
+         "duration": 10.0, "fps": 59.92274340431231},
 
         # Crafter: an open-world survival game. You wander freely (arrows move,
         # SPACE interacts) with no instant death -- friendlier than CartPole,
@@ -71,6 +73,8 @@ def main() -> None:
     p.add_argument("--size", default="1024x768")
     p.add_argument("--fullscreen", action="store_true")
     p.add_argument("--dummy-trigger", action="store_true")
+    p.add_argument("--no-audio", action="store_true",
+                   help="Disable game audio for the entire session.")
     p.add_argument("--save-pixels", action="store_true",
                    help="ALE only: also store lossless pixels (large; warns).")
     p.add_argument("--vgdl-repo", default=os.environ.get("VGDL_REPO"),
@@ -88,6 +92,8 @@ def main() -> None:
     for phase in curriculum:
         if phase.get("type") != "game":
             continue
+        if args.no_audio:
+            phase["audio"] = False
         backend = phase.get("backend", "gym")
         if backend == "ale" and args.save_pixels:
             phase.setdefault("save_pixels", True)

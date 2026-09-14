@@ -3,6 +3,11 @@
 Get fmri-gym running and play every currently supported DBP game with a
 one-liner. For design notes, adapters, and logging details see [README.md](README.md).
 
+Native audio plays automatically where supported (currently ViZDoom and
+stable-retro). Add `--no-audio` to any launch command to mute the session, or
+set `"audio": false` in one game phase to mute only that block. See
+[Audio support](AUDIO.md) for the backend list and why some games are silent.
+
 ## 1. Install
 
 ```bash
@@ -57,6 +62,7 @@ python fmri_play.py --subject sub-01 --curriculum configs/dbp_games/<game>.json
 | Flag / key | What it does |
 |---|---|
 | `--subject sub-01` | Subject id used in the output folder name |
+| `--no-audio` | Disable audio for every game block |
 | **SPACE** | Advance past the experimenter screen |
 | **`=`** | Scanner trigger (anchors the session clock) |
 | **ESC** | Quit early; data is still saved |
@@ -78,6 +84,13 @@ python fmri_play.py --subject sub-01 --curriculum configs/dbp_games/vizdoom__dea
 ```
 
 Controls: arrows move/turn, Z/X strafe, SPACE shoots.
+
+ViZDoom plays its native audio through the default output device. Both configs
+run at 35 FPS to match Doom's native game speed (`frame_skip` defaults to 1).
+Slower playback leaves gaps in the audio; with another `frame_skip`, use
+`fps = 35 / frame_skip`. To disable output, use `--no-audio` or set
+`"audio": false` in the game phase. Existing
+`env_kwargs.audio_buffer_enabled=false` settings also remain supported.
 
 ### Crafter
 
@@ -142,6 +155,19 @@ python fmri_play.py --subject sub-01 --curriculum configs/dbp_games/supertuxkart
 
 Needs a real GL display (does **not** work under `SDL_VIDEODRIVER=dummy`).
 Controls: arrows steer/accelerate/brake, SPACE fire, Z drift, X nitro.
+
+### stable-retro audio demo
+
+```bash
+python fmri_play.py --subject sub-test --dummy-trigger --curriculum configs/demo_retro_audio.json
+```
+
+Requires `stable-retro` and `sounddevice`; the Airstriker ROM is included.
+Arrows move, Z fires. Native audio plays automatically; use `--no-audio` or
+`"audio": false` to mute it. Match `fps` to
+`env.unwrapped.em.get_screen_rate()` (about 59.923 for this Genesis core).
+The sample rate comes directly from the emulator; changing `fps` does not
+resample audio, so slower or faster playback causes gaps or accumulating delay.
 
 ## Tips
 

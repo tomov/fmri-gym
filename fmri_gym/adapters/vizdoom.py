@@ -17,6 +17,12 @@ default one below and curriculum `keys` overrides) are ALWAYS Discrete action
 indices. Setting `env_kwargs.max_buttons_pressed` to 0 switches the env to a
 MultiBinary action space so several buttons can be pressed at once; the keymap
 is unchanged, we just OR the buttons of every held key (e.g. forward + turn).
+
+Audio uses the engine's native PCM rate. Continuous playback requires
+``fps * env_kwargs.frame_skip == 35`` (frame_skip defaults to 1); slower
+gameplay leaves silence between audio blocks. Audio plays by default; set
+``audio`` to false to mute. ``env_kwargs.audio_buffer_enabled=false`` also
+remains supported.
 """
 
 from __future__ import annotations
@@ -24,11 +30,11 @@ from __future__ import annotations
 import itertools
 from typing import Any
 
-import numpy as np
 import gymnasium as gym
+import numpy as np
 
-from .keyspec import KeySpec, MultiKeySpec, SingleKeySpec
 from .base import EnvAdapter, FrameState
+from .keyspec import KeySpec, MultiKeySpec, SingleKeySpec
 
 # Physical key -> preferred Doom button (first available for the scenario wins).
 # The gymnasium wrapper's Discrete action i presses the buttons set in
@@ -119,10 +125,13 @@ class VizDoomAdapter(EnvAdapter):
         :return: a ViZDoom Gymnasium environment.
         """
         from vizdoom import gymnasium_wrapper  # noqa: F401  (registers Vizdoom*-v1)
-        env = gym.make(spec["game"], render_mode="rgb_array",
-                        **spec.get("env_kwargs", {}))
-        env.unwrapped.game.set_audio_buffer_enabled(True)
-        self.has_audio = True
+        kwargs = dict(spec.get("env_kwargs", {}))
+        # The wrapper caches audio capability and sizes its buffer at construction.
+        kwargs["audio_buffer_enabled"] = (
+            bool(spec.get("audio", True)) and bool(kwargs.get("audio_buffer_enabled", True))
+        )
+        env = gym.make(spec["game"], render_mode="rgb_array", **kwargs)
+        self.has_audio = env.unwrapped.game.is_audio_buffer_enabled()
         return env
 
     def _keyspec(self) -> KeySpec:
@@ -131,12 +140,20 @@ class VizDoomAdapter(EnvAdapter):
     def render(self) -> np.ndarray:
         return np.asarray(self.env.render())
 
-    def get_audio_buffer(self) -> np.ndarray:
-        if self.env.unwrapped.state:
-            return self.env.unwrapped.state.audio_buffer
+    def get_audio_buffer(self) -> np.ndarray | None:
+        """Return the current step's PCM; a finished episode has no state.
+
+        :return: stereo PCM array or None at episode termination.
+        """
+        state = self.env.unwrapped.state
+        return state.audio_buffer if state is not None else None
 
     def get_audio_sampling_rate(self) -> int:
-        return self.env.unwrapped.game.get_audio_sampling_rate()
+        """Read the game's native sampling rate without resampling.
+
+        :return: samples per second.
+        """
+        return int(self.env.unwrapped.game.get_audio_sampling_rate())
 
     def capture(self, obs: Any, info: dict, want_blob: bool = True) -> FrameState:
         variables = {}

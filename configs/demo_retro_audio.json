@@ -1,0 +1,14 @@
+{
+  "_note": "Install stable-retro and sounddevice. Airstriker's ROM is included. FPS is the Genesis core's native screen rate; audio uses its native 44100 Hz stereo PCM.",
+  "curriculum": [
+    {
+      "type": "game",
+      "backend": "retro",
+      "game": "Airstriker-Genesis-v0",
+      "mode": "duration",
+      "duration": 15.0,
+      "fps": 59.92274340431231,
+      "state_stride": 60
+    }
+  ]
+}
