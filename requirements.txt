@@ -10,6 +10,11 @@ sounddevice
 numpy
 setuptools<81          # some backends (minihack) import pkg_resources
 
+# Recording-device markers (optional; see README "Triggers: fMRI vs MEG")
+# pylsl                # `triggers.markers.backend: lsl`
+# pyserial             # `triggers.markers.backend: serial`
+# pyparallel           # `triggers.markers.backend: parallel` (Linux)
+
 # Backends (install what you need)
 ale-py                 # Atari backend
 stable-retro           # NES/SNES/Genesis/... backend

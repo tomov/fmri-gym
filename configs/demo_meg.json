@@ -1,0 +1,52 @@
+{
+  "_game": "MEG template: an fMRI curriculum plus a 'triggers' section",
+  "_note": "sync.mode 'send' emits scanner_start on the marker line after the experimenter's SPACE (MEG acquisitions started from the trigger input); use 'wait' for an fMRI trigger box. markers.backend null | lsl | serial | parallel (pip install pylsl / pyserial / pyparallel); a backend that cannot be opened stops the run with the reason. Codes are non-overlapping bit fields (frames 1-7, lifecycle bits 8/16/32/64); see README 'Triggers'.",
+  "triggers": {
+    "sync": {
+      "mode": "send",
+      "delay": 0.0
+    },
+    "markers": {
+      "backend": "serial",
+      "port": "/dev/ttyUSB0",
+      "lsl_stream_name": "fmri_gym",
+      "pulse_ms": 10,
+      "on_frame": true,
+      "frame_every": 1,
+      "on_episode_start": true,
+      "codes": {
+        "frame_bits": 3,
+        "task_start": 8,
+        "task_stop": 16,
+        "episode_start": 32,
+        "scanner_start": 64
+      }
+    }
+  },
+  "curriculum": [
+    {
+      "type": "message",
+      "text": "Pong (Atari)\n\nUP / DOWN move the paddle.\n\n(press SPACE to start)"
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    },
+    {
+      "type": "game",
+      "backend": "ale",
+      "game": "ALE/Pong-v5",
+      "mode": "duration",
+      "duration": 60.0,
+      "fps": 30,
+      "keys": {
+        "UP": 2,
+        "DOWN": 3
+      }
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    }
+  ]
+}

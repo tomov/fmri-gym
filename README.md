@@ -78,6 +78,14 @@ VGDL_REPO=../language_and_experience PYTHONPATH=../language_and_experience \
 python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/dbp_games/atari__pong.json
 ```
 
+Prefer forms to JSON? `--gui` opens a config editor first (session flags,
+curriculum, key remaps, triggers with fMRI/MEG presets, load/save); **Run**
+starts the session with what it shows:
+
+```bash
+python fmri_play.py --gui --curriculum configs/demo_meg.json
+```
+
 Drop `--dummy-trigger` for a real session (then press SPACE, then wait for the
 `=` scanner trigger). For VGDL setup see [Running VGDL games](#running-vgdl-games).
 
@@ -136,7 +144,7 @@ playwright, box2d-py, MuJoCo GL, ROM import).
 Runtime flow: experimenter screen (**SPACE**) → "Waiting for scanner..." →
 scanner **trigger `=`** (anchors the session clock) → curriculum phases → done.
 `ESC` quits early but still saves. Flags: `--size 1280x1024`, `--fullscreen`,
-`--save-pixels` (ALE only; see below).
+`--no-vsync` (see [Timing](#timing-what-is-stamped-when)), `--save-pixels` (ALE only; see below).
 
 ## Running stable-retro games
 
@@ -281,8 +289,10 @@ Controls, phase fields and the logged columns are documented in the configs'
 ```
 fmri_gym/
   session.py        # trigger, clock, curriculum loop, phases  — 100% engine-agnostic
-  display.py        # pygame: fixed window, aspect-fit frame, fixation, text, survey
+  display.py        # pygame: fixed window, aspect-fit frame, fixation, text; vsync-locked flip + call_on_flip
   logging.py        # manifest.json + one compressed .npz per game block
+  triggers.py       # run-start sync (wait/send/none) + MEG/EEG marker codes over lsl/serial/parallel
+  photodiode.py     # `python -m fmri_gym.photodiode`: flash a patch to measure the flip-to-photon offset
   adapters/
     base.py         # EnvAdapter + KeySpec flavors + FrameState (the seam)
     ale.py          # clone_state, getRAM, lossless indexed pixels
@@ -324,7 +334,17 @@ class EnvAdapter:
 
 ## Curriculum format
 
-An ordered JSON list of **phases** (bare list or `{"curriculum": [...]}`):
+An ordered JSON list of **phases** (bare list or `{"curriculum": [...]}`). The
+dict form can also carry `"triggers"` (below) and `"session"`, the CLI flags as
+a section (`subject`, `outdir`, `size`, `fullscreen`, `vsync`, `dummy_trigger`);
+a flag given on the command line still wins. The editor's Save leaves
+`subject` out, so a config file describes the rig and the task, not a participant.
+
+A whole scanning session is `"runs"` instead of `"curriculum"`: an ordered list
+of `{"name": "pong", "curriculum": [...]}`. Runs play one after the other, each
+with its own experimenter screen, trigger wait, clock and output folder
+(`<outdir>/run-01_pong/`, `run-02_.../`); ESC ends the session. `--run 2` or
+`--run pong` plays one run, e.g. to resume after a stop.
 
 ```jsonc
 {"type": "fixation", "duration": 2.0}                 // "+" for N seconds
@@ -402,18 +422,84 @@ gym.make("ALE/Pong-v5").unwrapped.get_action_meanings()
 `configs/dbp_games/atari__pong.json` and the built-in demo both use this mapping.
 CartPole similarly uses `{"LEFT": 0, "RIGHT": 1}`.
 
+## Triggers: fMRI vs MEG/EEG
+
+By default a session waits for the scanner's `=` key and sends nothing (fMRI).
+For MEG/EEG add a `"triggers"` section next to `"curriculum"` (full example:
+`configs/demo_meg.json`):
+
+```jsonc
+"triggers": {
+  "sync":    {"mode": "send", "delay": 0.0},
+  "markers": {"backend": "serial", "port": "/dev/ttyUSB0"}
+}
+```
+
+| `sync.mode` | after the experimenter's SPACE… |
+|---|---|
+| `wait` (default) | wait for `key` (default `"="`) from the trigger box, then start |
+| `send` | send the `scanner_start` code on the marker line, wait `delay` s, then start |
+| `none` | start immediately |
+
+`markers.backend`: `null` (default), `lsl`, `serial` or `parallel` — `pip
+install pylsl` / `pyserial` / `pyparallel`; `port` for serial/parallel,
+`lsl_stream_name` for LSL. A backend that cannot be opened stops the run
+before the experimenter screen, with the reason and the fix.
+
+What is sent: `task_start` when the clock anchors, `episode_start` at each
+reset, one code per frame (`"frame_every": N` to thin, `"on_frame": false` to
+drop), `task_stop` at the end. Codes never share bits, so two markers on the
+same sample still decode: frames cycle 1–7 in the low 3 bits, `task_start`=8,
+`task_stop`=16, `episode_start`=32, `scanner_start`=64, and a lifecycle code
+is OR'd with the current frame code (all under `"codes"`; overlaps are
+refused). Every value sent is logged: per frame as `marker` in the block
+`.npz`, lifecycle events with their `session_time` under `triggers` in
+`manifest.json`.
+
+## Timing
+
+Frames are shown with a vsync-locked flip and each frame's onset is logged as
+`flip_time`; message/fixation onsets in the manifest are flip times too. Key
+presses and releases are logged as they arrive (`key_time`, `key_name`,
+`key_down`), independent of the frame grid. The manifest records the display
+actually obtained (`vsync`, measured at start-up; `refresh_rate`).
+
+- Pick a game `fps` that divides the monitor's refresh rate (30 or 60 on 60 Hz).
+- Before a MEG/EEG session, check that the rig locks to the refresh:
+  `python -m fmri_gym.display --fullscreen` (verdict LOCKED / NOT locked; if
+  not, use fullscreen and disable the desktop compositor). `--no-vsync` turns
+  the request off.
+- Once per rig, measure the constant flip-to-photon offset with a photodiode on
+  the screen, then subtract it from `flip_time` and the frame markers:
+
+  ```bash
+  python -m fmri_gym.photodiode --fullscreen --config configs/demo_meg.json   # diode into the MEG/EEG amp
+  python -m fmri_gym.photodiode --fullscreen --audio                          # diode into this PC's sound card
+  ```
+
+  The first flashes a patch with the frame marker on each white flip; match
+  the markers to the diode edges in your recording with
+  `fmri_gym.photodiode.match_edges(marker_times, edge_times)`. The second
+  records the diode on the sound-card input and prints the offsets itself
+  (`--list-audio-devices` to pick the input).
+
 ## Output & data format
 
 Each session writes `data/<subject>_<timestamp>/`:
 
-- **`manifest.json`** — subject, curriculum, trigger epoch, and per-phase
-  onsets/offsets (+ survey responses).
+- **`manifest.json`** — subject, curriculum, trigger epoch, per-phase
+  onsets/offsets (+ survey responses; onsets are flip times), the `display`
+  actually opened (size, `vsync`, `refresh_rate`, driver) and the `triggers`
+  settings + lifecycle markers sent.
 - **`block-NN_<backend>_<game>.npz`** — one per game block, uniform schema:
 
   | key | meaning |
   |-----|---------|
   | `actions`, `rewards`, `terminal`, `episode_id` | per frame |
-  | `session_time`, `wall_time` | seconds since trigger; wall-clock Unix time |
+  | `session_time`, `wall_time` | seconds since trigger (after the step); wall-clock Unix time |
+  | `flip_time` | seconds since trigger of the **flip that showed the frame** (its onset; vsync-locked when the display reports `vsync: true`) |
+  | `key_time`, `key_name`, `key_down` | every key press/release during the block, stamped on arrival (~1 ms), independent of the frame grid |
+  | `marker` | the trigger value sent on that frame's flip (only when a marker backend is active) |
   | `states` | per-frame savestate blob (object array; `None` if engine has none) |
   | `episode_seeds` | RNG seed per episode |
   | `backend`, `game` | provenance |
@@ -490,9 +576,12 @@ resolving data dirs relative to `__file__`. Result: VGDL runs under gymnasium
 - [ ] Finish the **old-`gym` / shimmy** path against a real game (Sokoban,
       chess) — either port its source (VGDL recipe above) or run via shimmy in a
       `numpy<2` env; code path exists but is untested end-to-end.
-- [ ] **Photodiode sync square** and **LSL / parallel-port markers** for
-      MEG/EEG-grade timing; fMRI's slow HRF makes the `=`-anchored software
-      clock adequate.
+- [x] **LSL / serial / parallel-port markers** and a send-mode start signal
+      for MEG/EEG (`"triggers"` section) -- done.
+- [x] **Photodiode calibration task** (`python -m fmri_gym.photodiode`) to measure
+      the flip-to-photon offset of a rig -- done; an always-on sync square in
+      the corner of every frame remains an option if a lab wants per-frame
+      verification.
 - [ ] **retro `.bk2` movie logging** as an alternative to per-frame states
       (frame-exact, tiny).
 - [ ] Per-subject deterministic curriculum generation; multi-run structure with
