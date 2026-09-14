@@ -34,6 +34,10 @@ through small pluggable **adapters**:
 
 ## Install
 
+See [Machine requirements](MACHINE_REQUIREMENTS.md) for minimum and recommended
+hardware, and the [local test log](docs/local-testing/2026-09-14.md) for measurements
+and their scope.
+
 Everything coexists in one conda env (verified: ALE + stable-retro + plain gym
 all import and run in the same process).
 

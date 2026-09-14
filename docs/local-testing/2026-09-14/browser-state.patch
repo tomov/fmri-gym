@@ -1,0 +1,23 @@
+diff --git a/fmri_gym/adapters/aigamestore.py b/fmri_gym/adapters/aigamestore.py
+index 6835599..68b5ab5 100644
+--- a/fmri_gym/adapters/aigamestore.py
++++ b/fmri_gym/adapters/aigamestore.py
+@@ -212,3 +212,17 @@ def _state(page: Page) -> Any:
+     try:
+-        return page.evaluate("window.getGameState ? window.getGameState() : null")
++        # Three.js states contain large scene graphs; the log only uses scalar fields.
++        return page.evaluate("""async () => {
++            const state = window.getGameState ? await window.getGameState() : null;
++            if (!state || typeof state !== "object" || Array.isArray(state))
++                return null;
++            const scalars = [];
++            for (const key of Object.keys(state)) {
++                try {
++                    const value = state[key];
++                    if (["number", "string", "boolean", "bigint"].includes(typeof value))
++                        scalars.push([key, value]);
++                } catch {}  // Match Playwright's handling of unreadable properties.
++            }
++            return Object.fromEntries(scalars);
++        }""")
+     except Exception:
