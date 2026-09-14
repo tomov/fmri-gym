@@ -1,0 +1,830 @@
+{
+  "date": "2026-09-14",
+  "timezone": "UTC+08:00",
+  "scope": "22 selected visible manual runs on one Windows workstation, including seven WSL scenarios; not minimum-hardware certification",
+  "baseline_commit": "8653d8fe9920b58fabd9362b03ff1803c6b9a011",
+  "archived_browser_patch": "browser-state.patch",
+  "units": {
+    "memory": "MiB (1048576 bytes)",
+    "cpu": "100 percent equals one logical processor; process tree only",
+    "timing": "Logged environment updates, not physical display FPS"
+  },
+  "limitations": [
+    "Raw profiles, resource streams, NPZ files, and screenshots are retained locally, not published here.",
+    "RSS can double-count shared pages and excludes unobserved OS, desktop, WSL infrastructure, and graphics memory.",
+    "Sampling scopes differ; see each resources.scope and the accompanying log.",
+    "Turn-based code zero is a valid action, so input_steps is null for those games.",
+    "Screenshots do not cover every moment; Deadly Corridor has no retained gameplay screenshot.",
+    "Game4 has approximately 29 seconds of active play; Eat is a 17-second sample; SuperTuxKart subjective confirmation was not recorded."
+  ],
+  "runs": [
+    {
+      "run_id": "defend-center-visible-01",
+      "platform": "Windows",
+      "turn_based": false,
+      "browser_state_transfer": "not applicable",
+      "game_duration_s": 93.61635640007444,
+      "logged_steps": 3237,
+      "episode_count": 9,
+      "total_reward": 14.0,
+      "terminated_steps": 8,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 0,
+      "input_steps": 942,
+      "input_steps_definition": "step with at least one active button",
+      "timing": {
+        "steady_logged_updates_per_s": 34.99552514793494,
+        "interval_p95_ms": 30.22192009957507,
+        "interval_max_ms": 41.941900039091706,
+        "episode_boundary_gaps_ms": [
+          32.56590012460947,
+          29.41249986179173,
+          23.16330000758171,
+          51.60310002975166,
+          36.56619996763766,
+          37.9058001562953,
+          32.36249997280538,
+          38.91110001131892
+        ],
+        "scope": "Within-episode intervals after first five seconds of the block; existing measured summary used where available"
+      },
+      "resources": {
+        "scope": "Partial recording: approximately the last 25 seconds of the game block",
+        "sample_count": 50,
+        "rss_peak_mib": 129.37890625,
+        "cpu_mean_percent_one_logical_core": 16.70512179175294,
+        "cpu_p95_percent_one_logical_core": 25.30556210940323,
+        "cpu_peak_percent_one_logical_core": 27.889766554024686
+      },
+      "evidence": {},
+      "npz_file": "block-00_vizdoom_VizdoomDefendCenter-v1.npz",
+      "npz_sha256": "9ac4ba537ef150e11217f0d2979ff04e284d4ce929a042da6407ce409c4e9d79"
+    },
+    {
+      "run_id": "deadly-corridor-visible-01",
+      "platform": "Windows",
+      "turn_based": false,
+      "browser_state_transfer": "not applicable",
+      "game_duration_s": 47.56866470002569,
+      "logged_steps": 1629,
+      "episode_count": 10,
+      "total_reward": 1839.942138671875,
+      "terminated_steps": 9,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 0,
+      "input_steps": 585,
+      "input_steps_definition": "step with at least one active button",
+      "timing": {
+        "steady_logged_updates_per_s": 34.992256818913546,
+        "interval_p95_ms": 30.409560026600957,
+        "interval_max_ms": 718.1989999953657,
+        "episode_boundary_gaps_ms": [
+          31.97739995084703,
+          32.90110011585057,
+          30.86250019259751,
+          25.15599993057549,
+          26.056800037622452,
+          26.017099851742387,
+          35.57029995135963,
+          23.06120004504919,
+          26.74529980868101
+        ],
+        "scope": "Within-episode intervals after first five seconds of the block; existing measured summary used where available"
+      },
+      "resources": {
+        "scope": "Whole monitored run, including startup and instruction screens",
+        "sample_count": 100,
+        "rss_peak_mib": 137.53125,
+        "cpu_mean_percent_one_logical_core": 18.218305869481057,
+        "cpu_p95_percent_one_logical_core": 31.2049230301942,
+        "cpu_peak_percent_one_logical_core": 75.52850314514642
+      },
+      "evidence": {},
+      "npz_file": "block-02_vizdoom_VizdoomDeadlyCorridor-v1.npz",
+      "npz_sha256": "1159f1d5dfdbc25c0a78556e4516e1d5f8fd9ddfc74bc24d648d702ba586d30e"
+    },
+    {
+      "run_id": "crafter__crafter-visible-01",
+      "platform": "Windows",
+      "turn_based": true,
+      "browser_state_transfer": "not applicable",
+      "game_duration_s": 120.01907499996014,
+      "logged_steps": 367,
+      "episode_count": 2,
+      "total_reward": 9.600000381469727,
+      "terminated_steps": 1,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 0,
+      "input_steps": null,
+      "input_steps_definition": "all logged turn-based actions are retained, including code zero",
+      "timing": null,
+      "resources": {
+        "scope": "Whole monitored run, including startup and instruction screens",
+        "sample_count": 253,
+        "rss_peak_mib": 100.77734375,
+        "cpu_mean_percent_one_logical_core": 5.468383854185429,
+        "cpu_p95_percent_one_logical_core": 9.44937705876257,
+        "cpu_peak_percent_one_logical_core": 100.6244755175774
+      },
+      "evidence": {},
+      "npz_file": "block-02_crafter_crafter.npz",
+      "npz_sha256": "f49d9510ae7205ec134477c582c2bf24071c4f1e15bce6c9ee430cf4c7965e3d"
+    },
+    {
+      "run_id": "baba__make_win-visible-01",
+      "platform": "Windows",
+      "turn_based": true,
+      "browser_state_transfer": "not applicable",
+      "game_duration_s": 70.441955300048,
+      "logged_steps": 176,
+      "episode_count": 9,
+      "total_reward": 6.4160003662109375,
+      "terminated_steps": 8,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 8,
+      "input_steps": null,
+      "input_steps_definition": "all logged turn-based actions are retained, including code zero",
+      "timing": null,
+      "resources": {
+        "scope": "Whole monitored run, including startup and instruction screens",
+        "sample_count": 147,
+        "rss_peak_mib": 96.703125,
+        "cpu_mean_percent_one_logical_core": 2.251719566717404,
+        "cpu_p95_percent_one_logical_core": 8.742564736479412,
+        "cpu_peak_percent_one_logical_core": 69.86288784126602
+      },
+      "evidence": {},
+      "npz_file": "block-02_baba_make_win.npz",
+      "npz_sha256": "c92f0917762c1f4ef6488eb701489d37e0a79bffe0da83052130f23b518c4b74"
+    },
+    {
+      "run_id": "rushhour__easy-visible-01",
+      "platform": "Windows",
+      "turn_based": true,
+      "browser_state_transfer": "not applicable",
+      "game_duration_s": 120.01455079996958,
+      "logged_steps": 127,
+      "episode_count": 2,
+      "total_reward": -53.0,
+      "terminated_steps": 1,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 0,
+      "input_steps": null,
+      "input_steps_definition": "all logged turn-based actions are retained, including code zero",
+      "timing": null,
+      "resources": {
+        "scope": "Whole monitored run, including startup and instruction screens",
+        "sample_count": 253,
+        "rss_peak_mib": 79.10546875,
+        "cpu_mean_percent_one_logical_core": 1.7517693272726365,
+        "cpu_p95_percent_one_logical_core": 5.633592836866429,
+        "cpu_peak_percent_one_logical_core": 62.1943397020524
+      },
+      "evidence": {},
+      "npz_file": "block-02_rushhour_RushHourHuman-v0.npz",
+      "npz_sha256": "93db8b27dddd43b411facbd8c6d990aad4c3e8952ab486da1b74b6455ae58276"
+    },
+    {
+      "run_id": "aigamestore__game1-visible-01",
+      "platform": "Windows",
+      "turn_based": false,
+      "browser_state_transfer": "original",
+      "game_duration_s": 68.07715940009803,
+      "logged_steps": 674,
+      "episode_count": 1,
+      "total_reward": 305.0,
+      "terminated_steps": 0,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 0,
+      "input_steps": 123,
+      "input_steps_definition": "nonempty held-key set",
+      "timing": {
+        "steady_logged_updates_per_s": 9.997653092721318,
+        "interval_p95_ms": 111.24624989461154,
+        "interval_max_ms": 136.6787999868393,
+        "episode_boundary_gaps_ms": [],
+        "scope": "Within-episode intervals after first five seconds of the block; existing measured summary used where available"
+      },
+      "resources": {
+        "scope": "Whole monitored run, including startup and instruction screens",
+        "sample_count": 158,
+        "rss_peak_mib": 854.07421875,
+        "cpu_mean_percent_one_logical_core": 52.506954628778736,
+        "cpu_p95_percent_one_logical_core": 82.87135044244167,
+        "cpu_peak_percent_one_logical_core": 103.45325720364923
+      },
+      "evidence": {},
+      "npz_file": "block-02_aigamestore_game1.npz",
+      "npz_sha256": "c19df42c7b6f587ea1a5f1301e5086335b4139139bda2a3bc9d44b199608afbe"
+    },
+    {
+      "run_id": "aigamestore__game2-visible-01",
+      "platform": "Windows",
+      "turn_based": false,
+      "browser_state_transfer": "original",
+      "game_duration_s": 120.68602510006167,
+      "logged_steps": 1201,
+      "episode_count": 1,
+      "total_reward": 2320.0,
+      "terminated_steps": 0,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 0,
+      "input_steps": 319,
+      "input_steps_definition": "nonempty held-key set",
+      "timing": {
+        "steady_logged_updates_per_s": 10.001209239528217,
+        "interval_p95_ms": 121.59751993604,
+        "interval_max_ms": 156.7094000056386,
+        "episode_boundary_gaps_ms": [],
+        "scope": "Within-episode intervals after first five seconds of the block; existing measured summary used where available"
+      },
+      "resources": {
+        "scope": "Whole monitored run, including startup and instruction screens",
+        "sample_count": 270,
+        "rss_peak_mib": 971.71875,
+        "cpu_mean_percent_one_logical_core": 78.99847918321994,
+        "cpu_p95_percent_one_logical_core": 123.50814207207317,
+        "cpu_peak_percent_one_logical_core": 170.2235253899704
+      },
+      "evidence": {},
+      "npz_file": "block-02_aigamestore_game2.npz",
+      "npz_sha256": "e0b4859e1c0860b26b57f94c51cd13cc1b085f4a51b2a7d19b984710f1a66ce6"
+    },
+    {
+      "run_id": "aigamestore__game3-verified-human-01",
+      "platform": "Windows",
+      "turn_based": false,
+      "browser_state_transfer": "scalar patch",
+      "game_duration_s": 120.6427365001291,
+      "logged_steps": 1201,
+      "episode_count": 1,
+      "total_reward": 1500.0,
+      "terminated_steps": 0,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 0,
+      "input_steps": 817,
+      "input_steps_definition": "nonempty held-key set",
+      "timing": {
+        "steady_logged_updates_per_s": 9.999991492023998,
+        "interval_p95_ms": 110.45847507193685,
+        "interval_max_ms": 112.82190005294979,
+        "episode_boundary_gaps_ms": [],
+        "scope": "Within-episode intervals after first five seconds of the block; existing measured summary used where available"
+      },
+      "resources": {
+        "scope": "Game onset + 5 s through offset - 0.5 s",
+        "sample_count": 230,
+        "rss_peak_mib": 796.14453125,
+        "cpu_mean_percent_one_logical_core": 65.11834164830867,
+        "cpu_p95_percent_one_logical_core": 91.16982038227742,
+        "cpu_peak_percent_one_logical_core": 100.89970770939435
+      },
+      "evidence": {
+        "phases": {
+          "PLAYING": 1201
+        },
+        "score_max": 1500.0
+      },
+      "npz_file": "block-02_aigamestore_game3.npz",
+      "npz_sha256": "5374d72d577e686633ba54607e58230ac6c0cdae4d7453185ffe5a8b8ad560c5"
+    },
+    {
+      "run_id": "aigamestore__game4-retry-human-01",
+      "platform": "Windows",
+      "turn_based": false,
+      "browser_state_transfer": "scalar patch",
+      "game_duration_s": 58.58110190019943,
+      "logged_steps": 580,
+      "episode_count": 1,
+      "total_reward": -6.0,
+      "terminated_steps": 0,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 0,
+      "input_steps": 121,
+      "input_steps_definition": "nonempty held-key set",
+      "timing": {
+        "steady_logged_updates_per_s": 10.001161184335883,
+        "interval_p95_ms": 110.37696003913878,
+        "interval_max_ms": 125.01360010355711,
+        "episode_boundary_gaps_ms": [],
+        "scope": "Within-episode intervals after first five seconds of the block; existing measured summary used where available"
+      },
+      "resources": {
+        "scope": "Game onset + 5 s through offset - 0.5 s",
+        "sample_count": 106,
+        "rss_peak_mib": 748.0078125,
+        "cpu_mean_percent_one_logical_core": 47.69469235186162,
+        "cpu_p95_percent_one_logical_core": 75.00359945419494,
+        "cpu_peak_percent_one_logical_core": 97.00216984183825
+      },
+      "evidence": {
+        "phases": {
+          "PLAYING": 285,
+          "GAME_OVER_LOSE": 38,
+          "START": 257
+        },
+        "score_max": 607.0
+      },
+      "npz_file": "block-02_aigamestore_game4.npz",
+      "npz_sha256": "ecb836900528760fbcb827761c786add79e561f1408c1dde19550e34e62e47fa"
+    },
+    {
+      "run_id": "aigamestore__game5-verified-human-01",
+      "platform": "Windows",
+      "turn_based": false,
+      "browser_state_transfer": "scalar patch",
+      "game_duration_s": 107.59607089986093,
+      "logged_steps": 1072,
+      "episode_count": 1,
+      "total_reward": 2150.0,
+      "terminated_steps": 0,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 0,
+      "input_steps": 245,
+      "input_steps_definition": "nonempty held-key set",
+      "timing": {
+        "steady_logged_updates_per_s": 10.000703389492966,
+        "interval_p95_ms": 110.26433994993567,
+        "interval_max_ms": 125.54759997874498,
+        "episode_boundary_gaps_ms": [],
+        "scope": "Within-episode intervals after first five seconds of the block; existing measured summary used where available"
+      },
+      "resources": {
+        "scope": "Game onset + 5 s through offset - 0.5 s",
+        "sample_count": 204,
+        "rss_peak_mib": 785.44921875,
+        "cpu_mean_percent_one_logical_core": 47.95163072968787,
+        "cpu_p95_percent_one_logical_core": 71.87821956815759,
+        "cpu_peak_percent_one_logical_core": 102.48889244063975
+      },
+      "evidence": {
+        "phases": {
+          "PLAYING": 1002,
+          "GAME_OVER_LOSE": 35,
+          "START": 35
+        },
+        "score_max": 6300.0
+      },
+      "npz_file": "block-02_aigamestore_game5.npz",
+      "npz_sha256": "dcbec1908981953a48dcbbdec9d92b3639d0419850c95048f0a4b6ce1cbe4b01"
+    },
+    {
+      "run_id": "aigamestore__game6-verified-human-01",
+      "platform": "Windows",
+      "turn_based": false,
+      "browser_state_transfer": "scalar patch",
+      "game_duration_s": 120.63670539995655,
+      "logged_steps": 1201,
+      "episode_count": 1,
+      "total_reward": 300.0,
+      "terminated_steps": 0,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 0,
+      "input_steps": 655,
+      "input_steps_definition": "nonempty held-key set",
+      "timing": {
+        "steady_logged_updates_per_s": 9.999633379340365,
+        "interval_p95_ms": 110.27420015307143,
+        "interval_max_ms": 118.10320010408759,
+        "episode_boundary_gaps_ms": [],
+        "scope": "Within-episode intervals after first five seconds of the block; existing measured summary used where available"
+      },
+      "resources": {
+        "scope": "Game onset + 5 s through offset - 0.5 s",
+        "sample_count": 230,
+        "rss_peak_mib": 787.64453125,
+        "cpu_mean_percent_one_logical_core": 44.86604150061309,
+        "cpu_p95_percent_one_logical_core": 70.54539052008222,
+        "cpu_peak_percent_one_logical_core": 106.53814304807561
+      },
+      "evidence": {
+        "phases": {
+          "PLAYING": 1201
+        },
+        "score_max": 300.0
+      },
+      "npz_file": "block-02_aigamestore_game6.npz",
+      "npz_sha256": "ecc4e4ff02045b4e2778e6197627b58b012b84f1d778cd64f60b9e9164e3f9a6"
+    },
+    {
+      "run_id": "aigamestore__game7-verified-human-01",
+      "platform": "Windows",
+      "turn_based": false,
+      "browser_state_transfer": "scalar patch",
+      "game_duration_s": 120.63183119986206,
+      "logged_steps": 1201,
+      "episode_count": 1,
+      "total_reward": 3300.0,
+      "terminated_steps": 0,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 0,
+      "input_steps": 959,
+      "input_steps_definition": "nonempty held-key set",
+      "timing": {
+        "steady_logged_updates_per_s": 10.0005729635464,
+        "interval_p95_ms": 110.44352484168485,
+        "interval_max_ms": 115.02810008823872,
+        "episode_boundary_gaps_ms": [],
+        "scope": "Within-episode intervals after first five seconds of the block; existing measured summary used where available"
+      },
+      "resources": {
+        "scope": "Game onset + 5 s through offset - 0.5 s",
+        "sample_count": 230,
+        "rss_peak_mib": 790.25,
+        "cpu_mean_percent_one_logical_core": 45.069040906134205,
+        "cpu_p95_percent_one_logical_core": 71.94492736615008,
+        "cpu_peak_percent_one_logical_core": 93.87047334302741
+      },
+      "evidence": {
+        "phases": {
+          "PLAYING": 1191,
+          "GAME_OVER_WIN": 10
+        },
+        "score_max": 3300.0
+      },
+      "npz_file": "block-02_aigamestore_game7.npz",
+      "npz_sha256": "4579e3914497705cf21bbcf9ce616371b4d40d9d5e90162ebe2b0f1a9676643e"
+    },
+    {
+      "run_id": "aigamestore__game8-verified-human-01",
+      "platform": "Windows",
+      "turn_based": false,
+      "browser_state_transfer": "scalar patch",
+      "game_duration_s": 120.6393645000644,
+      "logged_steps": 1201,
+      "episode_count": 1,
+      "total_reward": 4820.0,
+      "terminated_steps": 0,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 0,
+      "input_steps": 143,
+      "input_steps_definition": "nonempty held-key set",
+      "timing": {
+        "steady_logged_updates_per_s": 9.999729483328695,
+        "interval_p95_ms": 110.29597488231957,
+        "interval_max_ms": 116.01100000552833,
+        "episode_boundary_gaps_ms": [],
+        "scope": "Within-episode intervals after first five seconds of the block; existing measured summary used where available"
+      },
+      "resources": {
+        "scope": "Game onset + 5 s through offset - 0.5 s",
+        "sample_count": 230,
+        "rss_peak_mib": 792.25390625,
+        "cpu_mean_percent_one_logical_core": 47.508449059008,
+        "cpu_p95_percent_one_logical_core": 70.65912102931986,
+        "cpu_peak_percent_one_logical_core": 106.2159471800726
+      },
+      "evidence": {
+        "phases": {
+          "PLAYING": 1141,
+          "LEVEL_TRANSITION": 60
+        },
+        "score_max": 4820.0
+      },
+      "npz_file": "block-02_aigamestore_game8.npz",
+      "npz_sha256": "0f6a95cd6e1351ba9daec6ecb319f4ed49e466512f8825dbbd9b428ab7583ab6"
+    },
+    {
+      "run_id": "aigamestore__game9-verified-human-01",
+      "platform": "Windows",
+      "turn_based": false,
+      "browser_state_transfer": "scalar patch",
+      "game_duration_s": 120.6362827999983,
+      "logged_steps": 1201,
+      "episode_count": 1,
+      "total_reward": 3300.0,
+      "terminated_steps": 0,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 0,
+      "input_steps": 327,
+      "input_steps_definition": "nonempty held-key set",
+      "timing": {
+        "steady_logged_updates_per_s": 9.999881173700016,
+        "interval_p95_ms": 110.28064991114661,
+        "interval_max_ms": 121.16030021570623,
+        "episode_boundary_gaps_ms": [],
+        "scope": "Within-episode intervals after first five seconds of the block; existing measured summary used where available"
+      },
+      "resources": {
+        "scope": "Game onset + 5 s through offset - 0.5 s",
+        "sample_count": 230,
+        "rss_peak_mib": 784.02734375,
+        "cpu_mean_percent_one_logical_core": 45.6221937219995,
+        "cpu_p95_percent_one_logical_core": 71.50886027167026,
+        "cpu_peak_percent_one_logical_core": 90.8729924015367
+      },
+      "evidence": {
+        "phases": {
+          "PLAYING": 1201
+        },
+        "score_max": 3300.0
+      },
+      "npz_file": "block-02_aigamestore_game9.npz",
+      "npz_sha256": "a1660db04579c0f1df7f43ec0593bfd528e7d0b14fad4bc843146567005ca867"
+    },
+    {
+      "run_id": "aigamestore__game10-verified-human-01",
+      "platform": "Windows",
+      "turn_based": false,
+      "browser_state_transfer": "scalar patch",
+      "game_duration_s": 120.63662049989216,
+      "logged_steps": 1201,
+      "episode_count": 1,
+      "total_reward": 1090.0,
+      "terminated_steps": 0,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 0,
+      "input_steps": 860,
+      "input_steps_definition": "nonempty held-key set",
+      "timing": {
+        "steady_logged_updates_per_s": 9.999987628780305,
+        "interval_p95_ms": 110.47450004843995,
+        "interval_max_ms": 120.26110012084246,
+        "episode_boundary_gaps_ms": [],
+        "scope": "Within-episode intervals after first five seconds of the block; existing measured summary used where available"
+      },
+      "resources": {
+        "scope": "Game onset + 5 s through offset - 0.5 s",
+        "sample_count": 230,
+        "rss_peak_mib": 792.31640625,
+        "cpu_mean_percent_one_logical_core": 42.254072730927575,
+        "cpu_p95_percent_one_logical_core": 68.6933074450822,
+        "cpu_peak_percent_one_logical_core": 88.86633773309849
+      },
+      "evidence": {
+        "phases": {
+          "PLAYING": 1155,
+          "GAME_OVER_LOSE": 29,
+          "START": 17
+        },
+        "score_max": 1200.0
+      },
+      "npz_file": "block-02_aigamestore_game10.npz",
+      "npz_sha256": "ee32b83357a319e3b65ee2b60b6c5a9c6883e8f7f06178869cb2598183aadf24"
+    },
+    {
+      "run_id": "minihack__room5x5-human-wsl-01",
+      "platform": "WSL",
+      "turn_based": true,
+      "browser_state_transfer": "not applicable",
+      "game_duration_s": 120.06696323599999,
+      "logged_steps": 197,
+      "episode_count": 29,
+      "total_reward": 27.819997787475586,
+      "terminated_steps": 28,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 28,
+      "input_steps": null,
+      "input_steps_definition": "all logged turn-based actions are retained, including code zero",
+      "timing": null,
+      "resources": {
+        "scope": "Game onset + 5 s through offset - 0.5 s",
+        "sample_count": 229,
+        "rss_peak_mib": 80.625,
+        "cpu_mean_percent_one_logical_core": 0.3402542497172386,
+        "cpu_p95_percent_one_logical_core": 1.9982165525709816,
+        "cpu_peak_percent_one_logical_core": 3.993961178625552
+      },
+      "evidence": {
+        "action_counts": {
+          "1": 45,
+          "6": 6,
+          "7": 6,
+          "2": 35,
+          "3": 11,
+          "4": 1,
+          "5": 84,
+          "0": 9
+        }
+      },
+      "npz_file": "block-02_minihack_MiniHack-Room-5x5-v0.npz",
+      "npz_sha256": "8772cbcd9ff66efed9cececd76081ed6dd5bbf74dd6c9c706046d569b51c5307"
+    },
+    {
+      "run_id": "minihack__room15x15-human-wsl-01",
+      "platform": "WSL",
+      "turn_based": true,
+      "browser_state_transfer": "not applicable",
+      "game_duration_s": 48.44045319899999,
+      "logged_steps": 171,
+      "episode_count": 13,
+      "total_reward": 12.0,
+      "terminated_steps": 12,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 12,
+      "input_steps": null,
+      "input_steps_definition": "all logged turn-based actions are retained, including code zero",
+      "timing": null,
+      "resources": {
+        "scope": "Game onset + 5 s through offset - 0.5 s",
+        "sample_count": 86,
+        "rss_peak_mib": 80.5859375,
+        "cpu_mean_percent_one_logical_core": 0.5344005027030158,
+        "cpu_p95_percent_one_logical_core": 1.9984797356323698,
+        "cpu_peak_percent_one_logical_core": 1.9995222541478732
+      },
+      "evidence": {
+        "action_counts": {
+          "5": 169,
+          "3": 1,
+          "0": 1
+        }
+      },
+      "npz_file": "block-02_minihack_MiniHack-Room-15x15-v0.npz",
+      "npz_sha256": "aef95f65f36667a09bb3df19ed4dd7760c705f2c4400e2519d6b306c35f08fc3"
+    },
+    {
+      "run_id": "minihack__mazewalk9x9-retry-human-wsl-01",
+      "platform": "WSL",
+      "turn_based": true,
+      "browser_state_transfer": "not applicable",
+      "game_duration_s": 120.06654053499999,
+      "logged_steps": 427,
+      "episode_count": 25,
+      "total_reward": 23.299999237060547,
+      "terminated_steps": 24,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 24,
+      "input_steps": null,
+      "input_steps_definition": "all logged turn-based actions are retained, including code zero",
+      "timing": null,
+      "resources": {
+        "scope": "Game onset + 5 s through offset - 0.5 s",
+        "sample_count": 229,
+        "rss_peak_mib": 81.60546875,
+        "cpu_mean_percent_one_logical_core": 0.5060350638313161,
+        "cpu_p95_percent_one_logical_core": 1.9987487561755737,
+        "cpu_peak_percent_one_logical_core": 3.995732102600999
+      },
+      "evidence": {
+        "action_counts": {
+          "2": 107,
+          "3": 100,
+          "1": 110,
+          "0": 110
+        }
+      },
+      "npz_file": "block-02_minihack_MiniHack-MazeWalk-9x9-v0.npz",
+      "npz_sha256": "17bdb78e7675689816c35bc4809832fe24f930e7fb1e1f7eb254bbee5f4f639f"
+    },
+    {
+      "run_id": "minihack__river-human-wsl-01",
+      "platform": "WSL",
+      "turn_based": true,
+      "browser_state_transfer": "not applicable",
+      "game_duration_s": 120.02750653200002,
+      "logged_steps": 389,
+      "episode_count": 5,
+      "total_reward": 3.990000009536743,
+      "terminated_steps": 4,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 4,
+      "input_steps": null,
+      "input_steps_definition": "all logged turn-based actions are retained, including code zero",
+      "timing": null,
+      "resources": {
+        "scope": "Game onset + 5 s through offset - 0.5 s",
+        "sample_count": 229,
+        "rss_peak_mib": 81.2890625,
+        "cpu_mean_percent_one_logical_core": 0.46238257666093857,
+        "cpu_p95_percent_one_logical_core": 1.9981851237379562,
+        "cpu_peak_percent_one_logical_core": 3.9949310876184807
+      },
+      "evidence": {
+        "action_counts": {
+          "2": 53,
+          "1": 171,
+          "0": 51,
+          "3": 114
+        }
+      },
+      "npz_file": "block-02_minihack_MiniHack-River-v0.npz",
+      "npz_sha256": "54861ff836b85ad0a8f31822584058d76f2fbda9767fcbd5148a4a39d1a15b71"
+    },
+    {
+      "run_id": "minihack__corridor-keyboard-retry-human-wsl-01",
+      "platform": "WSL",
+      "turn_based": true,
+      "browser_state_transfer": "not applicable",
+      "game_duration_s": 120.02306154799999,
+      "logged_steps": 478,
+      "episode_count": 2,
+      "total_reward": -0.2099999189376831,
+      "terminated_steps": 1,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 1,
+      "input_steps": null,
+      "input_steps_definition": "all logged turn-based actions are retained, including code zero",
+      "timing": null,
+      "resources": {
+        "scope": "Game onset + 5 s through offset - 0.5 s",
+        "sample_count": 229,
+        "rss_peak_mib": 81.33203125,
+        "cpu_mean_percent_one_logical_core": 0.5060364723324965,
+        "cpu_p95_percent_one_logical_core": 1.9983398609714296,
+        "cpu_peak_percent_one_logical_core": 3.996286498726307
+      },
+      "evidence": {
+        "action_counts": {
+          "1": 123,
+          "2": 52,
+          "10": 153,
+          "8": 15,
+          "9": 11,
+          "0": 40,
+          "3": 62,
+          "6": 2,
+          "5": 6,
+          "7": 11,
+          "4": 3
+        }
+      },
+      "npz_file": "block-02_minihack_MiniHack-Corridor-R2-v0.npz",
+      "npz_sha256": "58251bcaa1a4dbfb49c3daf82826e1a388a3081179184360576adf15f44ece50"
+    },
+    {
+      "run_id": "minihack__eat-human-wsl-01",
+      "platform": "WSL",
+      "turn_based": true,
+      "browser_state_transfer": "not applicable",
+      "game_duration_s": 17.098111813999992,
+      "logged_steps": 59,
+      "episode_count": 10,
+      "total_reward": 8.879999160766602,
+      "terminated_steps": 9,
+      "truncated_steps": 0,
+      "positive_reward_terminations": 9,
+      "input_steps": null,
+      "input_steps_definition": "all logged turn-based actions are retained, including code zero",
+      "timing": null,
+      "resources": {
+        "scope": "Game onset + 5 s through offset - 0.5 s",
+        "sample_count": 23,
+        "rss_peak_mib": 80.1171875,
+        "cpu_mean_percent_one_logical_core": 0.6081178129380664,
+        "cpu_p95_percent_one_logical_core": 1.998269245968435,
+        "cpu_peak_percent_one_logical_core": 1.9986426658036123
+      },
+      "evidence": {
+        "action_counts": {
+          "2": 10,
+          "3": 4,
+          "1": 11,
+          "29": 9,
+          "7": 9,
+          "0": 16
+        }
+      },
+      "npz_file": "block-02_minihack_MiniHack-Eat-v0.npz",
+      "npz_sha256": "cfa03b89fe7925a9bbe550bef08732c7ce9efc6dcc72ff4cedba61ff23991b84"
+    },
+    {
+      "run_id": "supertuxkart__race-human-wsl-01",
+      "platform": "WSL",
+      "turn_based": false,
+      "browser_state_transfer": "not applicable",
+      "game_duration_s": 120.07610070699997,
+      "logged_steps": 3603,
+      "episode_count": 3,
+      "total_reward": -30.23830795288086,
+      "terminated_steps": 0,
+      "truncated_steps": 2,
+      "positive_reward_terminations": 0,
+      "input_steps": 2034,
+      "input_steps_definition": "nonempty held-key set",
+      "timing": {
+        "steady_logged_updates_per_s": 30.00081170705344,
+        "interval_p95_ms": 33.878242450020934,
+        "interval_max_ms": 36.69531499997447,
+        "episode_boundary_gaps_ms": [
+          586.2101980000034,
+          1164.0217350000057
+        ],
+        "scope": "Within-episode intervals after first five seconds of each episode"
+      },
+      "resources": {
+        "scope": "Game onset + 5 s through offset - 0.5 s",
+        "sample_count": 228,
+        "rss_peak_mib": 540.55859375,
+        "cpu_mean_percent_one_logical_core": 18.1752909311193,
+        "cpu_p95_percent_one_logical_core": 23.977578300954296,
+        "cpu_peak_percent_one_logical_core": 71.92352228029186
+      },
+      "evidence": {
+        "key_counts": {
+          "RIGHT": 323,
+          "UP": 1235,
+          "LEFT": 510,
+          "DOWN": 178,
+          "Z": 9,
+          "SPACE": 6
+        },
+        "distance_min": 0.0,
+        "distance_max": 1113.1239013671875,
+        "distance_changed_intervals": 3019
+      },
+      "npz_file": "block-02_supertuxkart_supertuxkart.npz",
+      "npz_sha256": "afebb46f991bb37a0f0fa196c269f16f320ffc28defac97003047cf10a5d1f91"
+    }
+  ]
+}
