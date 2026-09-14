@@ -66,6 +66,13 @@ on game-over) → fixation. Output lands in `data/<subject>_<timestamp>/`.
 
 Runtime: experimenter screen (**SPACE**) → "Waiting for scanner..." → trigger **`=`** → curriculum.
 
+ViZDoom and stable-retro play native audio by default. Add `--no-audio` to the
+launch command to mute every game, or set `"audio": false` on a game phase to
+mute only that block. Generated ViZDoom PCM remains logged. ViZDoom's explicit
+`env_kwargs.audio_buffer_enabled: false` also disables its audio observations
+and logging. See [Game audio](AUDIO.md) for native frame rates, the short retro
+demo, and playback/recording limits.
+
 ## 3. Run every game
 
 All commands assume you're in the repo root with `fmri-gym` activated.

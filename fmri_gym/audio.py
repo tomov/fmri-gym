@@ -25,12 +25,10 @@ running.
 from __future__ import annotations
 
 import glob
-import logging
 import os
 import platform
-import queue
-import threading
-from typing import TYPE_CHECKING
+from collections import deque
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -63,7 +61,7 @@ if "ALSA_CONFIG_PATH" not in os.environ and os.path.exists(_SYSTEM_ALSA_CONF):
         os.environ["ALSA_CONFIG_PATH"] = _SYSTEM_ALSA_CONF
         os.environ.setdefault("ALSA_PLUGIN_DIR", plugin_dirs[0])
 
-import sounddevice  # noqa: E402  (needs the ALSA env above at import time)
+import sounddevice  # Needs the ALSA environment above before PortAudio initializes.
 
 # Stream lifecycle. ``NOT_STARTED`` is unused: we construct already
 # ``STOPPED`` and only start the PortAudio stream in :meth:`play`.
@@ -80,7 +78,7 @@ def _preferred_output_device() -> int | None:
     """
     try:
         devices = sounddevice.query_devices()
-    except Exception:  # no audio at all -- let the stream raise instead
+    except sounddevice.PortAudioError:  # no audio at all -- let the stream raise instead
         return None
     for name in ("pulse", "default"):
         for device in devices:
@@ -90,148 +88,135 @@ def _preferred_output_device() -> int | None:
 
 
 class SoundDeviceGameBlockStream:
-    """Queue PCM blocks from the caller onto a PortAudio output stream."""
+    """Queue owned PCM blocks for nonblocking playback at their native rate."""
 
     def __init__(
         self,
         sample_rate: float,
         block_size: int = 0,
         channels: int = 2,
-        dtype=sounddevice.default.dtype[1],
+        dtype: str | np.dtype = sounddevice.default.dtype[1],
     ) -> None:
-        """Open an output stream; does not start playback until :meth:`play`.
+        """Open an inactive stream with at most 32 pending engine chunks.
 
-        :param sample_rate: samples per second; must match the input blocks.
-        :param block_size: PortAudio block size in frames; ``0`` lets the
-            host pick. When the caller knows its chunk length, pass it so
-            one queued block often fills one callback.
-        :param channels: channel count of queued arrays (stereo is 2).
-        :param dtype: numpy / PortAudio sample dtype. Default is the
-            device's output dtype (``sounddevice.default.dtype[1]``).
+        :param sample_rate: native samples per second, including fractional rates.
+        :param block_size: device callback size; zero lets the host choose.
+        :param channels: number of PCM channels.
+        :param dtype: native sample format supported by sounddevice.
         """
+        self._channels = channels
+        self._dtype = np.dtype(dtype)
+        self._silence = 128 if self._dtype == np.dtype("uint8") else 0
+        # Append/popleft are thread-safe; a full deque drops its oldest pending
+        # chunk instead of allowing a slow output device to accumulate audio.
+        self._blocks: deque[np.ndarray] = deque(maxlen=32)
+        self._current: np.ndarray | None = None
+        self._offset = 0
+        self.status = STOPPED
+        self._closed = False
+        self._prime = np.full((int(0.1 * sample_rate), channels), self._silence, dtype=dtype)
         device = _preferred_output_device()
-        # Silence is otherwise indistinguishable from a stream that opened on
-        # the wrong card, so say where the sound is going.
-        # ``kind`` matters: with ``device=None`` (any non-ALSA host, where
-        # PortAudio's own default is already the right one) a bare
-        # query_devices() would return the whole device list, not a device.
         print("audio out:", sounddevice.query_devices(device, "output")["name"],
-              f"({sample_rate:g} Hz, {channels}ch, {np.dtype(dtype).name})")
-        self.blocks: queue.Queue = queue.Queue()
-        # ~100 ms of silence, matching ``latency=0.1`` below: queued ahead of
-        # the real samples so the first callback has something to play. A
-        # producer that makes one game frame of sound per game frame never
-        # builds that slack up on its own, so :meth:`play` re-queues it.
-        self.silence = np.zeros((int(0.1 * sample_rate), channels), dtype=dtype)
-        self.blocks.put(self.silence)
-        self.lock = threading.Lock()
+              f"({sample_rate:g} Hz, {channels}ch, {self._dtype.name})")
         self.output_stream = sounddevice.OutputStream(
-            samplerate=sample_rate,
-            blocksize=block_size,
-            latency=0.1,
-            device=device,
-            channels=channels,
-            callback=self.callback,
-            dtype=dtype,
-            # Let PortAudio zero the initial buffers instead of calling us
-            # before :meth:`play` (and before any real game audio is queued).
+            samplerate=sample_rate, blocksize=block_size, latency=0.1,
+            device=device, channels=channels, callback=self.callback, dtype=self._dtype,
             prime_output_buffers_using_stream_callback=False,
         )
-        self.current_block_idx = 0
-        self.current_block = None
-        self.status = STOPPED
 
-    def callback(self, outdata, frames: int, time, status) -> None:
-        """PortAudio output callback: copy queued PCM into ``outdata``.
+    def callback(self, outdata: np.ndarray, frames: int, time: Any, status: Any) -> None:
+        """Fill one device buffer without waiting for the game thread.
 
-        Runs on PortAudio's thread. Keep it short: fill ``outdata`` and
-        return. Blocking here underruns and clicks.
-
-        A single queued block is often longer or shorter than ``frames``, so
-        we splice across queue items until this callback's slot is full.
-
-        :param outdata: preallocated output array, shape ``(frames, C)``.
-        :param frames: number of sample frames PortAudio wants this call.
-        :param time: PortAudio timing info (unused).
+        :param outdata: writable device buffer shaped ``(frames, channels)``.
+        :param frames: number of sample frames requested.
+        :param time: PortAudio timing information (unused).
         :param status: PortAudio status flags (unused).
         """
-        if self.status == STOPPED:
+        outdata.fill(self._silence)
+        if self.status != PLAYING:
             return
-        if self.blocks.empty():
-            outdata.fill(0)
-            logging.debug("sound queue empty")
-            return
-        elif self.current_block is None:
-            with self.lock:
-                self.current_block = self.blocks.get()
-
-        out_idx = 0
-        while True:
-            current_block_len = self.current_block.shape[0]
-
-            split_idx = min(current_block_len - self.current_block_idx, frames - out_idx)
-            split_end = self.current_block_idx + split_idx
-            outdata[out_idx : out_idx + split_idx] = self.current_block[
-                self.current_block_idx : split_end
-            ]
-            out_idx += split_idx
-
-            self.current_block_idx = split_end
-            if split_end == current_block_len:
-                with self.lock:
-                    try:
-                        # Tiny timeout so a late producer put does not stall
-                        # PortAudio; underrun is preferable to a hang.
-                        self.current_block = self.blocks.get(timeout=0.01)
-                    except queue.Empty:
-                        logging.debug("sound queue empty")
-                self.current_block_idx = 0
-            if out_idx == frames:
-                return
+        written = 0
+        while written < frames:
+            if self._current is None:
+                try:
+                    self._current = self._blocks.popleft()
+                except IndexError:
+                    return
+            count = min(len(self._current) - self._offset, frames - written)
+            outdata[written:written + count] = self._current[self._offset:self._offset + count]
+            written += count
+            self._offset += count
+            if self._offset == len(self._current):
+                self._current = None
+                self._offset = 0
 
     def put(self, block: np.ndarray) -> None:
-        """Enqueue one PCM chunk from the producer thread.
+        """Copy native PCM for asynchronous playback; skip empty chunks.
 
-        :param block: array shaped ``(n_samples, channels)``, same dtype
-            as the stream. The queue holds a reference; copy first if the
-            underlying buffer will be reused.
+        :param block: array shaped ``(samples, channels)`` in the stream's dtype.
+        :raises ValueError: if shape or dtype does not match the stream.
+        :raises RuntimeError: if the device has already been closed.
         """
-        with self.lock:
-            self.blocks.put(block)
+        if self._closed:
+            raise RuntimeError("cannot queue audio on a closed stream")
+        block = np.asarray(block)
+        if block.ndim != 2 or block.shape[1] != self._channels:
+            raise ValueError(f"audio must have shape (samples, {self._channels})")
+        if block.dtype != self._dtype:
+            raise ValueError(f"audio dtype must stay {self._dtype}, got {block.dtype}")
+        if len(block):
+            self._blocks.append(block.copy(order="C"))
 
     def play(self) -> None:
-        """Start the PortAudio stream (idempotent if already running).
+        """Start playback once; close a device whose startup fails.
 
-        Re-primes the queue with silence, since :meth:`stop` empties it and a
-        restarted stream would otherwise run with no slack at all.
+        :raises RuntimeError: if the device has already been closed.
         """
-        if self.blocks.empty():
-            self.blocks.put(self.silence)
+        if self._closed:
+            raise RuntimeError("cannot start a closed audio stream")
+        if self.status == PLAYING:
+            return
+        # Each episode starts with the same slack, ahead of any real PCM.
+        self._current = self._prime if len(self._prime) else None
+        self._offset = 0
         self.status = PLAYING
-        self.output_stream.start()
+        try:
+            self.output_stream.start()
+        except BaseException:
+            self.close()
+            raise
 
     def stop(self) -> None:
-        """Stop playback and drop any queued samples.
-
-        Flush after stop so leftover PCM is not played on a later
-        :meth:`play`.
-        """
+        """Stop callbacks and discard queued and partially consumed samples."""
+        if self._closed:
+            return
         self.status = STOPPED
-        self.output_stream.stop()
-        self.flush()
+        try:
+            self.output_stream.stop()
+        finally:
+            self.flush()
 
     def flush(self) -> None:
-        """Drop queued blocks. Replaces the queue rather than draining it.
+        """Drop pending samples while callbacks are stopped.
 
-        Draining while the callback may still hold ``current_block`` is
-        racy; a fresh ``Queue`` is the simple cutoff.
+        :raises RuntimeError: if playback is still running.
         """
-        self.blocks = queue.Queue()
+        if self.status == PLAYING:
+            raise RuntimeError("stop audio before flushing its buffers")
+        self._blocks.clear()
+        self._current = None
+        self._offset = 0
 
     def close(self) -> None:
-        """Stop playback and release the PortAudio stream."""
-        self.stop()
-        self.output_stream.close()
+        """Release the device once, even when stopping or playback failed."""
+        if self._closed:
+            return
+        self.status = STOPPED
+        try:
+            self.output_stream.close()
+        finally:
+            self._closed = True
+            self.flush()
 
 
 class Audio:
@@ -258,7 +243,11 @@ class Audio:
         """
         if sound is None:
             return
-        pcm = sound.pcm
+        pcm = np.asarray(sound.pcm)
+        if pcm.ndim != 2 or pcm.shape[1] == 0:
+            raise ValueError("audio must have shape (samples, channels)")
+        if not len(pcm):
+            return
         # Chunk LENGTH is only a hint to PortAudio -- the callback splices
         # across queued blocks -- so a shorter final chunk must not count as a
         # format change and reopen the device mid-episode.
@@ -268,9 +257,13 @@ class Audio:
             self.stream = SoundDeviceGameBlockStream(
                 sound.sample_rate, pcm.shape[0], pcm.shape[1], dtype=pcm.dtype)
             self.format = sound_format
-        if self.stream.status != PLAYING:
-            self.stream.play()
-        self.stream.put(pcm)
+        try:
+            self.stream.put(pcm)
+            if self.stream.status != PLAYING:
+                self.stream.play()
+        except BaseException:
+            self.close()
+            raise
 
     def stop(self) -> None:
         """Stop playback and drop what is still queued.
@@ -283,7 +276,8 @@ class Audio:
 
     def close(self) -> None:
         """Release the output device (the audio half of a session teardown)."""
-        if self.stream is not None:
-            self.stream.close()
+        stream = self.stream
         self.stream = None
         self.format = None
+        if stream is not None:
+            stream.close()

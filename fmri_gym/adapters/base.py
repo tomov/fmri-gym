@@ -42,7 +42,7 @@ class Sound:
     """
 
     pcm: np.ndarray
-    sample_rate: int
+    sample_rate: float
 
 
 class EnvAdapter:
