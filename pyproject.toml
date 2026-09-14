@@ -42,6 +42,8 @@ box2d = ["gymnasium[box2d]"]
 mujoco = ["gymnasium[mujoco]"]  # run with MUJOCO_GL=egl headless
 shimmy = ["shimmy"]  # old-`gym` envs via "legacy_gym": true
 tilematch = ["tile-match-gym"]  # display + logging only
+# MEG/EEG trigger backends (README "Triggers"): `triggers.backend` lsl / serial / parallel.
+triggers = ["pylsl", "pyserial", "pyparallel"]
 
 # The nine DBP picks (DBP_FINAL_LIST.md). Not installable from an index and
 # therefore not listed: craftium (prebuilt wheel on its GitHub releases) and
@@ -50,7 +52,7 @@ dbp = [
     "fmri-gym[vizdoom,aigamestore,crafter,rushhour,baba,minihack,supertuxkart,overcooked]",
 ]
 all = [
-    "fmri-gym[dbp,ale,retro,nethack,box2d,mujoco,shimmy,tilematch]",
+    "fmri-gym[dbp,ale,retro,nethack,box2d,mujoco,shimmy,tilematch,triggers]",
 ]
 
 [project.scripts]

@@ -76,6 +76,27 @@ Before editing `session.py`, `display.py`, `keys.py`, `logging.py`, `base.py`, o
   This is especially important when using outdated `gym` or `gym-retro` libraries, which result in dependency conflicts if imported globally.
 - **No stray `print` in the frame loop.** Please make sure to remove any debugging logic before committing, to avoid code bloat and unnecessary latency.
 
+## Rule 4: when something is wrong, stop -- never run with an invisible problem
+
+The worst outcome this code can produce is not a crash. It is a session that
+runs to the end, looks fine, and turns out afterwards to have sent no triggers,
+opened the wrong port, ignored a config key, or quietly fallen back to
+something else: the participant's hour is gone and nobody knew. So:
+
+- **Validate at start-up and raise, with the fix in the message**, before the
+  participant screen (`fmri_play.py` builds the triggers before the window for
+  this reason). Don't catch an error to `sys.exit` politely, and don't catch
+  one to continue.
+- **One shape per input.** No `isinstance` branches that accept two config
+  layouts, no `x or {}` / `.get(k) or []` that turn a wrong value into an
+  empty one. Enforce the shape and say what was expected.
+- **A default that changes what the recording gets is allowed only if it is
+  visible**: on the experimenter screen, on the console, and in the manifest
+  (see `Triggers.status()` / `triggers.defaulted`). A silent default is a bug.
+- **Test switches announce themselves** (`--dummy-trigger` prints what it
+  skips and lands in the manifest). Degrading gracefully is for the frame
+  loop mid-session, not for set-up.
+
 ## Adding a new backend: the checklist
 
 1. `fmri_gym/adapters/<BACKEND>.py` — module docstring (what the engine is, why it was

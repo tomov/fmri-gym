@@ -684,6 +684,9 @@ all = [
     { name = "overcooked-ai" },
     { name = "pillow" },
     { name = "playwright" },
+    { name = "pylsl" },
+    { name = "pyparallel" },
+    { name = "pyserial" },
     { name = "pystk2-gymnasium" },
     { name = "rushhour-gym" },
     { name = "shimmy" },
@@ -740,6 +743,11 @@ supertuxkart = [
 tilematch = [
     { name = "tile-match-gym" },
 ]
+triggers = [
+    { name = "pylsl" },
+    { name = "pyparallel" },
+    { name = "pyserial" },
+]
 vizdoom = [
     { name = "vizdoom" },
 ]
@@ -749,7 +757,7 @@ requires-dist = [
     { name = "ale-py", marker = "extra == 'ale'" },
     { name = "baba", marker = "extra == 'baba'", git = "https://github.com/nacloos/baba-is-ai.git" },
     { name = "crafter", marker = "extra == 'crafter'" },
-    { name = "fmri-gym", extras = ["dbp", "ale", "retro", "nethack", "box2d", "mujoco", "shimmy", "tilematch"], marker = "extra == 'all'" },
+    { name = "fmri-gym", extras = ["dbp", "ale", "retro", "nethack", "box2d", "mujoco", "shimmy", "tilematch", "triggers"], marker = "extra == 'all'" },
     { name = "fmri-gym", extras = ["vizdoom", "aigamestore", "crafter", "rushhour", "baba", "minihack", "supertuxkart", "overcooked"], marker = "extra == 'dbp'" },
     { name = "gymnasium" },
     { name = "gymnasium", extras = ["box2d"], marker = "extra == 'box2d'" },
@@ -762,6 +770,9 @@ requires-dist = [
     { name = "pillow", marker = "extra == 'aigamestore'" },
     { name = "playwright", marker = "extra == 'aigamestore'" },
     { name = "pygame-ce" },
+    { name = "pylsl", marker = "extra == 'triggers'" },
+    { name = "pyparallel", marker = "extra == 'triggers'" },
+    { name = "pyserial", marker = "extra == 'triggers'" },
     { name = "pystk2-gymnasium", marker = "extra == 'supertuxkart'" },
     { name = "rushhour-gym", marker = "extra == 'rushhour'", specifier = ">=0.6.0" },
     { name = "setuptools", specifier = "<81" },
@@ -771,7 +782,7 @@ requires-dist = [
     { name = "tile-match-gym", marker = "extra == 'tilematch'" },
     { name = "vizdoom", marker = "extra == 'vizdoom'" },
 ]
-provides-extras = ["ale", "retro", "crafter", "minihack", "nethack", "aigamestore", "vizdoom", "overcooked", "baba", "rushhour", "supertuxkart", "box2d", "mujoco", "shimmy", "tilematch", "dbp", "all"]
+provides-extras = ["ale", "retro", "crafter", "minihack", "nethack", "aigamestore", "vizdoom", "overcooked", "baba", "rushhour", "supertuxkart", "box2d", "mujoco", "shimmy", "tilematch", "triggers", "dbp", "all"]
 
 [[package]]
 name = "fonttools"
@@ -2097,6 +2108,24 @@ wheels = [
 ]
 
 [[package]]
+name = "pylsl"
+version = "1.18.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
+    { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a9/22/f7f331841138351653388797c8b786f7d50dbfb96ab7d5c3faf8b79ea1b6/pylsl-1.18.2.tar.gz", hash = "sha256:e0f591bc9722d976c3cd3721c958ef3d9fc2b2bbe32e9218609a6f6070349a88", size = 42759, upload-time = "2026-04-22T04:21:32.707Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/79/27/4daf3a230344ce9bd25b9a68cd674819deaaedb994a141d61a2d17ca6823/pylsl-1.18.2-py2.py3-none-any.whl", hash = "sha256:0758d45b13aa97beb806884ec607648fe6568505b04c3ce152bfea214a4f06c2", size = 42949, upload-time = "2026-04-22T04:21:33.431Z" },
+    { url = "https://files.pythonhosted.org/packages/6e/7f/9f19c023dfb770ffe23031e05251e64fcf3f3bfc4f51d16d352b8e58f5ec/pylsl-1.18.2-py2.py3-none-macosx_11_0_universal2.whl", hash = "sha256:dd459aaa36af808cca4e4046ae926b42886fdd9672b219bfd4dd154010ca1c8b", size = 662393, upload-time = "2026-04-22T04:21:31.549Z" },
+    { url = "https://files.pythonhosted.org/packages/64/08/c2ae65d3fe8d1cfaa4be05617a6f6af71342ba0dc1750363b929098065b7/pylsl-1.18.2-py2.py3-none-manylinux_2_35_x86_64.whl", hash = "sha256:f0331fed141cf19be65017e6529edff79b8505b4781e9e1838c95de5d072ade4", size = 1043264, upload-time = "2026-04-22T04:21:30.201Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/b1/e599a7327376e29847dd00b33f127b9238e76d9aedd27eae6eb9ff77a190/pylsl-1.18.2-py2.py3-none-win32.whl", hash = "sha256:2f9f50aa16510600066e43628a1b66ac6b6a32b321de3000824f9c60e26cfbfa", size = 272611, upload-time = "2026-04-22T04:21:28.666Z" },
+    { url = "https://files.pythonhosted.org/packages/8a/a8/8ccb88b3cd65140e57966472038baa0cebb56bde5e86ad51852faed99cad/pylsl-1.18.2-py2.py3-none-win_amd64.whl", hash = "sha256:3ea2693417c7d79766cebf967250fde78aa1a3ad2b198e40246d36f549dbfde1", size = 307506, upload-time = "2026-04-22T04:21:35.177Z" },
+]
+
+[[package]]
 name = "pyopengl"
 version = "3.1.10"
 source = { registry = "https://pypi.org/simple" }
@@ -2106,12 +2135,30 @@ wheels = [
 ]
 
 [[package]]
+name = "pyparallel"
+version = "0.2.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/87/85/be9988fdafabb41d6cc0a1a5dc70a351d968e0b3e80d8b627dc7ad075712/pyparallel-0.2.2.tar.gz", hash = "sha256:b5550293af42a42d7b2e1ada1224d3c3ce2f09b80e85421820e068655908c611", size = 11814, upload-time = "2016-01-05T09:06:48.316Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/08/06/b8dfcd5509b4c2ee68528a90be91eddfcb1f8c9fab90c0e734841b03fb3c/pyparallel-0.2.2-py3-none-any.whl", hash = "sha256:f382422c97a885453b405acadd27c522bff87e9407968dc814955ed68b1cc777", size = 38836, upload-time = "2016-01-05T09:07:18.364Z" },
+]
+
+[[package]]
 name = "pyparsing"
 version = "3.3.2"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f3/91/9c6ee907786a473bf81c5f53cf703ba0957b23ab84c264080fb5a450416f/pyparsing-3.3.2.tar.gz", hash = "sha256:c777f4d763f140633dcb6d8a3eda953bf7a214dc4eff598413c070bcdc117cbc", size = 6851574, upload-time = "2026-01-21T03:57:59.36Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/10/bd/c038d7cc38edc1aa5bf91ab8068b63d4308c66c4c8bb3cbba7dfbc049f9c/pyparsing-3.3.2-py3-none-any.whl", hash = "sha256:850ba148bd908d7e2411587e247a1e4f0327839c40e2e5e6d05a007ecc69911d", size = 122781, upload-time = "2026-01-21T03:57:55.912Z" },
+]
+
+[[package]]
+name = "pyserial"
+version = "3.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1e/7d/ae3f0a63f41e4d2f6cb66a5b57197850f919f59e558159a4dd3a818f5082/pyserial-3.5.tar.gz", hash = "sha256:3c77e014170dfffbd816e6ffc205e9842efb10be9f58ec16d3e8675b4925cddb", size = 159125, upload-time = "2020-11-23T03:59:15.045Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/07/bc/587a445451b253b285629263eb51c2d8e9bcea4fc97826266d186f96f558/pyserial-3.5-py2.py3-none-any.whl", hash = "sha256:c4451db6ba391ca6ca299fb3ec7bae67a5c55dde170964c7a14ceefec02f2cf0", size = 90585, upload-time = "2020-11-23T03:59:13.41Z" },
 ]
 
 [[package]]

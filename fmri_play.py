@@ -5,12 +5,11 @@ One experiment framework across backends: Atari (ALE), stable-retro consoles
 per game block in the curriculum; the experiment loop is identical for all.
 
 Usage:
-    python fmri_play.py --subject sub-01                        # built-in demo
     python fmri_play.py --subject sub-01 --curriculum my.json
-    python fmri_play.py --subject sub-01 --dummy-trigger        # testing
+    python fmri_play.py --subject sub-01 --curriculum my.json --dummy-trigger   # testing
 
 See configs/demo_mixed.json for a curriculum that mixes all three backends,
-and README.md for the curriculum schema.
+and README.md for the config schema.
 """
 
 from __future__ import annotations
@@ -18,58 +17,38 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import time
 
-from fmri_gym import Audio, Display, Session
+from fmri_gym import Audio, Display, Session, Triggers
 
 
-def build_demo_curriculum() -> list[dict]:
-    """Mixed-backend demo: an Atari game, a retro game, and a survival game.
+def load_config(path: str) -> dict:
+    """Load a config file: a dict with ``"curriculum"`` and optional sections.
 
-    All three are forgiving, free-roaming games (no instant game-over), so a
-    first-time human can actually play them.
+    ``"triggers"`` is the start sync + trigger codes (:mod:`fmri_gym.triggers`);
+    ``_``-prefixed keys are notes. One shape only -- a bare list is refused.
+
+    :param path: JSON file path.
+    :return: the config dict.
+    :raises ValueError: if the file is not a dict with a ``"curriculum"`` list.
     """
-    return [
-        {"type": "message", "text": "Pong (Atari)", "duration": 2.0},
-        {"type": "fixation", "duration": 2.0},
-        # Pong's paddle actions are RIGHT=2 / LEFT=3; remap them onto the
-        # up/down arrows, which read more naturally for a vertical paddle.
-        {"type": "game", "backend": "ale", "game": "ALE/Pong-v5", "mode": "duration",
-         "duration": 10.0, "fps": 30, "keys": {"UP": 2, "DOWN": 3}},
-
-        {"type": "message", "text": "Airstriker (Genesis)", "duration": 2.0},
-        {"type": "fixation", "duration": 2.0},
-        {"type": "game", "backend": "retro", "game": "Airstriker-Genesis-v0", "mode": "duration", "duration": 10.0, "fps": 60},
-
-        # Crafter: an open-world survival game. You wander freely (arrows move,
-        # SPACE interacts) with no instant death -- friendlier than CartPole,
-        # which topples in ~2 s. Needs `pip install crafter`.
-        {"type": "message", "text": "Crafter", "duration": 2.0},
-        {"type": "fixation", "duration": 2.0},
-        {"type": "game", "backend": "crafter", "game": "crafter", "mode": "episode",
-         "n_episodes": 1, "max_duration": 20.0, "fps": 15, "seed": 0},
-
-        {"type": "fixation", "duration": 4.0},
-        {"type": "survey", "questions": [
-            "I was fully absorbed in the games.",
-            "The games were too difficult.",
-        ]},
-    ]
-
-
-def load_curriculum(path: str) -> list[dict]:
     with open(path) as f:
-        data = json.load(f)
-    return data["curriculum"] if isinstance(data, dict) else data
+        config = json.load(f)
+    if not isinstance(config, dict) or not isinstance(config.get("curriculum"), list):
+        raise ValueError(f'{path}: expected a JSON object with a "curriculum" list')
+    return config
 
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Run any gym game as an fMRI task.")
     p.add_argument("--subject", default="sub-test")
-    p.add_argument("--curriculum")
+    p.add_argument("--curriculum", required=True, help="config JSON (see README)")
     p.add_argument("--outdir")
     p.add_argument("--size", default="1024x768")
     p.add_argument("--fullscreen", action="store_true")
+    p.add_argument("--no-vsync", action="store_true",
+                   help="do not lock flips to the monitor refresh (default: try to)")
     p.add_argument("--dummy-trigger", action="store_true")
     p.add_argument("--save-pixels", action="store_true",
                    help="ALE only: also store lossless pixels (large; warns).")
@@ -77,8 +56,8 @@ def main() -> None:
                    help="path to the language_and_experience checkout (vgdl backend)")
     args = p.parse_args()
 
-    curriculum = (load_curriculum(args.curriculum) if args.curriculum
-                  else build_demo_curriculum())
+    config = load_config(args.curriculum)
+    curriculum = config["curriculum"]
     w, h = (int(x) for x in args.size.lower().split("x"))
     outdir = args.outdir or os.path.join(
         "data", f"{args.subject}_{time.strftime('%Y%m%d-%H%M%S')}")
@@ -94,15 +73,23 @@ def main() -> None:
         if backend == "vgdl" and args.vgdl_repo:
             phase.setdefault("repo", args.vgdl_repo)
 
-    display = Display(size=(w, h), fullscreen=args.fullscreen)
+    # Triggers first: a bad section or an unopenable port stops the run here,
+    # at the desk, before any window opens -- not mid-session with a participant.
+    triggers = Triggers.from_config(config.get("triggers"))
+    print(f"triggers: {triggers.status()}", file=sys.stderr)
+    if args.dummy_trigger:
+        print("triggers: --dummy-trigger: the experimenter and scanner waits are skipped; "
+              "this is a test run, not a session", file=sys.stderr)
+    display = Display(size=(w, h), fullscreen=args.fullscreen, vsync=not args.no_vsync)
     audio = Audio()
     session = Session(args.subject, curriculum, display, outdir,
-                      audio=audio, dummy_trigger=args.dummy_trigger)
+                      audio=audio, triggers=triggers, dummy_trigger=args.dummy_trigger)
     try:
         session.run()
     finally:
         display.close()
         audio.close()
+        triggers.close()
 
 
 if __name__ == "__main__":

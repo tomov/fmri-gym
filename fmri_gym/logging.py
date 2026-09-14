@@ -52,6 +52,14 @@ class Logger:
         """
         self.manifest["phases"].append(entry)
 
+    def set_extra(self, key: str, value: Any) -> None:
+        """Store a session-level entry in the manifest (e.g. trigger settings).
+
+        :param key: top-level manifest key.
+        :param value: JSON-serializable value.
+        """
+        self.manifest[key] = value
+
     def save_game_block(
         self,
         block_index: int,
@@ -84,6 +92,8 @@ class Logger:
             truncated=np.asarray(frames["truncated"], dtype=bool),
             episode_id=np.asarray(frames["episode_id"], dtype=np.int32),
             session_time=np.asarray(frames["session_time"], dtype=np.float64),
+            # Session time of the flip that showed each frame (the onset).
+            flip_time=np.asarray(frames["flip_time"], dtype=np.float64),
             wall_time=np.asarray(frames["wall_time"], dtype=np.float64),
             # Opaque per-frame savestate blobs (object array of bytes|None).
             states=np.array(frames["state_blob"], dtype=object),
@@ -91,6 +101,16 @@ class Logger:
             backend=backend,
             game=game,
         )
+        # Per-frame trigger code sent to the recording device (0 = none);
+        # present only when a trigger backend is active.
+        if frames["trigger"]:
+            arrays["trigger"] = np.asarray(frames["trigger"], dtype=np.int16)
+        # Every key press/release during the block, stamped on arrival
+        # (~1 ms), independent of the frame grid.
+        events = frames["key_events"]
+        arrays["key_time"] = np.asarray([e[0] for e in events], dtype=np.float64)
+        arrays["key_name"] = np.asarray([e[1] for e in events], dtype=str)
+        arrays["key_down"] = np.asarray([e[2] for e in events], dtype=bool)
         # Stack every named variable the adapter surfaced (ram, obs, ...).
         for key, series in frames["variables"].items():
             try:

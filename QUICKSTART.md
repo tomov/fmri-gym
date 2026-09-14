@@ -138,7 +138,11 @@ Controls: arrows steer/accelerate/brake, SPACE fire, Z drift, X nitro.
 
 ## Tips
 
-- Useful flags: `--size 1280x1024`, `--fullscreen`.
+- Useful flags: `--size 1280x1024`, `--fullscreen`, `--no-vsync`.
+- Before a MEG/EEG session, check that flips lock to the refresh on the
+  presentation machine: `python -m fmri_gym.display --fullscreen`.
+- Once per rig, measure the flip-to-photon offset with a photodiode on the
+  screen: `python -m fmri_gym.photodiode --fullscreen` (see README "Timing").
 - Archived / unsupported configs live under `configs/dbp_games/archive/` and
   `configs/dbp_games/unsupported/` — see the README for the wider game list.
 - Per-config `_note` / `_game` fields document setup quirks for that title.
