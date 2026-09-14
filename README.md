@@ -81,6 +81,11 @@ python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/dbp_ga
 Drop `--dummy-trigger` for a real session (then press SPACE, then wait for the
 `=` scanner trigger). For VGDL setup see [Running VGDL games](#running-vgdl-games).
 
+ViZDoom and stable-retro play native audio by default. Use `--no-audio` or a
+game phase's `"audio": false` to mute playback while keeping generated ViZDoom
+PCM in the log. See [Game audio](AUDIO.md) for engine settings, frame rates,
+the retro audio demo, and recording/synchronization limits.
+
 Note: **MuJoCo and Box2D use continuous (`Box`) action spaces** — the default
 keymap pushes arrows to each dim's limit, so they render and log fine but aren't
 really human-playable without a per-game control scheme. Everything else in

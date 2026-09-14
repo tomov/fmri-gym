@@ -1,0 +1,10 @@
+{
+  "_note": "Airstriker ships with stable-retro. Audio plays by default; --no-audio mutes playback. The fps matches this Genesis core's native rate.",
+  "curriculum": [
+    {"type": "message", "text": "Airstriker: arrows move, Z fires; ESC quits.", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"type": "game", "backend": "retro", "game": "Airstriker-Genesis-v0",
+     "mode": "duration", "duration": 15.0, "fps": 59.92274340431231, "state_stride": 15},
+    {"type": "fixation", "duration": 1.0}
+  ]
+}
