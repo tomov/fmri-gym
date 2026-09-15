@@ -42,6 +42,9 @@ def get_adapter(backend: str, spec: dict) -> EnvAdapter:
     if backend in ("supertuxkart", "stk"):
         from .supertuxkart import SuperTuxKartAdapter
         return SuperTuxKartAdapter(spec)
+    if backend in ("stk_gym", "stk-gym"):
+        from .stk_gym import STKGymAdapter
+        return STKGymAdapter(spec)
     if backend == "rushhour":
         from .rushhour import RushHourAdapter
         return RushHourAdapter(spec)

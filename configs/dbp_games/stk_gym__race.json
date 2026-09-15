@@ -1,0 +1,38 @@
+{
+  "_game": "SuperTuxKart (sports/racing) -- the current game, via the stk-code fork's gym server",
+  "_note": "Build the fork: git clone -b gym-frames https://github.com/chrplr/stk-code ../stk-code && cmake -S ../stk-code -B ../stk-code/build -DCMAKE_BUILD_TYPE=Release && cmake --build ../stk-code/build -j; then pip install -e ../stk-code/python. The binary is found in the fork's build/bin, or set STK_ENV_BIN. Needs a real OpenGL display: the game renders into a hidden window and every frame is read back and shown here; it does not work under SDL_VIDEODRIVER=dummy or with --render-driver=vulkan.",
+  "_keys_note": "MultiKeySpec: the env's action is the 8-vector of keys held [LEFT, RIGHT, UP, DOWN, N, V, SPACE, BACKSPACE] = [left, right, up, down, nitro, skid, fire, rescue] (SuperTuxKart's own bindings), and the game's player controller turns it into controls. A 'keys' override maps a key name to such a vector, e.g. {\"Z\": [0,0,0,0,0,1,0,0]} to skid with Z; keep the Controls text in sync by hand.",
+  "_timing_note": "The game is lock-stepped: one step per frame, frame_skip physics ticks (120 Hz) per step, so fps must equal 120 / frame_skip; the adapter refuses otherwise. Measured 2.5 ms per step at 640x360 with four karts on an Intel Arc laptop.",
+  "_logging_note": "Per frame: actions (the 8-vector), reward (progress, metres), and every SAMPLE_FIELDS column from stk_gym: tick/time/phase, speed, x/y/z, heading, distance_down_track, distance_to_center, on_road/on_ground/wrong_way, rank, finished_laps, powerup, nitro_energy, progress_m, ctrl_* (the controls the kart applied). Frames are shown, not stored. A block replays from episode_seeds + actions with the same track, karts, seed and binary: python ../stk-code/python/examples/replay_log.py <block.npz>.",
+  "curriculum": [
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "SuperTuxKart",
+        "",
+        "Race to the finish! Steer around the track and",
+        "beat the other karts across the line.",
+        "",
+        "Controls:",
+        "   UP             accelerate",
+        "   DOWN           brake / reverse",
+        "   LEFT / RIGHT   steer",
+        "   SPACE          fire item",
+        "   V              skid",
+        "   N              nitro (boost)",
+        "   BACKSPACE      rescue",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {"type": "fixation", "duration": 1.0},
+    {
+      "type": "game", "backend": "stk_gym", "game": "supertuxkart",
+      "track": "hacienda", "laps": 3, "num_karts": 4, "difficulty": 1,
+      "screensize": "640x360", "frame_skip": 2, "seed": 1,
+      "mode": "duration", "duration": 300.0, "fps": 60
+    },
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

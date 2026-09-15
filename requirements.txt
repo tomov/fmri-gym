@@ -22,6 +22,7 @@ pystk2-gymnasium       # `supertuxkart` backend (3D racing; NEEDS a real GL disp
 rushhour-gym>=0.6.0    # `rushhour` backend (sliding-block puzzle; fetches its Go engine on first use)
 
 # From non-PyPI sources / needing a toolchain (see each config's _note):
+#   stk_gym    -> the chrplr/stk-code fork (branch gym-frames): build it (cmake), then pip install -e <fork>/python
 #   baba       -> pip install "git+https://github.com/nacloos/baba-is-ai.git"
 #   craftium   -> pip install the prebuilt wheel from github.com/mikelma/craftium releases
 #                 (pins gymnasium 0.29 but runs on 1.2)

@@ -18,6 +18,7 @@ _PYGAME_KEY_NAMES = {
     pygame.K_RIGHT: "RIGHT",
     pygame.K_SPACE: "SPACE",
     pygame.K_RETURN: "RETURN",
+    pygame.K_BACKSPACE: "BACKSPACE",
     pygame.K_TAB: "TAB",
     pygame.K_LSHIFT: "LSHIFT",
     pygame.K_a: "A",
