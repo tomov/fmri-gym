@@ -268,6 +268,7 @@ class Session:
         seed: int,
         episode_id: int,
         turn_based: bool,
+        latched: bool,
         dt: float,
         state_stride: int,
         block_end: float,
@@ -279,6 +280,7 @@ class Session:
         :param seed: RNG seed for this episode's ``reset``.
         :param episode_id: index of this episode within the game block.
         :param turn_based: if True, advance only on mapped keydowns.
+        :param latched: real-time only: let a fresh keydown win over held keys.
         :param dt: target seconds per frame (``1 / fps``).
         :param state_stride: save a full state blob every this many frames.
         :param block_end: ``perf_counter`` deadline for the game block.
@@ -288,7 +290,8 @@ class Session:
         terminated = truncated = False
         ep_frame = 0
         next_t = time.perf_counter()
-        key_to_action = adapter.keyspec.key_to_action_map() if turn_based else {}
+        key_to_action = (adapter.keyspec.key_to_action_map()
+                         if turn_based or latched else {})
 
         ## Reset environment and show initial state
         obs, info = adapter.reset(seed)
@@ -311,9 +314,15 @@ class Session:
                 if action is None:
                     continue                    # no press -> don't step
             else:
-                if _check_quit():
+                # Real time: step every frame. `key_to_action` is empty unless
+                # the phase asked for latched keys, and then this is just
+                # _check_quit(); when it is filled, a keydown seen during this
+                # frame wins and a tap shorter than dt is no longer dropped.
+                action, user_quit = _get_action(key_to_action)
+                if user_quit:
                     return True
-                action = adapter.keyspec.resolve(held_key_names())
+                if action is None:
+                    action = adapter.keyspec.resolve(held_key_names())
 
             obs, reward, terminated, truncated, info = adapter.step(action)
             # Anchor a full savestate at episode start and every stride.
@@ -348,7 +357,7 @@ class Session:
 
         :param phase: game-phase config (``backend``, ``game``, ``mode``,
             ``duration`` / ``n_episodes``, ``fps``, ``seed``, ``state_stride``,
-            ``turn_based``, optional ``keys`` overrides, …).
+            ``turn_based``, ``latched_keys``, optional ``keys`` overrides, …).
         :param index: phase index in the curriculum (for the manifest).
         :raises KeyboardInterrupt: if the subject quits mid-block.
         """
@@ -373,6 +382,13 @@ class Session:
         # for e.g. FrozenLake is action 0 = LEFT), so the agent "moves on its own"
         # and a single held key fires many times. turn_based fixes both.
         turn_based = bool(phase.get("turn_based", False))
+        # Real-time blocks poll HELD keys, so a press that starts and ends
+        # between two frames is never seen -- at a grid world's few frames per
+        # second that loses most taps. `latched_keys` lets a fresh keydown win
+        # instead, falling back to the held-key poll (so holding a key still
+        # repeats). Off by default: backends whose actions are key COMBINATIONS
+        # must keep polling, and this is exactly what they do today.
+        latched = bool(phase.get("latched_keys", False))
 
         # Some backends (nle, browser games) take several seconds to start;
         # show a Loading screen so the previous fixation "+" doesn't freeze.
@@ -396,8 +412,8 @@ class Session:
             user_quit = self._episode(
                 adapter, frames,
                 seed=base_seed + episode_id, episode_id=episode_id,
-                turn_based=turn_based, dt=dt, state_stride=state_stride,
-                block_end=block_end)
+                turn_based=turn_based, latched=latched, dt=dt,
+                state_stride=state_stride, block_end=block_end)
             # An episode's last sounds are still queued when it ends; drop them
             # so they do not play over the next episode or the next fixation.
             self.audio.stop()

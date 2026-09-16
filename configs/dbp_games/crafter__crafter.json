@@ -1,8 +1,10 @@
 {
   "_game": "Crafter",
-  "_note": "pip install crafter.",
-  "_keys_note": "Crafter's Discrete(17) map is 0=noop, 1=move_left, 2=move_right, 3=move_up, 4=move_down, 5=do, 6=sleep, 7=place_stone, 8=place_table, 9=place_furnace, 10=place_plant, 11=make_wood_pickaxe, 12=make_stone_pickaxe, 13=make_iron_pickaxe, 14=make_wood_sword, 15=make_stone_sword, 16=make_iron_sword. Curriculum 'keys' are Discrete action indices (same as the adapter default). Place/make are reachable by extending 'keys'. Keep the message Controls text in sync with 'keys' by hand.",
+  "_note": "pip install crafter. This is the paradigm's level 4 (survival), which is stock crafter: hostiles on, health/food/drink/energy decay, death ends the episode, nothing hidden from the HUD. Levels 1-3 freeze or remove parts of that and belong in a gymnasium.Wrapper shipped with the env, not here: an adapter that added them would stop humans and models from playing the same game.",
+  "_keys_note": "Crafter's Discrete(17) map is 0=noop, 1=move_left, 2=move_right, 3=move_up, 4=move_down, 5=do, 6=sleep, 7=place_stone, 8=place_table, 9=place_furnace, 10=place_plant, 11=make_wood_pickaxe, 12=make_stone_pickaxe, 13=make_iron_pickaxe, 14=make_wood_sword, 15=make_stone_sword, 16=make_iron_sword. Curriculum 'keys' are Discrete action indices and here they restate the adapter default, so all 17 actions are reachable; noop is 'no key held'. On a button box with fewer buttons, cut 'keys' down and cut the Controls text with it, by hand.",
   "_keys_reference": "https://github.com/danijar/crafter/blob/master/crafter/data.yaml",
+  "_pacing_note": "fps is the env step rate, so it sets how fast the survival clock runs against scanner time. 5 is what crafter's own interactive player uses (run_gui.py, --fps default 5), which is the only human-play cadence the engine actually documents; slowing to 2.5 buys 400 ms a decision at the cost of halving the game clock, so treat it as a knob rather than a constant. turn_based is false on purpose: with hostiles and homeostatic decay, freezing the world until the subject presses a key would remove the survival pressure and decouple game time from scanner time. latched_keys makes each frame prefer a fresh keydown over the held-key poll, so a tap shorter than one frame is not dropped, which is what run_gui.py does. One action per frame, last press wins.",
+  "_state_note": "state_stride 50 = one pickled savestate (~145 KB) every 10 s at 5 fps, counted per episode; a measured 300 s block held 36 anchors, 5.2 MB raw and 0.7 MB inside the compressed npz. Each is an exact branch point for analysis or a model rollout. log_frames stores the displayed pixels too, zlib'd per frame (6.5 KB median in daylight, ~5 ms of the 200 ms frame; crafter mixes per-pixel noise into the view at night, so night frames reach 210 KB, and the measured block came to 1506 frames / 30 MB of pixels in a 27 MB npz). They are stored because stock crafter does NOT replay exactly: it rebalances creatures every tenth step by iterating a Python set of objects, so the despawn choice follows object id() and two runs of the same seed and actions diverge from step 10 on (terrain is identical; creatures are not). Sorting that list by position fixes it, which is a one-line change to crafter itself and belongs in a fork shared with the model harness. Until that lands, the stored frames rather than a replay are the record of what the subject saw.",
   "curriculum": [
     {
       "type": "message",
@@ -11,12 +13,15 @@
         "Crafter",
         "",
         "Open-world survival. Gather materials, craft",
-        "tools, and stay alive.",
+        "tools, eat, drink, sleep, and stay alive.",
         "",
         "Controls:",
-        "   ARROWS   move",
-        "   SPACE    interact / attack / collect",
-        "   S        sleep",
+        "   ARROWS      move",
+        "   SPACE       interact / attack / collect",
+        "   S           sleep",
+        "   R T F P     place stone / table / furnace / plant",
+        "   1 2 3       make wood / stone / iron pickaxe",
+        "   4 5 6       make wood / stone / iron sword",
         "",
         "(press SPACE to start)"
       ]
@@ -24,9 +29,15 @@
     {"type": "fixation", "duration": 1.0},
     {
       "type": "game", "backend": "crafter", "game": "crafter",
-      "env_kwargs": {"size": [512, 512]},
-      "keys": {"LEFT": 1, "RIGHT": 2, "UP": 3, "DOWN": 4, "SPACE": 5, "S": 6},
-      "mode": "duration", "duration": 300.0, "fps": 15, "turn_based": true, "seed": 0
+      "env_kwargs": {"size": [384, 384], "length": 0},
+      "keys": {
+        "LEFT": 1, "RIGHT": 2, "UP": 3, "DOWN": 4, "SPACE": 5, "S": 6,
+        "R": 7, "T": 8, "F": 9, "P": 10,
+        "1": 11, "2": 12, "3": 13, "4": 14, "5": 15, "6": 16
+      },
+      "mode": "duration", "duration": 300.0, "fps": 5,
+      "turn_based": false, "latched_keys": true,
+      "state_stride": 50, "log_frames": true, "seed": 0
     },
     {"type": "fixation", "duration": 2.0}
   ]

@@ -110,10 +110,20 @@ right. There is no test suite yet; a run against a real config is the test.
   key set. Please avoid writing a fourth one unless the three don't fit.
 - **Copy observations you keep.** Several envs reuse their observation buffers, so
   `capture` must `.copy()` anything it stores (see `minihack.py`).
+- **`render()` is not always free of side effects.** If it draws from the same RNG the
+  dynamics use, an extra render shifts every later draw and the run silently stops matching
+  its own log. Return the frame `step` already produced, and if you must render out of band
+  (`restore`), save and restore the RNG around it — crafter's night noise is the live example.
 - **Reproducibility is the product.** A block must be replayable from
   `episode_seeds` + `actions`. If the env has no savestate, leave `blob=None` and make sure
-  `reset(seed=...)` really determines the episode.
+  `reset(seed=...)` really determines the episode. **Test it rather than assume it**: replay
+  one recorded block twice and compare the frames bit-for-bit. Crafter passes every surface
+  check (a seed argument, a seeded `RandomState`, deterministic worldgen) and still diverges
+  after ten steps, because one creature list is built from a Python `set`.
 - **Turn-based games** (grid worlds, puzzles) need `"turn_based": true` in the config. 
+- **Slow real-time games** (a grid world that must keep ticking, so `turn_based` is out) need
+  `"latched_keys": true`: the default real-time path polls *held* keys, and at a few frames
+  per second a tap that begins and ends between two frames is never seen.
 
 ## Widely accepted references
 

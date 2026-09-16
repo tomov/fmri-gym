@@ -352,13 +352,17 @@ An ordered JSON list of **phases** (bare list or `{"curriculum": [...]}`):
  "max_duration": 300.0,         // hard wall-clock safety cap (episode mode)
  "fps": 30,                     // target game frames/second
  "turn_based": false,           // step only on a key PRESS, not per frame (grid/toy_text games)
+ "latched_keys": false,         // real-time: a fresh key PRESS beats the held-key poll, so a
+                                //   tap shorter than one frame is not dropped (slow-fps games)
  "seed": 1234,                  // base RNG seed (optional)
  "state_stride": 1,             // save a full savestate every K frames (see below)
  "state": "Level1",             // retro: named savestate/level (optional)
  "scenario": null,              // retro: scenario name (optional)
  "level": 0,                    // vgdl: level index; also uses "game","block_size"
  "keys": {"LEFT": 0, "RIGHT": 1}, // override keyboard->action map (see below)
- "save_pixels": false}          // ALE: also store lossless pixels (see warning)
+ "save_pixels": false,          // ALE: also store lossless pixels (see warning)
+ "log_frames": false}           // crafter: store the displayed frame (zlib) every frame,
+                                //   because crafter does not replay exactly (see below)
 ```
 
 ### Keymaps
@@ -465,6 +469,25 @@ r.unwrapped.em.set_state(d["states"][10]); r.unwrapped.data.update_ram()
 > Measured on Airstriker-Genesis: a 1.5 s @60 fps block drops from **780 KB →
 > 86 KB with `state_stride: 15`** (~9×). Analysis variables (RAM, `info_*`) are
 > always logged every frame regardless of stride.
+>
+> ⚠️ **Crafter is the exception: it does not replay exactly.** Every tenth step
+> it rebalances creatures per chunk by iterating a Python *set* of objects, so
+> which animal is despawned follows object `id()` and two runs of the same seed
+> and action list diverge from step 10 onwards (the terrain is identical; the
+> creatures are not; measured 2026-09-15). Sorting that list by position makes
+> 300 random-action steps bit-identical, which is a one-line fix to crafter
+> itself and belongs in a fork shared with the model-evaluation harness. Until
+> then set **`"log_frames": true`** on a crafter phase: the displayed frame is
+> zlib'd into `frame_zlib` every frame, and those pixels rather than a replay
+> are the record of what the subject saw. Measured on a real 300 s @5 fps block
+> at size 384: 6.5 KB and ~5 ms for a median daylit frame, but crafter mixes
+> per-pixel noise into the view at night, so night frames reach 210 KB and the
+> block came to **1506 frames / 30 MB of pixels in a 27 MB npz**. Decode with
+> `np.frombuffer(zlib.decompress(blob.tobytes()), np.uint8).reshape(frame_shape)`.
+> That same night noise is drawn from the RNG the creatures use, so an *extra*
+> `render()` outside the step loop shifts every later draw; the adapter returns
+> the frame `step` already made, and puts the RNG back around the one render
+> `restore` needs.
 >
 > ⚠️ **`--save-pixels` (ALE)** stores the screen every frame. It's lossless
 > (indexed palette; `palette[screen_index] == RGB`) and zlib-friendly
