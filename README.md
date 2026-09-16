@@ -306,7 +306,9 @@ fmri_gym/
     nethack.py      # base NLE: TTY grid -> RGB; vi-key movement; blstats
     aigamestore.py  # p5.js browser games via Playwright: canvas->RGB, getGameState
     rushhour.py     # Go engine via rushhour-gym; select+slide UI, rushui look, Rush-Hour's log columns; one puzzle per block
-fmri_play.py        # CLI entry point
+  policies.py       # what plays a block when nobody is at the keyboard
+fmri_play.py        # CLI entry point: a person in the scanner
+agent_play.py       # CLI entry point: a policy on the same config and seeds
 configs/            # example curricula
 vendor/aigamestore/ # the 10 public AI GameStore games (p5.js/HTML/JS)
 ```
@@ -361,8 +363,8 @@ An ordered JSON list of **phases** (bare list or `{"curriculum": [...]}`):
  "level": 0,                    // vgdl: level index; also uses "game","block_size"
  "keys": {"LEFT": 0, "RIGHT": 1}, // override keyboard->action map (see below)
  "save_pixels": false,          // ALE: also store lossless pixels (see warning)
- "log_frames": false}           // crafter: store the displayed frame (zlib) every frame,
-                                //   because crafter does not replay exactly (see below)
+ "log_frames": false,           // crafter: store the displayed frame (zlib) every frame
+ "show_score": false}           // crafter: draw the achievement count beside the frame
 ```
 
 ### Keymaps
@@ -470,19 +472,24 @@ r.unwrapped.em.set_state(d["states"][10]); r.unwrapped.data.update_ram()
 > 86 KB with `state_stride: 15`** (~9×). Analysis variables (RAM, `info_*`) are
 > always logged every frame regardless of stride.
 >
-> ⚠️ **Crafter is the exception: it does not replay exactly.** Every tenth step
-> it rebalances creatures per chunk by iterating a Python *set* of objects, so
-> which animal is despawned follows object `id()` and two runs of the same seed
-> and action list diverge from step 10 onwards (the terrain is identical; the
-> creatures are not; measured 2026-09-15). Sorting that list by position makes
-> 300 random-action steps bit-identical, which is a one-line fix to crafter
-> itself and belongs in a fork shared with the model-evaluation harness. Until
-> then set **`"log_frames": true`** on a crafter phase: the displayed frame is
-> zlib'd into `frame_zlib` every frame, and those pixels rather than a replay
-> are the record of what the subject saw. Measured on a real 300 s @5 fps block
-> at size 384: 6.5 KB and ~5 ms for a median daylit frame, but crafter mixes
-> per-pixel noise into the view at night, so night frames reach 210 KB and the
-> block came to **1506 frames / 30 MB of pixels in a 27 MB npz**. Decode with
+> ⚠️ **Crafter replays only on a fork.** Every tenth step stock crafter
+> rebalances creatures per chunk by iterating a Python *set* of objects, so which
+> animal is despawned follows object `id()` and two runs of the same seed and
+> action list diverge (the terrain is identical; the creatures are not; measured
+> 2026-09-15: step 69 of a 300-action check). Sorting that list by position is
+> the whole fix, and it lives in
+> [`chengfanbrain/crafter@deterministic`](https://github.com/chengfanbrain/crafter/tree/deterministic):
+> `pip install 'crafter @ git+https://github.com/chengfanbrain/crafter.git@deterministic'`.
+> On that build a measured 300 s block replayed all 6 episodes from
+> `episode_seeds` + `actions` into both the logged symbolic state and the logged
+> pixels, and all **33/33** savestate anchors restored and played their episode
+> out identically. Keep **`"log_frames": true`** on a crafter phase regardless:
+> the displayed frame is zlib'd into `frame_zlib` every frame, and those pixels
+> are the record that does not depend on whoever opens the block later having
+> the fork installed. Measured on a real 300 s @2.5 fps block at size 384:
+> 7.0 KB for a median daylit frame, but crafter mixes per-pixel noise into the
+> view at night, so the 34 night frames reached 189 KB and the block came to
+> **756 frames / 11.2 MB of pixels in a 10.2 MB npz**. Decode with
 > `np.frombuffer(zlib.decompress(blob.tobytes()), np.uint8).reshape(frame_shape)`.
 > That same night noise is drawn from the RNG the creatures use, so an *extra*
 > `render()` outside the step loop shifts every later draw; the adapter returns
@@ -493,6 +500,34 @@ r.unwrapped.em.set_state(d["states"][10]); r.unwrapped.data.update_ram()
 > (indexed palette; `palette[screen_index] == RGB`) and zlib-friendly
 > (~0.25 KB/frame) — but unnecessary, since per-frame state already
 > reconstructs pixels. Prints a loud warning when enabled.
+
+## Playing a block with a model
+
+`agent_play.py` runs the same curriculum with a policy where `fmri_play.py` puts
+a person. It shares everything that defines the task — the config, the adapter,
+the episode seeds, the logger and its npz schema — and none of the session loop,
+which exists for a scanner (trigger wait, fps pacing, a window, a key queue).
+
+```sh
+python agent_play.py --curriculum configs/dbp_games/crafter__crafter.json \
+    --policy random --outdir data/model-random --n-episodes 2 --max-frames 60
+python agent_play.py --curriculum configs/dbp_games/crafter__crafter.json \
+    --policy vlm --model claude-sonnet-5 --history 4 --max-frames 60
+```
+
+The output npz has the **same 21 fields as a human block**, plus `policy` and
+`policy_model`, so one analysis reads both. Episode seeds are the block's own
+(`seed` + episode index): the model plays the worlds the subject played.
+
+A policy is given the frame the display would have shown, the key table the
+subject was taught, and the status lines the subject could read beside the frame
+— nothing else. `--history` fixes how many recent frames and past keys a VLM
+policy sees; it is the one asymmetry against a human watching a continuous
+stream, so set it in advance and report it rather than tuning it against scores.
+
+Rolling a model out from a *human's* savestate anchor, or reading a VLM's
+forward pass over a human's frames, both consume these npz files from outside
+and are deliberately not part of this repo.
 
 ## Migrating your game list
 

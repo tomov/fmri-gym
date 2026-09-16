@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 BG_COLOR = (0, 0, 0)
 TEXT_COLOR = (220, 220, 220)
 FIX_COLOR = (255, 255, 255)
+HUD_COLOR = (235, 235, 235)
 
 
 class Display:
@@ -48,6 +49,7 @@ class Display:
         self.size = self.screen.get_size()
         self.font = pygame.font.Font(pygame.font.get_default_font(), 28)
         self.fix_font = pygame.font.Font(pygame.font.get_default_font(), 80)
+        self.hud_font = pygame.font.Font(pygame.font.get_default_font(), 24)
 
     def ensure(self) -> None:
         """Re-create the window if pygame display was torn down.
@@ -58,10 +60,15 @@ class Display:
         if not pygame.display.get_init() or not pygame.get_init():
             self._init_display()
 
-    def draw_frame(self, rgb: np.ndarray) -> None:
+    def draw_frame(
+        self, rgb: np.ndarray, overlay: list[str] | None = None
+    ) -> None:
         """Blit an RGB frame, aspect-fit and centered with black pad.
 
         :param rgb: frame array shaped ``(H, W, 3)``.
+        :param overlay: optional short status lines to draw alongside the
+            frame; ``None`` (the default) draws the frame alone, exactly as
+            before this argument existed.
         """
         self.screen.fill(BG_COLOR)
         h, w = rgb.shape[:2]
@@ -71,7 +78,36 @@ class Display:
         surf = pygame.transform.scale(surf, (dw, dh))
         rect = surf.get_rect(center=(self.size[0] // 2, self.size[1] // 2))
         self.screen.blit(surf, rect.topleft)
+        if overlay:
+            self._draw_overlay(overlay, rect)
         pygame.display.flip()
+
+    def _draw_overlay(self, lines: list[str], rect: pygame.Rect) -> None:
+        """Draw status lines in the letterbox margin, or over the frame.
+
+        Aspect-fitting a square frame into a 4:3 window leaves a black bar on
+        each side, and text there covers no pixel the subject is playing on.
+        That matters beyond tidiness: whatever the overlay says has to be
+        state the env already reports, so the model harness sees the same
+        numbers, and it must not hide game content from one side of the
+        comparison. Lines are wrapped to the bar, so split long labels on
+        spaces rather than underscores. A frame that fills the window has no
+        bar; then the text lands top-left over the frame, on a black box so it
+        stays readable.
+
+        :param lines: short status strings, already formatted by the adapter.
+        :param rect: rect the frame was blitted into, i.e. where the bar ends.
+        """
+        pad = 8
+        column = rect.left if rect.left > 4 * pad else self.size[0]
+        y = pad
+        for raw in lines:
+            for line in self._wrap(self.hud_font, raw, column - 2 * pad):
+                surf = self.hud_font.render(line, True, HUD_COLOR)
+                box = surf.get_rect(topleft=(pad, y))
+                self.screen.fill(BG_COLOR, box)
+                self.screen.blit(surf, box)
+                y += self.hud_font.get_height()
 
     def _wrap(self, font: pygame.font.Font, line: str, max_w: int) -> list[str]:
         """Word-wrap one logical line so no rendered line exceeds ``max_w`` px.

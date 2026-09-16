@@ -25,20 +25,26 @@ Two traps, both about reproducibility:
   death. If a config does set a cap, the step-limit case is reported as
   `truncated` and only death as `terminated`.
 
-Seed + actions do NOT replay crafter exactly, and that is an engine bug rather
-than a rig one. Every tenth step `Env.step` rebalances creatures per chunk, and
-`World.chunks` holds each chunk's objects in a Python *set*; set order follows
-object id(), so the despawn pick `creatures[random.randint(...)]` lands on a
-different animal between two runs of the same seed and actions. Measured
-2026-09-15: terrain is bit-identical (worldgen is seeded properly) while
-creatures, and with them the rendered frame, diverge from step 10 onwards.
-Sorting that list by position makes 300 random-action steps bit-identical, so
-the one-line fix belongs in a crafter fork the model harness uses too. Until
-then `log_frames` is the honest answer: the stored pixels, not a replay, are
-the record of what the subject saw. Cost, measured on a real 300 s block at
-5 fps (1506 frames, size 384): 6.5 KB and ~5 ms for a median daylit frame, but
-crafter mixes per-pixel noise into the view at night, so night frames run to
-210 KB and the block totals 30 MB of frames inside a 27 MB npz.
+Seed + actions replay crafter exactly, but only on a fork, because the bug this
+config works around is an engine one rather than a rig one. Every tenth step
+`Env.step` rebalances creatures per chunk, and `World.chunks` holds each chunk's
+objects in a Python *set*; set order follows object id(), so the despawn pick
+`creatures[random.randint(...)]` lands on a different animal between two runs of
+the same seed and actions. Terrain is bit-identical either way, since worldgen is
+seeded properly; creatures, and with them the rendered frame, are not. Sorting
+that list by position is the whole fix, and this config expects it:
+
+    pip install git+https://github.com/chengfanbrain/crafter.git@deterministic
+
+Measured 2026-09-15. Stock 1.8.3 leaves its own trajectory at step 69 of a
+300-random-action replay; on the fork, every one of the 6 episodes in a real
+300 s block replayed from `episode_seeds` + `actions` into both the logged
+symbolic state and the logged pixels, bit for bit. `log_frames` stays on anyway:
+the stored frames are the record that does not depend on whoever opens the block
+later having the right build installed. Cost at 2.5 fps (756 frames, size 384):
+7.0 KB for a median daylit frame, but crafter mixes per-pixel noise into the view
+at night, so that block's 34 night frames ran to 189 KB and the frames totalled
+11.2 MB inside a 10.2 MB npz.
 
 Rendering is not side-effect free at night, which is a second trap. That noise
 is drawn from `world.random`, the same stream the creatures use, so any render
@@ -48,17 +54,17 @@ frame `step` already produced rather than calling the engine again, and
 restoring a night anchor and stepping to the end of the episode reproduces the
 log exactly, and does not if one extra render is inserted first.
 
-Crafter has no savestate API, but the whole Env pickles to ~145 KB in ~1.3 ms,
-so `capture` returns that blob and `restore` loads it. A restored copy renders
-the same frame bit-for-bit by day; at night only the state is preserved, since
-the noise is a fresh draw. Storing one per frame would cost ~220 MB a block,
-hence `state_stride` in the config (50 = one anchor every 10 s at 5 fps, counted
-per episode). An anchor is an exact snapshot -- all 36 in the measured block
-restored to a bit-identical state -- and so a sound branch point for analysis or
-a model rollout. It is not a way to recompute the frames after it: unpickling
-gives the objects new id()s, so 21 of those 36 continuations left the log at the
-next creature rebalance, 9 to 109 steps on. The same one-line sort fixes that
-case too (verified 2026-09-15).
+Crafter has no savestate API, but the whole Env pickles to ~195 KB in ~1.2 ms
+(and loads back in ~7.7 ms), so `capture` returns that blob and `restore` loads
+it. Storing one per frame would cost ~147 MB a block, hence `state_stride` in
+the config (25 = one anchor every 10 s at 2.5 fps, counted per episode). On the
+fork an anchor is a real branch point: all 33 in the measured block restored and
+then played their episode out with every frame and every semantic grid identical
+to the seed replay, which is what a model rollout from a subject's own state
+needs. On stock crafter most of them do not, because unpickling gives the objects
+new id()s and the next rebalance picks a different animal. A restored copy also
+re-renders the same frame bit-for-bit by day; at night only the state is
+preserved, since the noise is a fresh draw (4 of those 33 anchors).
 
 `info` carries the whole symbolic state -- 16 inventory counters (health, food,
 drink, energy, then materials and tools), 22 achievement counters, the player's
@@ -67,6 +73,12 @@ four and `block_extra` ships the tables that decode them.
 
 Crafter ships no sound at all (56 assets, every one a PNG), so `sound` is left
 at the base class's None and nothing is played for these blocks.
+
+The env's HUD covers inventory and the four status bars but not the achievement
+count, so `show_score` turns on an `overlay` that puts it in the letterbox bar
+beside the frame. It reports only what `info` already carries, which is what
+keeps humans and models on the same game: `agent_play.py` hands a policy the
+same lines as text.
 """
 
 from __future__ import annotations
@@ -118,10 +130,15 @@ class CrafterAdapter(EnvAdapter):
     name: str = "crafter"
 
     def _make(self, spec: dict) -> Any:
+        import crafter
         # Built here so `env` is valid before the first reset; reset() then
         # rebuilds it per episode from that episode's seed.
         self._kwargs = dict(spec.get("env_kwargs", {}))
         self._log_frames = bool(spec.get("log_frames", False))
+        self._show_score = bool(spec.get("show_score", False))
+        self._n_achievements = len(crafter.constants.achievements)
+        self._unlocked: set[str] = set()
+        self._last_unlock: str | None = None
         self._last_obs = None
         return self._build(spec.get("seed"))
 
@@ -143,12 +160,15 @@ class CrafterAdapter(EnvAdapter):
         """
         if seed is not None:
             self.env = self._build(seed)
+        self._unlocked = set()
+        self._last_unlock = None
         self._last_obs = np.asarray(self.env.reset())
         return self._last_obs, {}
 
     def step(self, action: Any) -> tuple[Any, float, bool, bool, dict]:
         obs, reward, done, info = self.env.step(int(action))
         self._last_obs = np.asarray(obs)
+        self._note_unlocks(info["achievements"])
         # crafter's `done` is death OR its own step cap; only death is terminal,
         # and health rides along in `info`, so the two are separable here.
         alive = info["inventory"]["health"] > 0
@@ -158,6 +178,39 @@ class CrafterAdapter(EnvAdapter):
         # obs IS the RGB frame, and re-rendering it would consume the world RNG
         # after dark (see the module docstring), so hand back what step made.
         return self._last_obs
+
+    def _note_unlocks(self, achievements: dict) -> None:
+        """Track which achievements are unlocked, and the newest one.
+
+        :param achievements: crafter's per-achievement counts for this frame.
+        """
+        unlocked = {name for name, n in achievements.items() if n > 0}
+        new = unlocked - self._unlocked
+        if new:
+            # Two can land on one step (eat_cow completes collect_drink's
+            # sibling, say); taking the min just makes the pick reproducible.
+            self._last_unlock = min(new)
+        self._unlocked = unlocked
+
+    def overlay(self) -> list[str] | None:
+        """Score lines for the display margin, when the config asks for them.
+
+        Crafter draws its own HUD -- four status bars and the inventory -- but
+        never the achievement count, which is the score its paper reports and
+        the only feedback that the tech tree moved. A subject who cannot see it
+        is guessing. The numbers come straight out of the ``info`` dict the env
+        already returns every step, so the model harness reads the identical
+        values and rule 1 holds: this shows env state, it does not add any.
+
+        :return: the lines to draw, or ``None`` when ``show_score`` is off.
+        """
+        if not self._show_score:
+            return None
+        lines = ["SCORE", f"{len(self._unlocked)} / {self._n_achievements}"]
+        if self._last_unlock:
+            # Underscores would not wrap inside the 128 px bar; spaces do.
+            lines += ["", "LAST", self._last_unlock.replace("_", " ")]
+        return lines
 
     def capture(
         self, obs: Any, info: dict, want_blob: bool = True
