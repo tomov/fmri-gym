@@ -118,8 +118,11 @@ right. There is no test suite yet; a run against a real config is the test.
   `episode_seeds` + `actions`. If the env has no savestate, leave `blob=None` and make sure
   `reset(seed=...)` really determines the episode. **Test it rather than assume it**: replay
   one recorded block twice and compare the frames bit-for-bit. Crafter passes every surface
-  check (a seed argument, a seeded `RandomState`, deterministic worldgen) and still diverges
-  after ten steps, because one creature list is built from a Python `set`.
+  check (a seed argument, a seeded `RandomState`, deterministic worldgen) and still diverged,
+  because one creature list is built from a Python `set` and the despawn pick therefore
+  follows object `id()`. Sorting that list is the whole fix, and it lives in a fork the config
+  names (`chengfanbrain/crafter@deterministic`), not in the adapter: when the bug is in the
+  engine, fix the engine and pin the build, or the rig starts owning game behaviour.
 - **Turn-based games** (grid worlds, puzzles) need `"turn_based": true` in the config. 
 - **Slow real-time games** (a grid world that must keep ticking, so `turn_based` is out) need
   `"latched_keys": true`: the default real-time path polls *held* keys, and at a few frames
