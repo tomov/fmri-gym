@@ -78,12 +78,17 @@ class EnvAdapter:
 
         :param spec: game-phase config dict from the curriculum (already
             validated for the keys this backend cares about).
+        :raises ValueError: if the resulting keymap is empty, which would leave
+            the subject with a game that ignores every key.
         """
         self.spec = spec
         self.env = self._make(spec)
         self.keyspec = self._keyspec()
         if spec.get("keys"):
             self.keyspec.apply_overrides(spec["keys"])
+        if not self.keyspec.combos:
+            raise ValueError(f"{type(self).__name__} has no key bindings: the "
+                             'adapter declared none and the phase has no "keys"')
 
     def _make(self, spec: dict) -> Any:
         """Create and return the underlying engine env for one game block.

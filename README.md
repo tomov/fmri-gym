@@ -388,8 +388,10 @@ which differ only in how they combine the matching combos:
 ### Remapping keys (the `keys` field)
 
 Any game phase can override the mapping with a `keys` dict of
-`"<key(s)>": <action>`. The keys are pygame names (`UP`, `DOWN`, `LEFT`,
-`RIGHT`, `SPACE`, `RETURN`, letters `A`–`Z`, digits) and `<action>` is the
+`"<key(s)>": <action>`. The keys come from the vocabulary in `fmri_gym/keys.py`
+(`UP`, `DOWN`, `LEFT`, `RIGHT`, `SPACE`, `RETURN`, `TAB`, `LSHIFT`, `COMMA`,
+`PERIOD`, letters `A`–`Z`, digits `0`–`9`); an unknown name raises when the
+block starts rather than going unnoticed. `<action>` is the
 action the env expects — an **integer** for a `Discrete` space (ale, gym,
 vgdl, …). Combine keys with `+` (e.g. `"UP+SPACE"`). A combo overrides its
 parts: with `SingleKeySpec` the most specific fully-held combo wins, and with
