@@ -16,7 +16,7 @@ from __future__ import annotations
 import sys
 import time
 from collections import defaultdict
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 import pygame
 
@@ -81,6 +81,13 @@ def _check_quit() -> bool:
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             return True
     return False
+
+
+def _stall_warning(stall: dict) -> str:
+    """The console warning for a block that dropped stalls (see ``Session.stalls``)."""
+    return (f"WARNING pacing: block {stall['phase']} ({stall['game']}) stalled {stall['n']}x, "
+            f"longest {stall['longest_ms']:.0f} ms late: its frames fell behind schedule there "
+            "(pacing_reset_time in its npz)")
 
 
 def _poll_keys_until(
@@ -150,7 +157,7 @@ def _wait_for_char(display: Display, char: str, dummy_trigger: bool = False) -> 
         display.idle(time.perf_counter() + 0.005, poll=0.005)
 
 
-def _join_multiline_text(text: Union[str, list, tuple]) -> str:
+def _join_multiline_text(text: str | list | tuple) -> str:
     """Normalize message ``text`` to a single string.
 
     Accepts a plain string or a list/tuple of lines (joined with ``\\n``), so
@@ -211,7 +218,9 @@ class Session:
         self.logger = Logger(outdir, subject, curriculum, self.clock)
         self.logger.set_extra("display", display.describe())
         self.logger.set_extra("dummy_trigger", dummy_trigger)
+        self.logger.set_extra("audio", self.audio.describe())
         self.outdir = outdir
+        self.stalls: list[dict] = []        # blocks that dropped stalls, for the exit warning
         self.triggers = triggers or Triggers.from_config(None)
         self.sync = self.triggers.sync
 
@@ -227,7 +236,8 @@ class Session:
         self.display.draw_text(
             "Please keep your head as still as possible.\n\n"
             "(experimenter: press SPACE when ready)\n\n"
-            f"triggers: {self.triggers.status()}")
+            f"triggers: {self.triggers.status()}\n"
+            f"audio: {self.audio.status()}")
         _wait_for_char(self.display, EXPERIMENTER_KEY, dummy_trigger=self.dummy_trigger)
         if self.sync.mode == "wait":
             self.display.draw_text("Waiting for scanner...")
@@ -329,6 +339,7 @@ class Session:
         dt: float,
         state_stride: int,
         block_end: float,
+        play_sound: bool,
     ) -> bool:
         """Run one episode, appending frame data to ``frames``.
 
@@ -340,20 +351,23 @@ class Session:
         :param dt: target seconds per frame (``1 / fps``).
         :param state_stride: save a full state blob every this many frames.
         :param block_end: ``perf_counter`` deadline for the game block.
+        :param play_sound: pass the adapter's sound to the speakers (the
+            phase's ``audio``); muting never changes what is logged.
         :return: ``True`` if the user quit (ESC/window close), else ``False``.
         """
         frames["episode_seeds"].append(seed)
         terminated = truncated = False
         ep_frame = 0
-        next_t = time.perf_counter()
         key_to_action = adapter.keyspec.key_to_action_map() if turn_based else None
         key_log = frames["key_events"]
 
         ## Reset environment and show initial state
         obs, info = adapter.reset(seed)
         self.display.call_on_flip(self.triggers.episode_start)
-        self.display.draw_frame(adapter.render())
-        self.audio.play(adapter.sound())
+        # Paced from the flip, so a slow reset does not become a burst of
+        # catch-up frames. The reset frame's sound is not played: it is not a
+        # step's, and it would start the episode's sound off its flips.
+        next_t = self._show(adapter, play_sound=False) + dt
 
         ## Loop over frames within episode
         while not (terminated or truncated) and time.perf_counter() < block_end:
@@ -379,8 +393,14 @@ class Session:
             fs = adapter.capture(obs, info, want_blob=save_blob)
             # The frame trigger goes out on the flip that shows this frame.
             self.display.call_on_flip(self.triggers.frame)
-            flip_t = self.display.draw_frame(adapter.render())
-            self.audio.play(adapter.sound())
+            flip_t = self._show(adapter, play_sound)
+            # More than a frame behind (a stall): drop the debt, or it is repaid
+            # as a burst of one-refresh frames. The frame of slack is what a
+            # vsync-locked flip normally lands after its tick.
+            if not turn_based and next_t + dt < flip_t:
+                late = flip_t - (next_t - dt)
+                frames["pacing_reset"].append((self.clock.from_perf(flip_t), late))
+                next_t = flip_t + dt
 
             # Prefer env_action when an adapter translates UI meta-keys into a
             # different logged action (e.g. Rush Hour select+move -> Discrete).
@@ -393,6 +413,7 @@ class Session:
             frames["episode_id"].append(episode_id)
             frames["session_time"].append(t_step)
             frames["flip_time"].append(self.clock.from_perf(flip_t))
+            frames["audio_chunk"].append(self.audio.last_chunk)
             frames["wall_time"].append(self.clock.wall_time())
             frames["state_blob"].append(fs.blob)
             if self.triggers.enabled:
@@ -400,6 +421,18 @@ class Session:
             for k, v in fs.variables.items():
                 frames["variables"][k].append(v)
         return False
+
+    def _show(self, adapter: EnvAdapter, play_sound: bool) -> float:
+        """Flip the adapter's frame, then queue its sound against that flip.
+
+        :param adapter: the env whose ``render`` / ``sound`` to present.
+        :param play_sound: pass the sound to the speakers.
+        :return: ``perf_counter`` of the flip.
+        """
+        flip_t = self.display.draw_frame(adapter.render())
+        if play_sound:
+            self.audio.play(adapter.sound(), flip_t)
+        return flip_t
 
     def _game(self, phase: dict, index: int) -> None:
         """Run a game block (one or more episodes) and save frame-level data.
@@ -434,6 +467,10 @@ class Session:
         # for e.g. FrozenLake is action 0 = LEFT), so the agent "moves on its own"
         # and a single held key fires many times. turn_based fixes both.
         turn_based = bool(phase.get("turn_based", False))
+        play_sound = phase.get("audio", True)
+        if not isinstance(play_sound, bool):
+            raise ValueError(f'game phase {index}: "audio" must be true or false, '
+                             f"got {play_sound!r}")
 
         # Some backends (nle, browser games) take several seconds to start;
         # show a Loading screen so the previous fixation "+" doesn't freeze.
@@ -446,6 +483,9 @@ class Session:
         frames["variables"] = defaultdict(list)  # varname -> list, filled lazily
 
         ## Init loop over episodes
+        locked = self.display.vsync and self.display.refresh_rate
+        flip_period = 1 / self.display.refresh_rate if locked else None
+        self.audio.start(frame_period=None if turn_based else dt, flip_period=flip_period)
         onset = self.clock.session_time()
         block_end = time.perf_counter() + cap
         episode_id = 0
@@ -458,7 +498,7 @@ class Session:
                 adapter, frames,
                 seed=base_seed + episode_id, episode_id=episode_id,
                 turn_based=turn_based, dt=dt, state_stride=state_stride,
-                block_end=block_end)
+                block_end=block_end, play_sound=play_sound)
             # An episode's last sounds are still queued when it ends; drop them
             # so they do not play over the next episode or the next fixation.
             self.audio.stop()
@@ -468,6 +508,10 @@ class Session:
 
         self.triggers.block_end()
         extra = getattr(adapter, "block_extra", lambda: None)()
+        audio_log = self.audio.block_log(frames["audio_chunk"])
+        if audio_log:
+            frames["audio_onset"] = self.clock.from_perf(audio_log.pop("audio_onset"))
+            extra = {**(extra if extra is not None else {}), **audio_log}
         adapter.close()
         # Some gym envs (classic-control) call pygame.display.quit() on close(),
         # which tears down our shared window; rebuild it if so.
@@ -479,11 +523,27 @@ class Session:
             "game": phase["game"], "mode": mode,
             "onset": onset, "offset": self.clock.session_time(),
             "n_episodes": episode_id, "n_frames": len(frames["action"]),
+            "n_pacing_resets": len(frames["pacing_reset"]),
             "total_reward": sum(float(r) for r in frames["reward"]),
             "data_file": path.split("/")[-1],
         })
+        self._note_stalls(index, phase["game"], frames["pacing_reset"])
         if user_quit:
             raise KeyboardInterrupt
+
+    def _note_stalls(self, index: int, game: str, resets: list) -> None:
+        """Warn about a block's dropped stalls now; :meth:`run` repeats it at exit.
+
+        :param index: the block's phase index.
+        :param game: its game id.
+        :param resets: the block's ``(flip time, seconds late)`` pacing resets.
+        """
+        if not resets:
+            return
+        stall = {"phase": index, "game": game, "n": len(resets),
+                 "longest_ms": max(late for _, late in resets) * 1000}
+        self.stalls.append(stall)
+        print(_stall_warning(stall), file=sys.stderr)
 
     def run(self) -> None:
         """Run the full curriculum: trigger wait, then each phase in order.
@@ -510,6 +570,9 @@ class Session:
             if self.clock.t0_perf is not None:
                 self.triggers.lifecycle("task_stop")
             self.logger.set_extra("triggers", self.triggers.describe(self.clock))
+            self.logger.set_extra("stalls", self.stalls)
             manifest_path = self.logger.save_manifest()
             print(f"Saved session to: {self.outdir}")
             print(f"Manifest: {manifest_path}")
+            for stall in self.stalls:
+                print(_stall_warning(stall), file=sys.stderr)

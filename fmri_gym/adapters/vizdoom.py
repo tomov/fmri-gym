@@ -21,6 +21,7 @@ is unchanged, we just OR the buttons of every held key (e.g. forward + turn).
 Sound is opt-in per curriculum: `env_kwargs.audio_buffer_enabled` puts one tic
 of stereo PCM in `obs["audio"]` (so a model sees the same observation a subject
 hears), which `sound()` hands to the session's speakers and `capture()` logs.
+The phase's `"audio": false` mutes the speakers; the PCM is still logged.
 Doom produces 1/35 s of sound per step whatever the frame rate, so audio only
 runs in real time when `fps * env_kwargs.frame_skip == 35`; below that it plays
 with gaps, above it lags further behind every frame.
@@ -31,11 +32,11 @@ from __future__ import annotations
 import itertools
 from typing import Any
 
-import numpy as np
 import gymnasium as gym
+import numpy as np
 
-from .keyspec import KeySpec, MultiKeySpec, SingleKeySpec
 from .base import EnvAdapter, FrameState, Sound
+from .keyspec import KeySpec, MultiKeySpec, SingleKeySpec
 
 # Physical key -> preferred Doom button (first available for the scenario wins).
 # The gymnasium wrapper's Discrete action i presses the buttons set in
@@ -127,7 +128,7 @@ class VizDoomAdapter(EnvAdapter):
         """
         from vizdoom import gymnasium_wrapper  # noqa: F401  (registers Vizdoom*-v1)
         env = gym.make(spec["game"], render_mode="rgb_array",
-                        **spec.get("env_kwargs", {}))
+                       **spec.get("env_kwargs", {}))
         if env.unwrapped.game.is_audio_buffer_enabled():
             # ViZDoom 1.3.0 ships an assert-enabled OpenAL Soft whose EFX
             # (reverb) filter setup aborts with "gain > 0.00001f" the moment the
@@ -161,12 +162,12 @@ class VizDoomAdapter(EnvAdapter):
     def capture(self, obs: Any, info: dict, want_blob: bool = True) -> FrameState:
         variables = {}
         if isinstance(obs, dict) and "gamevariables" in obs:
-            variables["gamevariables"] = np.asarray(obs["gamevariables"])
+            variables["gamevariables"] = np.asarray(obs["gamevariables"]).copy()
         if isinstance(obs, dict) and "audio" in obs:
             # What the subject heard this frame. Taken from obs, not sound(),
             # because obs has a (zeroed) audio buffer on the terminal frame too,
             # keeping this series the same length as actions and rewards.
-            variables["audio"] = np.asarray(obs["audio"])
+            variables["audio"] = np.asarray(obs["audio"]).copy()
         return FrameState(blob=None, variables=variables)
 
     def block_extra(self) -> dict | None:

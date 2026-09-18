@@ -7,6 +7,7 @@ per game block in the curriculum; the experiment loop is identical for all.
 Usage:
     python fmri_play.py --subject sub-01 --curriculum my.json
     python fmri_play.py --subject sub-01 --curriculum my.json --dummy-trigger   # testing
+    python fmri_play.py --subject sub-01 --curriculum my.json --no-audio        # mute all games
 
 See configs/demo_mixed.json for a curriculum that mixes all three backends,
 and README.md for the config schema.
@@ -50,6 +51,8 @@ def main() -> None:
     p.add_argument("--no-vsync", action="store_true",
                    help="do not lock flips to the monitor refresh (default: try to)")
     p.add_argument("--dummy-trigger", action="store_true")
+    p.add_argument("--no-audio", action="store_true", help="mute game audio in every block (the curriculum saved "
+                   "in the manifest shows \"audio\": false)")
     p.add_argument("--save-pixels", action="store_true",
                    help="ALE only: also store lossless pixels (large; warns).")
     p.add_argument("--vgdl-repo", default=os.environ.get("VGDL_REPO"),
@@ -67,21 +70,24 @@ def main() -> None:
     for phase in curriculum:
         if phase.get("type") != "game":
             continue
+        if args.no_audio:
+            phase["audio"] = False
         backend = phase.get("backend", "gym")
         if backend == "ale" and args.save_pixels:
             phase.setdefault("save_pixels", True)
         if backend == "vgdl" and args.vgdl_repo:
             phase.setdefault("repo", args.vgdl_repo)
 
-    # Triggers first: a bad section or an unopenable port stops the run here,
-    # at the desk, before any window opens -- not mid-session with a participant.
+    # Before the window: a bad section, an unopenable port or an unusable
+    # output must stop the run before the session starts.
     triggers = Triggers.from_config(config.get("triggers"))
     print(f"triggers: {triggers.status()}", file=sys.stderr)
     if args.dummy_trigger:
         print("triggers: --dummy-trigger: the experimenter and scanner waits are skipped; "
               "this is a test run, not a session", file=sys.stderr)
+    audio = Audio(enabled=not args.no_audio)
+    print(f"audio: {audio.status()}", file=sys.stderr)
     display = Display(size=(w, h), fullscreen=args.fullscreen, vsync=not args.no_vsync)
-    audio = Audio()
     session = Session(args.subject, curriculum, display, outdir,
                       audio=audio, triggers=triggers, dummy_trigger=args.dummy_trigger)
     try:

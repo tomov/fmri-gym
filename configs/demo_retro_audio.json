@@ -1,0 +1,18 @@
+{
+  "_note": "Airstriker ships with stable-retro. Its sound plays a constant delay after each frame's flip; --no-audio mutes it. fps is this Genesis core's native rate: the session stops a block whose sound per step does not match 1/fps.",
+  "_keys_note": "Genesis buttons for this core are [B, A, MODE, START, UP, DOWN, LEFT, RIGHT, C, Y, X, Z] and 'keys' values are button vectors in that order. Airstriker uses the D-pad to move and B to fire, so the map below is arrows + X (keyboard) -> B (console). The controls the subject sees are a plain 'message' phase; keep its text in sync with 'keys' by hand.",
+  "curriculum": [
+    {"type": "message", "text": "Airstriker: arrows move, X fires; ESC quits.", "duration": 2.0},
+    {"type": "fixation", "duration": 1.0},
+    {"type": "game", "backend": "retro", "game": "Airstriker-Genesis-v0",
+     "mode": "duration", "duration": 15.0, "fps": 59.92274340431231, "state_stride": 15,
+     "keys": {
+       "LEFT":  [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+       "RIGHT": [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+       "UP":    [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+       "DOWN":  [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+       "X":     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+     }},
+    {"type": "fixation", "duration": 1.0}
+  ]
+}

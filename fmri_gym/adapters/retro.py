@@ -5,6 +5,8 @@ Maps stable-retro behind the standard EnvAdapter interface:
 - per-frame exact savestate via em.get_state()/set_state() (bit-exact, verified);
 - state variables: the console RAM plus the game's decoded `info` variables
   (score/lives/... from the integration's data.json), surfaced uniformly.
+- native PCM through sound(), played unless the phase sets "audio": false
+  (retro does not log it). Match fps to the core's frame rate (Genesis: 59.92).
 
 Notes verified against stable_retro 1.0.1:
 - The emulator object is env.unwrapped.em; the libretro RAM view must be
@@ -19,10 +21,11 @@ from __future__ import annotations
 from typing import Any
 
 import gymnasium as gym
+import numpy as np
 import stable_retro as retro
 
+from .base import EnvAdapter, FrameState, Sound
 from .keyspec import MultiKeySpec
-from .base import EnvAdapter, FrameState
 
 # Keyboard -> console button. Same scheme as the interactive retro player.
 # We map by button NAME; each game reports its own button ordering via
@@ -86,6 +89,14 @@ class RetroAdapter(EnvAdapter):
         # em.get_state() is ~1 MB for Genesis; only snapshot on stride frames.
         blob = u.em.get_state() if want_blob else None
         return FrameState(blob=blob, variables=variables)
+
+    def sound(self) -> Sound | None:
+        """Return native emulator PCM for the session's audio output.
+
+        :return: stereo PCM with its unrounded sample rate, or ``None``.
+        """
+        em = self.env.unwrapped.em
+        return Sound(np.asarray(em.get_audio()), em.get_audio_rate())
 
     def restore(self, blob: bytes) -> None:
         u = self.env.unwrapped

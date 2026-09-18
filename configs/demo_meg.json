@@ -1,6 +1,7 @@
 {
   "_game": "MEG template: an fMRI curriculum plus a 'triggers' section",
   "_note": "sync.mode 'send' emits scanner_start on the trigger line after the experimenter's SPACE (MEG acquisitions started from the trigger input); use 'wait' for an fMRI trigger box. backend null | lsl | serial | parallel (pip install pylsl / pyserial / pyparallel); a backend that cannot be opened stops the run with the reason. Codes are non-overlapping bit fields (frames 1-7, lifecycle bits 8/16/32/64); see README 'Triggers'.",
+  "_audio_note": "Game sound plays through the system's default output, a constant delay after each frame's flip (printed at start-up, logged). Measure the rig's real audio offset with python -m fmri_gym.photodiode --audio-click.",
   "triggers": {
     "sync": {
       "mode": "send",

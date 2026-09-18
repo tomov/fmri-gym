@@ -31,6 +31,8 @@ An adapter is lightweight glue that takes a gym env and makes it fMRI-friendly. 
 - build the env (`_make`) and, if needed, normalize a non-Gymnasium API (`reset`/`step`)
 - declare a default keyboard map (`_keyspec`)
 - produce an RGB frame for the screen (`render`)
+- if the engine makes sound, hand over this step's PCM (`sound`; the contract is in
+  `EnvAdapter.sound`, and `retro.py` is a two-line example)
 - pull out the analysis-relevant variables (`capture`)
 
 If you find yourself writing game rules, drawing a board, tracking a selection cursor,
@@ -51,6 +53,8 @@ Before editing `session.py`, `display.py`, `keys.py`, `logging.py`, `base.py`, o
 
 - Keep it **additive and default-off**, so no existing backend changes behaviour.
 - Keep it **nameless**: no `if backend == "rushhour"`, no game ids, no engine imports.
+  This holds for the prose too -- a core file's comments and docstrings state the contract,
+  they don't cite the backend that happens to use it.
 - Prefer the **opt-in capability** pattern already in use: the adapter sets a flag or
   defines an optional method, and core reads it defensively.
 - Say so in the PR description. A core change is the part a reviewer must read closely.

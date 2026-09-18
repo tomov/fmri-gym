@@ -92,6 +92,14 @@ uv run fmri-play --subject sub-01 --dummy-trigger --curriculum configs/dbp_games
 Drop `--dummy-trigger` for a real session (then press SPACE, then wait for the
 `=` scanner trigger). For VGDL setup see [Running VGDL games](#running-vgdl-games).
 
+stable-retro games play their native audio, and ViZDoom does when its config sets
+`env_kwargs.audio_buffer_enabled`. Use `--no-audio` or a game phase's
+`"audio": false` to mute playback; logged audio is unchanged. Each frame's sound
+starts a constant delay after the flip that shows it, measured from the system's
+default output at start-up and logged. A game with sound must run at its engine's
+own frame rate (ViZDoom: `fps * frame_skip == 35`; Genesis cores: 59.92), or the
+block stops and names the fps that fits.
+
 Note: **MuJoCo and Box2D use continuous (`Box`) action spaces** — the default
 keymap pushes arrows to each dim's limit, so they render and log fine but aren't
 really human-playable without a per-game control scheme. Everything else in
@@ -515,13 +523,16 @@ actually obtained (`vsync`, measured at start-up; `refresh_rate`).
   ```bash
   python -m fmri_gym.photodiode --fullscreen --config configs/demo_meg.json   # diode into the MEG/EEG amp
   python -m fmri_gym.photodiode --fullscreen --audio                          # diode into this PC's sound card
+  python -m fmri_gym.photodiode --fullscreen --audio --audio-click             # + mic on input 1: when sound is heard
   ```
 
   The first flashes a patch with the frame trigger on each white flip; match
   the triggers to the diode edges in your recording with
   `fmri_gym.photodiode.match_edges(trigger_times, edge_times)`. The second
   records the diode on the sound-card input and prints the offsets itself
-  (`--list-audio-devices` to pick the input).
+  (`--list-audio-devices` to pick the input). `--audio-click` also plays a tone
+  burst on each white flip through the session's audio output and reports when
+  it reaches a microphone on input channel 1.
 
 ## Output & data format
 
@@ -530,7 +541,8 @@ Each session writes `data/<subject>_<timestamp>/`:
 - **`manifest.json`** — subject, curriculum, trigger epoch, per-phase
   onsets/offsets (+ survey responses; onsets are flip times), the `display`
   actually opened (size, `vsync`, `refresh_rate`, driver), the `triggers`
-  settings + lifecycle triggers sent (+ what the config left `defaulted`) and
+  settings + lifecycle triggers sent (+ what the config left `defaulted`), the
+  `audio` output (device, measured device delay, chosen delay) and
   `dummy_trigger`.
 - **`block-NN_<backend>_<game>.npz`** — one per game block, uniform schema:
 
@@ -539,8 +551,10 @@ Each session writes `data/<subject>_<timestamp>/`:
   | `actions`, `rewards`, `terminal`, `episode_id` | per frame |
   | `session_time`, `wall_time` | seconds since trigger (after the step); wall-clock Unix time |
   | `flip_time` | seconds since trigger of the **flip that showed the frame** (its onset; vsync-locked when the display reports `vsync: true`) |
+  | `pacing_reset_time`, `pacing_reset_late` | flips that ended a stall of more than a frame, and how many seconds late each was: the frame schedule restarted there instead of catching up with a burst of short frames. Empty in a clean block; otherwise warned about on the console when the block ends and again at exit, and listed in the manifest (`stalls`, and `n_pacing_resets` per phase) |
   | `key_time`, `key_name`, `key_down` | every key press/release during the block, stamped on arrival (~1 ms), independent of the frame grid |
   | `trigger` | the code sent on that frame's flip (only when a trigger backend is active) |
+  | `audio_onset` | seconds since trigger that the frame's sound reached the DAC, NaN if none (only when the block played sound; with `audio_delay_ms`, `audio_resyncs`, `audio_trimmed_samples`) |
   | `states` | per-frame savestate blob (object array; `None` if engine has none) |
   | `episode_seeds` | RNG seed per episode |
   | `backend`, `game` | provenance |

@@ -31,9 +31,22 @@ Two ways to read the diode, because how it is plugged in varies by lab:
   own input latency is inside the number; PortAudio reports the ADC time of
   each buffer, which compensates it as far as the driver allows.
 
+**Sound** (``--audio-click``): the same run also measures when sound is
+heard. On every white flip a 10 ms tone burst is queued through
+:class:`~fmri_gym.audio.Audio` exactly as a game frame's sound is (same
+output, same delay chosen at start-up), and its DAC onset is logged. A microphone at the ear -- at the end of the scanner's
+sound tube, or inside the headphone -- gives the acoustic edge. Recorded on
+the second input channel with ``--audio`` (diode on channel 0, microphone on
+channel 1), the task prints flip-to-sound and photon-to-sound offsets on the
+spot; recorded on a MEG/EEG channel, :func:`match_edges` does the same
+offline against the triggers. Expect flip-to-sound = the printed delay plus the
+speaker/tube delay, with a spread of about a millisecond on a low-latency
+device.
+
 Output: ``data/photodiode_<timestamp>/`` with ``photodiode.npz`` (per-flash
-``flip_on``, ``flip_off``, ``trigger``, and the audio signal if recorded) and
-``summary.json`` (display, trigger settings, offset statistics).
+``flip_on``, ``flip_off``, ``trigger``, ``click_dac``, and the audio signal if
+recorded) and ``summary.json`` (display, trigger and audio settings, offset
+statistics).
 """
 
 from __future__ import annotations
@@ -44,13 +57,17 @@ import os
 import random
 import sys
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
 import pygame
 
+from .adapters.base import Sound
 from .display import Display
 from .triggers import TriggerSettings, Triggers
+
+if TYPE_CHECKING:
+    from .audio import Audio
 
 CORNERS = ("br", "bl", "tr", "tl")
 
@@ -101,6 +118,7 @@ def run_flashes(
     rng: random.Random,
     corner: str = "br",
     px: int = 120,
+    click: Callable[[float], None] | None = None,
 ) -> dict[str, np.ndarray]:
     """Flash the patch ``n`` times; a frame trigger goes out on each white flip.
 
@@ -112,6 +130,7 @@ def run_flashes(
     :param rng: random source for the gaps (seeded for a reproducible schedule).
     :param corner: ``"br"``, ``"bl"``, ``"tr"`` or ``"tl"``.
     :param px: patch side in pixels.
+    :param click: called with each white flip's time, to queue a sound on it.
     :return: ``flip_on``, ``flip_off`` (``perf_counter``), ``trigger`` (value sent).
     """
     flip_on, flip_off, values = [], [], []
@@ -122,6 +141,8 @@ def run_flashes(
         _hold(display, rng.uniform(*gap_ms) / 1000.0)
         display.call_on_flip(triggers.frame)
         flip_on.append(_show_patch(display, True, corner, px))
+        if click is not None:
+            click(flip_on[-1])
         values.append(triggers.last_frame)
         _hold(display, on_ms / 1000.0)
         flip_off.append(_show_patch(display, False, corner, px))
@@ -145,16 +166,18 @@ class AudioRecorder:
     the recording and the flip times share a time base.
     """
 
-    def __init__(self, device: int | str | None = None, samplerate: int = 48000) -> None:
+    def __init__(
+        self, device: int | str | None = None, samplerate: int = 48000, channels: int = 1
+    ) -> None:
         import sounddevice as sd
         self.fs = samplerate
         self._chunks: list[tuple[float, np.ndarray]] = []
         self._pairs: list[tuple[float, float]] = []
-        self._stream = sd.InputStream(device=device, channels=1, samplerate=samplerate,
+        self._stream = sd.InputStream(device=device, channels=channels, samplerate=samplerate,
                                       callback=self._callback)
 
     def _callback(self, indata: np.ndarray, frames: int, t: Any, status: Any) -> None:
-        self._chunks.append((float(t.inputBufferAdcTime), indata[:, 0].copy()))
+        self._chunks.append((float(t.inputBufferAdcTime), indata.copy()))
 
     def sync(self) -> None:
         """Record a (stream clock, perf_counter) pair."""
@@ -171,15 +194,28 @@ class AudioRecorder:
         self._stream.close()
 
     def signal(self) -> tuple[np.ndarray, np.ndarray]:
-        """The recording as ``(perf_counter times, samples)``."""
+        """The recording as ``(perf_counter times, samples shaped (n, channels))``."""
         offset = float(np.median([p - s for s, p in self._pairs]))
         times, values = [], []
         for adc_t, x in self._chunks:
             times.append(adc_t + offset + np.arange(len(x)) / self.fs)
             values.append(x)
         if not values:
-            return np.zeros(0), np.zeros(0)
+            return np.zeros(0), np.zeros((0, self._stream.channels))
         return np.concatenate(times), np.concatenate(values)
+
+
+def tone_burst(samplerate: float, ms: float = 10.0, hz: float = 2000.0) -> Sound:
+    """A short stereo tone burst: a sharp, unambiguous acoustic onset.
+
+    :param samplerate: output sample rate.
+    :param ms: duration.
+    :param hz: tone frequency.
+    :return: int16 PCM at half scale.
+    """
+    t = np.arange(int(samplerate * ms / 1000)) / samplerate
+    mono = (np.sin(2 * np.pi * hz * t) * 16384).astype(np.int16)
+    return Sound(np.column_stack([mono, mono]), samplerate)
 
 
 def detect_edges(
@@ -277,6 +313,10 @@ def _parse_args() -> argparse.Namespace:
                    help="record the photodiode on the sound-card input and compute offsets")
     p.add_argument("--audio-device", help="sounddevice input device (index or name substring)")
     p.add_argument("--samplerate", type=int, default=48000)
+    p.add_argument("--audio-click", action="store_true",
+                   help="queue a tone burst on each white flip through the session's audio "
+                        "output; with --audio, record a microphone "
+                        "on input channel 1")
     p.add_argument("--list-audio-devices", action="store_true")
     p.add_argument("--outdir")
     return p.parse_args()
@@ -292,7 +332,9 @@ def main() -> None:
     os.makedirs(outdir, exist_ok=True)
     w, h = (int(x) for x in args.size.lower().split("x"))
     triggers = Triggers(_trigger_settings(args))    # before the window: fails at the desk
+    audio = _audio_output() if args.audio_click else None
     display = Display((w, h), fullscreen=args.fullscreen, vsync=not args.no_vsync)
+    click, chunks = _clicker(audio) if audio is not None else (None, [])
     recorder = None
     if args.audio:
         # Asked for the audio readout: if the input cannot open, stop here
@@ -300,7 +342,7 @@ def main() -> None:
         device = args.audio_device
         if (device or "").isdigit():
             device = int(device)
-        recorder = AudioRecorder(device, args.samplerate)
+        recorder = AudioRecorder(device, args.samplerate, channels=2 if args.audio_click else 1)
         recorder.start()
     summary: dict[str, Any] = {"display": display.describe(), "triggers": triggers.describe(),
                                "n": args.n, "on_ms": args.on_ms, "gap_ms": list(args.gap_ms),
@@ -308,26 +350,77 @@ def main() -> None:
     arrays: dict[str, np.ndarray] = {}
     try:
         arrays = run_flashes(display, triggers, args.n, args.on_ms, tuple(args.gap_ms),
-                             random.Random(args.seed), args.corner, args.patch_px)
+                             random.Random(args.seed), args.corner, args.patch_px, click)
     except KeyboardInterrupt:
         print("photodiode: interrupted", file=sys.stderr)
     finally:
         if recorder is not None:
             recorder.stop()
+        if audio is not None:
+            _log_clicks(audio, chunks, arrays, summary)
         triggers.close()
         display.close()
     if recorder is not None and "flip_on" in arrays:
-        t, x = recorder.signal()
-        arrays["audio_time"], arrays["audio"] = t, x
-        edges = detect_edges(t, x, arrays["flip_on"])
-        arrays["edge_time"] = edges
-        arrays["offset_s"] = edges - arrays["flip_on"]
-        summary["offset"] = summarize(arrays["offset_s"])
+        _readout(*recorder.signal(), arrays, summary)
     summary["triggers"] = triggers.describe()
     np.savez_compressed(os.path.join(outdir, "photodiode.npz"), **arrays)
     with open(os.path.join(outdir, "summary.json"), "w") as f:
         json.dump(summary, f, indent=2, default=str)
     _report(summary, arrays, outdir)
+
+
+def _audio_output() -> Audio:
+    """The session's audio output, built as a session builds it."""
+    from .audio import Audio
+    audio = Audio()
+    print(f"audio: {audio.status()}", file=sys.stderr)
+    return audio
+
+
+def _log_clicks(audio: Audio, chunks: list[int], arrays: dict, summary: dict) -> None:
+    """Close the output and log when each click reached the DAC."""
+    log = audio.block_log(chunks)
+    audio.close()
+    summary["audio_out"] = audio.describe()
+    if log and "flip_on" in arrays:
+        arrays["click_dac"] = log["audio_onset"]
+        summary["click_dac_offset"] = summarize(log["audio_onset"] - arrays["flip_on"])
+
+
+def _clicker(audio: Audio) -> tuple[Callable[[float], None], list[int]]:
+    """A ``click`` for :func:`run_flashes`, and the chunk each click was queued as.
+
+    :param audio: the output, as a session builds it.
+    :return: ``(click, chunks)``; ``chunks`` fills as the flashes run.
+    """
+    burst = tone_burst(audio.samplerate)
+    chunks: list[int] = []
+    audio.start(frame_period=None, flip_period=None)    # clicks are not game steps
+
+    def click(flip_t: float) -> None:
+        audio.play(burst, flip_t)
+        chunks.append(audio.last_chunk)
+
+    return click, chunks
+
+
+def _readout(t: np.ndarray, x: np.ndarray, arrays: dict, summary: dict) -> None:
+    """Offsets from the sound-card recording: diode on channel 0, mic on 1."""
+    arrays["audio_time"], arrays["audio"] = t, x
+    edges = detect_edges(t, x[:, 0], arrays["flip_on"])
+    arrays["edge_time"] = edges
+    arrays["offset_s"] = edges - arrays["flip_on"]
+    summary["offset"] = summarize(arrays["offset_s"])
+    if "click_dac" not in arrays:
+        return
+    # From the click's DAC time, not the flip: the delay between them is room
+    # noise that would pass for an edge.
+    sound = detect_edges(t, x[:, 1], arrays["click_dac"] - 0.010)
+    arrays["sound_time"] = sound
+    arrays["sound_offset_s"] = sound - arrays["flip_on"]
+    arrays["av_offset_s"] = sound - edges
+    summary["sound_offset"] = summarize(arrays["sound_offset_s"])
+    summary["av_offset"] = summarize(arrays["av_offset_s"])
 
 
 def _report(summary: dict, arrays: dict, outdir: str) -> None:
@@ -350,6 +443,14 @@ def _report(summary: dict, arrays: dict, outdir: str) -> None:
     else:
         print("no audio readout: match the trigger-channel codes to the diode edges in "
               "your recording with fmri_gym.photodiode.match_edges()")
+    for key, label in (("click_dac_offset", "flip -> click at the DAC"),
+                       ("sound_offset", "flip -> sound at the microphone"),
+                       ("av_offset", "photodiode -> sound (audio behind video)")):
+        o = summary.get(key, {})
+        if o.get("n_matched"):
+            print(f"{label}: median {o['median_ms']:.2f} ms  sd {o['sd_ms']:.2f}  "
+                  f"min {o['min_ms']:.2f}  max {o['max_ms']:.2f}  "
+                  f"(matched {o['n_matched']}/{o['n']})")
     print(f"saved: {outdir}")
 
 
