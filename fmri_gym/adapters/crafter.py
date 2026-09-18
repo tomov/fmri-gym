@@ -48,11 +48,16 @@ class CrafterAdapter(EnvAdapter):
         return SingleKeySpec(combos=combos, noop=0)
 
     def reset(self, seed: int | None) -> tuple[Any, dict]:
-        # Old-gym reset(): obs only. Re-seed per episode if supported.
-        try:
-            obs = self.env.reset(seed=seed) if seed is not None else self.env.reset()
-        except TypeError:
-            obs = self.env.reset()
+        # crafter.Env has no reset(seed=...) -- its RNG is fixed at construction
+        # (crafter.Env(..., seed=...)) and never changes after. Re-seeding an
+        # episode is done by rebuilding the env
+        import crafter
+        self.env.close()
+        env_kwargs = dict(self.spec.get("env_kwargs", {}))
+        if seed is not None:
+            env_kwargs["seed"] = seed
+        self.env = crafter.Env(**env_kwargs)
+        obs = self.env.reset()
         if isinstance(obs, tuple):  # be tolerant if a newer crafter returns (obs, info)
             obs, info = obs
         else:
