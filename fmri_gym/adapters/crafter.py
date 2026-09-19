@@ -71,14 +71,46 @@ drink, energy, then materials and tools), 22 achievement counters, the player's
 world position, and a 64x64 grid of material/object ids -- so `capture` logs all
 four and `block_extra` ships the tables that decode them.
 
-Crafter ships no sound at all (56 assets, every one a PNG), so `sound` is left
-at the base class's None and nothing is played for these blocks.
-
 The env's HUD covers inventory and the four status bars but not the achievement
 count, so `show_score` turns on an `overlay` that puts it in the letterbox bar
 beside the frame. It reports only what `info` already carries, which is what
 keeps humans and models on the same game: `agent_play.py` hands a policy the
 same lines as text.
+
+Crafter ships no sound at all (56 assets, every one a PNG), which leaves a
+subject in the bore unable to tell three situations apart, all of which look
+like a frame where nothing much moved: the press landed on a creature but did
+not kill it (a zombie takes five bare-handed blows), the press was refused by
+the engine (no pickaxe for that rock, no table in reach), and the press was
+dropped by the rig. `cues` fills that in, with the three waveforms in
+`fmri_gym.cues` and a rule per frame: score > hit > blocked, at most one,
+because audio output queues rather than mixes.
+
+Which cue to play is decided BEFORE the step, by reading the state the engine is
+about to act on, not by diffing state afterwards. Afterwards is not enough: a
+non-lethal blow changes nothing that reaches `info`, and a refusal is
+indistinguishable from a refusal-plus-a-zombie-walking-past. The prediction is
+exact rather than heuristic because the player is `world.objects[0]` -- added in
+`reset` before worldgen -- and `Env.step` updates objects in that order, so
+nothing can move between the read and `Player.update`. It reimplements the
+branches of `Player.update` over `constants.collect / place / make`, reading
+crafter's own tables, and touches neither the world nor `world.random`.
+
+Reimplementing engine branches is the part of this file that can go stale
+without anyone noticing, so it is checked rather than asserted:
+`docs/crafter_cue_check.py` runs each press twice against a deep copy of the
+live env -- once as pressed, once as `noop` -- and calls the prediction wrong if
+the two resulting states disagree with it. 4545 presses, 0 mismatches on
+2026-09-19. Re-run it after a crafter version bump.
+
+Collecting grass is deliberately silent: `data.yaml` gives it `probability: 0.1`
+and `leaves: grass`, so a press that yields nothing is the roll failing rather
+than the engine refusing, and the honest cue for luck is no cue.
+
+The four resulting columns (`hit`, `no_effect`, `cue`, `target`) are logged
+whether or not `cues` is on, since they describe the frame rather than the
+feedback; only the sound and the overlay line are gated, together, so that what
+a model reads as text is exactly what a subject heard.
 """
 
 from __future__ import annotations
@@ -89,8 +121,9 @@ from typing import Any
 
 import numpy as np
 
+from .. import cues as cue_bank
+from .base import EnvAdapter, FrameState, Sound
 from .keyspec import SingleKeySpec
-from .base import EnvAdapter, FrameState
 
 # Crafter's Discrete(17): 0=noop, 1-4 move left/right/up/down, 5=do, 6=sleep,
 # 7-10 place stone/table/furnace/plant, 11-13 make wood/stone/iron pickaxe,
@@ -105,6 +138,15 @@ _DEFAULT_KEYMAP = {
     "R": 7, "T": 8, "F": 9, "P": 10,
     "1": 11, "2": 12, "3": 13, "4": 14, "5": 15, "6": 16,
 }
+
+#: What ``move_<name>`` displaces the player by, copied from ``Player._move``.
+_DIRECTIONS = {"left": (-1, 0), "right": (+1, 0), "up": (0, -1), "down": (0, +1)}
+
+#: Overlay text per cue -- the model's copy of what the subject just heard.
+_CUE_LINES = {"score": ["+1"], "hit": ["HIT"], "blocked": ["NO EFFECT"]}
+
+#: The outcome of a frame that has not happened yet (reset, or no env).
+_NO_OUTCOME = {"hit": False, "refused": False, "target": ""}
 
 
 def _semantic_names(env: Any) -> list[str] | None:
@@ -136,10 +178,20 @@ class CrafterAdapter(EnvAdapter):
         self._kwargs = dict(spec.get("env_kwargs", {}))
         self._log_frames = bool(spec.get("log_frames", False))
         self._show_score = bool(spec.get("show_score", False))
+        self._cues = bool(spec.get("cues", False))
+        # Synthesized once per block rather than per frame: each is a few tens
+        # of thousands of samples, and the loop wants them at 2.5 Hz.
+        self._cue_sounds = {
+            "score": cue_bank.score_cue(),
+            "hit": cue_bank.hit_cue(),
+            "blocked": cue_bank.blocked_cue(),
+        } if self._cues else {}
         self._n_achievements = len(crafter.constants.achievements)
         self._unlocked: set[str] = set()
         self._last_unlock: str | None = None
         self._last_obs = None
+        self._cue = ""
+        self._outcome: dict = _NO_OUTCOME
         return self._build(spec.get("seed"))
 
     def _build(self, seed: int | None) -> Any:
@@ -162,27 +214,136 @@ class CrafterAdapter(EnvAdapter):
             self.env = self._build(seed)
         self._unlocked = set()
         self._last_unlock = None
+        self._cue = ""
+        self._outcome = _NO_OUTCOME
         self._last_obs = np.asarray(self.env.reset())
         return self._last_obs, {}
 
     def step(self, action: Any) -> tuple[Any, float, bool, bool, dict]:
+        # Read what this press is about to meet, before the engine acts on it.
+        self._outcome = self._predict(int(action))
         obs, reward, done, info = self.env.step(int(action))
         self._last_obs = np.asarray(obs)
-        self._note_unlocks(info["achievements"])
+        scored = self._note_unlocks(info["achievements"])
+        # One cue at a time, highest first: the killing blow that unlocks
+        # defeat_zombie is a "+1", not a thud, and a refusal never outranks
+        # something that actually happened.
+        self._cue = ("score" if scored else
+                     "hit" if self._outcome["hit"] else
+                     "blocked" if self._outcome["refused"] else "")
         # crafter's `done` is death OR its own step cap; only death is terminal,
         # and health rides along in `info`, so the two are separable here.
         alive = info["inventory"]["health"] > 0
         return self._last_obs, reward, done and not alive, done and alive, info
+
+    def _predict(self, action: int) -> dict:
+        """What the pending action will do, read off the pre-step state.
+
+        A reimplementation of the branches of ``Player.update``, against
+        crafter's own ``constants.collect / place / make`` tables rather than a
+        copy of their contents. Read-only: it indexes the world and the
+        inventory, and never touches ``world.random``, so inserting it into the
+        loop cannot perturb a replay.
+
+        "Refused" means the engine ran the action and returned having changed
+        nothing -- a rock without the pickaxe for it, a craft with no table in
+        reach, a walk into a wall the player already faces. Turning to face a
+        new direction counts as an effect even when the step itself is blocked,
+        because ``Player._move`` sets ``facing`` before it tests the tile.
+
+        :param action: index into ``env.action_names``.
+        :return: ``{"hit": bool, "refused": bool, "target": str}``, where
+            ``target`` names whatever the player is facing (object class if one
+            is there, else the material, else ``""`` off-map).
+        """
+        import crafter
+        from crafter import objects as crafter_objects
+
+        player = getattr(self.env, "_player", None)
+        world = getattr(self.env, "_world", None)
+        if player is None or world is None:
+            return _NO_OUTCOME
+        name = self.env.action_names[action]
+        facing = tuple(player.facing)
+        material, obj = world[(player.pos[0] + facing[0],
+                               player.pos[1] + facing[1])]
+        out = dict(_NO_OUTCOME)
+        out["target"] = type(obj).__name__.lower() if obj else (material or "")
+        items = crafter.constants.items
+        if name == "noop":
+            return out
+        if player.sleeping and player.inventory["energy"] < items["energy"]["max"]:
+            # Asleep, `Player.update` overwrites the action with `sleep`, so
+            # every press in this state is swallowed whole.
+            return {**out, "refused": True}
+
+        if name.startswith("move_"):
+            direction = _DIRECTIONS[name[len("move_"):]]
+            blocked = not player.is_free(player.pos + np.array(direction))
+            return {**out, "refused": blocked and direction == facing}
+
+        if name == "do":
+            if obj is not None:
+                if isinstance(obj, crafter_objects.Plant):
+                    return {**out, "refused": not obj.ripe}
+                if isinstance(obj, (crafter_objects.Zombie,
+                                    crafter_objects.Skeleton,
+                                    crafter_objects.Cow)):
+                    return {**out, "hit": True}
+                # Everything else on a tile is an arrow in flight, and
+                # `_do_object` has no branch for one. Crafter's `Fence` would
+                # be the other case, but no code path constructs one: there is
+                # no `place_fence` action, no `fence` inventory slot and no
+                # `collect_fence` achievement, so its pickup branch raises
+                # KeyError. Treated as the arrow it must be, not special-cased.
+                return {**out, "refused": True}
+            info = crafter.constants.collect.get(material)
+            if not info:
+                return {**out, "refused": True}
+            short = any(player.inventory[k] < v
+                        for k, v in info["require"].items())
+            return {**out, "refused": short}
+
+        if name == "sleep":
+            asleep = player.inventory["energy"] >= items["energy"]["max"]
+            return {**out, "refused": asleep}
+
+        if name.startswith("place_"):
+            info = crafter.constants.place[name[len("place_"):]]
+            refused = (obj is not None
+                       or material not in info["where"]
+                       or any(player.inventory[k] < v
+                              for k, v in info["uses"].items()))
+            return {**out, "refused": refused}
+
+        if name.startswith("make_"):
+            info = crafter.constants.make[name[len("make_"):]]
+            # Same 3x3 read `_make` does; slicing the maps, no RNG.
+            nearby, _ = world.nearby(player.pos, 1)
+            refused = (not all(util in nearby for util in info["nearby"])
+                       or any(player.inventory[k] < v
+                              for k, v in info["uses"].items()))
+            return {**out, "refused": refused}
+        return out
+
+    def sound(self) -> Sound | None:
+        """The cue for the frame just stepped, or ``None``.
+
+        :return: one :class:`~fmri_gym.adapters.base.Sound`, or ``None`` when
+            ``cues`` is off or the frame earned no cue.
+        """
+        return self._cue_sounds.get(self._cue)
 
     def render(self) -> np.ndarray:
         # obs IS the RGB frame, and re-rendering it would consume the world RNG
         # after dark (see the module docstring), so hand back what step made.
         return self._last_obs
 
-    def _note_unlocks(self, achievements: dict) -> None:
+    def _note_unlocks(self, achievements: dict) -> bool:
         """Track which achievements are unlocked, and the newest one.
 
         :param achievements: crafter's per-achievement counts for this frame.
+        :return: whether this frame unlocked at least one new achievement.
         """
         unlocked = {name for name, n in achievements.items() if n > 0}
         new = unlocked - self._unlocked
@@ -191,9 +352,10 @@ class CrafterAdapter(EnvAdapter):
             # sibling, say); taking the min just makes the pick reproducible.
             self._last_unlock = min(new)
         self._unlocked = unlocked
+        return bool(new)
 
     def overlay(self) -> list[str] | None:
-        """Score lines for the display margin, when the config asks for them.
+        """Score and cue lines for the display margin, when asked for.
 
         Crafter draws its own HUD -- four status bars and the inventory -- but
         never the achievement count, which is the score its paper reports and
@@ -202,15 +364,24 @@ class CrafterAdapter(EnvAdapter):
         already returns every step, so the model harness reads the identical
         values and rule 1 holds: this shows env state, it does not add any.
 
-        :return: the lines to draw, or ``None`` when ``show_score`` is off.
+        The cue line is the same bit of information the subject just heard,
+        written down, so a policy reading these lines as text is told what a
+        human in the bore is told and no more. It is gated on the same flag as
+        the audio for exactly that reason.
+
+        :return: the lines to draw, or ``None`` when there are none.
         """
-        if not self._show_score:
-            return None
-        lines = ["SCORE", f"{len(self._unlocked)} / {self._n_achievements}"]
-        if self._last_unlock:
-            # Underscores would not wrap inside the 128 px bar; spaces do.
-            lines += ["", "LAST", self._last_unlock.replace("_", " ")]
-        return lines
+        lines: list[str] = []
+        if self._show_score:
+            lines += ["SCORE", f"{len(self._unlocked)} / {self._n_achievements}"]
+            if self._last_unlock:
+                # Underscores would not wrap inside the 128 px bar; spaces do.
+                lines += ["", "LAST", self._last_unlock.replace("_", " ")]
+        if self._cues and self._cue:
+            lines += ([""] if lines else []) + _CUE_LINES[self._cue]
+            if self._cue == "hit":
+                lines.append(self._outcome["target"])
+        return lines or None
 
     def capture(
         self, obs: Any, info: dict, want_blob: bool = True
@@ -229,6 +400,13 @@ class CrafterAdapter(EnvAdapter):
             # SemanticView hands out a fresh array today; copy anyway, because a
             # view onto the live map would be overwritten in place next step.
             "semantic": np.asarray(info["semantic"]).copy(),
+            # Outcome of the press that produced this frame (see _predict).
+            # Logged whether or not `cues` is on: `cue` is the label of what
+            # happened, and only its playback is optional.
+            "hit": self._outcome["hit"],
+            "no_effect": self._outcome["refused"],
+            "cue": self._cue,
+            "target": self._outcome["target"],
         }
         if self._log_frames:
             # Kept as uint8 rather than bytes: a list of bytes becomes a numpy
@@ -245,6 +423,9 @@ class CrafterAdapter(EnvAdapter):
         :param blob: bytes previously returned as :attr:`FrameState.blob`.
         """
         self.env = pickle.loads(blob)
+        # The restored frame is one nobody pressed a button to reach.
+        self._cue = ""
+        self._outcome = _NO_OUTCOME
         world = getattr(self.env, "_world", None)
         if world is None:
             self._last_obs = np.asarray(self.env.render())
