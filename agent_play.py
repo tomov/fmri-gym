@@ -107,7 +107,11 @@ def play_block(phase: dict, index: int, args, logger: Logger,
     backend = phase.get("backend", "gym")
     base_seed = phase.get("seed", 1000 + index)
     state_stride = max(1, int(phase.get("state_stride", 1)))
-    adapter = get_adapter(backend, phase)
+    # A policy has no ears. Whatever the block's config plays to a subject as a
+    # sound, it reads as a line of text, so the two players are told the same
+    # things; scanner configs keep that line off the screen to hold the gaze on
+    # the frame. Adapters without cues ignore the key.
+    adapter = get_adapter(backend, {**phase, "cue_overlay": True})
     policy = build_policy(args, adapter)
 
     frames = defaultdict(list)

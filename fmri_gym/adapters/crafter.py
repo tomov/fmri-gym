@@ -109,8 +109,13 @@ than the engine refusing, and the honest cue for luck is no cue.
 
 The four resulting columns (`hit`, `no_effect`, `cue`, `target`) are logged
 whether or not `cues` is on, since they describe the frame rather than the
-feedback; only the sound and the overlay line are gated, together, so that what
-a model reads as text is exactly what a subject heard.
+feedback. What is gated is delivery, and each player gets one channel: `cues`
+plays the sound, and `cue_overlay` writes the same thing as a line in the
+letterbox bar. Scanner configs set the first and not the second, because a
+subject who has already heard the cue would only be reading a repeat of it, and
+every glance at the margin is a glance away from the frame. `agent_play.py`
+forces the second on, since a policy cannot hear one: the information a model
+reads is still exactly the information the subject got.
 """
 
 from __future__ import annotations
@@ -179,6 +184,7 @@ class CrafterAdapter(EnvAdapter):
         self._log_frames = bool(spec.get("log_frames", False))
         self._show_score = bool(spec.get("show_score", False))
         self._cues = bool(spec.get("cues", False))
+        self._cue_overlay = bool(spec.get("cue_overlay", False))
         # Synthesized once per block rather than per frame: each is a few tens
         # of thousands of samples, and the loop wants them at 2.5 Hz.
         self._cue_sounds = {
@@ -366,8 +372,11 @@ class CrafterAdapter(EnvAdapter):
 
         The cue line is the same bit of information the subject just heard,
         written down, so a policy reading these lines as text is told what a
-        human in the bore is told and no more. It is gated on the same flag as
-        the audio for exactly that reason.
+        human in the bore is told and no more. It has its own flag because the
+        two players receive it differently: a subject hears it, and a line in
+        the margin only repeats that while pulling the eyes off the frame, so
+        scanner configs leave `cue_overlay` off. A policy has no ears, so
+        `agent_play.py` turns it on and reads as text what the subject heard.
 
         :return: the lines to draw, or ``None`` when there are none.
         """
@@ -377,7 +386,7 @@ class CrafterAdapter(EnvAdapter):
             if self._last_unlock:
                 # Underscores would not wrap inside the 128 px bar; spaces do.
                 lines += ["", "LAST", self._last_unlock.replace("_", " ")]
-        if self._cues and self._cue:
+        if self._cue_overlay and self._cue:
             lines += ([""] if lines else []) + _CUE_LINES[self._cue]
             if self._cue == "hit":
                 lines.append(self._outcome["target"])

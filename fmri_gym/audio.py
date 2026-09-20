@@ -147,8 +147,20 @@ class SoundDeviceGameBlockStream:
         Runs on PortAudio's thread. Keep it short: fill ``outdata`` and
         return. Blocking here underruns and clicks.
 
-        A single queued block is often longer or shorter than ``frames``, so
-        we splice across queue items until this callback's slot is full.
+        A queued block and ``frames`` have nothing to do with each other -- a
+        block can span many callbacks and a callback can span many blocks -- so
+        this splices across the queue until the slot is full. Two rules keep
+        that honest for a producer that falls silent between sounds, which is
+        most of a block for a game that only speaks on events:
+
+        - a block that has started always finishes, across as many callbacks as
+          it takes, whether or not anything else is queued behind it;
+        - a slot that runs out of samples is completed with zeros, never with
+          samples that have already been played.
+
+        Both are the cases a producer of one chunk per frame never reaches, so
+        they went unnoticed until sporadic cues arrived (see
+        ``docs/audio_queue_check.py``).
 
         :param outdata: preallocated output array, shape ``(frames, C)``.
         :param frames: number of sample frames PortAudio wants this call.
@@ -156,38 +168,30 @@ class SoundDeviceGameBlockStream:
         :param status: PortAudio status flags (unused).
         """
         if self.status == STOPPED:
-            return
-        if self.blocks.empty():
             outdata.fill(0)
-            logging.debug("sound queue empty")
             return
-        elif self.current_block is None:
-            with self.lock:
-                self.current_block = self.blocks.get()
-
         out_idx = 0
-        while True:
-            current_block_len = self.current_block.shape[0]
-
-            split_idx = min(current_block_len - self.current_block_idx, frames - out_idx)
-            split_end = self.current_block_idx + split_idx
-            outdata[out_idx : out_idx + split_idx] = self.current_block[
-                self.current_block_idx : split_end
-            ]
-            out_idx += split_idx
-
-            self.current_block_idx = split_end
-            if split_end == current_block_len:
+        while out_idx < frames:
+            if self.current_block is None:
                 with self.lock:
                     try:
-                        # Tiny timeout so a late producer put does not stall
-                        # PortAudio; underrun is preferable to a hang.
-                        self.current_block = self.blocks.get(timeout=0.01)
+                        # Never wait: this is PortAudio's realtime thread, and
+                        # a block that arrives late is simply the next
+                        # callback's, which costs it one slot and nothing else.
+                        self.current_block = self.blocks.get_nowait()
                     except queue.Empty:
+                        outdata[out_idx:] = 0
                         logging.debug("sound queue empty")
+                        return
                 self.current_block_idx = 0
-            if out_idx == frames:
-                return
+            block = self.current_block
+            take = min(block.shape[0] - self.current_block_idx, frames - out_idx)
+            end = self.current_block_idx + take
+            outdata[out_idx:out_idx + take] = block[self.current_block_idx:end]
+            out_idx += take
+            self.current_block_idx = end
+            if end == block.shape[0]:
+                self.current_block = None
 
     def put(self, block: np.ndarray) -> None:
         """Enqueue one PCM chunk from the producer thread.
@@ -221,12 +225,17 @@ class SoundDeviceGameBlockStream:
         self.flush()
 
     def flush(self) -> None:
-        """Drop queued blocks. Replaces the queue rather than draining it.
+        """Drop queued blocks, and the one that was half-played.
 
         Draining while the callback may still hold ``current_block`` is
-        racy; a fresh ``Queue`` is the simple cutoff.
+        racy; a fresh ``Queue`` is the simple cutoff. The half-played block
+        goes with them, or :meth:`stop` would only drop the sounds that had
+        not started, and the next episode would open on the tail of the last
+        one now that a started block is always finished.
         """
         self.blocks = queue.Queue()
+        self.current_block = None
+        self.current_block_idx = 0
 
     def close(self) -> None:
         """Stop playback and release the PortAudio stream."""
@@ -259,14 +268,20 @@ class Audio:
         if sound is None:
             return
         pcm = sound.pcm
-        # Chunk LENGTH is only a hint to PortAudio -- the callback splices
-        # across queued blocks -- so a shorter final chunk must not count as a
-        # format change and reopen the device mid-episode.
+        # Length is not part of the format: the callback splices across queued
+        # blocks, so a shorter final chunk must not count as a format change
+        # and reopen the device mid-episode. It is not passed as the blocksize
+        # either. Only the first chunk of a block would get a say, and it
+        # would then set the callback period for the whole 300 s: a game whose
+        # chunks are all one frame long would be asking for its own frame,
+        # which is reasonable, but one that speaks in sounds of different
+        # lengths would be setting it by whichever sound happened to come
+        # first. Host's choice is the same for both and answers sooner.
         sound_format = (sound.sample_rate, pcm.shape[1], pcm.dtype)
         if sound_format != self.format:
             self.close()
             self.stream = SoundDeviceGameBlockStream(
-                sound.sample_rate, pcm.shape[0], pcm.shape[1], dtype=pcm.dtype)
+                sound.sample_rate, 0, pcm.shape[1], dtype=pcm.dtype)
             self.format = sound_format
         if self.stream.status != PLAYING:
             self.stream.play()

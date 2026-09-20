@@ -24,15 +24,17 @@ harmonic chime, ``blocked`` a low sine. Audio output queues rather than mixes
 picking by priority.
 
 Queueing makes cue length a timing constraint, not just a stylistic one: a cue
-longer than a frame delays the next one by the difference. ``hit`` (60 ms) and
-``blocked`` (100 ms) fit inside the scanner block's 400 ms turn with room to
-spare. ``score`` does not -- it runs 670 ms, so an unlock followed immediately
-by another cue pushes that cue ~270 ms late, and three unlocks on consecutive
-frames drift ~800 ms. It is kept at that length deliberately, because it is the
-rig's existing reward sound and a subject who played both frontends should hear
-one reward; shortening the third note to ~0.18 s would make it fit, at the cost
-of that continuity. Unlocks are capped at 22 an episode and each fires once, so
-the case is rare -- but it is a real artifact and belongs in the methods.
+longer than a frame delays the next one by the difference. All three fit inside
+the scanner block's 400 ms turn -- ``hit`` 60 ms, ``blocked`` 100 ms, ``score``
+exactly 400 -- so no cue can ever push the next one into a later frame than the
+press that earned it, and a cue always names the press the subject just made.
+
+``score`` is the one that had to be cut to get there. It is a port of the rig's
+``celebrate_wav``, whose third note rings for 0.45 s (670 ms in all), and at
+that length an unlock followed immediately by another cue delayed it ~270 ms,
+with three unlocks on consecutive frames drifting ~800 ms. Shortened to 0.18 s
+on 2026-09-20: the two frontends now differ in the tail of the reward note,
+which is the cost, and the attack that identifies it is untouched.
 
 Everything is synthesized from these numbers rather than shipped as a wav, so
 the exact stimulus a session presented is recoverable from the commit hash.
@@ -70,17 +72,19 @@ def _pcm(wave: np.ndarray, peak: float = _PEAK) -> np.ndarray:
 
 
 def score_cue(rate: int = SAMPLE_RATE) -> Sound:
-    """The "+1" chime: a three-note ascending arpeggio, ~0.67 s.
+    """The "+1" chime: a three-note ascending arpeggio, exactly 0.40 s.
 
     B5, E6, B6, each a sine plus a quieter octave harmonic under a 5 ms attack
-    and an exponential decay. Ported unchanged from the rig's ``celebrate_wav``
-    so that a subject who played both frontends heard the same reward sound.
+    and an exponential decay. Ported from the rig's ``celebrate_wav``, with the
+    third note cut from 0.45 s to 0.18 so the whole cue fits one 400 ms turn
+    (see the module docstring). The two short notes that make it recognisable
+    are the rig's own.
 
     :param rate: sample rate in Hz.
     :return: the cue as a :class:`~fmri_gym.adapters.base.Sound`.
     """
     parts = []
-    for freq, dur in ((987.77, 0.11), (1318.51, 0.11), (1975.53, 0.45)):
+    for freq, dur in ((987.77, 0.11), (1318.51, 0.11), (1975.53, 0.18)):
         t = np.arange(int(rate * dur)) / rate
         tone = np.sin(2 * np.pi * freq * t) + 0.5 * np.sin(4 * np.pi * freq * t)
         envelope = np.minimum(t / 0.005, 1.0) * np.exp(-t / (0.7 * dur))
