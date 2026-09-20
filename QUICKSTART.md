@@ -95,6 +95,16 @@ before each puzzle, blank interval, solved hold); see its `_session_note`.
 
 The engine binary is fetched on first run (see §1); nothing to build.
 
+### Boing! (Pong)
+
+```bash
+uv sync --extra boing
+uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/boing__vs_ai.json    # one match against the computer, first to 10
+```
+
+Runs real-time at 60 fps with the game's sound effects through the session's
+audio output; put `"audio": false` in the game phase on a machine without one.
+
 ### Baba is AI
 
 ```bash

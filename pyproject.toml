@@ -36,6 +36,7 @@ vizdoom = ["vizdoom"]
 overcooked = ["overcooked-ai"]
 baba = ["baba @ git+https://github.com/nacloos/baba-is-ai.git"]
 rushhour = ["rushhour-gym>=0.6.0"]
+boing = ["boing-gym>=0.1.0"]  # Pong (Code the Classics); pure pygame, sound effects
 supertuxkart = ["pystk2-gymnasium"]  # needs a real GL display at runtime
 # `gym` backend families beyond classic_control / toy_text (which ship with gymnasium):
 box2d = ["gymnasium[box2d]"]
@@ -54,7 +55,7 @@ dbp = [
     "fmri-gym[vizdoom,aigamestore,crafter,rushhour,baba,minihack,supertuxkart,overcooked]",
 ]
 all = [
-    "fmri-gym[dbp,ale,retro,nethack,box2d,mujoco,shimmy,tilematch,triggers]",
+    "fmri-gym[dbp,ale,retro,nethack,boing,box2d,mujoco,shimmy,tilematch,triggers]",
 ]
 
 [project.scripts]
