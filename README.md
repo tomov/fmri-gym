@@ -21,6 +21,7 @@ through small pluggable **adapters**:
 | `overcooked`  | Overcooked co-op cooking (social) | overcooked_ai |
 | `baba`        | Baba Is You (rule-manipulation puzzle) | baba-is-ai |
 | `rushhour`    | Rush Hour sliding-block puzzle | `rushhour-gym` (PyPI; fetches its Go engine) |
+| `boing`       | Boing!, the *Code the Classics* Pong, against its computer player (sound) | `boing-gym` (PyPI; pure pygame) |
 | `supertuxkart`| SuperTuxKart 3D racing (needs a real GL display) | pystk2 |
 | `stk_gym`     | SuperTuxKart, the current game: frames from the game's gym server, keys to its player controller (needs a real GL display) | [chrplr/stk-code](https://github.com/chrplr/stk-code) fork |
 
@@ -137,6 +138,7 @@ the right per-game keymap/settings baked in. Coverage by class:
 | `overcooked__` | 1 | cramped_room (co-op cooking; other layouts) |
 | `baba__` | 1 | make_win (rule-manipulation puzzle; other ids) |
 | `rushhour__` | 1 | easy (sliding-block puzzle). `rushhour__complete.json` is the full self-paced session of Rush-Hour's own program, then the rest of the library: all 49 puzzles, the first 12 easiest-first and the other 37 in a fixed shuffled order, one game phase each, with ready screens and solved feedback as message phases |
+| `boing__` | 1 | vs_ai (Pong against the book's computer player, one match per block, with sound) |
 | `supertuxkart__` | 1 | race (3D racing; needs a real GL display) |
 | `stk_gym__` | 1 | race (the current SuperTuxKart via its gym server; needs the fork built and a real GL display) |
 | `retro__` | 3 | tobutobugirldx, nomolos, anguna (need ROMs imported) |

@@ -48,6 +48,9 @@ def get_adapter(backend: str, spec: dict) -> EnvAdapter:
     if backend == "rushhour":
         from .rushhour import RushHourAdapter
         return RushHourAdapter(spec)
+    if backend == "boing":
+        from .boing import BoingAdapter
+        return BoingAdapter(spec)
     if backend == "baba":
         from .baba import BabaAdapter
         return BabaAdapter(spec)

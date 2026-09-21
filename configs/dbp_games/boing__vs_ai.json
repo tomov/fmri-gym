@@ -1,0 +1,58 @@
+{
+  "_game": "Boing! (Pong: the Code the Classics game, against its computer player)",
+  "_note": "Setup: the `boing` extra (pip install boing-gym). The env is BoingHuman-v0 from boing-gym: the book's game with Pygame Zero taken out -- its rules, sprites, computer opponent and sound effects, one step per frame of its 60 Hz loop -- so the block runs real-time at fps 60 (speeds are pixels per frame; a lower fps is a slower game). Sound is on by default and plays through the session's audio output; set 'audio': false in the game phase without an audio device. One block is one match, over when a score passes 9 (typically 1-3 min); the book's menu and game-over screens are the message phases around it.",
+  "_keys_note": "Env action space Discrete(3): 0 stay, 1 up, 2 down, resolved from the keys held each frame. The defaults are the book's player-1 keys (boing_gym.DEFAULT_KEYS): UP/DOWN arrows or A/Z; 1/2 below are the button box. Keep the message Controls text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/chrplr/boing-gym/blob/main/src/boing_gym/env.py",
+  "curriculum": [
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "BOING!",
+        "",
+        "You play the LEFT bat against the computer.",
+        "Return the ball; the first to 10 points wins.",
+        "",
+        "Controls:",
+        "   UP    or  A  or  1   move the bat up",
+        "   DOWN  or  Z  or  2   move the bat down",
+        "",
+        "Hitting the ball with the edge of the bat",
+        "sends it off at an angle.",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {
+      "type": "fixation",
+      "duration": 1.0
+    },
+    {
+      "type": "game",
+      "backend": "boing",
+      "game": "BoingHuman-v0",
+      "audio": true,
+      "keys": {
+        "UP": 1,
+        "DOWN": 2,
+        "A": 1,
+        "Z": 2,
+        "1": 1,
+        "2": 2
+      },
+      "mode": "episode",
+      "n_episodes": 1,
+      "max_duration": 600.0,
+      "fps": 60
+    },
+    {
+      "type": "message",
+      "text": "GAME OVER",
+      "duration": 2.0
+    },
+    {
+      "type": "fixation",
+      "duration": 2.0
+    }
+  ]
+}
