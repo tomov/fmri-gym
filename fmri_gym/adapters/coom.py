@@ -132,7 +132,7 @@ class COOMAdapter(EnvAdapter):
         """Derive the keymap from the scenario's own button list.
 
         :return: arrows to turn/move, plus the scenario's 4th button on its
-            mapped key (:data:`_EXECUTE_KEY`), including turn/move combinations.
+            mapped key (:data:`_EXECUTE_KEY`), both alone and combined with UP.
         :raises RuntimeError: if the scenario doesn't report COOM's standard
             4-button layout, or its 4th button has no default key mapped.
         """
@@ -160,12 +160,6 @@ class COOMAdapter(EnvAdapter):
             frozenset(["RIGHT", "UP"]): action_for(turn_right=True, move=True),
             frozenset([execute_key]): action_for(execute=True),
             frozenset(["UP", execute_key]): action_for(move=True, execute=True),
-            frozenset(["LEFT", execute_key]): action_for(turn_left=True, execute=True),
-            frozenset(["RIGHT", execute_key]): action_for(turn_right=True, execute=True),
-            frozenset(["LEFT", "UP", execute_key]): action_for(
-                turn_left=True, move=True, execute=True),
-            frozenset(["RIGHT", "UP", execute_key]): action_for(
-                turn_right=True, move=True, execute=True),
         }
         return SingleKeySpec(combos=combos, noop=_NOOP)
 

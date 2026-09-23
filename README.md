@@ -275,26 +275,14 @@ derives a sensible default keymap automatically (arrows to turn/move, that
 you want to remap it. COOM blocks log the raw ViZDoom `game_variables`
 (health, ammo, position, ...) as an analysis variable; there's no in-memory
 savestate, so reconstruction is via seed + action replay like most backends.
-The nine COOM curricula enable native audio with
-`env_kwargs.audio_buffer_enabled: true`. On Ubuntu install `libopenal1`
-(`sudo apt install libopenal1`); the adapter stops with an error if this
-library cannot load. Keep `fps: 35`: each step generates one Doom tic of
-44.1 kHz stereo PCM. `--no-audio` mutes playback while keeping PCM in the log.
-Set `env_kwargs.audio_buffer_enabled: false` for a run without audio capture.
-
-`env_kwargs.audio_efx: false` explicitly disables reverb to avoid an older
-OpenAL EFX crash; this is printed and saved with the audio metadata. The
-engine console is enabled so initialization failures are visible. MIDI
-background music needs a working ViZDoom MIDI renderer separately; a
-`Starting MIDI playback failed` message means music is missing even when
-sound effects work. Do not treat sound effects alone as full audio validation.
-
-Logs contain `audio`, `audio_valid`, and `audio_sampling_rate`. Terminal
-frames, for which ViZDoom exposes no state, have zero PCM with
-`audio_valid=false`; playback does not replay the previous buffer. The
-session discards queued sound at episode end. `audio_onset` is a PortAudio
-DAC-time estimate, not a physical microphone/photodiode latency measurement.
-The default keys support turning and moving while attacking/jumping/running.
+The nine COOM curricula enable audio via `env_kwargs.audio_buffer_enabled`.
+On Ubuntu, install OpenAL with `sudo apt install libopenal1`. Keep `fps: 35`
+for one Doom tic of 44.1 kHz stereo PCM per step. `--no-audio` mutes playback
+but preserves recorded PCM; terminal frames are marked `audio_valid=false`.
+`audio_efx: false` disables reverb to avoid an older OpenAL crash. MIDI music
+requires a working engine MIDI renderer; check the startup console for errors.
+Queued sounds can be cut at episode end. Logged `audio_onset` estimates DAC
+timing, not physical speaker latency.
 
 ## Running AI GameStore games
 
