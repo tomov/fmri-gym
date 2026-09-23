@@ -1,6 +1,7 @@
 {
   "_game": "COOM: Raise the Roof (Doom continual-RL suite; own scenario, not stock ViZDoom)",
   "_note": "Needs the TTomilin/COOM repo checked out somewhere and COOM_REPO set to it (or pass --coom-repo) -- the coom backend reads its conf.cfg/.wad scenario assets directly, it does not pip install the COOM package (which pins a conflicting gymnasium version).",
+  "_audio_note": "Requires OpenAL (Ubuntu: sudo apt install libopenal1). Native stereo PCM at 44100 Hz, one Doom tic per step: keep fps=35. EFX reverb is explicitly disabled. --no-audio mutes playback but preserves logged PCM. MIDI music also requires a working engine MIDI renderer; check the engine startup log.",
   "_keys_note": "The coom backend derives its own default keymap from the scenario's 4 buttons (always TURN_LEFT, TURN_RIGHT, MOVE_FORWARD, plus one scenario-specific button). For raise_the_roof that 4th button is USE -> E.",
   "curriculum": [
     {
@@ -24,6 +25,7 @@
     {"type": "fixation", "duration": 1.0},
     {
       "type": "game", "backend": "coom", "game": "raise_the_roof",
+      "env_kwargs": {"audio_buffer_enabled": true, "audio_efx": false},
       "mode": "duration", "duration": 300.0, "fps": 35
     },
     {"type": "fixation", "duration": 2.0}

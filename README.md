@@ -93,7 +93,7 @@ uv run fmri-play --subject sub-01 --dummy-trigger --curriculum configs/dbp_games
 Drop `--dummy-trigger` for a real session (then press SPACE, then wait for the
 `=` scanner trigger). For VGDL setup see [Running VGDL games](#running-vgdl-games).
 
-stable-retro games play their native audio, and ViZDoom does when its config sets
+stable-retro games play their native audio; ViZDoom and COOM do when their config sets
 `env_kwargs.audio_buffer_enabled`. Use `--no-audio` or a game phase's
 `"audio": false` to mute playback; logged audio is unchanged. Each frame's sound
 starts a constant delay after the flip that shows it, measured from the system's
@@ -275,7 +275,14 @@ derives a sensible default keymap automatically (arrows to turn/move, that
 you want to remap it. COOM blocks log the raw ViZDoom `game_variables`
 (health, ammo, position, ...) as an analysis variable; there's no in-memory
 savestate, so reconstruction is via seed + action replay like most backends.
-No native audio yet, unlike the `vizdoom` backend's `sound()`.
+The nine COOM curricula enable audio via `env_kwargs.audio_buffer_enabled`.
+On Ubuntu, install OpenAL with `sudo apt install libopenal1`. Keep `fps: 35`
+for one Doom tic of 44.1 kHz stereo PCM per step. `--no-audio` mutes playback
+but preserves recorded PCM; terminal frames are marked `audio_valid=false`.
+`audio_efx: false` disables reverb to avoid an older OpenAL crash. MIDI music
+requires a working engine MIDI renderer; check the startup console for errors.
+Queued sounds can be cut at episode end. Logged `audio_onset` estimates DAC
+timing, not physical speaker latency.
 
 ## Running AI GameStore games
 

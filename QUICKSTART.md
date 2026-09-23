@@ -127,7 +127,9 @@ uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__raise_the
 Controls: UP moves forward, LEFT/RIGHT turn, and the scenario's one extra
 button is SPACE (pitfall, chainsaw, run_and_gun, parkour), LSHIFT
 (health_gathering, hide_and_seek, arms_dealer, floor_is_lava) or E
-(raise_the_roof). No native audio on this backend yet.
+(raise_the_roof). The nine configs enable native audio; OpenAL is required.
+MIDI background music needs a working MIDI renderer. See README for audio setup
+and the current episode-end playback limitation.
 
 ### Crafter
 
