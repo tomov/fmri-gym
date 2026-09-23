@@ -93,7 +93,7 @@ uv run fmri-play --subject sub-01 --dummy-trigger --curriculum configs/dbp_games
 Drop `--dummy-trigger` for a real session (then press SPACE, then wait for the
 `=` scanner trigger). For VGDL setup see [Running VGDL games](#running-vgdl-games).
 
-stable-retro games play their native audio, and ViZDoom does when its config sets
+stable-retro games play their native audio; ViZDoom and COOM do when their config sets
 `env_kwargs.audio_buffer_enabled`. Use `--no-audio` or a game phase's
 `"audio": false` to mute playback; logged audio is unchanged. Each frame's sound
 starts a constant delay after the flip that shows it, measured from the system's
@@ -275,7 +275,26 @@ derives a sensible default keymap automatically (arrows to turn/move, that
 you want to remap it. COOM blocks log the raw ViZDoom `game_variables`
 (health, ammo, position, ...) as an analysis variable; there's no in-memory
 savestate, so reconstruction is via seed + action replay like most backends.
-No native audio yet, unlike the `vizdoom` backend's `sound()`.
+The nine COOM curricula enable native audio with
+`env_kwargs.audio_buffer_enabled: true`. On Ubuntu install `libopenal1`
+(`sudo apt install libopenal1`); the adapter stops with an error if this
+library cannot load. Keep `fps: 35`: each step generates one Doom tic of
+44.1 kHz stereo PCM. `--no-audio` mutes playback while keeping PCM in the log.
+Set `env_kwargs.audio_buffer_enabled: false` for a run without audio capture.
+
+`env_kwargs.audio_efx: false` explicitly disables reverb to avoid an older
+OpenAL EFX crash; this is printed and saved with the audio metadata. The
+engine console is enabled so initialization failures are visible. MIDI
+background music needs a working ViZDoom MIDI renderer separately; a
+`Starting MIDI playback failed` message means music is missing even when
+sound effects work. Do not treat sound effects alone as full audio validation.
+
+Logs contain `audio`, `audio_valid`, and `audio_sampling_rate`. Terminal
+frames, for which ViZDoom exposes no state, have zero PCM with
+`audio_valid=false`; playback does not replay the previous buffer. The
+session discards queued sound at episode end. `audio_onset` is a PortAudio
+DAC-time estimate, not a physical microphone/photodiode latency measurement.
+The default keys support turning and moving while attacking/jumping/running.
 
 ## Running AI GameStore games
 

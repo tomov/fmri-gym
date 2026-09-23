@@ -28,9 +28,11 @@ own action indices without hardcoding a per-scenario button table.
 `step()` returns ViZDoom's raw (near-zero) reward; COOM's actual reward
 shaping lives in Python wrapper classes we deliberately don't use here. Game
 variables (health, ammo, position, ...) are logged as an analysis variable
-instead, mirroring the `vizdoom` backend's `gamevariables`. No native audio
-yet (unlike `vizdoom.py`'s `sound()`) -- ViZDoom exposes it the same way
-here, just not wired up.
+instead, mirroring the `vizdoom` backend's `gamevariables`. Opt-in native
+audio uses one 44.1 kHz stereo buffer per Doom tic, so the phase must run at
+35 fps. Playback uses the shared Audio output; capture logs independent PCM
+copies even when playback is muted. Terminal states have no audio buffer:
+log a marked zero placeholder, never replay the previous step's sound.
 """
 
 from __future__ import annotations
@@ -41,8 +43,8 @@ from typing import Any
 
 import numpy as np
 
+from .base import EnvAdapter, FrameState, Sound
 from .keyspec import KeySpec, SingleKeySpec
-from .base import EnvAdapter, FrameState
 
 # Physical key for each possible 4th (execute) button.
 _EXECUTE_KEY = {"JUMP": "SPACE", "ATTACK": "SPACE", "SPEED": "LSHIFT", "USE": "E"}
@@ -58,6 +60,37 @@ def _build_actions() -> list[list[bool]]:
 
 _ACTIONS = _build_actions()
 _NOOP = _ACTIONS.index([False, False, False, False])
+
+
+def _configure_audio(game: Any, spec: dict) -> None:
+    """Configure opt-in PCM before init; reject missing Linux OpenAL explicitly."""
+    import ctypes
+    import sys
+
+    import vizdoom as vzd
+
+    options = spec.get("env_kwargs", {})
+    enabled = options.get("audio_buffer_enabled", False)
+    efx = options.get("audio_efx", False)
+    if not isinstance(enabled, bool) or not isinstance(efx, bool):
+        raise TypeError("COOM audio_buffer_enabled and audio_efx must be booleans")
+    game.set_audio_buffer_enabled(enabled)
+    if not enabled:
+        return
+    if spec.get("fps", 30) != 35 or spec.get("turn_based", False):
+        raise ValueError("COOM audio needs fps=35 and turn_based=false (one Doom tic per step)")
+    if sys.platform.startswith("linux"):
+        try:
+            ctypes.CDLL("libopenal.so.1")
+        except OSError as error:
+            raise RuntimeError("COOM audio requires OpenAL: install libopenal1 "
+                               "(Ubuntu: sudo apt install libopenal1)") from error
+    game.set_audio_sampling_rate(vzd.SamplingRate.SR_44100)
+    game.set_audio_buffer_size(1)
+    # Older OpenAL versions can abort in EFX setup. Keep the choice explicit.
+    game.add_game_args(f"+snd_efx {int(efx)}")
+    game.set_console_enabled(True)  # expose engine audio/MIDI initialization errors
+    print(f"COOM audio: 44100 Hz stereo, 1 tic/buffer; EFX reverb={efx}")
 
 
 class COOMAdapter(EnvAdapter):
@@ -90,6 +123,7 @@ class COOMAdapter(EnvAdapter):
         game.set_window_visible(False)
         game.set_screen_resolution(vzd.ScreenResolution.RES_640X480)
         game.set_seed(env_kwargs.get("seed", 0))
+        _configure_audio(game, spec)
         game.init()
         self._last_frame: np.ndarray | None = None
         return game
@@ -98,7 +132,7 @@ class COOMAdapter(EnvAdapter):
         """Derive the keymap from the scenario's own button list.
 
         :return: arrows to turn/move, plus the scenario's 4th button on its
-            mapped key (:data:`_EXECUTE_KEY`), both alone and combined with UP.
+            mapped key (:data:`_EXECUTE_KEY`), including turn/move combinations.
         :raises RuntimeError: if the scenario doesn't report COOM's standard
             4-button layout, or its 4th button has no default key mapped.
         """
@@ -126,6 +160,12 @@ class COOMAdapter(EnvAdapter):
             frozenset(["RIGHT", "UP"]): action_for(turn_right=True, move=True),
             frozenset([execute_key]): action_for(execute=True),
             frozenset(["UP", execute_key]): action_for(move=True, execute=True),
+            frozenset(["LEFT", execute_key]): action_for(turn_left=True, execute=True),
+            frozenset(["RIGHT", execute_key]): action_for(turn_right=True, execute=True),
+            frozenset(["LEFT", "UP", execute_key]): action_for(
+                turn_left=True, move=True, execute=True),
+            frozenset(["RIGHT", "UP", execute_key]): action_for(
+                turn_right=True, move=True, execute=True),
         }
         return SingleKeySpec(combos=combos, noop=_NOOP)
 
@@ -160,9 +200,31 @@ class COOMAdapter(EnvAdapter):
     def render(self) -> np.ndarray:
         return self._frame()
 
-    def capture(self, obs: Any, info: dict, want_blob: bool = True) -> FrameState:
+    def sound(self) -> Sound | None:
+        """Return this tic's native PCM, or None for disabled/terminal audio."""
+        if not self.env.is_audio_buffer_enabled():
+            return None
         state = self.env.get_state()
-        variables = {}
-        if state is not None:
-            variables["game_variables"] = np.asarray(state.game_variables)
+        if state is None:
+            return None
+        return Sound(state.audio_buffer, self.env.get_audio_sampling_rate())
+
+    def capture(self, obs: Any, info: dict, want_blob: bool = True) -> FrameState:
+        """Copy per-step variables/PCM; terminal placeholders keep arrays aligned."""
+        state = self.env.get_state()
+        variables = {"game_variables": state.game_variables.copy() if state is not None
+                     else np.full(len(self.env.get_available_game_variables()), np.nan)}
+        if self.env.is_audio_buffer_enabled():
+            variables["audio_valid"] = state is not None
+            variables["audio"] = (state.audio_buffer.copy() if state is not None else
+                                  np.zeros((self.env.get_audio_sampling_rate() // 35, 2),
+                                           dtype=np.int16))
         return FrameState(blob=None, variables=variables)
+
+    def block_extra(self) -> dict | None:
+        """Describe the logged PCM format and the engine's reverb setting."""
+        if not self.env.is_audio_buffer_enabled():
+            return None
+        return {"audio_sampling_rate": self.env.get_audio_sampling_rate(),
+                "audio_buffer_tics": 1,
+                "audio_efx": self.spec.get("env_kwargs", {}).get("audio_efx", False)}
