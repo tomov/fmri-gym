@@ -77,6 +77,27 @@ beside the frame. It reports only what `info` already carries, which is what
 keeps humans and models on the same game: `agent_play.py` hands a policy the
 same lines as text.
 
+`menu` swaps the 16-key map for the eight buttons a scanner button box has, the
+scheme crafter-for-brain-scan (v0.33, `core.py:ButtonMapper`) plays in: six
+buttons drive move/do/sleep directly, and the other ten actions sit in a list
+that `cycle` advances and `confirm` fires. That is a control scheme rather than
+a game change -- the space is still Discrete(17) and every action stays
+reachable -- so it belongs here and not in the env. The two meta-buttons take
+ids 17 and 18, just past the space, and never reach the engine: `cycle` steps it
+with `noop`, since moving the cursor still costs the subject a turn, and
+`confirm` steps it with whatever the cursor is on. So `actions` in the npz
+records what was pressed, and `capture` logs `env_action`, `menu_idx` and
+`menu_sel` beside it, which is what a replay needs to rebuild both the world and
+the screen.
+
+The selection is drawn over the player rather than in the letterbox bar, because
+that is where the eyes already are between presses, and only while the last
+press was a `cycle` or a `confirm`. The rig instead fades it out on a 3 s wall
+clock (`frontend_pygame.py --menu-s`), which a turn-based block cannot copy: it
+repaints only when a key is pressed, so nothing would clear the line until the
+next press anyway. "While you are using it" is the closest equivalent, and it
+has the better property of being reconstructible from the logged actions alone.
+
 Crafter ships no sound at all (56 assets, every one a PNG), which leaves a
 subject in the bore unable to tell three situations apart, all of which look
 like a frame where nothing much moved: the press landed on a creature but did
@@ -144,6 +165,14 @@ _DEFAULT_KEYMAP = {
     "1": 11, "2": 12, "3": 13, "4": 14, "5": 15, "6": 16,
 }
 
+# The six actions `menu` mode leaves on their own button, and the keys the rig's
+# own frontend puts them on (`frontend_pygame.py:KEYMAP` -- D and S beside the
+# arrows, W and A for cycle and confirm), so a subject who has practised in
+# crafter-for-brain-scan keeps their fingers. The remaining ten are not listed
+# anywhere: they are whatever is left of the action space, so a crafter that
+# gained an action would put it in the menu rather than drop it.
+_MENU_KEYMAP = {"LEFT": 1, "RIGHT": 2, "UP": 3, "DOWN": 4, "D": 5, "S": 6}
+
 #: What ``move_<name>`` displaces the player by, copied from ``Player._move``.
 _DIRECTIONS = {"left": (-1, 0), "right": (+1, 0), "up": (0, -1), "down": (0, +1)}
 
@@ -198,15 +227,39 @@ class CrafterAdapter(EnvAdapter):
         self._last_obs = None
         self._cue = ""
         self._outcome: dict = _NO_OUTCOME
-        return self._build(spec.get("seed"))
+        env = self._build(spec.get("seed"))
+        self._menu_mode = bool(spec.get("menu", False))
+        self._setup_menu(env)
+        return env
 
     def _build(self, seed: int | None) -> Any:
         """Construct a crafter env whose first episode is fixed by ``seed``."""
         import crafter
         return crafter.Env(seed=seed, **self._kwargs)
 
+    def _setup_menu(self, env: Any) -> None:
+        """Work out the menu list and the two meta-action ids.
+
+        The menu is the complement of the directly-mapped six within the env's
+        own ``action_names``, so it is read off the space rather than written
+        down twice. Set up even when ``menu`` is off: the ids are then unused,
+        and one branch fewer beats a half-built adapter.
+
+        :param env: the env being built, not yet stored as ``self.env``.
+        """
+        n = len(env.action_names)
+        direct = set(_MENU_KEYMAP.values()) | {0}
+        self._menu = [i for i in range(n) if i not in direct]
+        self._cycle, self._confirm = n, n + 1
+        self._menu_idx = 0
+        self._env_action = 0
+        self._show_menu = False
+
     def _keyspec(self) -> SingleKeySpec:
-        combos = {frozenset([k]): v for k, v in _DEFAULT_KEYMAP.items()}
+        keymap = _DEFAULT_KEYMAP
+        if self._menu_mode:
+            keymap = {**_MENU_KEYMAP, "W": self._cycle, "A": self._confirm}
+        combos = {frozenset([k]): v for k, v in keymap.items()}
         return SingleKeySpec(combos=combos, noop=0)
 
     def reset(self, seed: int | None) -> tuple[Any, dict]:
@@ -222,13 +275,20 @@ class CrafterAdapter(EnvAdapter):
         self._last_unlock = None
         self._cue = ""
         self._outcome = _NO_OUTCOME
+        # `_menu_idx` deliberately survives: the rig's mapper keeps the cursor
+        # across episodes within a run, and an adapter lives exactly one block.
+        self._show_menu = False
+        self._env_action = 0
         self._last_obs = np.asarray(self.env.reset())
         return self._last_obs, {}
 
     def step(self, action: Any) -> tuple[Any, float, bool, bool, dict]:
+        # In menu mode the press and the action part ways here; everything
+        # downstream -- cue prediction, engine, log -- uses what the env gets.
+        self._env_action = self._menu_action(int(action))
         # Read what this press is about to meet, before the engine acts on it.
-        self._outcome = self._predict(int(action))
-        obs, reward, done, info = self.env.step(int(action))
+        self._outcome = self._predict(self._env_action)
+        obs, reward, done, info = self.env.step(self._env_action)
         self._last_obs = np.asarray(obs)
         scored = self._note_unlocks(info["achievements"])
         # One cue at a time, highest first: the killing blow that unlocks
@@ -241,6 +301,33 @@ class CrafterAdapter(EnvAdapter):
         # and health rides along in `info`, so the two are separable here.
         alive = info["inventory"]["health"] > 0
         return self._last_obs, reward, done and not alive, done and alive, info
+
+    def _menu_action(self, action: int) -> int:
+        """Translate a button press into the action the engine will receive.
+
+        Only the two meta-buttons are translated; the six direct ones are
+        already engine actions and pass through untouched, as does everything
+        when ``menu`` is off.
+
+        :param action: the id the keyspec resolved the press to.
+        :return: a real crafter action. ``cycle`` returns ``noop``, because the
+            turn has to advance either way: a free look at the menu would let a
+            subject reach any of the ten for the price of one, and the rig does
+            not give them that.
+        """
+        if not self._menu_mode:
+            return action
+        self._show_menu = action in (self._cycle, self._confirm)
+        if action == self._cycle:
+            self._menu_idx = (self._menu_idx + 1) % len(self._menu)
+            return 0
+        if action == self._confirm:
+            return self._menu[self._menu_idx]
+        return action
+
+    def _menu_name(self) -> str:
+        """The action name the menu cursor is currently on."""
+        return self.env.action_names[self._menu[self._menu_idx]]
 
     def _predict(self, action: int) -> dict:
         """What the pending action will do, read off the pre-step state.
@@ -392,6 +479,23 @@ class CrafterAdapter(EnvAdapter):
                 lines.append(self._outcome["target"])
         return lines or None
 
+    def on_frame_overlay(self) -> tuple[list[str], float] | None:
+        """The menu cursor, drawn over the player, while it is being used.
+
+        The one thing on screen the subject is aiming with rather than reading,
+        so it goes where they are already looking instead of into the margin.
+        0.5 would be the middle of the frame; crafter draws its own HUD into the
+        bottom two of the nine tile rows, so the played part is the top seven
+        and the player stands at row 3.5 of 9.
+
+        :return: ``(lines, y_frac)`` for :meth:`fmri_gym.display.Display
+            .draw_frame`, or ``None`` when there is nothing to show.
+        """
+        if not (self._menu_mode and self._show_menu):
+            return None
+        # Underscores are the logged id; the screen gets the readable form.
+        return (["> " + self._menu_name().replace("_", " ")], 3.5 / 9.0)
+
     def capture(
         self, obs: Any, info: dict, want_blob: bool = True
     ) -> FrameState:
@@ -417,6 +521,14 @@ class CrafterAdapter(EnvAdapter):
             "cue": self._cue,
             "target": self._outcome["target"],
         }
+        if self._menu_mode:
+            # What the engine got, next to what was pressed: `actions` in the
+            # npz holds the button, and for cycle/confirm the two differ. Menu
+            # state is read after the press, so a cycle row names where the
+            # cursor landed, which is also what the frame shows.
+            variables["env_action"] = self._env_action
+            variables["menu_idx"] = self._menu_idx
+            variables["menu_sel"] = self._menu_name()
         if self._log_frames:
             # Kept as uint8 rather than bytes: a list of bytes becomes a numpy
             # "S" array, which strips the trailing NULs a zlib stream can end
@@ -435,6 +547,7 @@ class CrafterAdapter(EnvAdapter):
         # The restored frame is one nobody pressed a button to reach.
         self._cue = ""
         self._outcome = _NO_OUTCOME
+        self._show_menu = False
         world = getattr(self.env, "_world", None)
         if world is None:
             self._last_obs = np.asarray(self.env.render())
@@ -460,6 +573,17 @@ class CrafterAdapter(EnvAdapter):
             "inventory_names": np.array(list(crafter.constants.items)),
             "achievement_names": np.array(list(crafter.constants.achievements)),
         }
+        if self._menu_mode:
+            # `actions` now holds button ids, so the legend has to cover the two
+            # that are not engine actions; `env_action` still indexes the first
+            # 17 of it. menu_names decodes menu_idx, and is the order the
+            # subject cycles through.
+            extra["action_names"] = np.array(
+                list(self.env.action_names) + ["cycle", "confirm"]
+            )
+            extra["menu_names"] = np.array(
+                [self.env.action_names[i] for i in self._menu]
+            )
         names = _semantic_names(self.env)
         if names:
             extra["semantic_names"] = np.array(names)

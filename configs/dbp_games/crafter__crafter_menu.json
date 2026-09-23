@@ -1,0 +1,50 @@
+{
+  "_game": "Crafter (8-button menu)",
+  "_note": "crafter__crafter.json played through eight buttons instead of sixteen, which is the control scheme crafter-for-brain-scan v0.33 uses in the scanner (core.py:ButtonMapper, frontend_pygame.py:KEYMAP). Same env, same level, same Discrete(17): six actions keep a button of their own and the other ten sit in a cursor the subject cycles to. Install the same fork as crafter__crafter.json -- pip install 'crafter @ git+https://github.com/chengfanbrain/crafter.git@deterministic' -- for exact replay. Read that config's notes first; only what differs is written down here.",
+  "_menu_note": "menu turns on the adapter's button mapper. W advances the cursor and steps the env with noop, A performs the action the cursor is on; both draw the cursor over the player for that one frame. The cost of a look is a turn, as it is in the rig: a free cycle would make all ten actions reachable for one press. The npz records the button in 'actions' and the engine's action in the 'env_action' variable, plus 'menu_idx' and 'menu_sel' read after the press, and action_names gains 'cycle'/'confirm' at ids 17/18 so the button column decodes. Two deviations from the rig, both deliberate: the cursor shows while the last press was cycle or confirm rather than for 3 wall-clock seconds (--menu-s), because a turn-based block repaints only on a press and has no clock to fade against, and this version is reconstructible from the logged actions alone; and the cursor sits at 3.5/9 of the frame height, the centre of the played area above crafter's own two HUD rows, which is where the rig puts it too.",
+  "_keys_note": "No 'keys' block on purpose: the adapter supplies the eight-key map in menu mode, and a curriculum override here would have to restate it. A button box that reports other key names can still remap, but cycle and confirm have to be written as the literal ids 17 and 18, since they are not crafter actions and nothing else names them.",
+  "_pacing_note": "turn_based is true, which is the whole point of this variant and the one place it parts company with both crafter__crafter.json and the rig. Eight buttons cost more presses per action than sixteen, so a fixed cadence would spend the survival clock on menu cycling; here the world advances once per press and never otherwise, so the run is paced by the subject and every step is a decision. fps 15 is then a polling rate, not a game speed: it bounds how long a press waits to be seen (~67 ms), and it is what the other turn-based DBP configs use. latched_keys is irrelevant under turn_based -- the loop already reads keydowns -- and is left off. The rig has no turn-based mode at all: it runs a fixed 5 Hz cadence (frontend_pygame.py --cadence), so wall-clock comparisons with a rig run do not transfer, and only the action sequences do.",
+  "_size_note": "size stays 384, not the rig's GAME_PX 288. 384 is an integer half of the 768-pixel display height and 288 is not, and display.draw_frame scales unfiltered, so 288 would smear the pixel art and the HUD counters first. Nothing about the game depends on it; crafter renders its 9x9 view at whatever size it is given.",
+  "_state_note": "state_stride 25 counts frames, and a frame is now a press rather than 400 ms, so anchors fall every 25 presses instead of every 10 s. The block is also much shorter in frames than a 2.5 fps one of the same duration, so both the npz and the anchor count shrink.",
+  "curriculum": [
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Crafter",
+        "",
+        "Open-world survival. Gather materials, craft",
+        "tools, eat, drink, sleep, and stay alive.",
+        "",
+        "The world waits for you: it moves one step each",
+        "time you press a button, and not otherwise.",
+        "",
+        "Controls (8 buttons):",
+        "   ARROWS      move",
+        "   D           interact / attack / collect",
+        "   S           sleep",
+        "   W           next menu item",
+        "   A           do the menu item",
+        "",
+        "The menu holds the ten actions with no button of",
+        "their own: place stone, table, furnace, plant, and",
+        "make a wood / stone / iron pickaxe or sword. W",
+        "moves the cursor and shows it over your character;",
+        "A performs it. Moving the cursor also costs a turn.",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {"type": "fixation", "duration": 1.0},
+    {
+      "type": "game", "backend": "crafter", "game": "crafter",
+      "env_kwargs": {"size": [384, 384], "length": 0},
+      "menu": true,
+      "mode": "duration", "duration": 300.0, "fps": 15,
+      "turn_based": true, "latched_keys": false,
+      "state_stride": 25, "log_frames": true, "show_score": true,
+      "cues": true, "cue_overlay": false, "seed": 0
+    },
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

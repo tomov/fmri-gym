@@ -18,6 +18,12 @@ BG_COLOR = (0, 0, 0)
 TEXT_COLOR = (220, 220, 220)
 FIX_COLOR = (255, 255, 255)
 HUD_COLOR = (235, 235, 235)
+# Text drawn ON a frame, where gray would read as part of the picture. Light
+# sky blue: bright over both dark and light art, and cool enough not to be
+# mistaken for the red a game may reserve (crafter-for-brain-scan v0.33 picked
+# it for the same reason, and matching it keeps one rig's subjects at home in
+# the other).
+ON_FRAME_COLOR = (150, 215, 255)
 
 
 class Display:
@@ -61,7 +67,10 @@ class Display:
             self._init_display()
 
     def draw_frame(
-        self, rgb: np.ndarray, overlay: list[str] | None = None
+        self,
+        rgb: np.ndarray,
+        overlay: list[str] | None = None,
+        on_frame: tuple[list[str], float] | None = None,
     ) -> None:
         """Blit an RGB frame, aspect-fit and centered with black pad.
 
@@ -69,6 +78,9 @@ class Display:
         :param overlay: optional short status lines to draw alongside the
             frame; ``None`` (the default) draws the frame alone, exactly as
             before this argument existed.
+        :param on_frame: optional ``(lines, y_frac)`` drawn over the frame
+            itself rather than in the margin; ``None`` (the default) draws
+            nothing. See :meth:`_draw_on_frame`.
         """
         self.screen.fill(BG_COLOR)
         h, w = rgb.shape[:2]
@@ -80,6 +92,8 @@ class Display:
         self.screen.blit(surf, rect.topleft)
         if overlay:
             self._draw_overlay(overlay, rect)
+        if on_frame:
+            self._draw_on_frame(on_frame, rect)
         pygame.display.flip()
 
     def _draw_overlay(self, lines: list[str], rect: pygame.Rect) -> None:
@@ -108,6 +122,45 @@ class Display:
                 self.screen.fill(BG_COLOR, box)
                 self.screen.blit(surf, box)
                 y += self.hud_font.get_height()
+
+    def _draw_on_frame(
+        self, on_frame: tuple[list[str], float], rect: pygame.Rect
+    ) -> None:
+        """Draw lines over the frame on a black backdrop, horizontally centered.
+
+        The counterpart of :meth:`_draw_overlay`, and the opposite trade: the
+        margin is the right place for something the subject reads now and then,
+        and the wrong place for something they are acting on, which has to be
+        where they are already looking. Covering game pixels is the cost, so a
+        caller should put a line here only while it is in use.
+
+        Drawn at display resolution over the scaled frame, not into the array,
+        so the text is not magnified by the same unfiltered scale as the art --
+        and so the frame the adapter logged stays the frame the engine made.
+
+        ``y_frac`` exists because "where they are already looking" is not
+        always the middle of the picture: a game that draws its own HUD into
+        the bottom of its frame leaves the played part above centre.
+
+        :param on_frame: ``(lines, y_frac)``, where ``y_frac`` is the fraction
+            of the frame's height the block is centered on (0.5 = middle).
+        :param rect: rect the frame was blitted into.
+        """
+        lines, y_frac = on_frame
+        surfs = [self.hud_font.render(ln, True, ON_FRAME_COLOR) for ln in lines]
+        if not surfs:
+            return
+        total_h = sum(s.get_height() for s in surfs)
+        width = max(s.get_width() for s in surfs)
+        cx = rect.centerx
+        top = rect.top + int(rect.height * y_frac) - total_h // 2
+        backdrop = pygame.Rect(0, 0, width + 16, total_h + 10)
+        backdrop.center = (cx, top + total_h // 2)
+        self.screen.fill(BG_COLOR, backdrop)
+        y = top
+        for surf in surfs:
+            self.screen.blit(surf, surf.get_rect(midtop=(cx, y)))
+            y += surf.get_height()
 
     def _wrap(self, font: pygame.font.Font, line: str, max_w: int) -> list[str]:
         """Word-wrap one logical line so no rendered line exceeds ``max_w`` px.

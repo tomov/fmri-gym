@@ -276,7 +276,9 @@ class Session:
         """Run one episode, appending frame data to ``frames``.
 
         :param adapter: wrapped env for reset/step/render/sound/capture, and
-            optionally an ``overlay()`` returning status lines for the display.
+            optionally an ``overlay()`` returning status lines for the display
+            margin, or an ``on_frame_overlay()`` returning lines to draw over
+            the frame itself.
         :param frames: mutable frame-log dict; lists are appended in place.
         :param seed: RNG seed for this episode's ``reset``.
         :param episode_id: index of this episode within the game block.
@@ -294,10 +296,11 @@ class Session:
         key_to_action = (adapter.keyspec.key_to_action_map()
                          if turn_based or latched else {})
         overlay = getattr(adapter, "overlay", lambda: None)
+        on_frame = getattr(adapter, "on_frame_overlay", lambda: None)
 
         ## Reset environment and show initial state
         obs, info = adapter.reset(seed)
-        self.display.draw_frame(adapter.render(), overlay())
+        self.display.draw_frame(adapter.render(), overlay(), on_frame())
         self.audio.play(adapter.sound())
 
         ## Loop over frames within episode
@@ -347,7 +350,7 @@ class Session:
             for k, v in fs.variables.items():
                 frames["variables"][k].append(v)
 
-            self.display.draw_frame(adapter.render(), overlay())
+            self.display.draw_frame(adapter.render(), overlay(), on_frame())
             self.audio.play(adapter.sound())
         return False
 
