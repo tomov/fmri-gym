@@ -18,7 +18,7 @@ config the loop behaves as the fMRI default and sends nothing.
 
 from __future__ import annotations
 
-import sys
+import sys, os
 import time
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
@@ -33,6 +33,7 @@ from .display import Display, check_monitor
 from .keys import held_key_names, key_name
 from .logging import Logger
 from .triggers import Triggers
+from .recorder import EpisodeRecorder
 
 if TYPE_CHECKING:
     from .adapters.base import EnvAdapter
@@ -400,7 +401,7 @@ class Run:
         state_stride: int,
         block_end: float,
         play_sound: bool,
-    ) -> bool:
+    ) -> tuple[bool, EpisodeRecorder|None]:
         """Run one episode, appending frame data to ``frames``.
 
         :param adapter: wrapped env for reset/step/render/sound/capture.
@@ -429,6 +430,15 @@ class Run:
         # step's, and it would start the episode's sound off its flips.
         next_t = self._show(adapter, play_sound=False) + dt
 
+        recorder = EpisodeRecorder(
+            path = os.path.join(self.outdir, f"episode-{episode_id:02d}.mkv"),
+            frame_size = adapter.render().shape,
+            audio_layout = None#'stereo' if play_sound else None,
+        )
+        recorder.start()
+        record_step_start = next_t
+        recorder.step(0, adapter.render(), adapter.sound())
+
         ## Loop over frames within episode
         while not (terminated or truncated) and time.perf_counter() < block_end:
             # Wait for the frame tick (turn-based: for a mapped keydown, up to
@@ -439,7 +449,8 @@ class Run:
             action, user_quit = _poll_keys_until(
                 self.display, deadline, key_log, self.clock, key_to_action)
             if user_quit:
-                return True
+                recorder.stop()
+                return True, recorder
             next_t += dt
             if turn_based and action is None:
                 continue                        # block ended without a press
@@ -455,6 +466,7 @@ class Run:
             # The frame trigger goes out on the flip that shows this frame.
             self.display.call_on_flip(self.triggers.frame)
             flip_t = self._show(adapter, play_sound)
+            recorder.step(flip_t-record_step_start, adapter.render(), adapter.sound())
             # More than a frame behind (a stall): drop the debt, or it is repaid
             # as a burst of one-refresh frames. The frame of slack is what a
             # vsync-locked flip normally lands after its tick.
@@ -482,7 +494,8 @@ class Run:
                 frames["trigger"].append(self.triggers.last_frame)
             for k, v in fs.variables.items():
                 frames["variables"][k].append(v)
-        return False
+        recorder.stop() # send signal that there won't be more steps being pushed, ready to close
+        return False, recorder
 
     def _show(self, adapter: EnvAdapter, play_sound: bool) -> float:
         """Flip the adapter's frame, then queue its sound against that flip.
@@ -557,20 +570,25 @@ class Run:
         episode_id = 0
         user_quit = False
 
+        # keep a list of backlog of recorders, should ensure all thread are joined before going onto the next game
+        all_recorders = []
+
         ## Loop over episodes within game block
         while not user_quit and time.perf_counter() < block_end:
             ## Run one episode
-            user_quit = self._episode(
+            user_quit, recorder = self._episode(
                 adapter, frames,
                 seed=base_seed + episode_id, episode_id=episode_id,
                 turn_based=turn_based, dt=dt, state_stride=state_stride,
-                block_end=block_end, play_sound=play_sound)
+                block_end=block_end, play_sound=play_sound,
+            )
             # An episode's last sounds are still queued when it ends; drop them
             # so they do not play over the next episode or the next fixation.
             self.audio.stop()
             episode_id += 1
             if mode == "episode" and episode_id >= n_episodes:
                 break
+            all_recorders.append(recorder)
 
         self.triggers.block_end()
         extra = getattr(adapter, "block_extra", lambda: None)()
@@ -593,6 +611,10 @@ class Run:
             "total_reward": sum(float(r) for r in frames["reward"]),
             "data_file": path.split("/")[-1], **speed,
         })
+
+        for recorder in all_recorders:
+            # ensure that all recording threads had the opportunity to complete and flush packets before quitting
+            recorder.join()
         if user_quit:
             raise KeyboardInterrupt
 
