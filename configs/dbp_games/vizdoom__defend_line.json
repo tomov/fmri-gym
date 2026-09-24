@@ -1,0 +1,35 @@
+{
+  "_game": "ViZDoom: Defend the Line (Doom action-shooter; COOM engine)",
+  "_note": "pip install vizdoom. Like DefendCenter, but the monsters come from one side of a hall instead of all around you, and they respawn -- survive as long as possible while killing them. Same three buttons as DefendCenter.",
+  "_keys_note": "Action indices are scenario-specific. For VizdoomDefendLine-v1 the Discrete(4) map is 0=noop, 1=ATTACK, 2=TURN_RIGHT, 3=TURN_LEFT (verify with env.unwrapped.button_map). 'keys' are always these Discrete indices; env_kwargs.max_buttons_pressed picks how held keys combine: 0 = MultiBinary (keys OR together, e.g. turn while shooting), 1 = Discrete (one key wins). The controls the subject sees are a plain 'message' phase; keep its text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/Farama-Foundation/ViZDoom/blob/main/scenarios/defend_the_line.cfg",
+  "_audio_note": "env_kwargs.audio_buffer_enabled turns Doom's sound on: it arrives in obs['audio'], is played through the session's speakers, and is logged per frame. Doom makes 1/35 s of sound per step, so fps * env_kwargs.frame_skip must be 35: the session stops the block otherwise, because sound could not follow the frames.",
+  "curriculum": [
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Defend the Line",
+        "",
+        "Monsters advance on you from the far side of the",
+        "hall, and more keep coming. Turn to aim and shoot",
+        "them before they reach you.",
+        "",
+        "Controls:",
+        "   LEFT    turn left",
+        "   RIGHT   turn right",
+        "   SPACE   shoot",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {"type": "fixation", "duration": 1.0},
+    {
+      "type": "game", "backend": "vizdoom", "game": "VizdoomDefendLine-v1",
+      "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
+      "keys": {"LEFT": 3, "RIGHT": 2, "SPACE": 1},
+      "mode": "duration", "duration": 300.0, "fps": 35
+    },
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

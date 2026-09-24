@@ -1,0 +1,34 @@
+{
+  "_game": "ViZDoom: Basic (Doom action-shooter; COOM engine) -- strafe and shoot",
+  "_note": "pip install vizdoom. The simplest ViZDoom scenario: one monster on the far wall of a small rectangular room. Line it up and shoot it; the episode ends on the kill (or after 300 tics). There are no turn buttons here, only strafing.",
+  "_keys_note": "Action indices are scenario-specific. For VizdoomBasic-v1 the Discrete(4) map is 0=noop, 1=ATTACK, 2=MOVE_RIGHT, 3=MOVE_LEFT (verify with env.unwrapped.button_map). The adapter puts strafing on Z/X; since this scenario cannot turn, 'keys' below also points the LEFT/RIGHT arrows at the same two buttons, so both pairs work. 'keys' are always these Discrete indices; env_kwargs.max_buttons_pressed picks how held keys combine: 0 = MultiBinary (keys OR together, e.g. strafe while shooting), 1 = Discrete (one key wins). The controls the subject sees are a plain 'message' phase; keep its text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/Farama-Foundation/ViZDoom/blob/main/scenarios/basic.cfg",
+  "_audio_note": "env_kwargs.audio_buffer_enabled turns Doom's sound on: it arrives in obs['audio'], is played through the session's speakers, and is logged per frame. Doom makes 1/35 s of sound per step, so fps * env_kwargs.frame_skip must be 35: the session stops the block otherwise, because sound could not follow the frames.",
+  "curriculum": [
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Basic",
+        "",
+        "A single monster stands against the far wall.",
+        "Slide left and right to line up your shot, then",
+        "shoot it.",
+        "",
+        "Controls:",
+        "   LEFT / RIGHT   move left / right",
+        "   SPACE          shoot",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {"type": "fixation", "duration": 1.0},
+    {
+      "type": "game", "backend": "vizdoom", "game": "VizdoomBasic-v1",
+      "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
+      "keys": {"LEFT": 3, "RIGHT": 2, "Z": 3, "X": 2, "SPACE": 1},
+      "mode": "duration", "duration": 300.0, "fps": 35
+    },
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

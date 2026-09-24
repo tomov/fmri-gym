@@ -1,0 +1,35 @@
+{
+  "_game": "ViZDoom: Predict Position (Doom action-shooter; COOM engine)",
+  "_note": "pip install vizdoom. You hold a rocket launcher and face a monster moving across a hall. The rocket takes time to fly, so you have to fire where the monster is GOING to be, not where it is -- that is the point of the scenario. One rocket per episode; the episode ends when it lands (or after the timeout).",
+  "_keys_note": "Action indices are scenario-specific. For VizdoomPredictPosition-v1 the Discrete(4) map is 0=noop, 1=ATTACK, 2=TURN_RIGHT, 3=TURN_LEFT (verify with env.unwrapped.button_map). 'keys' are always these Discrete indices; env_kwargs.max_buttons_pressed picks how held keys combine: 0 = MultiBinary (keys OR together, e.g. turn while shooting), 1 = Discrete (one key wins). The controls the subject sees are a plain 'message' phase; keep its text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/Farama-Foundation/ViZDoom/blob/main/scenarios/predict_position.cfg",
+  "_audio_note": "env_kwargs.audio_buffer_enabled turns Doom's sound on: it arrives in obs['audio'], is played through the session's speakers, and is logged per frame. Doom makes 1/35 s of sound per step, so fps * env_kwargs.frame_skip must be 35: the session stops the block otherwise, because sound could not follow the frames.",
+  "curriculum": [
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Predict Position",
+        "",
+        "You have a rocket launcher and one monster is",
+        "pacing across the hall. Rockets fly slowly, so aim",
+        "AHEAD of the monster and fire where it will be.",
+        "",
+        "Controls:",
+        "   LEFT    turn left",
+        "   RIGHT   turn right",
+        "   SPACE   fire rocket",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {"type": "fixation", "duration": 1.0},
+    {
+      "type": "game", "backend": "vizdoom", "game": "VizdoomPredictPosition-v1",
+      "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
+      "keys": {"LEFT": 3, "RIGHT": 2, "SPACE": 1},
+      "mode": "duration", "duration": 300.0, "fps": 35
+    },
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

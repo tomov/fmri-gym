@@ -33,32 +33,56 @@ minihack = ["minihack", "nle>=1.3"]
 nethack = ["nle>=1.3"]
 aigamestore = ["playwright", "pillow"]
 vizdoom = ["vizdoom"]
+coom = ["vizdoom"]  # coom backend drives vizdoom.DoomGame directly; needs a COOM_REPO checkout too
 overcooked = ["overcooked-ai"]
 baba = ["baba @ git+https://github.com/nacloos/baba-is-ai.git"]
 rushhour = ["rushhour-gym>=0.6.0"]
 supertuxkart = ["pystk2-gymnasium"]  # needs a real GL display at runtime
+# The chrplr/stk-code fork's client. The wheel is pure Python; it fetches the
+# game and a trimmed asset pack (254 MiB) from the matching GitHub release on
+# first use, into ~/.cache/supertuxkart-gym. Linux x86_64 only for now, and it
+# needs a real GL display, because the observation is the game's own rendering.
+# A fork checkout still wins if there is one, so `pip install -e ../stk-code/python`
+# remains the way to work on the engine itself.
+stk_gym = ["supertuxkart-gym>=0.1.1"]
 # `gym` backend families beyond classic_control / toy_text (which ship with gymnasium):
 box2d = ["gymnasium[box2d]"]
 mujoco = ["gymnasium[mujoco]"]  # run with MUJOCO_GL=egl headless
 shimmy = ["shimmy"]  # old-`gym` envs via "legacy_gym": true
 tilematch = ["tile-match-gym"]  # display + logging only
+# MEG/EEG trigger backends (README "Triggers"): `triggers.backend` lsl / serial / parallel.
+triggers = ["pylsl", "pyserial", "pyparallel"]
+# The fmri-edit config editor. Essentials is the widgets half of PySide6 (LGPL),
+# without the WebEngine/3D add-ons, which would triple the download.
+gui = ["PySide6-Essentials>=6.6"]
 
 # The nine DBP picks (DBP_FINAL_LIST.md). Not installable from an index and
 # therefore not listed: craftium (prebuilt wheel on its GitHub releases) and
 # VGDL (a repo checkout on PYTHONPATH; see README "Running VGDL games").
 dbp = [
-    "fmri-gym[vizdoom,aigamestore,crafter,rushhour,baba,minihack,supertuxkart,overcooked]",
+    "fmri-gym[vizdoom,aigamestore,crafter,rushhour,baba,minihack,supertuxkart,stk_gym,overcooked]",
 ]
 all = [
-    "fmri-gym[dbp,ale,retro,nethack,box2d,mujoco,shimmy,tilematch]",
+    "fmri-gym[dbp,ale,retro,nethack,box2d,mujoco,shimmy,tilematch,triggers,gui]",
 ]
 
 [project.scripts]
 fmri-play = "fmri_play:main"
+# The config editor (the `gui` extra). Separate from fmri-play, which only ever
+# plays one run: what Play starts there is an fmri-play command like any other.
+fmri-edit = "fmri_gym.gui:main"
+# The next free session number for a subject: a session script's first line, so
+# all of its runs land in one session. Nothing else reads the disk for a number.
+fmri-ses = "fmri_gym.bids:main"
 
 [tool.setuptools]
 packages = ["fmri_gym", "fmri_gym.adapters"]
 py-modules = ["fmri_play"]
+
+[tool.uv]
+# A never-true marker on classic `pygame`, so it is never installed and
+# pygame-ce (an API-compatible superset) owns the `pygame` module alone.
+override-dependencies = ["pygame; sys_platform == 'pygame-ce-only'"]
 
 [tool.ruff]
 line-length = 100

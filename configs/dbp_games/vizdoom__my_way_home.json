@@ -1,0 +1,35 @@
+{
+  "_game": "ViZDoom: My Way Home (Doom navigation; COOM engine)",
+  "_note": "pip install vizdoom. A nine-room maze with a green armour vest in one fixed room; you start in a random room facing a random direction and have to navigate there. Reward is sparse (the vest) minus a small per-tic cost, so this is the spatial-navigation scenario rather than a shooter -- there is no attack button.",
+  "_keys_note": "Action indices are scenario-specific. For VizdoomMyWayHome-v1 the Discrete(6) map is 0=noop, 1=MOVE_RIGHT, 2=MOVE_LEFT, 3=MOVE_FORWARD, 4=TURN_RIGHT, 5=TURN_LEFT (verify with env.unwrapped.button_map). 'keys' are always these Discrete indices; env_kwargs.max_buttons_pressed picks how held keys combine: 0 = MultiBinary (keys OR together, e.g. walk forward while turning), 1 = Discrete (one key wins). The controls the subject sees are a plain 'message' phase; keep its text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/Farama-Foundation/ViZDoom/blob/main/scenarios/my_way_home.cfg",
+  "_audio_note": "env_kwargs.audio_buffer_enabled turns Doom's sound on: it arrives in obs['audio'], is played through the session's speakers, and is logged per frame. Doom makes 1/35 s of sound per step, so fps * env_kwargs.frame_skip must be 35: the session stops the block otherwise, because sound could not follow the frames.",
+  "curriculum": [
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "My Way Home",
+        "",
+        "You wake up somewhere in a maze of rooms. Find",
+        "your way to the room with the green armour vest.",
+        "Each new episode starts you somewhere else.",
+        "",
+        "Controls:",
+        "   UP             move forward",
+        "   LEFT / RIGHT   turn left / right",
+        "   Z / X          move left / right",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {"type": "fixation", "duration": 1.0},
+    {
+      "type": "game", "backend": "vizdoom", "game": "VizdoomMyWayHome-v1",
+      "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
+      "keys": {"UP": 3, "LEFT": 5, "RIGHT": 4, "Z": 2, "X": 1},
+      "mode": "duration", "duration": 300.0, "fps": 35
+    },
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

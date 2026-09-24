@@ -1,0 +1,34 @@
+{
+  "_game": "ViZDoom: Health Gathering Supreme (Doom navigation; COOM engine)",
+  "_note": "pip install vizdoom. The acid-floor maze: health drains every tic, so you have to keep finding medikits to stay alive. 'Supreme' is the hard variant of HealthGathering -- a maze rather than an open room, and poison vials that hurt you mixed in with the medikits. No weapon, no attack button.",
+  "_keys_note": "Action indices are scenario-specific. For VizdoomHealthGatheringSupreme-v1 the Discrete(4) map is 0=noop, 1=MOVE_FORWARD, 2=TURN_RIGHT, 3=TURN_LEFT (verify with env.unwrapped.button_map). 'keys' are always these Discrete indices; env_kwargs.max_buttons_pressed picks how held keys combine: 0 = MultiBinary (keys OR together, e.g. walk forward while turning), 1 = Discrete (one key wins). The controls the subject sees are a plain 'message' phase; keep its text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/Farama-Foundation/ViZDoom/blob/main/scenarios/health_gathering_supreme.cfg",
+  "_audio_note": "env_kwargs.audio_buffer_enabled turns Doom's sound on: it arrives in obs['audio'], is played through the session's speakers, and is logged per frame. Doom makes 1/35 s of sound per step, so fps * env_kwargs.frame_skip must be 35: the session stops the block otherwise, because sound could not follow the frames.",
+  "curriculum": [
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Health Gathering",
+        "",
+        "The floor is acid and your health drops all the",
+        "time. Explore the maze and walk over medikits to",
+        "top up. Avoid the green vials -- they hurt you.",
+        "",
+        "Controls:",
+        "   UP             move forward",
+        "   LEFT / RIGHT   turn left / right",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {"type": "fixation", "duration": 1.0},
+    {
+      "type": "game", "backend": "vizdoom", "game": "VizdoomHealthGatheringSupreme-v1",
+      "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
+      "keys": {"UP": 1, "LEFT": 3, "RIGHT": 2},
+      "mode": "duration", "duration": 300.0, "fps": 35
+    },
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

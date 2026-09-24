@@ -1,0 +1,37 @@
+{
+  "_game": "ViZDoom: Deathmatch (Doom action-shooter; COOM engine) -- full arsenal",
+  "_note": "pip install vizdoom. The big scenario: an arena with respawning monsters, weapons and ammo pickups, scored by KILLCOUNT. Unlike the small scenarios it also declares the mouse axes, so ViZDoom's action space is Dict{binary, continuous}; the adapter hides the axes (there is no mouse in the scanner) and keeps the keyboard buttons, so turning is TURN_LEFT/TURN_RIGHT only.",
+  "_keys_note": "Action indices are scenario-specific. For VizdoomDeathmatch-v1 the 17 keyboard buttons give a Discrete(18) map: 0=noop, 1=SELECT_PREV_WEAPON, 2=SELECT_NEXT_WEAPON, 3..8=SELECT_WEAPON6..1, 9=TURN_LEFT, 10=TURN_RIGHT, 11=MOVE_FORWARD, 12=MOVE_BACKWARD, 13=MOVE_LEFT, 14=MOVE_RIGHT, 15=STRAFE, 16=SPEED, 17=ATTACK (verify with env.unwrapped.button_map). 'keys' are always these Discrete indices; env_kwargs.max_buttons_pressed picks how held keys combine: 0 = MultiBinary (keys OR together, e.g. run forward while shooting), 1 = Discrete (one key wins). The controls the subject sees are a plain 'message' phase; keep its text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/Farama-Foundation/ViZDoom/blob/main/scenarios/deathmatch.cfg",
+  "_audio_note": "env_kwargs.audio_buffer_enabled turns Doom's sound on: it arrives in obs['audio'], is played through the session's speakers, and is logged per frame. Doom makes 1/35 s of sound per step, so fps * env_kwargs.frame_skip must be 35: the session stops the block otherwise, because sound could not follow the frames.",
+  "curriculum": [
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Deathmatch",
+        "",
+        "An arena full of monsters, weapons and ammo. Pick",
+        "up what you find and kill as many as you can.",
+        "",
+        "Controls:",
+        "   UP / DOWN      move forward / back",
+        "   LEFT / RIGHT   turn left / right",
+        "   Z / X          move left / right",
+        "   SPACE          shoot",
+        "   N / M          previous / next weapon",
+        "   S              run",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {"type": "fixation", "duration": 1.0},
+    {
+      "type": "game", "backend": "vizdoom", "game": "VizdoomDeathmatch-v1",
+      "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
+      "keys": {"UP": 11, "DOWN": 12, "LEFT": 9, "RIGHT": 10, "Z": 13, "X": 14, "SPACE": 17, "N": 1, "M": 2, "S": 16},
+      "mode": "duration", "duration": 300.0, "fps": 35
+    },
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

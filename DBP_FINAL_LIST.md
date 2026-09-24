@@ -9,7 +9,7 @@ are skipped: no Gymnasium interface.)
 
 | Category | Game | Backend / how | Config | Status |
 |---|---|---|---|---|
-| Action/shooter | **COOM** | `vizdoom` (COOM's exact Doom engine) | `dbp_games/vizdoom__defend_center.json` | ✅ |
+| Action/shooter | **COOM** | `vizdoom` (COOM's exact Doom engine) | `dbp_games/vizdoom__defend_center.json` … (9 stock scenarios + 1 pair) | ✅ |
 | Action/shooter, Puzzle | **AI GameStore** | `aigamestore` (p5.js via headless browser) | `dbp_games/aigamestore__game1.json` … | ✅ |
 | Building/open-world | **Crafter** | `crafter` | `dbp_games/crafter__crafter.json` | ✅ |
 | Building/open-world | **Craftium** | `gym` + `import_module` (Luanti voxel) | `dbp_games/craftium__choptree.json` | ✅ |
@@ -29,8 +29,11 @@ Each was verified to render a real frame (PNG spot-checks for the SuperTuxKart
 1. **COOM → ViZDoom.** Real COOM pins `gymnasium==0.28`, which breaks
    MiniHack/NetHack/retro (need 1.2). ViZDoom is the *identical Doom engine*
    COOM is built on, works with our gymnasium, and provides the action-shooter
-   scenarios — so we use it. If COOM's specific continual-learning scenario
-   WADs are ever needed, that's a separate `gymnasium==0.28` env.
+   scenarios — so we use it for the DBP slot above. COOM's own continual-learning
+   scenarios (pitfall, chainsaw, hide_and_seek, ...) are now also reachable
+   without a separate env: the `coom` backend drives `vizdoom.DoomGame` directly
+   against COOM's `conf.cfg`/`.wad` files from a `COOM_REPO` checkout, never
+   importing the COOM package itself (see `dbp_games/coom__pitfall.json`, etc.).
 
 2. **SuperTuxKart needs a real GL display.** pystk2-gymnasium is state-only
    (no pixels), so we drive `pystk2` directly for the 3D render — but Irrlicht

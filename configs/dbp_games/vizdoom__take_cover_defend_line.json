@@ -1,0 +1,59 @@
+{
+  "_game": "ViZDoom: Take Cover + Defend the Line (Doom; COOM engine) -- two scenarios in one run",
+  "_note": "pip install vizdoom. Runs the two scenarios back to back as separate game blocks (so the npz files, seeds and keymaps stay per-scenario): first Take Cover, where you can only dodge, then Defend the Line, where you can only turn and shoot. Each block is 150 s, so the pair costs the same ~5 min as one single-scenario config; raise both 'duration' fields if you want the full 300 s each. For either scenario on its own use vizdoom__take_cover.json / vizdoom__defend_line.json.",
+  "_keys_note": "Action indices are scenario-specific, so the two blocks have different 'keys': TakeCover's Discrete(3) map is 0=noop, 1=MOVE_RIGHT, 2=MOVE_LEFT, while DefendLine's Discrete(4) map is 0=noop, 1=ATTACK, 2=TURN_RIGHT, 3=TURN_LEFT (verify with env.unwrapped.button_map). The arrow keys therefore MOVE in the first block and TURN in the second -- each block gets its own 'message' phase saying so; keep that text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/Farama-Foundation/ViZDoom/blob/main/scenarios/take_cover.cfg and https://github.com/Farama-Foundation/ViZDoom/blob/main/scenarios/defend_the_line.cfg",
+  "_audio_note": "env_kwargs.audio_buffer_enabled turns Doom's sound on: it arrives in obs['audio'], is played through the session's speakers, and is logged per frame. Doom makes 1/35 s of sound per step, so fps * env_kwargs.frame_skip must be 35: the session stops the block otherwise, because sound could not follow the frames.",
+  "curriculum": [
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Take Cover  (1 of 2)",
+        "",
+        "Monsters across the room are throwing fireballs at",
+        "you, and more of them keep arriving. You have no",
+        "weapon -- just dodge, and survive as long as you can.",
+        "",
+        "Controls:",
+        "   LEFT / RIGHT   move left / right",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {"type": "fixation", "duration": 1.0},
+    {
+      "type": "game", "backend": "vizdoom", "game": "VizdoomTakeCover-v1",
+      "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
+      "keys": {"LEFT": 2, "RIGHT": 1, "Z": 2, "X": 1},
+      "mode": "duration", "duration": 150.0, "fps": 35
+    },
+    {"type": "fixation", "duration": 2.0},
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Defend the Line  (2 of 2)",
+        "",
+        "Now you have a weapon but you cannot walk. Monsters",
+        "advance on you from the far side of the hall, and",
+        "more keep coming. Turn to aim and shoot them.",
+        "",
+        "Controls:",
+        "   LEFT    turn left",
+        "   RIGHT   turn right",
+        "   SPACE   shoot",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {"type": "fixation", "duration": 1.0},
+    {
+      "type": "game", "backend": "vizdoom", "game": "VizdoomDefendLine-v1",
+      "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
+      "keys": {"LEFT": 3, "RIGHT": 2, "SPACE": 1},
+      "mode": "duration", "duration": 150.0, "fps": 35
+    },
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

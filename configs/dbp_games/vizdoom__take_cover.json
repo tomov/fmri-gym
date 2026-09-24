@@ -1,0 +1,33 @@
+{
+  "_game": "ViZDoom: Take Cover (Doom dodging; COOM engine)",
+  "_note": "pip install vizdoom. Fireball-dodging: monsters on the far wall shoot at you and more of them spawn over time, and all you can do is strafe. Reward is one point per tic survived; there is no weapon and no attack button.",
+  "_keys_note": "Action indices are scenario-specific. For VizdoomTakeCover-v1 the Discrete(3) map is 0=noop, 1=MOVE_RIGHT, 2=MOVE_LEFT (verify with env.unwrapped.button_map). The adapter puts strafing on Z/X; since this scenario cannot turn, 'keys' below also points the LEFT/RIGHT arrows at the same two buttons, so both pairs work. 'keys' are always these Discrete indices; env_kwargs.max_buttons_pressed picks how held keys combine: 0 = MultiBinary (keys OR together), 1 = Discrete (one key wins). The controls the subject sees are a plain 'message' phase; keep its text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/Farama-Foundation/ViZDoom/blob/main/scenarios/take_cover.cfg",
+  "_audio_note": "env_kwargs.audio_buffer_enabled turns Doom's sound on: it arrives in obs['audio'], is played through the session's speakers, and is logged per frame. Doom makes 1/35 s of sound per step, so fps * env_kwargs.frame_skip must be 35: the session stops the block otherwise, because sound could not follow the frames.",
+  "curriculum": [
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Take Cover",
+        "",
+        "Monsters across the room are throwing fireballs at",
+        "you, and more of them keep arriving. You have no",
+        "weapon -- just dodge, and survive as long as you can.",
+        "",
+        "Controls:",
+        "   LEFT / RIGHT   move left / right",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {"type": "fixation", "duration": 1.0},
+    {
+      "type": "game", "backend": "vizdoom", "game": "VizdoomTakeCover-v1",
+      "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
+      "keys": {"LEFT": 2, "RIGHT": 1, "Z": 2, "X": 1},
+      "mode": "duration", "duration": 300.0, "fps": 35
+    },
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

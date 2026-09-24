@@ -1,0 +1,30 @@
+{
+  "_game": "COOM: Pitfall (Doom continual-RL suite; own scenario, not stock ViZDoom)",
+  "_note": "Needs the TTomilin/COOM repo checked out somewhere and COOM_REPO set to it (or pass --coom-repo) -- the coom backend reads its conf.cfg/.wad scenario assets directly, it does not pip install the COOM package (which pins a conflicting gymnasium version).",
+  "_keys_note": "The coom backend derives its own default keymap from the scenario's 4 buttons (always TURN_LEFT, TURN_RIGHT, MOVE_FORWARD, plus one scenario-specific button). For pitfall that 4th button is JUMP -> SPACE. No 'keys' override needed here; other COOM scenarios get ATTACK/SPEED/USE mapped to SPACE/LSHIFT/E automatically.",
+  "curriculum": [
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Pitfall",
+        "",
+        "Cross the corridor without falling into a pit.",
+        "The floor layout is randomized every episode.",
+        "",
+        "Controls:",
+        "   UP           move forward",
+        "   LEFT / RIGHT turn left / right",
+        "   SPACE        jump",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {"type": "fixation", "duration": 1.0},
+    {
+      "type": "game", "backend": "coom", "game": "pitfall",
+      "mode": "duration", "duration": 300.0, "fps": 35
+    },
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

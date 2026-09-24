@@ -25,7 +25,7 @@ Legend: ✅ verified · 🟡 runs, display-only · ⚠️ needs assets · ❌ do
 | Wordle | `wordle` | gym | ❌ text-only | `Text(5)` typed-word action + text render |
 | Mastermind | `mastermind` | gym | ❌ can't install | requires Python ≥3.13 (env is 3.11) |
 | Rush Hour | `rush-hour` | gym | ✅ `rushhour` backend | `pip install rushhour-gym`; engine auto-fetched; selection UI in the adapter |
-| COOM | `coom` | gym | ⏸️ deferred | ViZDoom; own env factory → needs a custom adapter |
+| COOM | `coom__*` (9 scenarios) | coom | ✅ verified | new adapter; drives vizdoom.DoomGame directly against COOM's own scenario assets, sidestepping COOM's gymnasium==0.28 pin entirely |
 | Craftium | `craftium` | gym | ⏸️ deferred | needs the Luanti/Minetest engine built |
 
 **Takeaway:** every game that is a **real-time visual game with a pixel frame**
@@ -108,9 +108,19 @@ rushhour.py`) adds the button-selection UI of the experiment program (select a
 car, slide it), draws the legal slides, and `rushhour__complete.json` presents
 that program's whole self-paced session.
 
-### ⏸️ coom (gym) — deferred
-`TTomilin/COOM`, a ViZDoom-based continual-RL suite with its **own env factory**
-(not `gymnasium.make`). Needs a dedicated adapter + ViZDoom + Doom WADs.
+### ✅ coom (coom) — new backend
+`TTomilin/COOM` pins `gymnasium==0.28.1` (conflicts with minihack's `1.2`), so
+the `coom` adapter never imports the COOM package — it drives
+`vizdoom.DoomGame` directly against COOM's own `conf.cfg`/`.wad` scenario
+files from a `COOM_REPO` checkout (env var / `--coom-repo`, like `vgdl`).
+Reaches all 9 of COOM's own scenarios (pitfall, chainsaw, hide_and_seek,
+health_gathering, arms_dealer, parkour, raise_the_roof, run_and_gun,
+floor_is_lava), distinct from `vizdoom`'s stock ones. Keymap auto-derived
+from each scenario's 4 buttons; `game_variables` logged as the analysis
+variable; no savestate → seed + replay. Verified through the real
+`get_adapter`/config pipeline across all 9 scenarios (reset/step/render/
+capture/close, incl. episode-termination); interactively played (`pitfall`)
+through the actual pygame session.
 
 ### ⏸️ craftium (gym) — deferred
 `mikelma/craftium` needs the **Luanti/Minetest** engine built. Env ids

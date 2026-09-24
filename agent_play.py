@@ -3,7 +3,7 @@
 The comparison the rig is built for needs a model to play the worlds the subject
 played and be logged the same way. So this shares everything that defines the
 task -- the curriculum JSON, the EnvAdapter, the episode seeds, the Logger and
-its npz schema -- and shares none of the session loop, which exists for a
+its npz schema -- and shares none of the run loop, which exists for a
 scanner: trigger wait, fps pacing, a pygame window, a key event queue. A model
 needs no window and no wall clock, and faking them would only slow the block to
 human speed.
@@ -26,8 +26,8 @@ import time
 from collections import defaultdict
 
 from fmri_gym import Clock, Logger, get_adapter
+from fmri_gym.config import load_config, validate_config
 from fmri_gym.policies import Policy, RandomPolicy, VLMPolicy
-from fmri_play import load_curriculum
 
 
 def build_policy(args, adapter) -> Policy:
@@ -52,14 +52,14 @@ def play_episode(adapter, policy: Policy, frames: dict, clock: Clock, *,
                  max_frames: int) -> int:
     """Run one episode under ``policy``, appending to ``frames``.
 
-    Mirrors ``Session._episode`` field for field, minus everything that is
+    Mirrors ``Run._episode`` field for field, minus everything that is
     about a person at a screen. Keeping the two in step by hand is the price of
-    not bending the session loop around a case it was not written for.
+    not bending the run loop around a case it was not written for.
 
     :param adapter: the block's adapter.
     :param policy: the policy choosing actions.
     :param frames: mutable frame-log dict; lists are appended in place.
-    :param clock: session clock, for the same two time columns humans get.
+    :param clock: the run's clock, for the same time columns humans get.
     :param seed: RNG seed for this episode's ``reset``.
     :param episode_id: index of this episode within the block.
     :param state_stride: save a full state blob every this many frames.
@@ -85,7 +85,11 @@ def play_episode(adapter, policy: Policy, frames: dict, clock: Clock, *,
         frames["terminated"].append(bool(terminated))
         frames["truncated"].append(bool(truncated))
         frames["episode_id"].append(episode_id)
-        frames["session_time"].append(clock.session_time())
+        frames["run_time"].append(clock.run_time())
+        # A policy has no screen, so no frame of this block was ever flipped.
+        # NaN, not the step time: the human column is a measured photon onset
+        # and nothing should be able to average the two together by accident.
+        frames["flip_time"].append(float("nan"))
         frames["wall_time"].append(clock.wall_time())
         frames["state_blob"].append(fs.blob)
         for k, v in fs.variables.items():
@@ -97,11 +101,11 @@ def play_block(phase: dict, index: int, args, logger: Logger,
                clock: Clock) -> str:
     """Play every episode of one game block and write its npz.
 
-    :param phase: the game-phase config, used exactly as the session uses it.
+    :param phase: the game-phase config, used exactly as a run uses it.
     :param index: phase index in the curriculum (names the output file).
     :param args: parsed command-line arguments.
-    :param logger: the session logger writing the block.
-    :param clock: session clock.
+    :param logger: the run's logger writing the block.
+    :param clock: the run's clock.
     :return: path of the written npz.
     """
     backend = phase.get("backend", "gym")
@@ -155,7 +159,11 @@ def main() -> None:
     p.add_argument("--policy-seed", type=int, default=0)
     args = p.parse_args()
 
-    curriculum = load_curriculum(args.curriculum)
+    config = load_config(args.curriculum)
+    problems = validate_config(config)  # the same check fmri-play runs, so one file suits both
+    if problems:
+        raise ValueError(f"{args.curriculum}: " + "; ".join(problems))
+    curriculum = config["curriculum"]
     outdir = args.outdir or os.path.join(
         "data", f"{args.subject}_{time.strftime('%Y%m%d-%H%M%S')}")
     clock = Clock()

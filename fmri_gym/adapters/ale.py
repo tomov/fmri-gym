@@ -40,6 +40,14 @@ class ALEAdapter(EnvAdapter):
             spec["game"], render_mode="rgb_array",
             frameskip=1, repeat_action_probability=0.0)
 
+    def native_fps(self) -> float:
+        """The console's 60 frames per second; ``_make`` steps one frame at a time.
+
+        Stated here because ALE does not tell: its ``render_fps`` metadata is a
+        fixed 30 whatever the frameskip, which is half the speed of the machine.
+        """
+        return 60.0
+
     def _keyspec(self) -> SingleKeySpec:
         combos = {}
         for action, meaning in enumerate(self.env.unwrapped.get_action_meanings()):

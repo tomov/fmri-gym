@@ -5,8 +5,8 @@ Please read this before writing code.
 ## The shape of the repo
 
 ```text
-fmri_play.py                     CLI   parse args, build curriculum, run a Session
-fmri_gym/session.py              CORE  the experiment loop: trigger, phases, timing
+fmri_play.py                     CLI   parse the flags of one run, then play it (Run.from_config)
+fmri_gym/run.py                  CORE  one run's experiment loop: trigger, phases, timing
 fmri_gym/display.py              CORE  one pygame window: frames, text, fixation
 fmri_gym/keys.py                 CORE  pygame keycode to key NAME ("LEFT", "SPACE")
 fmri_gym/logging.py              CORE  manifest.json + one .npz per game block
@@ -16,7 +16,7 @@ fmri_gym/adapters/<BACKEND>.py   YOU   one small wrapper per game engine
 configs/dbp_games/<GAME>.json    YOU   one curriculum per game
 ```
 
-The core is engine-agnostic: `session.py` never imports a game engine, never touches
+The core is engine-agnostic: `run.py` never imports a game engine, never touches
 `env.unwrapped`, and never mentions a game by name. Everything engine-specific goes
 through an `EnvAdapter`.
 
@@ -31,6 +31,11 @@ An adapter is lightweight glue that takes a gym env and makes it fMRI-friendly. 
 - build the env (`_make`) and, if needed, normalize a non-Gymnasium API (`reset`/`step`)
 - declare a default keyboard map (`_keyspec`)
 - produce an RGB frame for the screen (`render`)
+- if the engine makes sound, hand over this step's PCM (`sound`; the contract is in
+  `EnvAdapter.sound`, and `retro.py` is a two-line example)
+- if the engine has a clock of its own, say how many steps per second are real speed
+  (`native_fps`), read from the engine where it tells; the run reports the block's
+  speed against it
 - pull out the analysis-relevant variables (`capture`)
 
 If you find yourself writing game rules, drawing a board, tracking a selection cursor,
@@ -46,11 +51,13 @@ that, ask whether the extra code belongs upstream in the env.
 
 ## Rule 2: changes to core libraries are a last resort, and stay generic
 
-Before editing `session.py`, `display.py`, `keys.py`, `logging.py`, `base.py`, or
+Before editing `run.py`, `display.py`, `keys.py`, `logging.py`, `base.py`, or
 `keyspec.py`, please try to solve the problem in your adapter. If you cannot:
 
 - Keep it **additive and default-off**, so no existing backend changes behaviour.
 - Keep it **nameless**: no `if backend == "rushhour"`, no game ids, no engine imports.
+  This holds for the prose too -- a core file's comments and docstrings state the contract,
+  they don't cite the backend that happens to use it.
 - Prefer the **opt-in capability** pattern already in use: the adapter sets a flag or
   defines an optional method, and core reads it defensively.
 - Say so in the PR description. A core change is the part a reviewer must read closely.
@@ -58,7 +65,7 @@ Before editing `session.py`, `display.py`, `keys.py`, `logging.py`, `base.py`, o
 ## Rule 3: write for the next *human* to read
 
 - **Each method should ideally fit on one screen** (~40 lines). If it doesn't, extract a helper with a name
-  that says what it does. `session._episode` and `_game` are at the upper limit already; let's try to not to expand them, if possible. 
+  that says what it does. `run._episode` and `_game` are at the upper limit already; let's try to not to expand them, if possible. 
 - **Stay within two levels of nesting.** Use guard clauses and early `return`/`continue`
   instead of `else` ladders — see `_get_action` and `KeySpec.maximal`.
 - **Module docstring explains *why*.** Every file here opens with the reasoning a
@@ -75,6 +82,27 @@ Before editing `session.py`, `display.py`, `keys.py`, `logging.py`, `base.py`, o
   installing one backend never requires the others. 
   This is especially important when using outdated `gym` or `gym-retro` libraries, which result in dependency conflicts if imported globally.
 - **No stray `print` in the frame loop.** Please make sure to remove any debugging logic before committing, to avoid code bloat and unnecessary latency.
+
+## Rule 4: when something is wrong, stop -- never run with an invisible problem
+
+The worst outcome this code can produce is not a crash. It is a session that
+runs to the end, looks fine, and turns out afterwards to have sent no triggers,
+opened the wrong port, ignored a config key, or quietly fallen back to
+something else: the participant's hour is gone and nobody knew. So:
+
+- **Validate at start-up and raise, with the fix in the message**, before the
+  participant screen (`fmri_play.py` builds the triggers before the window for
+  this reason). Don't catch an error to `sys.exit` politely, and don't catch
+  one to continue.
+- **One shape per input.** No `isinstance` branches that accept two config
+  layouts, no `x or {}` / `.get(k) or []` that turn a wrong value into an
+  empty one. Enforce the shape and say what was expected.
+- **A default that changes what the recording gets is allowed only if it is
+  visible**: on the experimenter screen, on the console, and in the manifest
+  (see `Triggers.status()` / `triggers.defaulted`). A silent default is a bug.
+- **Test switches announce themselves** (`--dummy-trigger` prints what it
+  skips and lands in the manifest). Degrading gracefully is for the frame
+  loop mid-session, not for set-up.
 
 ## Adding a new backend: the checklist
 
@@ -93,7 +121,7 @@ Before editing `session.py`, `display.py`, `keys.py`, `logging.py`, `base.py`, o
 Then check your work by actually running it:
 
 ```bash
-uv run fmri-play --subject sub-test --dummy-trigger \
+uv run fmri-play --subject sub-test --dummy-trigger --ses 1 --run 1 \
     --curriculum configs/dbp_games/<BACKEND>__<GAME>.json
 ruff check fmri_gym fmri_play.py
 ```
@@ -138,4 +166,4 @@ right. There is no test suite yet; a run against a real config is the test.
 - [Hitchhiker's Guide to Python — Code Style](https://docs.python-guide.org/writing/style/)
 - [Martin Fowler — Extract Function](https://refactoring.com/catalog/extractFunction.html)
 - [Gymnasium Env API](https://gymnasium.farama.org/api/env/) — the contract every adapter
-  presents to `session.py`
+  presents to `run.py`

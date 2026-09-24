@@ -1,0 +1,30 @@
+{
+  "_game": "COOM: Run and Gun (Doom continual-RL suite; own scenario, not stock ViZDoom)",
+  "_note": "Needs the TTomilin/COOM repo checked out somewhere and COOM_REPO set to it (or pass --coom-repo) -- the coom backend reads its conf.cfg/.wad scenario assets directly, it does not pip install the COOM package (which pins a conflicting gymnasium version). env_kwargs.task picks a WAD variant (default 'default'; also 'blue'/'red'/'green'/'hard'/'monsters'/'obstacles'/'resized'/'shadows').",
+  "_keys_note": "The coom backend derives its own default keymap from the scenario's 4 buttons (always TURN_LEFT, TURN_RIGHT, MOVE_FORWARD, plus one scenario-specific button). For run_and_gun that 4th button is ATTACK -> SPACE.",
+  "curriculum": [
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Run and Gun",
+        "",
+        "Locate and shoot the enemies scattered around",
+        "the maze. You have unlimited ammunition.",
+        "",
+        "Controls:",
+        "   UP           move forward",
+        "   LEFT / RIGHT turn left / right",
+        "   SPACE        shoot",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {"type": "fixation", "duration": 1.0},
+    {
+      "type": "game", "backend": "coom", "game": "run_and_gun",
+      "mode": "duration", "duration": 300.0, "fps": 35
+    },
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

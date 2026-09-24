@@ -265,12 +265,15 @@ class CrafterAdapter(EnvAdapter):
     def reset(self, seed: int | None) -> tuple[Any, dict]:
         """Start an episode on a world determined by ``seed`` alone.
 
-        :param seed: episode seed; ``None`` reuses the env as built, and then
-            crafter's episode counter rather than the log decides the world.
+        crafter.Env has no ``reset(seed=...)``: its RNG is fixed at
+        construction and never changes after, so re-seeding an episode means
+        rebuilding the env, and closing the one it replaces.
+
+        :param seed: episode seed, from the run's fold of the design.
         :return: ``(obs, info)``; crafter's reset returns no info, so ``{}``.
         """
-        if seed is not None:
-            self.env = self._build(seed)
+        self.env.close()
+        self.env = self._build(seed)
         self._unlocked = set()
         self._last_unlock = None
         self._cue = ""
