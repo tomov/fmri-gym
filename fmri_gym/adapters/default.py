@@ -82,27 +82,14 @@ class DefaultAdapter(EnvAdapter):
         return FrameState(blob=None, variables=variables)
 
     def rich_state(self, obs: Any, info: dict) -> dict | None:
-        """Thin wrapper so Session (which calls ``adapter.rich_state(obs,
-        info)`` by name) finds this hook -- see :meth:`get_rich_state`."""
+        """Thin wrapper so Session (hook lookup by name) finds this --
+        see :meth:`get_rich_state`."""
         return self.get_rich_state(obs, info)
 
     def get_rich_state(self, obs: Any, info: dict) -> dict | None:
-        """The one thing every plain Gymnasium env can offer beyond the
-        observation :meth:`capture` already logs: whatever env-specific
-        diagnostic data it chose to put in ``step()``'s own ``info`` dict --
-        Gymnasium's one catch-all for exactly this (MuJoCo's reward-term
-        breakdown, Box2D's shaping terms, ``Blackjack``'s dealer card,
-        ...), entirely env-dependent and otherwise dropped on the floor --
-        plus the action/observation space shapes for context, since a
-        generic backend has no other queryable ground truth beyond ``obs``/
-        ``info`` (there is no engine object to reach into the way ViZDoom's
-        ``game`` or NetHack's glyph grid let the other adapters go further).
-
-        :param obs: unused -- already logged by :meth:`capture`.
-        :param info: info dict from the latest :meth:`step`/:meth:`reset`.
-        :return: ``None`` if this env's ``info`` is empty (nothing extra to
-            report), else the dict described above.
-        """
+        """Whatever this env put in its own ``info`` (Gymnasium's
+        catch-all for env-specific diagnostics), plus space shapes for
+        context. ``None`` if ``info`` is empty."""
         if not info:
             return None
         return {

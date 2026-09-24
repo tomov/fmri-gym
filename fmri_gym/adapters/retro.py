@@ -93,25 +93,14 @@ class RetroAdapter(EnvAdapter):
         u.data.update_ram()
 
     def rich_state(self, obs: Any, info: dict) -> dict | None:
-        """Thin wrapper so Session (which calls ``adapter.rich_state(obs,
-        info)`` by name) finds this hook -- see :meth:`get_rich_state`."""
+        """Thin wrapper so Session (hook lookup by name) finds this --
+        see :meth:`get_rich_state`."""
         return self.get_rich_state(obs, info)
 
     def get_rich_state(self, obs: Any, info: dict) -> dict | None:
-        """Everything :meth:`capture` doesn't already log: ``info`` there
-        IS ``data.lookup_all()`` (stable-retro's own ``compute_step()``
-        computes it that way) -- every declared integration variable, not
-        a subset -- so there's no richer per-frame semantic layer hiding
-        underneath it the way ViZDoom's ground-truth entity list or
-        NetHack's glyph grid sit underneath their own scalar variables.
-        What's left is static console/game metadata: which buttons this
-        game/console actually has, how many players, and which game/state
-        file is loaded.
-
-        :param obs: unused.
-        :param info: the decoded integration variables (``data.lookup_all()``),
-            included here too so a single ``rich_state`` dict is self-contained.
-        """
+        """``info`` is already every declared integration variable
+        (``data.lookup_all()``); what's left is static console metadata:
+        buttons, players, game/state file."""
         u = self.env.unwrapped
         return {
             "game": u.gamename, "state": u.statename,

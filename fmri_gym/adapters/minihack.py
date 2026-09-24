@@ -83,17 +83,11 @@ class MiniHackAdapter(EnvAdapter):
         return FrameState(blob=None, variables=variables)
 
     def rich_state(self, obs: Any, info: dict) -> dict | None:
-        """Thin wrapper so Session (which calls ``adapter.rich_state(obs,
-        info)`` by name) finds this hook -- see :meth:`get_rich_state`."""
+        """Thin wrapper so Session (hook lookup by name) finds this --
+        see :meth:`get_rich_state`."""
         return self.get_rich_state(obs, info)
 
     def get_rich_state(self, obs: Any, info: dict) -> dict | None:
-        """See :func:`fmri_gym.adapters.nethack.nle_rich_state` (shared with
-        :class:`.nethack.NetHackAdapter`, the other NLE-based adapter):
-        decoded ``blstats``, the current message, inventory, and every
-        visible monster/object/trap with its plain-English description.
-
-        :param obs: the latest observation dict.
-        :param info: unused -- NLE's own state lives entirely in ``obs``.
-        """
+        """See :func:`fmri_gym.adapters.nethack.nle_rich_state` (shared
+        with :class:`.nethack.NetHackAdapter`)."""
         return nle_rich_state(obs)

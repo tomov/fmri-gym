@@ -57,26 +57,14 @@ class BabaAdapter(EnvAdapter):
         return FrameState(blob=None, variables={})
 
     def rich_state(self, obs: Any, info: dict) -> dict | None:
-        """Thin wrapper so Session (which calls ``adapter.rich_state(obs,
-        info)`` by name) finds this hook -- see :meth:`get_rich_state`."""
+        """Thin wrapper so Session (hook lookup by name) finds this --
+        see :meth:`get_rich_state`."""
         return self.get_rich_state(obs, info)
 
     def get_rich_state(self, obs: Any, info: dict) -> dict | None:
-        """capture() logs nothing at all (``obs`` is just a small numeric
-        grid encoding with no fixed per-cell meaning worth a scalar name),
-        so everything here is new: the agent's position/facing, what it's
-        carrying, the puzzle's win/lose condition, the CURRENT ruleset --
-        Baba Is You's whole mechanic is that pushing word blocks around
-        rewrites which objects are "you"/"win"/"push"/etc, so ``ruleset``
-        (recomputed by the engine every step from the live word-block
-        layout) is the one thing that actually changes as the puzzle is
-        solved -- and a sparse listing of every non-empty grid cell
-        (word blocks and objects alike, by type) underneath the raw
-        encoding.
-
-        :param obs: unused -- the engine's own grid (``self.env.grid``) is
-            read directly instead of decoding the numeric encoding.
-        :param info: unused.
+        """Agent position/facing/carrying, the win condition, the live
+        ruleset (recomputed from the word-block layout each step -- Baba's
+        core mechanic), and a sparse listing of every non-empty grid cell.
         """
         env = self.env
         grid = [

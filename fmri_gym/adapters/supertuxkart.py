@@ -92,25 +92,15 @@ class SuperTuxKartAdapter(EnvAdapter):
                           variables={"distance": float((info or {}).get("distance", 0.0))})
 
     def rich_state(self, obs: Any, info: dict) -> dict | None:
-        """Thin wrapper so Session (which calls ``adapter.rich_state(obs,
-        info)`` by name) finds this hook -- see :meth:`get_rich_state`."""
+        """Thin wrapper so Session (hook lookup by name) finds this --
+        see :meth:`get_rich_state`."""
         return self.get_rich_state(obs, info)
 
     def get_rich_state(self, obs: Any, info: dict) -> dict | None:
-        """The full ``pystk2.WorldState`` :meth:`capture` only reduces to
-        one scalar (``distance``): every kart's ground-truth physical state
-        (position/rotation/velocity, race position/lap/overall distance,
-        finish status, powerup/attachment, on-road/jumping flags) and every
-        item on the track -- ``self.env.unwrapped.world`` (kept current by
-        this env's own ``world_update()``, called every ``step()``), not
-        the ego-relative/sorted encoding :meth:`get_observation` builds for
-        the RL ``obs``.
-
-        :param obs: unused -- the raw world state has everything ``obs``
-            was derived from, and more (every kart, not just the ego one).
-        :param info: unused.
-        :return: ``None`` before the first reset (``world`` not yet set).
-        """
+        """The full ``pystk2.WorldState``: every kart's ground-truth
+        physical state and every item on the track -- more than the
+        ego-relative encoding :meth:`get_observation` builds for ``obs``.
+        ``None`` before the first reset."""
         world = self.env.unwrapped.world
         if world is None:
             return None

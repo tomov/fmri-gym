@@ -181,64 +181,15 @@ class VizDoomAdapter(EnvAdapter):
         return {"audio_sampling_rate": game.get_audio_sampling_rate()}
 
     def rich_state(self, obs: Any, info: dict) -> dict | None:
-        """Optional, opt-in counterpart to :meth:`capture` -- see
-        :mod:`fmri_gym.recording`'s ``save_rich_state`` phase field. Thin
-        wrapper so :func:`Session` (which calls ``adapter.rich_state(obs,
-        info)`` by name) finds this hook; the actual gathering lives in
-        :meth:`get_rich_state`, kept as its own method (same signature,
-        every adapter's ``get_rich_state`` matches it) so it can also be
-        called directly -- e.g. from a notebook -- without going through
-        the ``rich_state`` hook-lookup name. ViZDoom itself never reads
-        ``obs``/``info`` here: its own state lives on the env
-        (``self.env.unwrapped.state``).
-        """
+        """Thin wrapper so Session (hook lookup by name) finds this --
+        see :meth:`get_rich_state`."""
         return self.get_rich_state(obs, info)
 
     def get_rich_state(self, obs: Any, info: dict) -> dict | None:
-        """Every piece of scene state ViZDoom's backend can report right
-        now -- not just the handful of ``gamevariables`` a scenario's own
-        ``available_game_variables`` config happens to declare (Defend the
-        Center, e.g., only declares ``AMMO2``/``HEALTH``; that config
-        controls what ``obs["gamevariables"]`` contains, not what the engine
-        actually tracks).
-
-        - ``game_variables``: **every** ``vzd.GameVariable`` the installed
-          ViZDoom build knows about (position/angle/pitch/roll/velocity,
-          per-weapon ammo, kill/hit/damage/item/secret counts, dead/
-          on-ground/attack-ready flags, camera state, ...), queried directly
-          via ``game.get_game_variable(var)`` rather than limited to
-          ``game.get_available_game_variables()`` -- confirmed safe to call
-          for any scenario: undeclared/inapplicable variables just read back
-          ``0.0``, they don't raise (see ``analysis/`` for the probe that
-          checked this against Defend the Center specifically).
-        - ``episode``: state ``GameVariable`` doesn't cover -- engine tic
-          (``state.tic``) vs. this adapter's own frame ordinal
-          (``state.number``), wall-clock ``episode_time``, the reward
-          accounting ViZDoom itself keeps (``total_reward``/``last_reward``/
-          ``living_reward``), ``is_player_dead``, the last low-level action
-          applied, and the map name.
-        - ``objects``: every actor currently in the level (monsters, items,
-          decorations, the player itself) with its name, position, and
-          orientation -- ViZDoom's ground-truth entity list, independent of
-          what's actually on screen. Empty unless the scenario's
-          ``env_kwargs`` set ``objects_info_enabled: true``
-          (``game.set_objects_info_enabled``, off by default in ViZDoom).
-        - ``labels``: the subset of those objects actually visible on screen
-          this frame, each with its on-screen bounding box (``x``, ``y``,
-          ``width``, ``height``) and category (e.g. ``"Monster"``) in
-          addition to name/position -- the closest thing here to MiniHack's
-          glyph classification or ``AIGameStoreAdapter``'s tube layout.
-          Empty unless ``env_kwargs`` set ``labels_buffer_enabled: true``.
-        - ``sectors``: floor/ceiling height per level sector. Static for the
-          whole episode (wall geometry, ``sector.lines``, is not included --
-          this is the coarse per-sector heights only), so logging it every
-          frame is redundant; a short ``rich_state_stride`` (or reading it
-          from just one frame) is enough. Empty unless ``env_kwargs`` set
-          ``sectors_info_enabled: true``.
-
-        :return: the dict described above, or ``None`` on a terminal frame
-            (``state`` is ``None`` once the episode ends -- same case
-            :meth:`sound` already guards against).
+        """Every ``vzd.GameVariable`` (not just the scenario's declared
+        ``available_game_variables``), episode/engine metadata, and the
+        ground-truth objects/labels/sectors (opt-in via ``env_kwargs``).
+        ``None`` on a terminal frame (``state`` is ``None``).
         """
         state = self.env.unwrapped.state
         if state is None:

@@ -71,22 +71,14 @@ class RushHourAdapter(EnvAdapter):
         return FrameState(blob=None, variables={k: info.get(k) for k in _LOGGED if k in info})
 
     def rich_state(self, obs: Any, info: dict) -> dict | None:
-        """Thin wrapper so Session (which calls ``adapter.rich_state(obs,
-        info)`` by name) finds this hook -- see :meth:`get_rich_state`."""
+        """Thin wrapper so Session (hook lookup by name) finds this --
+        see :meth:`get_rich_state`."""
         return self.get_rich_state(obs, info)
 
     def get_rich_state(self, obs: Any, info: dict) -> dict | None:
-        """The actual board layout underneath the human-interface event
-        columns :meth:`capture` logs (``_LOGGED`` -- car selected, slide
-        direction, whether it was legal, ...): ``obs`` is the engine's own
-        per-slot ``(row, col, length, horizontal)`` array (default
-        ``obs_mode="cars"``), decoded per labeled car via ``info["labels"]``,
-        plus the full legal-action mask.
-
-        :param obs: the per-slot car-geometry array.
-        :param info: info dict from the latest :meth:`step`/:meth:`reset`.
-        :return: ``None`` if ``obs`` isn't array-like (not yet reset).
-        """
+        """The board layout underneath the human-interface event columns
+        :meth:`capture` logs: per-car row/col/length/orientation (decoded
+        via ``info["labels"]``) plus the legal-action mask."""
         info = info if isinstance(info, dict) else {}
         if obs is None:
             return None

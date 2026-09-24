@@ -191,27 +191,14 @@ class AIGameStoreAdapter(EnvAdapter):
             if isinstance(value, (int, float, bool, str))})
 
     def rich_state(self, obs: Any, info: dict) -> dict | None:
-        """Thin wrapper so :func:`Session` (which calls ``adapter.
-        rich_state(obs, info)`` by name) finds this hook -- see
-        :meth:`get_rich_state` for the actual gathering."""
+        """Thin wrapper so Session (hook lookup by name) finds this --
+        see :meth:`get_rich_state`."""
         return self.get_rich_state(obs, info)
 
     def get_rich_state(self, obs: Any, info: dict) -> dict | None:
-        """Optional, opt-in counterpart to :meth:`capture`: the game's full
-        ``window.getGameState()`` dict, boards/entity lists included -- see
-        :mod:`fmri_gym.recording`'s ``save_rich_state`` phase field. Only
-        called at all when a block asks for it (see ``Session._episode``),
-        since unlike :meth:`capture` this isn't otherwise free.
-
-        Some games (game1's Water Sort) stash a circular self-reference to
-        their own p5 sketch instance under every board entry's ``"p"`` key --
-        harmless for gameplay, but not JSON-safe, so it's stripped here the
-        same way ``analysis/game1_symbolic_gui.ipynb``'s ``clean_state`` does.
-
-        :param obs: unused -- matches :meth:`capture`'s signature.
-        :param info: info dict from the latest :meth:`step` / :meth:`reset`.
-        :return: the full state dict, or ``None`` if this frame has none
-            (the page was briefly unreadable -- see :func:`_state`).
+        """The game's full ``window.getGameState()`` dict (boards/entity
+        lists included, unlike :meth:`capture`'s scalars-only). Strips the
+        circular p5-sketch self-reference game1 leaves on board entries.
         """
         state = (info or {}).get("state")
         return _strip_p5_instance(state) if state is not None else None

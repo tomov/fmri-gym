@@ -81,24 +81,12 @@ class NetHackAdapter(EnvAdapter):
         return FrameState(blob=None, variables=variables)
 
     def rich_state(self, obs: Any, info: dict) -> dict | None:
-        """Thin wrapper so Session (which calls ``adapter.rich_state(obs,
-        info)`` by name) finds this hook -- see :meth:`get_rich_state`."""
+        """Thin wrapper so Session (hook lookup by name) finds this --
+        see :meth:`get_rich_state`."""
         return self.get_rich_state(obs, info)
 
     def get_rich_state(self, obs: Any, info: dict) -> dict | None:
-        """See :func:`nle_rich_state` (shared with :mod:`.minihack`, the
-        other NLE-based adapter): decodes ``blstats`` into named fields,
-        the current text message, inventory, and every visible monster/
-        object/trap with its NetHack-assigned plain-English description --
-        everything base NLE's default observation keys (``glyphs`` /
-        ``blstats`` / ``chars`` / ``inv_*`` / ``screen_descriptions``,
-        all present without any extra ``gym.make`` configuration for this
-        backend) make available beyond the raw arrays :meth:`capture`
-        already logs.
-
-        :param obs: the latest observation dict.
-        :param info: unused -- NLE's own state lives entirely in ``obs``.
-        """
+        """See :func:`nle_rich_state` (shared with :mod:`.minihack`)."""
         return nle_rich_state(obs)
 
 
@@ -133,15 +121,13 @@ def _tty_to_rgb(obs: Any, cell: int) -> np.ndarray:
 
 
 def _nle_text(buf: Any) -> str:
-    """Decode one NLE fixed-width, null-terminated byte buffer (``message``,
-    an ``inv_strs`` row, one ``screen_descriptions`` cell) to a plain str."""
+    """Decode one NLE fixed-width, null-terminated byte buffer to a str."""
     return bytes(np.asarray(buf)).split(b"\x00", 1)[0].decode("ascii", "ignore")
 
 
 def _nle_blstats(obs: dict) -> dict[str, int]:
-    """Decode the raw ``blstats`` array into ``{name: value}`` using NLE's
-    own field-index constants (``nethack.NLE_BL_*``) -- the array alone
-    doesn't say which slot is HP vs. depth vs. gold."""
+    """Decode ``blstats`` into ``{name: value}`` via NLE's field-index
+    constants (``nethack.NLE_BL_*``)."""
     from nle import nethack
     arr = np.asarray(obs["blstats"])
     stats = {}
@@ -155,9 +141,7 @@ def _nle_blstats(obs: dict) -> dict[str, int]:
 
 
 def _nle_inventory(obs: dict) -> list[dict]:
-    """Every carried item (letter/object-class/glyph/description), decoded
-    from the ``inv_*`` observation keys -- empty ``letter`` (``0``) slots
-    are unused inventory rows, skipped."""
+    """Every carried item, decoded from the ``inv_*`` observation keys."""
     if "inv_letters" not in obs:
         return []
     letters = obs["inv_letters"]
@@ -177,10 +161,7 @@ def _nle_inventory(obs: dict) -> list[dict]:
 
 
 def _nle_entities(obs: dict) -> list[dict]:
-    """Every visible monster/object/trap (not plain terrain), with its
-    ``(row, col)`` and NetHack's own plain-English description -- the
-    closest thing here to ViZDoom's ``labels`` or Crafter's ``semantic``
-    map: ground truth about what's actually in view, not just a glyph id."""
+    """Every visible monster/object/trap, with position and description."""
     if "glyphs" not in obs:
         return []
     from nle import nethack
@@ -200,19 +181,9 @@ def _nle_entities(obs: dict) -> list[dict]:
 
 
 def nle_rich_state(obs: Any) -> dict | None:
-    """Shared by :class:`NetHackAdapter` and :class:`.minihack.MiniHackAdapter`
-    (both NLE-based): decode ``blstats`` into named fields, the current
-    message, carried inventory, and every visible monster/object/trap --
-    everything NLE's observation dict makes available beyond the raw
-    ``glyphs``/``blstats``/``message`` arrays :meth:`EnvAdapter.capture`
-    already logs as opaque arrays.
-
-    :param obs: the latest observation dict (``None``/non-dict before the
-        first ``reset()``, or if a curriculum's ``observation_keys``
-        override dropped ``blstats`` entirely).
-    :return: the dict described above, or ``None`` if ``obs`` has no
-        ``blstats`` to decode.
-    """
+    """Shared by :class:`NetHackAdapter` and :class:`.minihack.MiniHackAdapter`:
+    decoded ``blstats``, message, inventory, and visible entities. ``None``
+    if ``obs`` has no ``blstats`` to decode."""
     if not isinstance(obs, dict) or "blstats" not in obs:
         return None
     return {

@@ -81,34 +81,14 @@ class CrafterAdapter(EnvAdapter):
         return FrameState(blob=None, variables=variables)
 
     def rich_state(self, obs: Any, info: dict) -> dict | None:
-        """Thin wrapper so Session (which calls ``adapter.rich_state(obs,
-        info)`` by name) finds this hook -- see :meth:`get_rich_state`."""
+        """Thin wrapper so Session (hook lookup by name) finds this --
+        see :meth:`get_rich_state`."""
         return self.get_rich_state(obs, info)
 
     def get_rich_state(self, obs: Any, info: dict) -> dict | None:
-        """Everything crafter's own ``step()`` surfaces beyond the
-        achievements array capture() logs -- all of it already rides in
-        ``info`` (crafter.Env.step's own contract), just not persisted
-        anywhere else:
-
-        - ``inventory``: every item count (health/food/drink/energy,
-          collected materials, crafted tools) -- crafter's actual resource
-          state, not just the achievement unlocks derived from it.
-        - ``achievements``: the same dict :meth:`capture` flattens to a
-          list, kept named here.
-        - ``player_pos``: the agent's ``(x, y)`` world position.
-        - ``semantic``: the full local semantic map -- one small integer
-          per world tile naming what object/terrain occupies it (crafter's
-          own ``engine.SemanticView``) -- the closest thing here to
-          MiniHack's glyph grid.
-        - ``discount``: 0.0 once the player has died, 1.0 otherwise.
-
-        :param obs: unused -- matches :meth:`capture`'s signature.
-        :param info: info dict from the latest :meth:`step` (empty ``{}``
-            immediately after :meth:`reset`, before the first step -- crafter's
-            own ``reset()`` returns no info).
-        :return: the dict described above, or ``None`` before the first step.
-        """
+        """Inventory, achievements, player position, and the local
+        semantic map -- all already in crafter's own ``info``, just not
+        persisted elsewhere. ``None`` before the first step."""
         if not isinstance(info, dict) or "semantic" not in info:
             return None
         return {

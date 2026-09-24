@@ -74,23 +74,11 @@ class OvercookedAdapter(EnvAdapter):
         return FrameState(blob=None, variables=variables)
 
     def rich_state(self, obs: Any, info: dict) -> dict | None:
-        """Thin wrapper so Session (which calls ``adapter.rich_state(obs,
-        info)`` by name) finds this hook -- see :meth:`get_rich_state`."""
+        """Thin wrapper so Session (hook lookup by name) finds this --
+        see :meth:`get_rich_state`."""
         return self.get_rich_state(obs, info)
 
     def get_rich_state(self, obs: Any, info: dict) -> dict | None:
-        """The complete ground-truth kitchen state: ``obs`` here already
-        *is* the ``OvercookedState`` object (``self.env.state`` -- see
-        :meth:`reset`/:meth:`step`), and it ships its own ``to_dict()``
-        covering both players (position/orientation/held item), every
-        object on the map (ingredients, plated/cooking soups, dishes) with
-        position, and the order list (``bonus_orders``/``all_orders``) --
-        everything :meth:`capture` doesn't already log (only the scalar
-        shaped-reward signal).
-
-        :param obs: the current ``OvercookedState`` (unused-looking, but
-            it IS the state -- this backend has no separate array obs).
-        :param info: unused.
-        :return: ``OvercookedState.to_dict()``, or ``None`` before reset.
-        """
+        """``obs`` already *is* the ``OvercookedState`` -- just calls its
+        own ``to_dict()`` (both players, every object, the order list)."""
         return obs.to_dict() if obs is not None else None
