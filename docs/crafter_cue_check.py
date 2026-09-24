@@ -29,8 +29,8 @@ Part 2 is not optional. Over 12 x 400 random presses the sweep faced a creature
 and pressed `do` eleven times, so the hit branch is almost all part 2's, and an
 earlier version of this file skipped those cases without saying so.
 
-Last run 2026-09-19 against chengfanbrain/crafter@deterministic: 4545 presses
-checked, 0 mismatches.
+Last run 2026-09-24 against chengfanbrain/crafter@deterministic, after the merge
+with main: 4545 presses checked, 0 mismatches.
 """
 
 import pickle

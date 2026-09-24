@@ -122,7 +122,7 @@ without anyone noticing, so it is checked rather than asserted:
 `docs/crafter_cue_check.py` runs each press twice against a deep copy of the
 live env -- once as pressed, once as `noop` -- and calls the prediction wrong if
 the two resulting states disagree with it. 4545 presses, 0 mismatches on
-2026-09-19. Re-run it after a crafter version bump.
+2026-09-24. Re-run it after a crafter version bump.
 
 Collecting grass is deliberately silent: `data.yaml` gives it `probability: 0.1`
 and `leaves: grass`, so a press that yields nothing is the roll failing rather
@@ -179,11 +179,35 @@ _DIRECTIONS = {"left": (-1, 0), "right": (+1, 0), "up": (0, -1), "down": (0, +1)
 #: Overlay text per cue -- the model's copy of what the subject just heard.
 _CUE_LINES = {"score": ["+1"], "hit": ["HIT"], "blocked": ["NO EFFECT"]}
 
-#: The outcome of a frame that has not happened yet (reset, or no env).
+#: The outcome of a frame nobody pressed a button for: a reset, or a restore.
 _NO_OUTCOME = {"hit": False, "refused": False, "target": ""}
 
+#: The crafter internals this adapter reads past the gym API: the pre-step state
+#: `_predict` needs, the RNG `restore` rewinds, and the semantic legend's tables.
+_INTERNALS = ("_player", "_world", "_sem_view")
 
-def _semantic_names(env: Any) -> list[str] | None:
+
+def _check_internals(env: Any) -> None:
+    """Fail at start-up if this crafter is not the one the adapter reads.
+
+    A crafter that renamed one of these would not announce itself. It would log
+    every frame as "nothing happened", or write a semantic grid with no legend,
+    and the block would be wrong rather than missing -- so the check is here,
+    before a subject is in the bore, rather than at the read.
+
+    :param env: the env just built.
+    :raises RuntimeError: naming what is missing and the build to install.
+    """
+    missing = [name for name in _INTERNALS if not hasattr(env, name)]
+    if missing:
+        raise RuntimeError(
+            f"this crafter's Env has no {', '.join(missing)}, which the adapter "
+            "reads for cue prediction, the night-noise RNG rewind and the "
+            "semantic legend. Install the build the config expects: pip install "
+            "git+https://github.com/chengfanbrain/crafter.git@deterministic")
+
+
+def _semantic_names(env: Any) -> list[str]:
     """Names for the ids in crafter's ``info["semantic"]`` grid, in id order.
 
     Read off the env's own two tables rather than hardcoded: crafter appends a
@@ -191,12 +215,9 @@ def _semantic_names(env: Any) -> list[str] | None:
     list, so the mapping is only fully known once the block has been played.
 
     :param env: the crafter env that produced the semantic grids.
-    :return: names indexed by id, or ``None`` if this crafter has no semantic
-        view (then the grid is logged without a legend).
+    :return: names indexed by id.
     """
-    view = getattr(env, "_sem_view", None)
-    if view is None:
-        return None
+    view = env._sem_view
     names = {i: mat or "void" for mat, i in view._mat_ids.items()}
     names.update({i: cls.__name__.lower() for cls, i in view._obj_ids.items()})
     return [names.get(i, "?") for i in range(max(names) + 1)]
@@ -228,6 +249,7 @@ class CrafterAdapter(EnvAdapter):
         self._cue = ""
         self._outcome: dict = _NO_OUTCOME
         env = self._build(spec.get("seed"))
+        _check_internals(env)
         self._menu_mode = bool(spec.get("menu", False))
         self._setup_menu(env)
         return env
@@ -272,7 +294,12 @@ class CrafterAdapter(EnvAdapter):
         :param seed: episode seed, from the run's fold of the design.
         :return: ``(obs, info)``; crafter's reset returns no info, so ``{}``.
         """
-        self.env.close()
+        # Through the adapter's own close(), not self.env.close(): crafter.Env
+        # subclasses gym.Env when gym happens to be installed and `object` when
+        # it is not, so it has a close() in one venv and none in the next, and
+        # the tolerance for that belongs in the one place base.py already keeps
+        # it. Measured: AttributeError on the first episode reset without gym.
+        self.close()
         self.env = self._build(seed)
         self._unlocked = set()
         self._last_unlock = None
@@ -339,7 +366,8 @@ class CrafterAdapter(EnvAdapter):
         crafter's own ``constants.collect / place / make`` tables rather than a
         copy of their contents. Read-only: it indexes the world and the
         inventory, and never touches ``world.random``, so inserting it into the
-        loop cannot perturb a replay.
+        loop cannot perturb a replay. Called from ``step`` only, so the episode
+        has been reset and the player exists.
 
         "Refused" means the engine ran the action and returned having changed
         nothing -- a rock without the pickaxe for it, a craft with no table in
@@ -355,10 +383,7 @@ class CrafterAdapter(EnvAdapter):
         import crafter
         from crafter import objects as crafter_objects
 
-        player = getattr(self.env, "_player", None)
-        world = getattr(self.env, "_world", None)
-        if player is None or world is None:
-            return _NO_OUTCOME
+        player, world = self.env._player, self.env._world
         name = self.env.action_names[action]
         facing = tuple(player.facing)
         material, obj = world[(player.pos[0] + facing[0],
@@ -551,12 +576,9 @@ class CrafterAdapter(EnvAdapter):
         self._cue = ""
         self._outcome = _NO_OUTCOME
         self._show_menu = False
-        world = getattr(self.env, "_world", None)
-        if world is None:
-            self._last_obs = np.asarray(self.env.render())
-            return
         # Rewind the stream this render just drew night noise from, so the
         # continuation sees the draws the recorded run saw.
+        world = self.env._world
         state = world.random.get_state()
         self._last_obs = np.asarray(self.env.render())
         world.random.set_state(state)
@@ -565,7 +587,7 @@ class CrafterAdapter(EnvAdapter):
         """Block-level legends for the per-frame variables.
 
         :return: id-indexed name arrays for the action space, the inventory
-            slots, the achievements and (when available) the semantic grid.
+            slots, the achievements and the semantic grid.
         """
         import crafter
         # constants.items / .achievements are what the player's dicts are built
@@ -587,9 +609,7 @@ class CrafterAdapter(EnvAdapter):
             extra["menu_names"] = np.array(
                 [self.env.action_names[i] for i in self._menu]
             )
-        names = _semantic_names(self.env)
-        if names:
-            extra["semantic_names"] = np.array(names)
+        extra["semantic_names"] = np.array(_semantic_names(self.env))
         if self._log_frames:
             extra["frame_shape"] = np.array(self._last_obs.shape)
         return extra
