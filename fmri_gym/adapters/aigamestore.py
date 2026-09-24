@@ -190,6 +190,32 @@ class AIGameStoreAdapter(EnvAdapter):
             f"state_{name}": value for name, value in state.items()
             if isinstance(value, (int, float, bool, str))})
 
+    def rich_state(self, obs: Any, info: dict) -> dict | None:
+        """Thin wrapper so :func:`Session` (which calls ``adapter.
+        rich_state(obs, info)`` by name) finds this hook -- see
+        :meth:`get_rich_state` for the actual gathering."""
+        return self.get_rich_state(obs, info)
+
+    def get_rich_state(self, obs: Any, info: dict) -> dict | None:
+        """Optional, opt-in counterpart to :meth:`capture`: the game's full
+        ``window.getGameState()`` dict, boards/entity lists included -- see
+        :mod:`fmri_gym.recording`'s ``save_rich_state`` phase field. Only
+        called at all when a block asks for it (see ``Session._episode``),
+        since unlike :meth:`capture` this isn't otherwise free.
+
+        Some games (game1's Water Sort) stash a circular self-reference to
+        their own p5 sketch instance under every board entry's ``"p"`` key --
+        harmless for gameplay, but not JSON-safe, so it's stripped here the
+        same way ``analysis/game1_symbolic_gui.ipynb``'s ``clean_state`` does.
+
+        :param obs: unused -- matches :meth:`capture`'s signature.
+        :param info: info dict from the latest :meth:`step` / :meth:`reset`.
+        :return: the full state dict, or ``None`` if this frame has none
+            (the page was briefly unreadable -- see :func:`_state`).
+        """
+        state = (info or {}).get("state")
+        return _strip_p5_instance(state) if state is not None else None
+
     def close(self) -> None:
         """Tear down browser, Playwright, and the local server.
 
@@ -210,6 +236,17 @@ class _QuietHandler(http.server.SimpleHTTPRequestHandler):
 
     def log_message(self, *args: Any) -> None:
         """Drop the request log line; nothing should print in the frame loop."""
+
+
+def _strip_p5_instance(value: Any) -> Any:
+    """Recursively drop the ``"p"`` key game1 (harmlessly) leaves on every
+    board entry, a self-reference to its own p5 sketch instance that is not
+    JSON-safe (see :meth:`AIGameStoreAdapter.rich_state`)."""
+    if isinstance(value, dict):
+        return {k: _strip_p5_instance(v) for k, v in value.items() if k != "p"}
+    if isinstance(value, list):
+        return [_strip_p5_instance(v) for v in value]
+    return value
 
 
 def _serve(directory: str) -> tuple[socketserver.TCPServer, str]:

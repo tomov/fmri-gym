@@ -90,3 +90,45 @@ class SuperTuxKartAdapter(EnvAdapter):
     def capture(self, obs: Any, info: dict, want_blob: bool = True) -> FrameState:
         return FrameState(blob=None,
                           variables={"distance": float((info or {}).get("distance", 0.0))})
+
+    def rich_state(self, obs: Any, info: dict) -> dict | None:
+        """Thin wrapper so Session (which calls ``adapter.rich_state(obs,
+        info)`` by name) finds this hook -- see :meth:`get_rich_state`."""
+        return self.get_rich_state(obs, info)
+
+    def get_rich_state(self, obs: Any, info: dict) -> dict | None:
+        """The full ``pystk2.WorldState`` :meth:`capture` only reduces to
+        one scalar (``distance``): every kart's ground-truth physical state
+        (position/rotation/velocity, race position/lap/overall distance,
+        finish status, powerup/attachment, on-road/jumping flags) and every
+        item on the track -- ``self.env.unwrapped.world`` (kept current by
+        this env's own ``world_update()``, called every ``step()``), not
+        the ego-relative/sorted encoding :meth:`get_observation` builds for
+        the RL ``obs``.
+
+        :param obs: unused -- the raw world state has everything ``obs``
+            was derived from, and more (every kart, not just the ego one).
+        :param info: unused.
+        :return: ``None`` before the first reset (``world`` not yet set).
+        """
+        world = self.env.unwrapped.world
+        if world is None:
+            return None
+        karts = [{
+            "id": k.id, "name": k.name, "player_id": k.player_id,
+            "position": k.position, "location": list(k.location),
+            "rotation": list(k.rotation), "velocity": list(k.velocity),
+            "speed": k.speed, "overall_distance": k.overall_distance,
+            "distance_down_track": k.distance_down_track,
+            "finished_laps": k.finished_laps,
+            "has_finished_race": k.has_finished_race,
+            "lap_time": k.lap_time, "energy": k.energy,
+            "jumping": k.jumping, "is_on_road": k.is_on_road,
+            "powerup": str(k.powerup), "attachment": str(k.attachment),
+        } for k in world.karts]
+        items = [{"location": list(it.location), "type": str(it.type)}
+                 for it in (world.items or [])]
+        return {
+            "track": self.env.unwrapped.current_track,
+            "time": world.time, "karts": karts, "items": items,
+        }

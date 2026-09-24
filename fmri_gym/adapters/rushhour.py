@@ -30,6 +30,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
+
 from .base import EnvAdapter, FrameState
 from .keyspec import SingleKeySpec
 
@@ -67,3 +69,38 @@ class RushHourAdapter(EnvAdapter):
     ) -> FrameState:
         info = info if isinstance(info, dict) else {}
         return FrameState(blob=None, variables={k: info.get(k) for k in _LOGGED if k in info})
+
+    def rich_state(self, obs: Any, info: dict) -> dict | None:
+        """Thin wrapper so Session (which calls ``adapter.rich_state(obs,
+        info)`` by name) finds this hook -- see :meth:`get_rich_state`."""
+        return self.get_rich_state(obs, info)
+
+    def get_rich_state(self, obs: Any, info: dict) -> dict | None:
+        """The actual board layout underneath the human-interface event
+        columns :meth:`capture` logs (``_LOGGED`` -- car selected, slide
+        direction, whether it was legal, ...): ``obs`` is the engine's own
+        per-slot ``(row, col, length, horizontal)`` array (default
+        ``obs_mode="cars"``), decoded per labeled car via ``info["labels"]``,
+        plus the full legal-action mask.
+
+        :param obs: the per-slot car-geometry array.
+        :param info: info dict from the latest :meth:`step`/:meth:`reset`.
+        :return: ``None`` if ``obs`` isn't array-like (not yet reset).
+        """
+        info = info if isinstance(info, dict) else {}
+        if obs is None:
+            return None
+        board = np.asarray(obs)
+        labels = info.get("labels", "")
+        cars = [
+            {"label": label, "row": int(row), "col": int(col),
+             "length": int(length), "horizontal": bool(horizontal)}
+            for label, (row, col, length, horizontal) in zip(labels, board.tolist())
+            if length > 0
+        ]
+        return {
+            "board": board.tolist(), "cars": cars, "labels": labels,
+            "n_cars": info.get("n_cars"),
+            "action_mask": (np.asarray(info["action_mask"]).tolist()
+                            if "action_mask" in info else None),
+        }

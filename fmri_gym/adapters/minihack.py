@@ -26,6 +26,7 @@ import gymnasium as gym
 
 from .keyspec import SingleKeySpec
 from .base import EnvAdapter, FrameState
+from .nethack import nle_rich_state
 
 # Cardinal arrows -> compass action indices (N=0, E=1, S=2, W=3).
 _KEYS = {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3}
@@ -39,8 +40,14 @@ class MiniHackAdapter(EnvAdapter):
         # Prefer the agent-centered square crop for display; the full terminal
         # ("pixel") only looks good with "full_screen": true.
         self._pixel_key = "pixel" if spec.get("full_screen") else "pixel_crop"
+        # inv_*/screen_descriptions aren't in MiniHack's own default set (unlike
+        # base NLE, which includes them automatically) -- requested here so
+        # get_rich_state() has an inventory and per-entity descriptions to
+        # decode, same as NetHackAdapter gets for free.
         keys = tuple(spec.get("observation_keys",
-                              (self._pixel_key, "glyphs", "blstats", "message")))
+                              (self._pixel_key, "glyphs", "blstats", "message",
+                               "inv_glyphs", "inv_letters", "inv_oclasses", "inv_strs",
+                               "screen_descriptions")))
         if self._pixel_key not in keys:
             keys = (self._pixel_key,) + keys
         env = gym.make(spec["game"], observation_keys=keys)
@@ -74,3 +81,19 @@ class MiniHackAdapter(EnvAdapter):
             if isinstance(obs, dict) and k in obs:
                 variables[k] = np.asarray(obs[k]).copy()
         return FrameState(blob=None, variables=variables)
+
+    def rich_state(self, obs: Any, info: dict) -> dict | None:
+        """Thin wrapper so Session (which calls ``adapter.rich_state(obs,
+        info)`` by name) finds this hook -- see :meth:`get_rich_state`."""
+        return self.get_rich_state(obs, info)
+
+    def get_rich_state(self, obs: Any, info: dict) -> dict | None:
+        """See :func:`fmri_gym.adapters.nethack.nle_rich_state` (shared with
+        :class:`.nethack.NetHackAdapter`, the other NLE-based adapter):
+        decoded ``blstats``, the current message, inventory, and every
+        visible monster/object/trap with its plain-English description.
+
+        :param obs: the latest observation dict.
+        :param info: unused -- NLE's own state lives entirely in ``obs``.
+        """
+        return nle_rich_state(obs)

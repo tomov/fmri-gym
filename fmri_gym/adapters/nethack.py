@@ -80,6 +80,27 @@ class NetHackAdapter(EnvAdapter):
                 variables[k] = np.asarray(obs[k])
         return FrameState(blob=None, variables=variables)
 
+    def rich_state(self, obs: Any, info: dict) -> dict | None:
+        """Thin wrapper so Session (which calls ``adapter.rich_state(obs,
+        info)`` by name) finds this hook -- see :meth:`get_rich_state`."""
+        return self.get_rich_state(obs, info)
+
+    def get_rich_state(self, obs: Any, info: dict) -> dict | None:
+        """See :func:`nle_rich_state` (shared with :mod:`.minihack`, the
+        other NLE-based adapter): decodes ``blstats`` into named fields,
+        the current text message, inventory, and every visible monster/
+        object/trap with its NetHack-assigned plain-English description --
+        everything base NLE's default observation keys (``glyphs`` /
+        ``blstats`` / ``chars`` / ``inv_*`` / ``screen_descriptions``,
+        all present without any extra ``gym.make`` configuration for this
+        backend) make available beyond the raw arrays :meth:`capture`
+        already logs.
+
+        :param obs: the latest observation dict.
+        :param info: unused -- NLE's own state lives entirely in ``obs``.
+        """
+        return nle_rich_state(obs)
+
 
 def _tty_to_rgb(obs: Any, cell: int) -> np.ndarray:
     """Render NLE's (24,80) tty_chars/tty_colors grid to an RGB image."""
@@ -109,6 +130,97 @@ def _tty_to_rgb(obs: Any, cell: int) -> np.ndarray:
             # center the glyph horizontally in its cell (glyph width may be < gw)
             surf.blit(glyph, (c * gw + (gw - glyph.get_width()) // 2, r * gh))
     return pygame.surfarray.array3d(surf).transpose(1, 0, 2)
+
+
+def _nle_text(buf: Any) -> str:
+    """Decode one NLE fixed-width, null-terminated byte buffer (``message``,
+    an ``inv_strs`` row, one ``screen_descriptions`` cell) to a plain str."""
+    return bytes(np.asarray(buf)).split(b"\x00", 1)[0].decode("ascii", "ignore")
+
+
+def _nle_blstats(obs: dict) -> dict[str, int]:
+    """Decode the raw ``blstats`` array into ``{name: value}`` using NLE's
+    own field-index constants (``nethack.NLE_BL_*``) -- the array alone
+    doesn't say which slot is HP vs. depth vs. gold."""
+    from nle import nethack
+    arr = np.asarray(obs["blstats"])
+    stats = {}
+    for name in dir(nethack):
+        if not name.startswith("NLE_BL_"):
+            continue
+        idx = getattr(nethack, name)
+        if idx < len(arr):
+            stats[name[len("NLE_BL_"):]] = int(arr[idx])
+    return stats
+
+
+def _nle_inventory(obs: dict) -> list[dict]:
+    """Every carried item (letter/object-class/glyph/description), decoded
+    from the ``inv_*`` observation keys -- empty ``letter`` (``0``) slots
+    are unused inventory rows, skipped."""
+    if "inv_letters" not in obs:
+        return []
+    letters = obs["inv_letters"]
+    oclasses = obs.get("inv_oclasses", [0] * len(letters))
+    glyphs = obs.get("inv_glyphs", [0] * len(letters))
+    strs = obs.get("inv_strs", [None] * len(letters))
+    items = []
+    for letter, oclass, glyph, desc in zip(letters, oclasses, glyphs, strs):
+        if int(letter) == 0:
+            continue
+        items.append({
+            "letter": chr(int(letter)), "object_class": int(oclass),
+            "glyph": int(glyph),
+            "description": _nle_text(desc) if desc is not None else "",
+        })
+    return items
+
+
+def _nle_entities(obs: dict) -> list[dict]:
+    """Every visible monster/object/trap (not plain terrain), with its
+    ``(row, col)`` and NetHack's own plain-English description -- the
+    closest thing here to ViZDoom's ``labels`` or Crafter's ``semantic``
+    map: ground truth about what's actually in view, not just a glyph id."""
+    if "glyphs" not in obs:
+        return []
+    from nle import nethack
+    glyphs = np.asarray(obs["glyphs"])
+    descs = np.asarray(obs["screen_descriptions"]) if "screen_descriptions" in obs else None
+    entities = []
+    for y in range(glyphs.shape[0]):
+        for x in range(glyphs.shape[1]):
+            g = int(glyphs[y, x])
+            if (nethack.glyph_is_monster(g) or nethack.glyph_is_object(g)
+                    or nethack.glyph_is_trap(g)):
+                entry = {"position": [y, x], "glyph": g}
+                if descs is not None:
+                    entry["description"] = _nle_text(descs[y, x])
+                entities.append(entry)
+    return entities
+
+
+def nle_rich_state(obs: Any) -> dict | None:
+    """Shared by :class:`NetHackAdapter` and :class:`.minihack.MiniHackAdapter`
+    (both NLE-based): decode ``blstats`` into named fields, the current
+    message, carried inventory, and every visible monster/object/trap --
+    everything NLE's observation dict makes available beyond the raw
+    ``glyphs``/``blstats``/``message`` arrays :meth:`EnvAdapter.capture`
+    already logs as opaque arrays.
+
+    :param obs: the latest observation dict (``None``/non-dict before the
+        first ``reset()``, or if a curriculum's ``observation_keys``
+        override dropped ``blstats`` entirely).
+    :return: the dict described above, or ``None`` if ``obs`` has no
+        ``blstats`` to decode.
+    """
+    if not isinstance(obs, dict) or "blstats" not in obs:
+        return None
+    return {
+        "blstats": _nle_blstats(obs),
+        "message": _nle_text(obs.get("message", b"")),
+        "inventory": _nle_inventory(obs),
+        "entities": _nle_entities(obs),
+    }
 
 
 def _mono_font(pygame: Any, size: int) -> Any:

@@ -12,6 +12,7 @@ display the rendered frame. No savestate -> seed + action replay.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import numpy as np
@@ -54,3 +55,43 @@ class BabaAdapter(EnvAdapter):
         self, obs: Any, info: dict, want_blob: bool = True
     ) -> FrameState:
         return FrameState(blob=None, variables={})
+
+    def rich_state(self, obs: Any, info: dict) -> dict | None:
+        """Thin wrapper so Session (which calls ``adapter.rich_state(obs,
+        info)`` by name) finds this hook -- see :meth:`get_rich_state`."""
+        return self.get_rich_state(obs, info)
+
+    def get_rich_state(self, obs: Any, info: dict) -> dict | None:
+        """capture() logs nothing at all (``obs`` is just a small numeric
+        grid encoding with no fixed per-cell meaning worth a scalar name),
+        so everything here is new: the agent's position/facing, what it's
+        carrying, the puzzle's win/lose condition, the CURRENT ruleset --
+        Baba Is You's whole mechanic is that pushing word blocks around
+        rewrites which objects are "you"/"win"/"push"/etc, so ``ruleset``
+        (recomputed by the engine every step from the live word-block
+        layout) is the one thing that actually changes as the puzzle is
+        solved -- and a sparse listing of every non-empty grid cell
+        (word blocks and objects alike, by type) underneath the raw
+        encoding.
+
+        :param obs: unused -- the engine's own grid (``self.env.grid``) is
+            read directly instead of decoding the numeric encoding.
+        :param info: unused.
+        """
+        env = self.env
+        grid = [
+            {"x": x, "y": y, "type": cell.type}
+            for y in range(env.height) for x in range(env.width)
+            if (cell := env.grid.get(x, y)) is not None
+        ]
+        # get_ruleset() returns a Ruleset wrapper object, not a plain dict --
+        # the actual {condition: {object: value}} mapping lives on .ruleset_dict.
+        ruleset = json.loads(json.dumps(dict(env.get_ruleset().ruleset_dict), default=str))
+        return {
+            "agent_pos": [int(v) for v in env.agent_pos],
+            "agent_dir": int(env.agent_dir),
+            "carrying": getattr(env.carrying, "type", None),
+            "win_rule": env.win_rule, "win_obj": env.win_obj,
+            "ruleset": ruleset,
+            "grid": grid,
+        }

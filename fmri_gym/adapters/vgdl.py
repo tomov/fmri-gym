@@ -128,6 +128,41 @@ class VGDLAdapter(EnvAdapter):
     def restore(self, blob: bytes) -> None:
         self.env.set_state(pickle.loads(blob))
 
+    def rich_state(self, obs: Any, info: dict) -> dict | None:
+        """Thin wrapper so Session (which calls ``adapter.rich_state(obs,
+        info)`` by name) finds this hook -- see :meth:`get_rich_state`."""
+        return self.get_rich_state(obs, info)
+
+    def get_rich_state(self, obs: Any, info: dict) -> dict | None:
+        """Everything VGDLEnv's own ``step()`` surfaces beyond
+        :meth:`capture`'s scalars: the symbolic per-cell object grid and
+        any collision/rule events VGDL fired this step, both already
+        riding in ``info`` -- this just isolates them as their own
+        ``rich_state`` so a block can toggle ``save_rich_state``
+        independently of the base recording, the same as every other
+        adapter here.
+
+        Nothing further beyond ``info`` was reachable to verify at
+        authoring time: the ``language_and_experience`` checkout this
+        backend needs (``VGDL_REPO`` -- see the module docstring) isn't
+        installed in this environment, so ``env.game``'s own attributes
+        (sprite lists, per-type counts, ...) couldn't be confirmed against
+        real objects the way every other adapter's ``get_rich_state`` was.
+        If that repo is available, this is the place to add them.
+
+        :param obs: unused.
+        :param info: info dict from the latest :meth:`step`.
+        :return: ``None`` if ``info`` has neither field to report.
+        """
+        if not isinstance(info, dict):
+            return None
+        rich = {}
+        if "state" in info:
+            rich["symbolic_state"] = info["state"]
+        if "events_triggered" in info:
+            rich["events"] = info["events_triggered"]
+        return rich or None
+
     def step(
         self, action: Any
     ) -> tuple[Any, float, bool, bool, dict]:

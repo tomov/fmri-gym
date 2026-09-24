@@ -74,6 +74,32 @@ class ALEAdapter(EnvAdapter):
     def restore(self, blob: bytes) -> None:
         self.env.unwrapped.restore_state(pickle.loads(blob))
 
+    def rich_state(self, obs: Any, info: dict) -> dict | None:
+        """Thin wrapper so Session (which calls ``adapter.rich_state(obs,
+        info)`` by name) finds this hook -- see :meth:`get_rich_state`."""
+        return self.get_rich_state(obs, info)
+
+    def get_rich_state(self, obs: Any, info: dict) -> dict | None:
+        """Everything the ALE interface can report beyond the RAM bytes
+        capture() already logs: lives remaining, the engine's own frame
+        counters (total vs. this episode's), and the two ALE-level
+        termination flags (``game_over``/``game_truncated``) -- ``ale``
+        tracks these itself, they aren't derivable from RAM alone without
+        knowing the game's own memory layout.
+
+        :param obs: unused -- matches :meth:`capture`'s signature.
+        :param info: unused -- everything here comes from ``self.env.
+            unwrapped.ale`` directly.
+        """
+        ale = self.env.unwrapped.ale
+        return {
+            "lives": ale.lives(),
+            "frame_number": ale.getFrameNumber(),
+            "episode_frame_number": ale.getEpisodeFrameNumber(),
+            "game_over": bool(ale.game_over()),
+            "game_truncated": bool(ale.game_truncated()),
+        }
+
     def block_extra(self) -> dict | None:
         """Block-level arrays merged into the npz (the palette, if save_pixels)."""
         if self.save_pixels:

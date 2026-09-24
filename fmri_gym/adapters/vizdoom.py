@@ -179,3 +179,107 @@ class VizDoomAdapter(EnvAdapter):
         if not game.is_audio_buffer_enabled():
             return None
         return {"audio_sampling_rate": game.get_audio_sampling_rate()}
+
+    def rich_state(self, obs: Any, info: dict) -> dict | None:
+        """Optional, opt-in counterpart to :meth:`capture` -- see
+        :mod:`fmri_gym.recording`'s ``save_rich_state`` phase field. Thin
+        wrapper so :func:`Session` (which calls ``adapter.rich_state(obs,
+        info)`` by name) finds this hook; the actual gathering lives in
+        :meth:`get_rich_state`, kept as its own method (same signature,
+        every adapter's ``get_rich_state`` matches it) so it can also be
+        called directly -- e.g. from a notebook -- without going through
+        the ``rich_state`` hook-lookup name. ViZDoom itself never reads
+        ``obs``/``info`` here: its own state lives on the env
+        (``self.env.unwrapped.state``).
+        """
+        return self.get_rich_state(obs, info)
+
+    def get_rich_state(self, obs: Any, info: dict) -> dict | None:
+        """Every piece of scene state ViZDoom's backend can report right
+        now -- not just the handful of ``gamevariables`` a scenario's own
+        ``available_game_variables`` config happens to declare (Defend the
+        Center, e.g., only declares ``AMMO2``/``HEALTH``; that config
+        controls what ``obs["gamevariables"]`` contains, not what the engine
+        actually tracks).
+
+        - ``game_variables``: **every** ``vzd.GameVariable`` the installed
+          ViZDoom build knows about (position/angle/pitch/roll/velocity,
+          per-weapon ammo, kill/hit/damage/item/secret counts, dead/
+          on-ground/attack-ready flags, camera state, ...), queried directly
+          via ``game.get_game_variable(var)`` rather than limited to
+          ``game.get_available_game_variables()`` -- confirmed safe to call
+          for any scenario: undeclared/inapplicable variables just read back
+          ``0.0``, they don't raise (see ``analysis/`` for the probe that
+          checked this against Defend the Center specifically).
+        - ``episode``: state ``GameVariable`` doesn't cover -- engine tic
+          (``state.tic``) vs. this adapter's own frame ordinal
+          (``state.number``), wall-clock ``episode_time``, the reward
+          accounting ViZDoom itself keeps (``total_reward``/``last_reward``/
+          ``living_reward``), ``is_player_dead``, the last low-level action
+          applied, and the map name.
+        - ``objects``: every actor currently in the level (monsters, items,
+          decorations, the player itself) with its name, position, and
+          orientation -- ViZDoom's ground-truth entity list, independent of
+          what's actually on screen. Empty unless the scenario's
+          ``env_kwargs`` set ``objects_info_enabled: true``
+          (``game.set_objects_info_enabled``, off by default in ViZDoom).
+        - ``labels``: the subset of those objects actually visible on screen
+          this frame, each with its on-screen bounding box (``x``, ``y``,
+          ``width``, ``height``) and category (e.g. ``"Monster"``) in
+          addition to name/position -- the closest thing here to MiniHack's
+          glyph classification or ``AIGameStoreAdapter``'s tube layout.
+          Empty unless ``env_kwargs`` set ``labels_buffer_enabled: true``.
+        - ``sectors``: floor/ceiling height per level sector. Static for the
+          whole episode (wall geometry, ``sector.lines``, is not included --
+          this is the coarse per-sector heights only), so logging it every
+          frame is redundant; a short ``rich_state_stride`` (or reading it
+          from just one frame) is enough. Empty unless ``env_kwargs`` set
+          ``sectors_info_enabled: true``.
+
+        :return: the dict described above, or ``None`` on a terminal frame
+            (``state`` is ``None`` once the episode ends -- same case
+            :meth:`sound` already guards against).
+        """
+        state = self.env.unwrapped.state
+        if state is None:
+            return None
+        game = self.env.unwrapped.game
+
+        import vizdoom as vzd  # lazy: only needed to enumerate GameVariable
+
+        game_variables = {}
+        for name in dir(vzd.GameVariable):
+            if name.startswith("_") or name in ("name", "value"):
+                continue
+            game_variables[name] = float(game.get_game_variable(getattr(vzd.GameVariable, name)))
+
+        objects = [{
+            "id": o.id, "name": o.name,
+            "position": [o.position_x, o.position_y, o.position_z],
+            "angle": o.angle, "pitch": o.pitch, "roll": o.roll,
+            "velocity": [o.velocity_x, o.velocity_y, o.velocity_z],
+        } for o in (state.objects or [])]
+
+        labels = [{
+            "object_id": l.object_id, "object_name": l.object_name,
+            "category": l.object_category, "value": l.value,
+            "bbox": [l.x, l.y, l.width, l.height],
+            "position": [l.object_position_x, l.object_position_y, l.object_position_z],
+        } for l in (state.labels or [])]
+
+        sectors = [{"floor_height": s.floor_height, "ceiling_height": s.ceiling_height}
+                   for s in (state.sectors or [])]
+
+        episode = {
+            "tic": state.tic, "frame_number": state.number,
+            "episode_time": game.get_episode_time(),
+            "total_reward": game.get_total_reward(),
+            "last_reward": game.get_last_reward(),
+            "living_reward": game.get_living_reward(),
+            "is_player_dead": game.is_player_dead(),
+            "last_action": [float(a) for a in game.get_last_action()],
+            "doom_map": game.get_doom_map(),
+        }
+
+        return {"game_variables": game_variables, "episode": episode,
+                "objects": objects, "labels": labels, "sectors": sectors}
