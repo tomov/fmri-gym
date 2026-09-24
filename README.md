@@ -811,9 +811,16 @@ which exists for a scanner (trigger wait, fps pacing, a window, a key queue).
 ```sh
 python agent_play.py --curriculum configs/dbp_games/crafter__crafter.json \
     --policy random --outdir data/model-random --n-episodes 2 --max-frames 60
+export ANTHROPIC_API_KEY=...      # `--policy vlm` refuses to start without it
 python agent_play.py --curriculum configs/dbp_games/crafter__crafter.json \
     --policy vlm --model claude-sonnet-5 --history 4 --max-frames 60
 ```
+
+The key is checked before the first frame, not at the first request: a block
+whose every call came back 401 would otherwise finish and log a model that chose
+to stand still. Calls that fail later are counted in the phase log as
+`dropped_calls` (and that frame is a noop) beside `invalid_replies`, which counts
+replies that named no key.
 
 The output npz has the **same 21 fields as a human block**, plus `policy` and
 `policy_model`, so one analysis reads both. Episode seeds are the block's own

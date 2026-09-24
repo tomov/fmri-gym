@@ -33,6 +33,9 @@ class Policy:
     #: set by a policy that cannot always parse its own output
     invalid: int = 0
 
+    #: set by a policy whose choice can fail to arrive at all (a network one)
+    dropped: int = 0
+
     def reset(self) -> None:
         """Forget per-episode history; called once before each episode."""
 
@@ -74,8 +77,9 @@ class VLMPolicy(Policy):
     config and report it; tuning it after seeing scores turns it into a free
     parameter that the human side does not have.
 
-    Credentials come from the environment's HTTP proxy, so ``api_key`` is a
-    placeholder unless one is genuinely needed.
+    The key is read from ``ANTHROPIC_API_KEY`` once, here, rather than per
+    request: a block that plays 750 frames of noop because every call came back
+    401 has spent the run and logged a model that chose to stand still.
 
     :param menu: ``{key name: action}``, the table the subject was taught.
     :param model: model id to query.
@@ -91,6 +95,12 @@ class VLMPolicy(Policy):
         self.history = history
         self.noop = noop
         self.max_tokens = max_tokens
+        self.api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not self.api_key:
+            raise RuntimeError(
+                "a vlm policy needs ANTHROPIC_API_KEY in the environment. "
+                "Without it every call is refused and the block records a run "
+                "of noops, which reads like a model that chose to stand still.")
         self.frames: list[np.ndarray] = []
         self.keys: list[str] = []
 
@@ -139,14 +149,21 @@ class VLMPolicy(Policy):
         req = urllib.request.Request(API_URL, data=body.encode(), headers={
             "content-type": "application/json",
             "anthropic-version": "2023-06-01",
-            "x-api-key": os.environ.get("ANTHROPIC_API_KEY", "onecli-managed")})
+            "x-api-key": self.api_key})
         try:
             with urllib.request.urlopen(req, timeout=60) as resp:
                 data = json.loads(resp.read())
             return "".join(b.get("text", "") for b in data.get("content", []))
-        except (OSError, ValueError):
+        except (OSError, ValueError) as e:
             # A dropped call must not end the block: it costs one frame, which
-            # the noop below records honestly, and `invalid` counts them.
+            # the noop below records honestly. But it must not pass for a choice
+            # either, so it is counted separately from an unparsable reply and
+            # said out loud the first time -- a proxy that is not there would
+            # otherwise look like a model standing still on purpose.
+            self.dropped += 1
+            if self.dropped == 1:
+                print(f"vlm policy: call failed ({e}); this frame is a noop. "
+                      "Later failures are counted, not printed.")
             return ""
 
 

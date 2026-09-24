@@ -140,7 +140,7 @@ def play_block(phase: dict, index: int, args, logger: Logger,
         "game": phase["game"], "policy": args.policy,
         "n_episodes": args.n_episodes, "n_frames": len(frames["action"]),
         "total_reward": sum(float(r) for r in frames["reward"]),
-        "invalid_replies": policy.invalid,
+        "invalid_replies": policy.invalid, "dropped_calls": policy.dropped,
         "data_file": path.split("/")[-1]})
     return path
 
