@@ -42,6 +42,13 @@ if TYPE_CHECKING:
 BG_COLOR = (0, 0, 0)
 TEXT_COLOR = (220, 220, 220)
 FIX_COLOR = (255, 255, 255)
+HUD_COLOR = (235, 235, 235)
+# Text drawn ON a frame, where gray would read as part of the picture. Light
+# sky blue: bright over both dark and light art, and cool enough not to be
+# mistaken for the red a game may reserve (crafter-for-brain-scan v0.33 picked
+# it for the same reason, and matching it keeps one rig's subjects at home in
+# the other).
+ON_FRAME_COLOR = (150, 215, 255)
 
 
 class Display:
@@ -95,6 +102,7 @@ class Display:
                   file=sys.stderr)
         self.font = pygame.font.Font(pygame.font.get_default_font(), 28)
         self.fix_font = pygame.font.Font(pygame.font.get_default_font(), 80)
+        self.hud_font = pygame.font.Font(pygame.font.get_default_font(), 24)
 
     def _open(self) -> pygame.Surface:
         """Open the window, trying for a vsync-locked flip.
@@ -191,10 +199,21 @@ class Display:
             return
         time.sleep(max(0.0, min(poll, deadline - time.perf_counter())))
 
-    def draw_frame(self, rgb: np.ndarray) -> float:
+    def draw_frame(
+        self,
+        rgb: np.ndarray,
+        overlay: list[str] | None = None,
+        on_frame: tuple[list[str], float] | None = None,
+    ) -> float:
         """Blit an RGB frame, aspect-fit and centered with black pad.
 
         :param rgb: frame array shaped ``(H, W, 3)``.
+        :param overlay: optional short status lines to draw alongside the
+            frame; ``None`` (the default) draws the frame alone, exactly as
+            before this argument existed.
+        :param on_frame: optional ``(lines, y_frac)`` drawn over the frame
+            itself rather than in the margin; ``None`` (the default) draws
+            nothing. See :meth:`_draw_on_frame`.
         :return: ``perf_counter`` of the flip that showed it.
         """
         self.canvas.fill(BG_COLOR)
@@ -205,7 +224,77 @@ class Display:
         surf = pygame.transform.scale(surf, (dw, dh))
         rect = surf.get_rect(center=(self.size[0] // 2, self.size[1] // 2))
         self.canvas.blit(surf, rect.topleft)
+        if overlay:
+            self._draw_overlay(overlay, rect)
+        if on_frame:
+            self._draw_on_frame(on_frame, rect)
         return self._present()
+
+    def _draw_overlay(self, lines: list[str], rect: pygame.Rect) -> None:
+        """Draw status lines in the letterbox margin, or over the frame.
+
+        Aspect-fitting a square frame into a 4:3 window leaves a black bar on
+        each side, and text there covers no pixel the subject is playing on.
+        That matters beyond tidiness: whatever the overlay says has to be
+        state the env already reports, so the model harness sees the same
+        numbers, and it must not hide game content from one side of the
+        comparison. Lines are wrapped to the bar, so split long labels on
+        spaces rather than underscores. A frame that fills the window has no
+        bar; then the text lands top-left over the frame, on a black box so it
+        stays readable.
+
+        :param lines: short status strings, already formatted by the adapter.
+        :param rect: rect the frame was blitted into, i.e. where the bar ends.
+        """
+        pad = 8
+        column = rect.left if rect.left > 4 * pad else self.size[0]
+        y = pad
+        for raw in lines:
+            for line in self._wrap(self.hud_font, raw, column - 2 * pad):
+                surf = self.hud_font.render(line, True, HUD_COLOR)
+                box = surf.get_rect(topleft=(pad, y))
+                self.canvas.fill(BG_COLOR, box)
+                self.canvas.blit(surf, box)
+                y += self.hud_font.get_height()
+
+    def _draw_on_frame(
+        self, on_frame: tuple[list[str], float], rect: pygame.Rect
+    ) -> None:
+        """Draw lines over the frame on a black backdrop, horizontally centered.
+
+        The counterpart of :meth:`_draw_overlay`, and the opposite trade: the
+        margin is the right place for something the subject reads now and then,
+        and the wrong place for something they are acting on, which has to be
+        where they are already looking. Covering game pixels is the cost, so a
+        caller should put a line here only while it is in use.
+
+        Drawn at display resolution over the scaled frame, not into the array,
+        so the text is not magnified by the same unfiltered scale as the art --
+        and so the frame the adapter logged stays the frame the engine made.
+
+        ``y_frac`` exists because "where they are already looking" is not
+        always the middle of the picture: a game that draws its own HUD into
+        the bottom of its frame leaves the played part above centre.
+
+        :param on_frame: ``(lines, y_frac)``, where ``y_frac`` is the fraction
+            of the frame's height the block is centered on (0.5 = middle).
+        :param rect: rect the frame was blitted into.
+        """
+        lines, y_frac = on_frame
+        surfs = [self.hud_font.render(ln, True, ON_FRAME_COLOR) for ln in lines]
+        if not surfs:
+            return
+        total_h = sum(s.get_height() for s in surfs)
+        width = max(s.get_width() for s in surfs)
+        cx = rect.centerx
+        top = rect.top + int(rect.height * y_frac) - total_h // 2
+        backdrop = pygame.Rect(0, 0, width + 16, total_h + 10)
+        backdrop.center = (cx, top + total_h // 2)
+        self.canvas.fill(BG_COLOR, backdrop)
+        y = top
+        for surf in surfs:
+            self.canvas.blit(surf, surf.get_rect(midtop=(cx, y)))
+            y += surf.get_height()
 
     def _wrap(self, font: pygame.font.Font, line: str, max_w: int) -> list[str]:
         """Word-wrap one logical line so no rendered line exceeds ``max_w`` px.

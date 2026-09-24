@@ -99,6 +99,7 @@ def _poll_keys_until(
     key_log: list,
     clock: Clock,
     key_to_action: dict | None = None,
+    latch: bool = False,
 ) -> tuple[object | None, bool]:
     """Poll the keyboard until ``deadline``, logging every press/release.
 
@@ -107,15 +108,21 @@ def _poll_keys_until(
     vsync-locked and :meth:`Display.idle` re-presents the frame instead of
     sleeping. In turn-based play (``key_to_action`` given) the wait ends at
     the first mapped keydown so the step happens then, not at the tick.
+    ``latch`` is the real-time counterpart: the keydown is remembered but the
+    wait still runs to the tick, so the frame period is what it says it is.
 
     :param display: the display, idled between polls.
     :param deadline: ``perf_counter`` at which to stop waiting.
     :param key_log: list receiving ``(run_time, key_name, is_down)``.
     :param clock: the run's clock for the timestamps.
-    :param key_to_action: turn-based: map of single key NAMES to env actions.
-    :return: ``(action_or_None, user_quit)``; ``action`` is set only in
-        turn-based play, ``user_quit`` on window close / ESC.
+    :param key_to_action: turn-based or latched: map of single key NAMES to
+        env actions.
+    :param latch: keep waiting after a mapped keydown and return the last one
+        seen, instead of ending the wait at the first.
+    :return: ``(action_or_None, user_quit)``; ``action`` is set only when
+        ``key_to_action`` is given, ``user_quit`` on window close / ESC.
     """
+    latched_action = None
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -130,9 +137,11 @@ def _poll_keys_until(
             down = event.type == pygame.KEYDOWN
             key_log.append((clock.run_time(), name, down))
             if down and key_to_action and name in key_to_action:
-                return key_to_action[name], False
+                if not latch:
+                    return key_to_action[name], False
+                latched_action = key_to_action[name]
         if time.perf_counter() >= deadline:
-            return None, False
+            return latched_action, False
         display.idle(deadline)
 
 
@@ -396,6 +405,7 @@ class Run:
         seed: int,
         episode_id: int,
         turn_based: bool,
+        latched: bool,
         dt: float,
         state_stride: int,
         block_end: float,
@@ -403,11 +413,15 @@ class Run:
     ) -> bool:
         """Run one episode, appending frame data to ``frames``.
 
-        :param adapter: wrapped env for reset/step/render/sound/capture.
+        :param adapter: wrapped env for reset/step/render/sound/capture, and
+            optionally an ``overlay()`` returning status lines for the display
+            margin, or an ``on_frame_overlay()`` returning lines to draw over
+            the frame itself.
         :param frames: mutable frame-log dict; lists are appended in place.
         :param seed: RNG seed for this episode's ``reset``.
         :param episode_id: index of this episode within the game block.
         :param turn_based: if True, advance only on mapped keydowns.
+        :param latched: real-time only: let a fresh keydown win over held keys.
         :param dt: target seconds per frame (``1 / fps``).
         :param state_stride: save a full state blob every this many frames.
         :param block_end: ``perf_counter`` deadline for the game block.
@@ -418,7 +432,8 @@ class Run:
         frames["episode_seeds"].append(seed)
         terminated = truncated = False
         ep_frame = 0
-        key_to_action = adapter.keyspec.key_to_action_map() if turn_based else None
+        key_to_action = (adapter.keyspec.key_to_action_map()
+                         if turn_based or latched else None)
         key_log = frames["key_events"]
 
         ## Reset environment and show initial state
@@ -437,13 +452,16 @@ class Run:
             # TODO(#43): anchor the wait to the last step (t_step + dt), not to the flip.
             deadline = block_end if turn_based else next_t
             action, user_quit = _poll_keys_until(
-                self.display, deadline, key_log, self.clock, key_to_action)
+                self.display, deadline, key_log, self.clock, key_to_action,
+                latch=latched and not turn_based)
             if user_quit:
                 return True
             next_t += dt
             if turn_based and action is None:
                 continue                        # block ended without a press
-            if not turn_based:
+            if not turn_based and action is None:
+                # No latched press this frame (or the phase never asked for
+                # one): the action is whatever is held down at the tick.
                 action = adapter.keyspec.resolve(held_key_names())
 
             obs, reward, terminated, truncated, info = adapter.step(action)
@@ -487,11 +505,17 @@ class Run:
     def _show(self, adapter: EnvAdapter, play_sound: bool) -> float:
         """Flip the adapter's frame, then queue its sound against that flip.
 
+        An adapter may also offer ``overlay()`` (status lines for the letterbox
+        margin) and ``on_frame_overlay()`` (lines drawn over the frame itself);
+        both are optional and draw nothing when absent or returning ``None``.
+
         :param adapter: the env whose ``render`` / ``sound`` to present.
         :param play_sound: pass the sound to the speakers.
         :return: ``perf_counter`` of the flip.
         """
-        flip_t = self.display.draw_frame(adapter.render())
+        overlay = getattr(adapter, "overlay", lambda: None)
+        on_frame = getattr(adapter, "on_frame_overlay", lambda: None)
+        flip_t = self.display.draw_frame(adapter.render(), overlay(), on_frame())
         if play_sound:
             self.audio.play(adapter.sound(), flip_t)
         return flip_t
@@ -504,7 +528,7 @@ class Run:
 
         :param phase: game-phase config (``backend``, ``game``, ``mode``,
             ``duration`` / ``n_episodes``, ``fps``, ``seed``, ``state_stride``,
-            ``turn_based``, optional ``keys`` overrides, …).
+            ``turn_based``, ``latched_keys``, optional ``keys`` overrides, …).
         :param index: phase index in the curriculum (for the manifest).
         :raises KeyboardInterrupt: if the subject quits mid-block.
         """
@@ -527,6 +551,13 @@ class Run:
         # for e.g. FrozenLake is action 0 = LEFT), so the agent "moves on its own"
         # and a single held key fires many times. turn_based fixes both.
         turn_based = bool(phase.get("turn_based", False))
+        # Real-time blocks poll HELD keys, so a press that starts and ends
+        # between two frames is never seen -- at a grid world's few frames per
+        # second that loses most taps. `latched_keys` lets a fresh keydown win
+        # instead, falling back to the held-key poll (so holding a key still
+        # repeats). Off by default: backends whose actions are key COMBINATIONS
+        # must keep polling, and this is exactly what they do today.
+        latched = bool(phase.get("latched_keys", False))
         play_sound = phase.get("audio", True)
         if not isinstance(play_sound, bool):
             raise ValueError(f'game phase {index}: "audio" must be true or false, '
@@ -563,7 +594,8 @@ class Run:
             user_quit = self._episode(
                 adapter, frames,
                 seed=base_seed + episode_id, episode_id=episode_id,
-                turn_based=turn_based, dt=dt, state_stride=state_stride,
+                turn_based=turn_based, latched=latched, dt=dt,
+                state_stride=state_stride,
                 block_end=block_end, play_sound=play_sound)
             # An episode's last sounds are still queued when it ends; drop them
             # so they do not play over the next episode or the next fixation.

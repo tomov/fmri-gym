@@ -51,9 +51,13 @@ pushBoulders, relational.
 ### ✅ crafter (crafter)  — new backend
 `pip install crafter`. Uses the **old-gym API shape** (reset()→obs only,
 step()→4-tuple), so a dedicated `crafter` adapter normalizes it to gymnasium.
-The observation IS the 64×64×3 RGB frame; `Discrete(17)` actions (arrows move,
-SPACE=interact, S=sleep; place/make via a `keys` override). No savestate →
-seed+replay. Achievements logged as an analysis variable.
+The observation IS the RGB frame (64×64 by default, 384 in the DBP config);
+`Discrete(17)` actions, all 17 keyed (arrows move, SPACE=interact, S=sleep,
+R/T/F/P place, 1–6 make). Superseded since this pass: the whole env pickles, so
+there IS a savestate (`state_stride` anchors), and replay needs the determinism
+fork — see the adapter docstring. Achievements, inventory, player position and
+the semantic grid are logged; `cues` adds the score/hit/blocked feedback layer
+(crafter ships no audio of its own).
 
 ### ✅ minihack (minihack)  — new backend
 `pip install minihack` (needs `setuptools<81` for `pkg_resources`; pulls
