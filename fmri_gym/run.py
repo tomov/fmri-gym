@@ -57,20 +57,23 @@ class Clock:
         self.t0_perf = time.perf_counter()
         self.t0_epoch = time.time()
 
-    def run_time(self) -> float:
+    def run_time(self) -> float | None:
         """Seconds since the scanner trigger (``perf_counter`` based).
 
-        :return: seconds since this run's trigger.
+        :return: seconds since this run's trigger, or ``None`` before it: a
+            curriculum may put its instructions above its ``trigger`` phase,
+            and a phase the scan has not started for has no run time.
         """
-        return time.perf_counter() - self.t0_perf
+        return None if self.t0_perf is None else time.perf_counter() - self.t0_perf
 
-    def from_perf(self, t_perf: float) -> float:
+    def from_perf(self, t_perf: float) -> float | None:
         """Convert a ``perf_counter`` stamp (e.g. a flip time) to run time.
 
         :param t_perf: a ``time.perf_counter()`` value.
-        :return: seconds since the scanner trigger.
+        :return: seconds since the scanner trigger, or ``None`` before it
+            (see :meth:`run_time`).
         """
-        return t_perf - self.t0_perf
+        return None if self.t0_perf is None else t_perf - self.t0_perf
 
     def wall_time(self) -> float:
         """Current wall-clock epoch time.
@@ -180,6 +183,29 @@ def _join_multiline_text(text: str | list | tuple) -> str:
     return str(text)
 
 
+def _warn_self_paced(curriculum: list[dict]) -> None:
+    """Say on stderr which phases let the subject decide how long the run is.
+
+    A phase that waits for a key -- an untimed ``message``, a ``survey`` -- adds
+    an unknown number of seconds to every onset after it and to the run's own
+    length, so the scan cannot be stopped at a planned volume count. Above the
+    curriculum's ``trigger`` phase that is exactly what is wanted and nothing is
+    said; below it, it is usually an oversight, and this is a warning rather than
+    a refusal because a behavioural run is entitled to be self-paced.
+
+    :param curriculum: the run's phases.
+    """
+    at = [i for i, p in enumerate(curriculum) if p["type"] == "trigger"]
+    start = at[0] + 1 if at else 0
+    loose = [f"phase {i} ({p['type']})" for i, p in enumerate(curriculum)
+             if i >= start and (p["type"] == "survey"
+                                or (p["type"] == "message" and p.get("duration") is None))]
+    if loose:
+        print(f"curriculum: {', '.join(loose)} wait for a key press inside the run, so this "
+              "run's length and every onset after them depend on the subject: put a trigger "
+              "phase below them, or give the message a duration", file=sys.stderr)
+
+
 def _wait_for_duration(display: Display, duration: float) -> None:
     """Block for ``duration`` seconds.
 
@@ -261,6 +287,7 @@ class Run:
         seeds = bids.fold_seeds(curriculum, out.label)
         check_monitor(args.monitor)
         fold_cli_options(curriculum, args)
+        _warn_self_paced(curriculum)
 
         triggers = Triggers.from_config(config.get("triggers"))
         print(f"triggers: {triggers.status()}", file=sys.stderr)
@@ -311,6 +338,23 @@ class Run:
         self.clock.trigger()
         self.logger.set_trigger_time()
         self.triggers.lifecycle("task_start")
+
+    def _trigger_phase(self, phase: dict, index: int) -> None:
+        """Start the scan here, in the middle of the curriculum.
+
+        A ``trigger`` phase is where t=0 goes when the phases above it must not
+        be inside the run. The instruction screen is the case it exists for: it
+        waits for a key, so with the trigger before it the run's length -- its
+        number of volumes -- and the onset of everything in it depend on how
+        long the subject took to read. Put the trigger under the instructions
+        and the scan starts at a fixed distance from the first fixation instead.
+
+        :param phase: the trigger-phase config (it has no fields).
+        :param index: phase index in the curriculum (for the manifest).
+        """
+        self._trigger()
+        self.logger.log_phase({"index": index, "type": "trigger",
+                               "onset": 0.0, "offset": self.clock.run_time()})
 
     def _fixation(self, phase: dict, index: int) -> None:
         """Show a fixation cross for ``phase["duration"]`` seconds.
@@ -658,9 +702,14 @@ class Run:
         """
         completed = False
         handlers = {"fixation": self._fixation, "message": self._message,
-                    "game": self._game, "survey": self._survey}
+                    "game": self._game, "trigger": self._trigger_phase,
+                    "survey": self._survey}
         try:
-            self._trigger()
+            # A curriculum that says where its scan starts starts it there; one
+            # that does not starts it above the first phase, as every
+            # curriculum did before there was a way to say otherwise.
+            if not any(p["type"] == "trigger" for p in self.curriculum):
+                self._trigger()
 
             for index, phase in enumerate(self.curriculum):
                 handler = handlers.get(phase["type"])

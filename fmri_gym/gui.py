@@ -203,6 +203,10 @@ PHASE_FIELDS: dict[str, list[Field]] = {
         Field("questions", "questions", "lines", tip="One question per line."),
         Field("n_points", "n_points", "int", tip="Likert scale points (default 7)."),
     ],
+    # A trigger phase has nothing to set: where it sits IS the setting. Put it
+    # under the instructions so the reading is not inside the run; a curriculum
+    # without one starts its scan above the first phase.
+    "trigger": [],
     "game": _GAME_FIELDS,
 }
 
@@ -401,6 +405,8 @@ def phase_label(index: int, phase: dict) -> str:
         detail = (text[0] if text else "") if isinstance(text, list) else text.split("\n")[0]
     elif kind == "survey":
         detail = f"{len(phase.get('questions', []))} questions"
+    elif kind == "trigger":
+        detail = "the scan starts here"
     else:
         detail = f"{phase.get('duration', 2.0)} s"
     return f"{index:02d} {kind:<8} {detail[:26]}"

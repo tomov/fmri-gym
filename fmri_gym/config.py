@@ -21,7 +21,7 @@ from typing import Any
 
 from .triggers import TriggerError, TriggerSettings
 
-PHASE_TYPES = ("fixation", "message", "game", "survey")
+PHASE_TYPES = ("fixation", "message", "game", "trigger", "survey")
 SECTIONS = ("curriculum", "triggers")
 #: Exit status of ``fmri_play`` when the run was quit (ESC) before its end; a
 #: session script (``set -e``) stops on it instead of starting the next run.
@@ -136,9 +136,35 @@ def validate_config(config: dict) -> list[str]:
         problems.append("curriculum: needs at least one phase")
     for i, phase in enumerate(config["curriculum"]):
         problems.extend(f"phase {i}: {p}" for p in _phase_problems(phase))
+    problems.extend(trigger_phase_problems(config["curriculum"]))
     problems.extend(trigger_problems(config.get("triggers")))
     problems.extend(trigger_key_clashes(config))
     return problems
+
+
+def trigger_phase_problems(curriculum: list[dict]) -> list[str]:
+    """What a ``trigger`` phase refuses: a second one, or a game before it.
+
+    A curriculum with no ``trigger`` phase is the old arrangement and is fine:
+    the scan then starts before the first phase, as it always did. One says
+    "start the scan here" instead, so the phases above it (the instructions the
+    subject reads at their own pace) are outside the run.
+
+    Two of them would mean two ``t=0``. A game above one cannot work at all:
+    every frame it logs is stamped in run time, and there is no run yet.
+
+    :param curriculum: the run's phases.
+    :return: one problem per offence.
+    """
+    at = [i for i, p in enumerate(curriculum) if p["type"] == "trigger"]
+    if not at:
+        return []
+    out = [f"phase {i}: a second trigger phase (phase {at[0]} already starts the scan): "
+           "a run has one t=0" for i in at[1:]]
+    out += [f"phase {i}: a game phase above the trigger (phase {at[0]}): every frame is stamped "
+            "in run time, and before the trigger there is no run time to stamp it in"
+            for i, p in enumerate(curriculum[:at[0]]) if p["type"] == "game"]
+    return out
 
 
 def trigger_key_clashes(config: dict) -> list[str]:

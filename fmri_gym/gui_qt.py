@@ -1341,6 +1341,7 @@ class _Editor(QtWidgets.QMainWindow):
         templates = {"fixation": {"type": "fixation", "duration": 2.0},
                      "message": {"type": "message", "text": "", "duration": 2.0},
                      "survey": {"type": "survey", "n_points": 7, "questions": []},
+                     "trigger": {"type": "trigger"},
                      # No fps: Check names it, as it does the empty game id -- the rate
                      # belongs to the game about to be picked, not to this template.
                      "game": {"type": "game", "backend": "gym", "game": "", "mode": "duration",

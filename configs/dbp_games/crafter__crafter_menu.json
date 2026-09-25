@@ -6,6 +6,7 @@
   "_pacing_note": "turn_based is true, which is the whole point of this variant and the one place it parts company with both crafter__crafter.json and the rig. Eight buttons cost more presses per action than sixteen, so a fixed cadence would spend the survival clock on menu cycling; here the world advances once per press and never otherwise, so the run is paced by the subject and every step is a decision. fps 15 is then a polling rate, not a game speed: it bounds how long a press waits to be seen (~67 ms), and it is what the other turn-based DBP configs use. latched_keys is irrelevant under turn_based -- the loop already reads keydowns -- and is left off. The rig has no turn-based mode at all: it runs a fixed 5 Hz cadence (frontend_pygame.py --cadence), so wall-clock comparisons with a rig run do not transfer, and only the action sequences do.",
   "_size_note": "size stays 384, not the rig's GAME_PX 288. 384 is an integer half of the 768-pixel display height and 288 is not, and display.draw_frame scales unfiltered, so 288 would smear the pixel art and the HUD counters first. Nothing about the game depends on it; crafter renders its 9x9 view at whatever size it is given.",
   "_state_note": "state_stride 25 counts frames, and a frame is now a press rather than 400 ms, so anchors fall every 25 presses instead of every 10 s. The block is also much shorter in frames than a 2.5 fps one of the same duration, so both the npz and the anchor count shrink.",
+  "_trigger_note": "The trigger phase sits under the instructions, not above them, so the scan starts after the subject has finished reading. With the trigger first, the instruction screen (which waits for SPACE) would be inside the run: the run's length in volumes and the onset of every phase after it would depend on how long the reading took, and this config's instructions are long. Below the trigger everything is on a fixed schedule, and the number of volumes this config produces is the same for every subject.",
   "curriculum": [
     {
       "type": "message",
@@ -35,6 +36,7 @@
         "(press SPACE to start)"
       ]
     },
+    {"type": "trigger"},
     {"type": "fixation", "duration": 1.0},
     {
       "type": "game", "backend": "crafter", "game": "crafter",

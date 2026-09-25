@@ -178,6 +178,23 @@ scanner **trigger `=`** (anchors the session clock) → curriculum phases → do
 [Timing](#timing-what-is-stamped-when)). The editor opens on its Launch tab,
 fullscreen ticked and the monitor picked there.
 
+### Where the run starts
+
+By default the trigger comes before phase 0, so everything in the curriculum is
+inside the run. A phase that waits for a key then decides how long the run is:
+an instruction screen with no `duration` puts the subject's reading time into
+the scan, so the number of volumes and the onset of every phase after it depend
+on how fast they read.
+
+A **`{"type": "trigger"}`** phase says where `t = 0` goes instead. Put it under
+the instructions and the scan starts a fixed distance from the first fixation,
+however long the reading took. The phases above it are logged with a `null`
+onset, because there is no run for them to have an onset in, and they are not in
+the events file. A curriculum with no `trigger` phase behaves exactly as it
+always did. Two of them, or a `game` above one, are refused at start-up; a
+survey or a duration-less message *below* the trigger only warns, since a
+behavioural run is entitled to be self-paced.
+
 ## Running stable-retro games
 
 stable-retro only exposes a game once it has an **integration** and the game's
@@ -518,6 +535,9 @@ it at the desk.
 {"type": "fixation", "duration": 2.0}                 // "+" for N seconds
 {"type": "message", "text": "Get ready", "duration": 2.0}  // text: string or list of lines; omit duration to wait for a key
 {"type": "survey", "n_points": 7, "questions": ["...","..."]}
+{"type": "trigger"}                                   // the scan starts HERE, not above phase 0: put it
+                                                      // under the instructions so the reading is outside
+                                                      // the run (see "Where the run starts" below)
 
 {"type": "game",
  "backend": "ale",              // "ale" | "retro" | "gym"
