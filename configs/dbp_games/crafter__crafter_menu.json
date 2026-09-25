@@ -7,6 +7,7 @@
   "_size_note": "size stays 384, not the rig's GAME_PX 288. 384 is an integer half of the 768-pixel display height and 288 is not, and display.draw_frame scales unfiltered, so 288 would smear the pixel art and the HUD counters first. Nothing about the game depends on it; crafter renders its 9x9 view at whatever size it is given.",
   "_state_note": "state_stride 25 counts frames, and a frame is now a press rather than 400 ms, so anchors fall every 25 presses instead of every 10 s. The block is also much shorter in frames than a 2.5 fps one of the same duration, so both the npz and the anchor count shrink.",
   "_trigger_note": "The trigger phase sits under the instructions, not above them, so the scan starts after the subject has finished reading. With the trigger first, the instruction screen (which waits for SPACE) would be inside the run: the run's length in volumes and the onset of every phase after it would depend on how long the reading took, and this config's instructions are long. Below the trigger everything is on a fixed schedule, and the number of volumes this config produces is the same for every subject.",
+  "_iti_note": "end_hold / iti / iti_cue reproduce the rig's structure between rounds (core.py: ITI_RANGE = (4.0, 12.0), the death hold of --death-hold-s 1.2; frontend_pygame.py turns the marker red --cue-s before the next round). The frame that ended the episode holds 1.2 s, so the subject reads what killed them instead of the next world appearing on it; then a blank of 4 to 12 s, drawn uniformly per interval, red for its last second. The jitter is what makes the episode onsets estimable: at one fixed gap every onset would fall at the same phase of every TR. One deviation, deliberate: the held frame is not tinted red (core.py:_death_tint). Stock crafter draws a health bar, so the tint has nothing left to say here, and it would put a colour change into a frame that the replay has to reproduce. The next world is generated inside the blank, not after the cue: crafter's terrain generation blocks for 2.3 to 2.7 s (measured), and waiting for it after the red cross would mean the cross had already announced an episode that was not ready. So the blank is the length it says it is; at the 4 s low end the cross is white for about half a second before it turns red, and the manifest logs what each build cost as the interval's 'built'.",
   "curriculum": [
     {
       "type": "message",
@@ -44,6 +45,7 @@
       "menu": true,
       "mode": "duration", "duration": 300.0, "fps": 15,
       "turn_based": true, "latched_keys": false,
+      "end_hold": 1.2, "iti": [4.0, 12.0], "iti_cue": 1.0,
       "state_stride": 25, "log_frames": true, "show_score": true,
       "cues": true, "cue_overlay": false, "seed": 0
     },

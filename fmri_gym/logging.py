@@ -108,6 +108,12 @@ class Logger:
             backend=backend,
             game=game,
         )
+        # Run time each episode became visible: the flip that showed its reset
+        # frame, which is one frame before its first STEPPED frame and so is not
+        # in `flip_time`. Parallel to `episode_seeds`; absent from a block no
+        # one watched (agent_play.py, which flips nothing).
+        if frames["episode_onset"]:
+            arrays["episode_onset"] = np.asarray(frames["episode_onset"], dtype=np.float64)
         # Per-frame trigger code sent to the recording device (0 = none);
         # present only when a trigger backend is active.
         if frames["trigger"]:

@@ -191,6 +191,35 @@ def trigger_key_clashes(config: dict) -> list[str]:
             for combo in phase.get("keys", {}) if name in combo.upper().split("+")]
 
 
+def seconds_range(value: Any, what: str) -> tuple[float, float]:
+    """A duration a phase may jitter: ``[lo, hi]`` drawn uniformly, or one fixed number.
+
+    :param value: the config value: seconds, or ``[lo, hi]`` seconds.
+    :param what: the field's name, for the message.
+    :return: ``(lo, hi)``, the two equal when the value was a plain number.
+    :raises ValueError: on a negative bound, a reversed range, or another shape.
+    """
+    if isinstance(value, (list, tuple)):
+        if len(value) != 2:
+            raise ValueError(f"{what}: expected [lo, hi] seconds, got {value!r}")
+        lo, hi = (_seconds(v, what) for v in value)
+        if hi < lo:
+            raise ValueError(f"{what}: expected [lo, hi] with lo <= hi, got [{lo:g}, {hi:g}]")
+        return lo, hi
+    fixed = _seconds(value, what)
+    return fixed, fixed
+
+
+def _seconds(value: Any, what: str) -> float:
+    """One non-negative number of seconds.
+
+    :raises ValueError: if it is not one (``True`` is not 1 second).
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+        raise ValueError(f"{what}: expected a non-negative number of seconds, got {value!r}")
+    return float(value)
+
+
 def _phase_problems(phase: dict) -> list[str]:
     if phase["type"] != "game":
         return []
@@ -200,6 +229,33 @@ def _phase_problems(phase: dict) -> list[str]:
     if phase.get("mode", "duration") not in ("duration", "episode"):
         out.append(f"mode: expected 'duration' or 'episode', got {phase.get('mode')!r}")
     out.extend(_fps_problems(phase))
+    out.extend(_interval_problems(phase))
+    return out
+
+
+def _interval_problems(phase: dict) -> list[str]:
+    """What the blank between a block's episodes refuses.
+
+    ``iti`` is the only one that may be a range, because it is the only one
+    that should be: a jittered hold or cue would just blur the onset it exists
+    to mark. All three default to 0, which is the block a version without them
+    played -- one episode's last frame and the next one's first are
+    consecutive flips.
+    """
+    out = []
+    try:
+        shortest = seconds_range(phase.get("iti", 0), "iti")[0]
+    except ValueError as exc:
+        return [str(exc)]
+    for field in ("iti_cue", "end_hold"):
+        try:
+            _seconds(phase.get(field, 0), field)
+        except ValueError as exc:
+            out.append(str(exc))
+    cue = phase.get("iti_cue", 0)
+    if not out and cue > shortest:
+        out.append(f"iti_cue: {cue:g} s, which does not fit the shortest iti ({shortest:g} s): "
+                   "the marker would already be red when the blank began")
     return out
 
 

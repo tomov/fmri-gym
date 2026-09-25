@@ -554,6 +554,15 @@ it at the desk.
  "turn_based": false,           // step only on a key PRESS, not per frame (grid/toy_text games)
  "latched_keys": false,         // real-time: a fresh key PRESS beats the held-key poll, so a
                                 //   tap shorter than one frame is not dropped (slow-fps games)
+ "end_hold": 1.2,               // seconds the ending frame stays up after an episode, so the
+                                //   subject reads what happened (default 0)
+ "iti": [4.0, 12.0],            // the blank between episodes: [lo, hi] drawn uniformly per
+                                //   interval, or one fixed number. Jittered, episode onsets do
+                                //   not all land at the same phase of the TR (default 0). The
+                                //   next episode's world is built inside this blank, so keep the
+                                //   low end above what that takes (crafter: ~2.4 s)
+ "iti_cue": 1.0,                // the fixation turns red for the last N s of the blank, so the
+                                //   next episode does not begin unannounced (default 0)
  "seed": 1234,                  // optional base seed: episodes play with seed, seed+1, ...
                                 // Pinned, every participant and run gets the same episodes.
                                 // Left out, it is derived from the run (sub/ses/task/run) and
@@ -750,6 +759,11 @@ run rather than a `_beh.tsv`, but the events file is there). Each folder holds:
   settings + lifecycle triggers sent (+ what the config left `defaulted`), the
   `audio` output (device, measured device delay, chosen delay),
   `dummy_trigger`, the `run` it is (label and `attempt`), the `seeds` (each game phase derived or pinned) and the `versions` of pygame and SDL.
+  A game phase also records what it was made of: its `episodes` (`id`, `seed`,
+  what `ended` it, onset/offset, `n_frames`) and its `intervals` (the `hold`, the
+  `drawn` iti and where it and its red `cue_onset` began, the seconds the next
+  episode's world took to be `built` inside the blank, and whether the block's end
+  `clamped` it short).
 - **`block-NN_<backend>_<game>.npz`** — one per game block, uniform schema:
 
   | key | meaning |
@@ -763,6 +777,7 @@ run rather than a `_beh.tsv`, but the events file is there). Each folder holds:
   | `audio_onset` | seconds since trigger that the frame's sound reached the DAC, NaN if none (only when the block played sound; with `audio_delay_ms`, `audio_resyncs`, `audio_trimmed_samples`) |
   | `states` | per-frame savestate blob (object array; `None` if engine has none) |
   | `episode_seeds` | RNG seed per episode |
+  | `episode_onset` | seconds since trigger that each episode became visible: the flip that showed its reset frame, which is one frame before its first stepped frame and so is not in `flip_time` |
   | `backend`, `game` | provenance |
   | *backend vars* | `ram` (ale/retro), `info_*` (retro decoded score/lives/…), `obs` (gym), `screen_index` (ale, with `"save_pixels"`) |
 

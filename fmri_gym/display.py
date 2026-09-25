@@ -42,6 +42,9 @@ if TYPE_CHECKING:
 BG_COLOR = (0, 0, 0)
 TEXT_COLOR = (220, 220, 220)
 FIX_COLOR = (255, 255, 255)
+# The fixation while it announces that something is about to start
+# (crafter-for-brain-scan v0.33 frontend_pygame.py uses this exact red for it).
+FIX_CUE_COLOR = (220, 30, 30)
 HUD_COLOR = (235, 235, 235)
 # Text drawn ON a frame, where gray would read as part of the picture. Light
 # sky blue: bright over both dark and light art, and cool enough not to be
@@ -361,12 +364,19 @@ class Display:
             y += surf.get_height()
         return self._present()
 
-    def draw_fixation(self) -> float:
-        """Draw a centered white ``+`` fixation cross.
+    def draw_fixation(self, red: bool = False) -> float:
+        """Draw a centered ``+`` fixation cross, white or red.
 
+        Red means something is about to start. Nothing else should ever change
+        the marker's colour, or the subject learns nothing from it; here it is
+        the last seconds of an inter-episode interval
+        (:meth:`fmri_gym.run.Run._interval`).
+
+        :param red: draw it in :data:`FIX_CUE_COLOR` instead of :data:`FIX_COLOR`.
         :return: ``perf_counter`` of the flip that showed it.
         """
-        return self.draw_text("+", color=FIX_COLOR, font=self.fix_font)
+        return self.draw_text("+", color=FIX_CUE_COLOR if red else FIX_COLOR,
+                              font=self.fix_font)
 
     def describe(self) -> dict[str, Any]:
         """What was actually opened, for the manifest.
