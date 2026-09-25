@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from . import bids
+
 if TYPE_CHECKING:
     from .run import Clock
 
@@ -21,7 +23,8 @@ class Logger:
     """Writes ``manifest.json`` and per-block compressed ``.npz`` files."""
 
     def __init__(
-        self, outdir: str, subject: str, curriculum: list[dict], clock: Clock
+        self, outdir: str, subject: str, curriculum: list[dict], clock: Clock,
+        label: str | None = None,
     ) -> None:
         """Create the run's output directory and an empty manifest.
 
@@ -29,9 +32,13 @@ class Logger:
         :param subject: subject identifier stored in the manifest.
         :param curriculum: full curriculum list stored in the manifest.
         :param clock: the run's clock (used for trigger epoch / perf times).
+        :param label: the run's BIDS label (:func:`fmri_gym.bids.run_label`),
+            which names its events file. Without one no events file is written:
+            a BIDS name is the only kind that file is worth having.
         """
         self.outdir = outdir
         self.clock = clock
+        self.label = label
         os.makedirs(outdir, exist_ok=True)
         self.manifest = {
             "subject": subject,
@@ -140,6 +147,46 @@ class Logger:
         with open(path, "w") as f:
             json.dump(self.manifest, f, indent=2, default=_json_default)
         return path
+
+    def save_events(self) -> str | None:
+        """Write the run's BIDS ``_events.tsv`` and its sidecar.
+
+        Derived from the manifest (:func:`fmri_gym.bids.events_rows`) and named
+        after the run, so a BIDS tool finds the timing without being taught this
+        rig's manifest. Called after :meth:`save_manifest`, including after an
+        interrupt: a run that stopped early still gets the events it did have.
+
+        :return: the path written, or ``None`` when the run has no timed event
+            to write -- a curriculum quit at its first screen, or a block played
+            by a policy, which has no onsets because it has no display.
+        """
+        rows = bids.events_rows(self.manifest)
+        if not self.label or not rows:
+            return None
+        path = os.path.join(self.outdir, f"{self.label}_events.tsv")
+        with open(path, "w") as f:
+            f.write("\t".join(bids.EVENT_COLUMNS) + "\n")
+            for row in rows:
+                f.write("\t".join(_tsv_cell(row.get(c)) for c in bids.EVENT_COLUMNS) + "\n")
+        with open(os.path.join(self.outdir, f"{self.label}_events.json"), "w") as f:
+            json.dump({c: {"Description": d} for c, d in bids.EVENT_COLUMNS.items()},
+                      f, indent=2)
+            f.write("\n")
+        return path
+
+
+def _tsv_cell(value: Any) -> str:
+    """One events-file cell: seconds to 0.1 ms, ``n/a`` for a column a row has not got.
+
+    ``n/a`` is what BIDS reads as missing. Four decimals because the onsets are
+    measured flip times and a frame is 16.7 ms: fewer would throw away what was
+    measured, more would claim a precision the display does not have.
+    """
+    if value is None:
+        return "n/a"
+    if isinstance(value, float):
+        return f"{value:.4f}"
+    return str(value)
 
 
 def _to_array(actions: list) -> np.ndarray:

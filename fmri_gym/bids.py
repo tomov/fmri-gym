@@ -22,9 +22,10 @@ run it replaces and a session's stimuli can still be regenerated from its
 script alone. No two runs -- of a participant, or of two participants --
 replay each other's episodes unless a phase pins its ``"seed"``.
 
-The names follow BIDS, apart from that attempt suffix; the contents do not yet
-(a manifest and ``.npz`` blocks in a folder per run, not ``_beh.tsv`` +
-``_events.tsv`` sidecars).
+The names follow BIDS, apart from that attempt suffix; the contents partly do.
+``<label>_events.tsv`` and its sidecar (:func:`events_rows`) are what a BIDS
+analysis reads, and the manifest and ``.npz`` blocks beside them are the record
+the events are a view of: a folder per run rather than a ``_beh.tsv``.
 """
 
 from __future__ import annotations
@@ -34,9 +35,27 @@ import hashlib
 import os
 import re
 import sys
-from typing import Callable, NamedTuple
+from typing import Any, Callable, NamedTuple
 
 _LABEL = re.compile(r"[A-Za-z0-9]+")
+
+#: The events file's columns, in order, with what the sidecar says each is.
+#: ``onset`` and ``duration`` in seconds from the scanner trigger, which is
+#: what BIDS means by them; the rest are this rig's own and are described
+#: because nothing else would explain them.
+EVENT_COLUMNS: dict[str, str] = {
+    "onset": "Seconds from the scanner trigger to the flip that showed this event.",
+    "duration": "Seconds the event lasted, from its own onset to the next thing shown.",
+    "trial_type": "What the event is: a curriculum phase's type (fixation, message, game, "
+                  "survey, trigger), or, inside a game phase, episode / hold / iti / response.",
+    "phase": "Index of the curriculum phase this event belongs to.",
+    "episode": "Index of the episode within its game phase (an episode, or the interval "
+               "after it); n/a outside a game phase.",
+    "seed": "The seed an episode was reset with, so its world can be rebuilt.",
+    "ended": "What ended an episode: terminated (the game said so), truncated (its own time "
+             "limit), block_end (the block's time ran out) or quit.",
+    "response": "The value a survey question was answered with.",
+}
 
 
 def subject_label(subject: str) -> str:
@@ -152,6 +171,60 @@ def phase_seed(label: str, index: int) -> int:
     """
     digest = hashlib.sha256(f"{label}|phase-{index}".encode()).digest()
     return int.from_bytes(digest[:4], "big") >> 1
+
+
+def events_rows(manifest: dict) -> list[dict]:
+    """The run's events, from its manifest: what happened, when, for how long.
+
+    A view, not a second record. Everything here is already in the manifest
+    (and the episode onsets in the npz); this is the same run in the one shape a
+    BIDS analysis will look for, so nobody has to write the reader.
+
+    Phases whose ``onset`` is ``None`` are dropped: they played above the
+    curriculum's ``trigger`` phase, before there was a scan for them to have an
+    onset in. A manifest from an older run, or from a block with no intervals,
+    simply has fewer rows.
+
+    :param manifest: a run's ``manifest.json`` contents.
+    :return: rows keyed by :data:`EVENT_COLUMNS`, in onset order. A row may
+        leave any key but ``onset`` and ``trial_type`` out.
+    """
+    rows = [row for phase in manifest.get("phases", []) for row in _phase_rows(phase)]
+    return sorted(rows, key=lambda r: r["onset"])
+
+
+def _phase_rows(phase: dict) -> list[dict]:
+    """One phase's rows: itself, then what it was made of."""
+    if phase.get("onset") is None:
+        return []
+    index = phase.get("index")
+    rows = [_event_row(phase["onset"], phase.get("offset"), phase["type"], index)]
+    for ep in phase.get("episodes", []):
+        rows.append(_event_row(ep.get("onset"), ep.get("offset"), "episode", index,
+                               episode=ep.get("id"), seed=ep.get("seed"),
+                               ended=ep.get("ended")))
+    for iv in phase.get("intervals", []):
+        after = iv.get("after_episode")
+        # The hold ends where the blank begins, so one bounds the other; a run
+        # quit inside either leaves the row with no duration rather than a guess.
+        rows.append(_event_row(iv.get("hold_onset"), iv.get("onset"), "hold", index,
+                               episode=after))
+        rows.append(_event_row(iv.get("onset"), iv.get("offset"), "iti", index,
+                               episode=after))
+    for answer in phase.get("responses", []):
+        # A confirmed answer is an instant, not a span: the seconds before it
+        # were the subject reading the question, which the phase's own row covers.
+        at = answer.get("run_time")
+        rows.append(_event_row(at, at, "response", index, response=answer.get("value")))
+    return [r for r in rows if r["onset"] is not None]
+
+
+def _event_row(onset: float | None, offset: float | None, trial_type: str,
+               phase: int | None, **rest: Any) -> dict:
+    """One row, with the duration worked out from the two ends it has."""
+    duration = None if onset is None or offset is None else offset - onset
+    return {"onset": onset, "duration": duration, "trial_type": trial_type,
+            "phase": phase, **rest}
 
 
 def _beh(root: str, subject: str, session: int) -> str:

@@ -732,9 +732,18 @@ names the folder only — the run's label, which the manifest records with the
 `attempt` number and which keys the seeds, stays canonical, so every attempt
 at a run plays the same episodes.
 
-The names follow BIDS apart from that suffix, the contents not yet (no
-`_beh.tsv` / `_events.tsv`). Each folder holds:
+The names follow BIDS apart from that suffix, the contents partly (a folder per
+run rather than a `_beh.tsv`, but the events file is there). Each folder holds:
 
+- **`<label>_events.tsv`** + **`<label>_events.json`** — the run's timing in the
+  one shape a BIDS analysis looks for, so nothing has to learn this rig's
+  manifest: `onset` (seconds from the trigger to the flip that showed it),
+  `duration`, `trial_type` (a phase's type, or `episode` / `hold` / `iti` /
+  `response` inside a game phase), `phase`, `episode`, `seed`, `ended`,
+  `response`, with `n/a` for a column a row has not got. A **view** of the
+  manifest, not a second record: everything in it is derived from the manifest
+  beside it. Phases above a `trigger` phase are not in it, having no onset;
+  a block played by `agent_play.py` is not either, having no display to flip.
 - **`manifest.json`** — subject, curriculum, trigger epoch, per-phase
   onsets/offsets (+ survey responses; onsets are flip times), the `display`
   actually opened (size, `vsync`, `refresh_rate`, driver), the `triggers`
@@ -900,6 +909,7 @@ resolving data dirs relative to `__file__`. Result: VGDL runs under gymnasium
 - [ ] More adapters: ViZDoom/COOM, MiniHack, crafter, MuJoCo (`qpos/qvel` as
       state vars) — each a small `EnvAdapter`.
 - [ ] Button-box / MRI-safe response device key remapping.
-- [ ] BIDS-style output layout + `events.tsv` per run.
+- [x] BIDS-style output layout + `events.tsv` per run -- done; the events file is
+      derived from the manifest, so the manifest stays the record.
 - [ ] A replay/QC utility to render any block to video from its states.
 - [ ] Crash-safe incremental logging (stream frames to disk) for long runs.

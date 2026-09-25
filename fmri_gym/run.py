@@ -232,6 +232,7 @@ class Run:
         audio: Audio | None = None,
         triggers: Triggers | None = None,
         dummy_trigger: bool = False,
+        label: str | None = None,
     ) -> None:
         """Set up clock, logger, and phase dispatch for one subject.
 
@@ -246,6 +247,9 @@ class Run:
             and the audio. ``None`` = the fMRI default: wait for ``=``, send
             no trigger codes.
         :param dummy_trigger: if ``True``, skip real experimenter/scanner waits.
+        :param label: the run's BIDS label (:func:`fmri_gym.bids.run_label`),
+            which names its events file; ``from_config`` passes the one it
+            worked out.
         """
         self.subject = subject
         self.curriculum = curriculum
@@ -253,7 +257,7 @@ class Run:
         self.audio = audio or Audio()
         self.dummy_trigger = dummy_trigger
         self.clock = Clock()
-        self.logger = Logger(outdir, subject, curriculum, self.clock)
+        self.logger = Logger(outdir, subject, curriculum, self.clock, label=label)
         self.logger.set_extra("display", display.describe())
         self.logger.set_extra("dummy_trigger", dummy_trigger)
         self.logger.set_extra("audio", self.audio.describe())
@@ -299,7 +303,7 @@ class Run:
         display = Display(size=(width, height), fullscreen=args.fullscreen,
                           vsync=not args.no_vsync, monitor=args.monitor)
         run = cls(args.subject, curriculum, display, out.folder, audio=audio,
-                  triggers=triggers, dummy_trigger=args.dummy_trigger)
+                  triggers=triggers, dummy_trigger=args.dummy_trigger, label=out.label)
         run.logger.set_extra("run", {"label": out.label, "attempt": out.attempt})
         run.logger.set_extra("seeds", seeds)
         run.logger.set_extra("versions", {  # the banner fmri_gym hides said these
@@ -727,6 +731,11 @@ class Run:
                 self.triggers.lifecycle("task_stop")
             self.logger.set_extra("triggers", self.triggers.describe(self.clock))
             manifest_path = self.logger.save_manifest()
+            # After the manifest, and it is derived from it: a raising events
+            # writer must not be able to cost the run its record.
+            events_path = self.logger.save_events()
             print(f"Saved run to: {self.outdir}")
             print(f"Manifest: {manifest_path}")
+            if events_path:
+                print(f"Events: {events_path}")
         return completed
