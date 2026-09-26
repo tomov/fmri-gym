@@ -395,25 +395,8 @@ uv pip install -e ../stk-code/python    # or pip install -e, in the same env
 
 Either way the binary can be overridden with `STK_ENV_BIN`, and
 `STK_ENV_OFFLINE=1` forbids the download outright. It needs a real OpenGL
-display (the frame is the game's rendering).
-
-The hidden window is where the drivers differ. It is a real X11 window that is
-never mapped, and Mesa (Intel, AMD) draws into one while the NVIDIA proprietary
-driver does not — there, every frame comes back byte-identical to the first, so
-the participant sees a frozen picture. The adapter therefore probes the hidden
-window on the first block (a few no-op steps: a live window changes every frame
-during the countdown sweep) and, if it is frozen, says so and relaunches the game
-with its window *on the screen*, behind ours, where every driver renders; it then
-raises our window over it and takes the keyboard focus back. The compositor keeps
-drawing a covered window, so the frames stay live. That path costs the game a
-vsync per step, so it gets a private STK config (`~/.cache/fmri-gym/stk_gym-config`)
-with vsync off; measured 1.6–3.2 ms per step on a Quadro T2000, at the price of
-1–4 % of frames arriving a refresh late (logged as `pacing_reset_time`). Put
-`"hidden": true` or `false` on the game phase to decide it by hand and skip the
-probe.
-
-`fps` must equal the game's physics rate over `frame_skip` (120 / 2 = 60 in the
-config); the config's `_note`s list
+display (the frame is the game's rendering). `fps` must equal the game's physics
+rate over `frame_skip` (120 / 2 = 60 in the config); the config's `_note`s list
 the keys, the phase fields and the logged columns, and the fork's
 `python/README.md` ("Frames", "Reproducibility") the details and measured cost.
 
