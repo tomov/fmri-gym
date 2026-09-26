@@ -1,0 +1,59 @@
+{
+  "_note": "The rig check, before a session: under a minute, most of it pressing the buttons. The controls check asks for the keys on the Controls tab. The photodiode reads on this PC's input 0 (readout 'soundcard') or in the MEG/EEG recording (readout 'recording'). Results: report.md and rigcheck.tsv in the run's folder; the machine's rig.json is asked for on first use.",
+  "triggers": null,
+  "curriculum": [
+    {
+      "type": "message",
+      "text": [
+        "Rig check",
+        "",
+        "Photodiode on the patch, bottom-right; microphone at the ear if there is one.",
+        "The controls check will ask for each button: press it on the participant's device.",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {
+      "type": "check_display",
+      "n": 60
+    },
+    {
+      "type": "check_frames",
+      "rates": [
+        60,
+        30
+      ],
+      "seconds": 2,
+      "loads": [
+        "none"
+      ]
+    },
+    {
+      "type": "check_triggers",
+      "pulses": 3,
+      "repeat": 1,
+      "hold_ms": 40,
+      "gap_ms": 40
+    },
+    {
+      "type": "check_controls",
+      "timeout_s": 10.0,
+      "keys": {
+        "1": "LEFT",
+        "2": "DOWN",
+        "3": "UP",
+        "4": "RIGHT"
+      }
+    },
+    {
+      "type": "check_photodiode",
+      "readout": "soundcard",
+      "n": 10,
+      "on_ms": 50,
+      "gap_min_ms": 150,
+      "gap_max_ms": 250,
+      "settle_ms": 300
+    }
+  ],
+  "_triggers_note": "null until this rig's are set: the first rig check asks for them (a preset or your own) and saves them here; the Triggers tab changes them. They must be the session's own: with sync 'wait' the check waits for the scanner and counts its pulses."
+}

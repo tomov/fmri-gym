@@ -21,6 +21,7 @@ from __future__ import annotations
 import sys
 import time
 from collections import defaultdict
+from functools import partial
 from typing import TYPE_CHECKING, Any
 
 import pygame
@@ -37,7 +38,6 @@ from .triggers import Triggers
 if TYPE_CHECKING:
     from .adapters.base import EnvAdapter
 
-TRIGGER_KEY = "="
 EXPERIMENTER_KEY = " "
 #: How far ``fps`` may sit from the engine's own rate and still count as real
 #: speed: what the audio output absorbs by resampling.
@@ -292,7 +292,8 @@ class Run:
             f"audio: {self.audio.status()}")
         _wait_for_char(self.display, EXPERIMENTER_KEY, dummy_trigger=self.dummy_trigger)
         if self.sync.mode == "wait":
-            self.display.draw_text("Waiting for scanner...")
+            self.display.draw_text(f"Waiting for the scanner...\n\n(its trigger key: "
+                                   f"{self.sync.key!r})")
             _wait_for_char(self.display, self.sync.key, dummy_trigger=self.dummy_trigger)
         elif self.sync.mode == "send":
             self.display.draw_text("Starting the recording...")
@@ -627,6 +628,10 @@ class Run:
         completed = False
         handlers = {"fixation": self._fixation, "message": self._message,
                     "game": self._game, "survey": self._survey}
+        if any(p["type"].startswith("check_") for p in self.curriculum):
+            from . import checks  # rig-check phases: measured with this run's display and lines
+            handlers.update({kind: partial(checks.run_check, self)
+                             for kind in checks.CHECK_TYPES})
         try:
             self._trigger()
 

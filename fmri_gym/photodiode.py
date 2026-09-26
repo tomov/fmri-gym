@@ -32,26 +32,30 @@ Two ways to read the diode, because how it is plugged in varies by lab:
   each buffer, which compensates it as far as the driver allows.
 
 **Sound** (``--audio-click``): the same run also measures when sound is
-heard. On every white flip a 10 ms tone burst is queued through
+heard. On every other white flip (so that an input hearing the clicks cannot
+pass for the diode: it would see only those flashes) a 10 ms tone burst is queued through
 :class:`~fmri_gym.audio.Audio` exactly as a game frame's sound is (same
 output, same delay chosen at start-up), and its DAC onset is logged. A microphone at the ear -- at the end of the scanner's
 sound tube, or inside the headphone -- gives the acoustic edge. Recorded on
-the second input channel with ``--audio`` (diode on channel 0, microphone on
-channel 1), the task prints flip-to-sound and photon-to-sound offsets on the
+the second input channel with ``--audio --mic`` (diode on channel 0,
+microphone on channel 1), the task prints flip-to-sound and photon-to-sound offsets on the
 spot; recorded on a MEG/EEG channel, :func:`match_edges` does the same
 offline against the triggers. Expect flip-to-sound = the printed delay plus the
 speaker/tube delay, with a spread of about a millisecond on a low-latency
-device.
+device. The photodiode and the sound get a verdict each (``checks`` in the
+summary): a missed flash fails the one, a click that never reached the DAC or
+the microphone the other, and both are measured whichever fails.
 
 Output: ``data/photodiode_<timestamp>/`` with ``photodiode.npz`` (per-flash
 ``flip_on``, ``flip_off``, ``trigger``, ``click_dac``, and the audio signal if
-recorded) and ``summary.json`` (display, trigger and audio settings, offset
+recorded) and ``photodiode.json`` (display, trigger and audio settings, offset
 statistics).
 """
 
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import os
 import random
@@ -84,15 +88,29 @@ def _patch_rect(size: tuple[int, int], corner: str, px: int) -> pygame.Rect:
     return pygame.Rect(x, y, px, px)
 
 
-def _show_patch(display: Display, on: bool, corner: str, px: int) -> float:
-    """Draw the patch white or black on a black canvas and present it.
+def _show_patch(display: Display, on: bool, corner: str, px: int,
+                caption: str | None = None) -> float:
+    """Draw the patch white or black on a black canvas, with a caption top-left, and
+    present it.
 
     :return: ``perf_counter`` of the flip.
     """
     display.canvas.fill((0, 0, 0))
     if on:
         display.canvas.fill((255, 255, 255), _patch_rect(display.size, corner, px))
+    if caption:
+        display.canvas.blit(_caption_font().render(caption, True, (160, 160, 160)), (16, 16))
     return display.redraw()
+
+
+def _caption_font() -> pygame.font.Font:
+    global _FONT
+    if _FONT is None:
+        _FONT = pygame.font.SysFont(None, 28)
+    return _FONT
+
+
+_FONT: pygame.font.Font | None = None
 
 
 def _hold(display: Display, seconds: float) -> None:
@@ -119,6 +137,9 @@ def run_flashes(
     corner: str = "br",
     px: int = 120,
     click: Callable[[float], None] | None = None,
+    settle: float = 1.0,
+    bracket: bool = True,
+    caption: Callable[[int], str] | None = None,
 ) -> dict[str, np.ndarray]:
     """Flash the patch ``n`` times; a frame trigger goes out on each white flip.
 
@@ -131,24 +152,33 @@ def run_flashes(
     :param corner: ``"br"``, ``"bl"``, ``"tr"`` or ``"tl"``.
     :param px: patch side in pixels.
     :param click: called with each white flip's time, to queue a sound on it.
+    :param settle: seconds of black before the first flash, for the diode and the
+        input's AC coupling to settle.
+    :param bracket: send ``task_start`` / ``task_stop`` around the flashes; off
+        inside a run, which sends its own.
+    :param caption: the text shown top-left during flash ``i`` (far from the patch),
+        to say what is being measured.
     :return: ``flip_on``, ``flip_off`` (``perf_counter``), ``trigger`` (value sent).
     """
     flip_on, flip_off, values = [], [], []
-    _show_patch(display, False, corner, px)
-    _hold(display, 1.0)                       # let the diode and the chain settle
-    triggers.lifecycle("task_start")
+    text = caption or (lambda _i: None)
+    _show_patch(display, False, corner, px, text(0))
+    _hold(display, settle)
+    if bracket:
+        triggers.lifecycle("task_start")
     for _ in range(n):
         _hold(display, rng.uniform(*gap_ms) / 1000.0)
         display.call_on_flip(triggers.frame)
-        flip_on.append(_show_patch(display, True, corner, px))
+        flip_on.append(_show_patch(display, True, corner, px, text(len(flip_on))))
         if click is not None:
             click(flip_on[-1])
         values.append(triggers.last_frame)
         _hold(display, on_ms / 1000.0)
-        flip_off.append(_show_patch(display, False, corner, px))
+        flip_off.append(_show_patch(display, False, corner, px, text(len(flip_off))))
     _hold(display, 0.5)
     triggers.block_end()
-    triggers.lifecycle("task_stop")
+    if bracket:
+        triggers.lifecycle("task_stop")
     return {"flip_on": np.asarray(flip_on), "flip_off": np.asarray(flip_off),
             "trigger": np.asarray(values, dtype=np.int16)}
 
@@ -265,14 +295,29 @@ def match_edges(onsets: np.ndarray, edges: np.ndarray, window: float = 0.2) -> n
     return out
 
 
-def summarize(offsets: np.ndarray) -> dict[str, float]:
-    """Median / SD / min / max of the matched offsets, in ms."""
-    ok = offsets[~np.isnan(offsets)] * 1000.0
+def summarize(offsets: np.ndarray, times: np.ndarray) -> dict[str, float]:
+    """Median / SD / min / max of the matched offsets, in ms, and their drift.
+
+    A median hides a slow drift -- a sound card whose clock runs apart from
+    the PC's moves the sound a few ms per minute -- so the trend of the offset
+    over the run is reported too, in ms per minute (a line fit), when the
+    matched flashes span a minute or more: over a few seconds the slope is
+    noise, extrapolated.
+
+    :param offsets: seconds per flash, ``nan`` where unmatched.
+    :param times: the flips they belong to (``perf_counter``).
+    """
+    matched = ~np.isnan(offsets)
+    ok = offsets[matched] * 1000.0
     if ok.size == 0:
         return {"n": int(len(offsets)), "n_matched": 0}
-    return {"n": int(len(offsets)), "n_matched": int(ok.size),
-            "median_ms": float(np.median(ok)), "sd_ms": float(np.std(ok)),
-            "min_ms": float(ok.min()), "max_ms": float(ok.max())}
+    out = {"n": int(len(offsets)), "n_matched": int(ok.size),
+           "median_ms": float(np.median(ok)), "sd_ms": float(np.std(ok)),
+           "min_ms": float(ok.min()), "max_ms": float(ok.max())}
+    minutes = times[matched] / 60.0
+    if minutes[-1] - minutes[0] >= 1.0:
+        out["drift_ms_per_min"] = float(np.polyfit(minutes, ok, 1)[0])
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -285,7 +330,7 @@ def _trigger_settings(args: argparse.Namespace) -> TriggerSettings:
     section: dict = {}
     if args.config:
         with open(args.config) as f:
-            section = dict(json.load(f).get("triggers", {}))
+            section = dict(json.load(f).get("triggers") or {})
         section.pop("sync", None)     # the calibration has no run start to sync
     if args.trigger_backend:
         section["backend"] = args.trigger_backend
@@ -303,6 +348,8 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--corner", choices=CORNERS, default="br")
     p.add_argument("--patch-px", type=int, default=120)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--settle-ms", type=float, default=1000.0,
+                   help="black before the first flash, for the diode's input to settle")
     p.add_argument("--size", default="1024x768")
     p.add_argument("--fullscreen", action="store_true")
     p.add_argument("--monitor", type=int, default=0,
@@ -317,8 +364,10 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--samplerate", type=int, default=48000)
     p.add_argument("--audio-click", action="store_true",
                    help="queue a tone burst on each white flip through the session's audio "
-                        "output; with --audio, record a microphone "
-                        "on input channel 1")
+                        "output, and time when each reaches the DAC")
+    p.add_argument("--mic", action="store_true",
+                   help="with --audio and --audio-click: a microphone at the ear is on input "
+                        "channel 1; time when each click is heard")
     p.add_argument("--list-audio-devices", action="store_true")
     p.add_argument("--outdir")
     return p.parse_args()
@@ -330,46 +379,77 @@ def main() -> None:
         import sounddevice as sd
         print(sd.query_devices())
         return
+    if args.mic and not (args.audio and args.audio_click):
+        raise SystemExit("photodiode: --mic reads the microphone on the sound card next to the "
+                         "diode, timing the clicks: it needs --audio and --audio-click")
     outdir = args.outdir or os.path.join("data", f"photodiode_{time.strftime('%Y%m%d-%H%M%S')}")
     os.makedirs(outdir, exist_ok=True)
     w, h = (int(x) for x in args.size.lower().split("x"))
     triggers = Triggers(_trigger_settings(args))    # before the window: fails at the desk
-    audio = _audio_output() if args.audio_click else None
+    audio, audio_error = _open_audio() if args.audio_click else (None, None)
     display = Display((w, h), fullscreen=args.fullscreen, vsync=not args.no_vsync,
                       monitor=args.monitor)
-    click, chunks = _clicker(audio) if audio is not None else (None, [])
-    recorder = None
-    if args.audio:
-        # Asked for the audio readout: if the input cannot open, stop here
-        # rather than flash for a minute and report "no edges found".
-        device = args.audio_device
-        if (device or "").isdigit():
-            device = int(device)
-        recorder = AudioRecorder(device, args.samplerate, channels=2 if args.audio_click else 1)
-        recorder.start()
+    click, chunks, clicked = _clicker(audio) if audio is not None else (None, [], [])
+    recorder = _recorder(args) if args.audio else None
     summary: dict[str, Any] = {"display": display.describe(), "triggers": triggers.describe(),
-                               "n": args.n, "on_ms": args.on_ms, "gap_ms": list(args.gap_ms),
+                               "readout": "soundcard" if args.audio else "recording",
+                               "mic": args.mic, "n": args.n, "on_ms": args.on_ms,
+                               "gap_ms": list(args.gap_ms),
                                "corner": args.corner, "patch_px": args.patch_px}
     arrays: dict[str, np.ndarray] = {}
     try:
         arrays = run_flashes(display, triggers, args.n, args.on_ms, tuple(args.gap_ms),
-                             random.Random(args.seed), args.corner, args.patch_px, click)
+                             random.Random(args.seed), args.corner, args.patch_px, click,
+                             args.settle_ms / 1000.0)
     except KeyboardInterrupt:
         print("photodiode: interrupted", file=sys.stderr)
     finally:
         if recorder is not None:
             recorder.stop()
         if audio is not None:
-            _log_clicks(audio, chunks, arrays, summary)
+            _log_clicks(audio, chunks, clicked, arrays, summary)
         triggers.close()
         display.close()
     if recorder is not None and "flip_on" in arrays:
         _readout(*recorder.signal(), arrays, summary)
     summary["triggers"] = triggers.describe()
+    summary["checks"] = {"photodiode": _light_verdict(arrays, summary),
+                         "audio": _sound_verdict(arrays, args.audio_click, audio_error)}
     np.savez_compressed(os.path.join(outdir, "photodiode.npz"), **arrays)
-    with open(os.path.join(outdir, "summary.json"), "w") as f:
+    with open(os.path.join(outdir, "photodiode.json"), "w") as f:
         json.dump(summary, f, indent=2, default=str)
     _report(summary, arrays, outdir)
+    failures = [f"{name}: {v['why']}" for name, v in summary["checks"].items()
+                if v["status"] == "fail"]
+    if failures:
+        raise RuntimeError("; ".join(failures))
+
+
+def _open_audio() -> tuple[Audio | None, str | None]:
+    """The session's audio output, or why it would not open.
+
+    An output that does not open fails the audio check, not the flashes: the
+    photodiode is measured all the same, and the error is reported with it.
+    """
+    try:
+        return _audio_output(), None
+    except Exception as exc:  # noqa: BLE001 -- any device failure; reported, then raised
+        print(f"audio: the output did not open: {exc}", file=sys.stderr)
+        return None, f"{type(exc).__name__}: {exc}"
+
+
+def _recorder(args: argparse.Namespace) -> AudioRecorder:
+    """The sound-card input, started: the diode on channel 0, the microphone on 1.
+
+    Asked for the audio readout: if the input cannot open, stop here rather
+    than flash for a minute and report "no edges found".
+    """
+    device = args.audio_device
+    if (device or "").isdigit():
+        device = int(device)
+    recorder = AudioRecorder(device, args.samplerate, channels=2 if args.mic else 1)
+    recorder.start()
+    return recorder
 
 
 def _audio_output() -> Audio:
@@ -380,31 +460,50 @@ def _audio_output() -> Audio:
     return audio
 
 
-def _log_clicks(audio: Audio, chunks: list[int], arrays: dict, summary: dict) -> None:
-    """Close the output and log when each click reached the DAC."""
+def _log_clicks(audio: Audio, chunks: list[int], clicked: list[int], arrays: dict,
+                summary: dict, close: bool = True) -> None:
+    """Log when each click reached the DAC, and on which flash; then close the output
+    (``close``) or only stop it, when it is a run's and plays on."""
     log = audio.block_log(chunks)
-    audio.close()
+    if close:
+        audio.close()
+    else:
+        audio.stop()
     summary["audio_out"] = audio.describe()
     if log and "flip_on" in arrays:
-        arrays["click_dac"] = log["audio_onset"]
-        summary["click_dac_offset"] = summarize(log["audio_onset"] - arrays["flip_on"])
+        idx = np.asarray(clicked, dtype=int)
+        arrays["click_flash"], arrays["click_dac"] = idx, log["audio_onset"]
+        on = arrays["flip_on"][idx]
+        summary["click_dac_offset"] = summarize(log["audio_onset"] - on, on)
 
 
-def _clicker(audio: Audio) -> tuple[Callable[[float], None], list[int]]:
-    """A ``click`` for :func:`run_flashes`, and the chunk each click was queued as.
+def _clicker(audio: Audio) -> tuple[Callable[[float], None], list[int], list[int]]:
+    """A ``click`` for :func:`run_flashes`: a tone burst on every other flash.
+
+    Every other, not every one: a diode sees every flash, while an input that
+    hears the clicks -- a microphone where the diode should be, or crosstalk
+    from the audio output -- sees only the flashes that had one. Clicking on
+    all of them would let sound pass for light.
 
     :param audio: the output, as a session builds it.
-    :return: ``(click, chunks)``; ``chunks`` fills as the flashes run.
+    :return: ``(click, chunks, clicked)``: the chunk each click was queued as and
+        the flash it was on, filled as the flashes run.
     """
     burst = tone_burst(audio.samplerate)
     chunks: list[int] = []
+    clicked: list[int] = []
+    flashes = itertools.count()
     audio.start(frame_period=None, flip_period=None)    # clicks are not game steps
 
     def click(flip_t: float) -> None:
+        i = next(flashes)
+        if i % 2:
+            return
         audio.play(burst, flip_t)
         chunks.append(audio.last_chunk)
+        clicked.append(i)
 
-    return click, chunks
+    return click, chunks, clicked
 
 
 def _readout(t: np.ndarray, x: np.ndarray, arrays: dict, summary: dict) -> None:
@@ -413,17 +512,97 @@ def _readout(t: np.ndarray, x: np.ndarray, arrays: dict, summary: dict) -> None:
     edges = detect_edges(t, x[:, 0], arrays["flip_on"])
     arrays["edge_time"] = edges
     arrays["offset_s"] = edges - arrays["flip_on"]
-    summary["offset"] = summarize(arrays["offset_s"])
-    if "click_dac" not in arrays:
+    summary["offset"] = summarize(arrays["offset_s"], arrays["flip_on"])
+    if "click_dac" not in arrays or x.shape[1] < 2:
         return
+    idx = arrays["click_flash"]
+    on = arrays["flip_on"][idx]
     # From the click's DAC time, not the flip: the delay between them is room
     # noise that would pass for an edge.
     sound = detect_edges(t, x[:, 1], arrays["click_dac"] - 0.010)
     arrays["sound_time"] = sound
-    arrays["sound_offset_s"] = sound - arrays["flip_on"]
-    arrays["av_offset_s"] = sound - edges
-    summary["sound_offset"] = summarize(arrays["sound_offset_s"])
-    summary["av_offset"] = summarize(arrays["av_offset_s"])
+    arrays["sound_offset_s"] = sound - on
+    arrays["av_offset_s"] = sound - edges[idx]
+    summary["sound_offset"] = summarize(arrays["sound_offset_s"], on)
+    summary["av_offset"] = summarize(arrays["av_offset_s"], on)
+
+
+def _missed(arrays: dict, key: str, noun: str = "flashes") -> str | None:
+    """Which entries ``arrays[key]`` has no value for, as ``"3 of 10 flashes (#0, #4, #7)"``."""
+    missed = np.flatnonzero(np.isnan(arrays[key]))
+    if not missed.size:
+        return None
+    return (f"{missed.size} of {len(arrays[key])} {noun} "
+            f"(#{', #'.join(map(str, missed[:10]))}{', ...' if missed.size > 10 else ''})")
+
+
+def _light_verdict(arrays: dict, summary: dict) -> dict[str, str | None]:
+    """Pass, fail or offline for the photodiode, and why.
+
+    A single flash the diode did not see fails: it is a white frame that never
+    showed (a missed refresh) or a diode off the patch, badly gained or noisy;
+    either way the offsets describe a rig other than the one the session gets.
+    """
+    if "flip_on" not in arrays:
+        return {"status": "fail", "why": "interrupted before the last flash; nothing measured"}
+    if summary["readout"] != "soundcard":
+        return {"status": "offline", "why": "match the trigger codes to the diode edges in "
+                                            "the recording (match_edges)"}
+    if _hears_clicks(arrays):
+        return {"status": "fail", "why": "input 0 saw only the flashes that had a click: it "
+                                         "hears the sound, not the light (a microphone, or "
+                                         "crosstalk from the audio output)"}
+    missed = _missed(arrays, "offset_s")
+    if missed:
+        return {"status": "fail", "why": f"the photodiode missed {missed}; check its "
+                                         "placement and input gain, and the display for "
+                                         "late flips"}
+    return {"status": "pass", "why": None}
+
+
+def _hears_clicks(arrays: dict) -> bool:
+    """The diode input saw the flashes that had a click and not the others: it hears.
+
+    A diode sees nearly all flashes, clicked or not; a microphone or crosstalk
+    nearly only the clicked ones, give or take an edge of noise.
+    """
+    if "click_flash" not in arrays:
+        return False
+    seen = ~np.isnan(arrays["offset_s"])
+    clicked = np.zeros(len(seen), dtype=bool)
+    clicked[arrays["click_flash"]] = True
+    if clicked.all() or not clicked.any():
+        return False
+    with_click, without = seen[clicked].mean(), seen[~clicked].mean()
+    return bool(without < 0.5 and with_click > without + 0.5)
+
+
+def _sound_verdict(arrays: dict, asked: bool, error: str | None) -> dict[str, str | None]:
+    """Pass, fail or not run for the sound, and why: every click reached the DAC (and was
+    heard, with a microphone)."""
+    if not asked:
+        return {"status": "not run", "why": None}
+    if error:
+        return {"status": "fail", "why": f"the audio output did not open ({error})"}
+    if "flip_on" not in arrays:
+        return {"status": "fail", "why": "interrupted before the last flash; nothing measured"}
+    if "click_dac" not in arrays:
+        return {"status": "fail", "why": "no click was logged at the DAC"}
+    missed = _missed(arrays, "click_dac", "clicks")
+    if missed:
+        return {"status": "fail", "why": f"no DAC time for {missed}: the output dropped them"}
+    missed = _missed(arrays, "sound_offset_s", "clicks") if "sound_offset_s" in arrays else None
+    if missed:
+        return {"status": "fail", "why": f"the microphone missed {missed}; check it sits at "
+                                         "the ear end and its input gain"}
+    return {"status": "pass", "why": None}
+
+
+def _drift(o: dict) -> str:
+    """The drift, for a report line, when the run was long enough to have one."""
+    if "drift_ms_per_min" not in o:
+        return ""
+    return f"  drift {o['drift_ms_per_min']:+.3f} ms/min"
 
 
 def _report(summary: dict, arrays: dict, outdir: str) -> None:
@@ -438,8 +617,10 @@ def _report(summary: dict, arrays: dict, outdir: str) -> None:
         o = summary["offset"]
         if o.get("n_matched"):
             print("flip -> photodiode offset: median {median_ms:.2f} ms  sd {sd_ms:.2f}  "
-                  "min {min_ms:.2f}  max {max_ms:.2f}  (matched {n_matched}/{n} flashes; "
-                  "a low fraction or a wide spread means noise, not the diode)".format(**o))
+                  "min {min_ms:.2f}  max {max_ms:.2f}{drift}  "
+                  "(matched {n_matched}/{n} flashes; "
+                  "a low fraction or a wide spread means noise, not the diode)".format(
+                      drift=_drift(o), **o))
         else:
             print("flip -> photodiode offset: no edges found -- check the diode, its "
                   "input gain, and that it sits on the patch")
@@ -452,7 +633,7 @@ def _report(summary: dict, arrays: dict, outdir: str) -> None:
         o = summary.get(key, {})
         if o.get("n_matched"):
             print(f"{label}: median {o['median_ms']:.2f} ms  sd {o['sd_ms']:.2f}  "
-                  f"min {o['min_ms']:.2f}  max {o['max_ms']:.2f}  "
+                  f"min {o['min_ms']:.2f}  max {o['max_ms']:.2f}{_drift(o)}  "
                   f"(matched {o['n_matched']}/{o['n']})")
     print(f"saved: {outdir}")
 

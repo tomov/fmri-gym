@@ -53,6 +53,16 @@ _QT_KEYS = {Qt.Key.Key_Up: "UP", Qt.Key.Key_Down: "DOWN", Qt.Key.Key_Left: "LEFT
             Qt.Key.Key_Tab: "TAB", Qt.Key.Key_Shift: "LSHIFT", Qt.Key.Key_Comma: "COMMA",
             Qt.Key.Key_Period: "PERIOD"}
 
+_GAME_KEYS_HINT = (
+    "Overrides of the backend's default keyboard map for this phase. Keys are pygame "
+    "names (UP, DOWN, LEFT, RIGHT, SPACE, RETURN, A-Z, 0-9), joined with + for combos; "
+    "the action is what the env expects (an int for Discrete; quote a string that "
+    "looks like a number). Unmentioned keys keep the backend default.")
+_CHECK_KEYS_HINT = (
+    "The keys the rig check asks for, one at a time, on the participant's device: each "
+    "button's key (a pygame name: 1, B, LEFT...), and what it stands for, shown when it is "
+    "asked for. A key that never comes, or comes as another, fails the check.")
+
 _STYLE = """
 QGroupBox { font-weight: 600; border: 1px solid palette(mid); border-radius: 8px;
             margin-top: 14px; padding: 12px 8px 8px 8px; }
@@ -593,15 +603,11 @@ class _Editor(QtWidgets.QMainWindow):
         self.ctl_phase.setMinimumWidth(420)
         self.ctl_phase.setFont(_mono())
         self.ctl_phase.activated.connect(self._select_ctl_phase)
-        layout.addLayout(_row(QtWidgets.QLabel("game phase"), self.ctl_phase))
-        hint = QtWidgets.QLabel(
-            "Overrides of the backend's default keyboard map for this phase. Keys are pygame "
-            "names (UP, DOWN, LEFT, RIGHT, SPACE, RETURN, A-Z, 0-9), joined with + for combos; "
-            "the action is what the env expects (an int for Discrete; quote a string that "
-            "looks like a number). Unmentioned keys keep the backend default.")
-        hint.setObjectName("hint")
-        hint.setWordWrap(True)
-        layout.addWidget(hint)
+        layout.addLayout(_row(QtWidgets.QLabel("phase"), self.ctl_phase))
+        self.ctl_hint = QtWidgets.QLabel(_GAME_KEYS_HINT)
+        self.ctl_hint.setObjectName("hint")
+        self.ctl_hint.setWordWrap(True)
+        layout.addWidget(self.ctl_hint)
         self.key_table = _KeyTable()
         layout.addWidget(self.key_table, 2)
         layout.addLayout(_row(
@@ -794,7 +800,7 @@ class _Editor(QtWidgets.QMainWindow):
         self.edit_index = self.ctl_index = None
         self._refresh_phase_list(0 if self.phases else None)
         self._refresh_ctl_phases()
-        section = dict(config.get("triggers", {}))
+        section = dict(config.get("triggers") or {})  # null: not set up yet (a rig check)
         codes = {**asdict(Codes()), **section.pop("codes", {})}
         self._set_sync(section.pop("sync", {}), codes["scanner_start"])
         self.code_form.set(codes)
@@ -1344,7 +1350,17 @@ class _Editor(QtWidgets.QMainWindow):
                      # No fps: Check names it, as it does the empty game id -- the rate
                      # belongs to the game about to be picked, not to this template.
                      "game": {"type": "game", "backend": "gym", "game": "", "mode": "duration",
-                              "duration": 30.0}}
+                              "duration": 30.0},
+                     # The rig check's: the quick check's values stated, keys to fill in.
+                     "check_display": {"type": "check_display", "n": 60},
+                     "check_frames": {"type": "check_frames", "rates": [60, 30],
+                                      "seconds": 2, "loads": ["none"]},
+                     "check_triggers": {"type": "check_triggers", "pulses": 3},
+                     "check_controls": {"type": "check_controls", "timeout_s": 10.0,
+                                        "keys": {"1": "LEFT", "2": "DOWN", "3": "UP",
+                                                 "4": "RIGHT"}},
+                     "check_photodiode": {"type": "check_photodiode", "readout": "soundcard",
+                                          "n": 10}}
         self._insert_phase(templates[kind])
 
     def _duplicate_phase(self) -> None:
@@ -1379,7 +1395,14 @@ class _Editor(QtWidgets.QMainWindow):
     # -- controls tab ------------------------------------------------------
 
     def _game_indices(self) -> list[int]:
-        return [i for i, p in enumerate(self.phases) if p["type"] == "game"]
+        """The phases with keys: games, and a rig check's controls check."""
+        return [i for i, p in enumerate(self.phases) if p["type"] in ("game", "check_controls")]
+
+    def _ctl_is_check(self) -> bool:
+        """The Controls tab shows a controls check: its keys are a device's buttons, each with
+        what it stands for, and there is no game to take defaults from."""
+        return (self.ctl_index is not None
+                and self.phases[self.ctl_index]["type"] == "check_controls")
 
     def _refresh_ctl_phases(self) -> None:
         indices = self._game_indices()
@@ -1391,6 +1414,7 @@ class _Editor(QtWidgets.QMainWindow):
                                if self.ctl_index is not None else {})
         if self.ctl_index is not None:
             self.ctl_phase.setCurrentIndex(indices.index(self.ctl_index))
+        self.ctl_hint.setText(_CHECK_KEYS_HINT if self._ctl_is_check() else _GAME_KEYS_HINT)
 
     def _select_ctl_phase(self, index: int) -> None:
         if not self._commit_all():
@@ -1398,6 +1422,7 @@ class _Editor(QtWidgets.QMainWindow):
             return
         self.ctl_index = self._game_indices()[index]
         self.key_table.set(self.phases[self.ctl_index].get("keys", {}))
+        self.ctl_hint.setText(_CHECK_KEYS_HINT if self._ctl_is_check() else _GAME_KEYS_HINT)
         self.defaults_text.setPlainText("")
         self._defaults = {}
 
@@ -1424,6 +1449,12 @@ class _Editor(QtWidgets.QMainWindow):
     def _show_defaults(self) -> None:
         if self.ctl_index is None:
             return
+        if self._ctl_is_check():
+            self.defaults_text.setPlainText(
+                "A controls check has no game, so no defaults: its keys are the buttons to "
+                "press, each with what it stands for (shown on screen when asked). Pick the "
+                "device below and Use it, or add keys with Press a key...")
+            return
         phase = {k: v for k, v in self.phases[self.ctl_index].items() if k != "keys"}
         self.defaults_text.setPlainText(f"loading {phase.get('game')}...")
         QtWidgets.QApplication.processEvents()
@@ -1445,6 +1476,9 @@ class _Editor(QtWidgets.QMainWindow):
         if self.ctl_index is None:
             return
         name = self.layout_pick.currentText()
+        if self._ctl_is_check():
+            self._check_layout(name)
+            return
         if not self._defaults:
             self._show_defaults()  # builds the adapter: the game's own map
         if not self._defaults:
@@ -1471,6 +1505,17 @@ class _Editor(QtWidgets.QMainWindow):
         if unbound:
             text += f"\nno button for: {', '.join(unbound)} (still on the keyboard)"
         self.defaults_text.setPlainText(text)
+
+    def _check_layout(self, name: str) -> None:
+        """A controls check tests the device's buttons themselves, each named for its key."""
+        layout = gui.DEVICE_LAYOUTS[name]
+        if not layout:
+            self.defaults_text.setPlainText("Keyboard: add the keys to test with Press a key..., "
+                                            "each with what it stands for")
+            return
+        self.key_table.set(dict(layout))
+        self.defaults_text.setPlainText(f"{name}: the check asks for "
+                                        + ", ".join(f"{k} ({v})" for k, v in layout.items()))
 
     def _use_defaults(self) -> None:
         if not self._defaults:
@@ -1669,6 +1714,7 @@ class _Editor(QtWidgets.QMainWindow):
             problems += [label + p for p in cfg.validate_config(self.configs[step["config"]])]
         if all(step["skip"] for step in self.steps):
             problems.append("every run is skipped: nothing would play")
+        problems += gui.trigger_mismatches(self.steps, self.configs)
         monitor = self.monitor_pick.currentData()
         if monitor >= len(self.monitors):
             labels = "; ".join(monitor_label(i, m) for i, m in enumerate(self.monitors))
@@ -1714,6 +1760,203 @@ class _Editor(QtWidgets.QMainWindow):
 
     def _error(self, text: str) -> None:
         QtWidgets.QMessageBox.critical(self, "fmri-gym config", text)
+
+
+_RIG_INTRO = ("Describe this rig once; every rig check copies it into its results, so the "
+              "checks of all sites can be pooled and compared. Software cannot see these: "
+              "say what is plugged in.")
+
+
+class _RigForm(QtWidgets.QDialog):
+    def __init__(self, path: str, values: dict) -> None:
+        super().__init__()
+        self.setWindowTitle(f"Rig file: {path}")
+        self.setMinimumWidth(640)
+        self.fields: dict[str, QtWidgets.QWidget] = {}
+        layout = QtWidgets.QVBoxLayout(self)
+        intro = QtWidgets.QLabel(_RIG_INTRO)
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+        from . import checks  # its rig file's fields; checks.py is not the editor's to import
+        self._problems = checks.rig_problems
+        form = QtWidgets.QFormLayout()
+        examples = checks.RIG_EXAMPLES
+        for key, what in checks.RIG_FIELDS.items():
+            form.addRow(key, self._field(key, str(values.get(key, "")), examples.get(key, "")))
+            hint = QtWidgets.QLabel(what)
+            hint.setStyleSheet("color: gray")
+            form.addRow("", hint)
+        layout.addLayout(form)
+        self.problems = QtWidgets.QLabel()
+        self.problems.setWordWrap(True)
+        self.problems.setStyleSheet("color: #c0392b")
+        layout.addWidget(self.problems)
+        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Save
+                                             | QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        self.save = buttons.button(QtWidgets.QDialogButtonBox.StandardButton.Save)
+        layout.addWidget(buttons)
+        self._check()
+
+    def _field(self, key: str, value: str, example: str) -> QtWidgets.QWidget:
+        """The widget for one key: a choice for ``modality``, a text box for ``notes``."""
+        if key == "modality":
+            w = QtWidgets.QComboBox()
+            from .checks import MODALITIES
+            w.addItems(["", *MODALITIES])
+            w.setCurrentText(value if value in MODALITIES else "")
+            w.currentTextChanged.connect(self._check)
+        elif key == "notes":
+            w = QtWidgets.QPlainTextEdit(value)
+            w.setFixedHeight(60)
+            w.textChanged.connect(self._check)
+        else:
+            w = QtWidgets.QLineEdit(value)
+            w.setPlaceholderText(f"e.g. {example}" if example else "")
+            w.textChanged.connect(self._check)
+        self.fields[key] = w
+        return w
+
+    @property
+    def rig(self) -> dict[str, str]:
+        """The values as typed, trimmed."""
+        out = {}
+        for key, w in self.fields.items():
+            text = (w.currentText() if isinstance(w, QtWidgets.QComboBox)
+                    else w.toPlainText() if isinstance(w, QtWidgets.QPlainTextEdit)
+                    else w.text())
+            out[key] = text.strip()
+        return out
+
+    def accept(self) -> None:
+        """Close with Save only when valid: a disabled button does not stop Enter."""
+        if not self._problems(self.rig):
+            super().accept()
+
+    def _check(self) -> None:
+        problems = self._problems(self.rig)
+        self.problems.setText("\n".join(f"• {p}" for p in problems))
+        self.save.setEnabled(not problems)
+
+
+def fill_rig(path: str, values: dict) -> dict[str, str] | None:
+    """The rig file (:mod:`fmri_gym.checks`), filled in a form instead of by hand; on Save,
+    written.
+
+    One window rather than a prompt per field: all of it stays in view, and the
+    problems are listed live -- the same :func:`~fmri_gym.checks.rig_problems` a
+    loaded file is held to, so the form cannot save a file the check would refuse.
+
+    :param path: the rig file to write.
+    :param values: what is known so far (an invalid file's content, or nothing).
+    :return: the rig written, or ``None`` if the form was cancelled.
+    """
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(["fmri-gym"])
+    app.setStyle("Fusion")
+    form = _RigForm(path, values)
+    if form.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+        return None
+    rig = form.rig
+    with open(path, "w") as f:
+        json.dump(rig, f, indent=2)
+        f.write("\n")
+    return rig
+
+
+class _TriggerChoice(QtWidgets.QDialog):
+    """The trigger settings of a config that has none: a preset, or one's own."""
+
+    _PICK = "(pick a setup, or set your own below)"
+
+    def __init__(self, path: str) -> None:
+        super().__init__()
+        self.setWindowTitle(f"Triggers: {path}")
+        self.setMinimumWidth(620)
+        self.touched = False
+        layout = QtWidgets.QVBoxLayout(self)
+        intro = QtWidgets.QLabel(
+            f"{path} has no trigger settings yet: how does this rig start the recording, and "
+            "what does it send? Pick a setup, or set your own. They are saved in the file; "
+            "the editor's Triggers tab changes them later, and the session's other runs "
+            "must use the same.")
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+        self.preset = QtWidgets.QComboBox()
+        self.preset.addItems([self._PICK, *cfg.TRIGGER_PRESETS])
+        self.preset.activated.connect(self._apply_preset)
+        layout.addLayout(_row(QtWidgets.QLabel("setup"), self.preset))
+        self.sync_form, self.trigger_form = _Form(gui.SYNC_FIELDS), _Form(gui.TRIGGER_FIELDS)
+        self.sync_form.set({**asdict(SyncSettings()), "scanner_start": Codes().scanner_start})
+        self.trigger_form.set(_trigger_defaults())
+        for form in (self.sync_form, self.trigger_form):
+            layout.addWidget(form)
+            form.changed.connect(self._edited)
+        self.text = QtWidgets.QLabel()
+        self.text.setWordWrap(True)
+        layout.addWidget(self.text)
+        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Save
+                                             | QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        self.save = buttons.button(QtWidgets.QDialogButtonBox.StandardButton.Save)
+        layout.addWidget(buttons)
+        self.touched = False  # filling the forms above is not a choice
+        self._refresh()
+
+    def _apply_preset(self) -> None:
+        if self.preset.currentText() == self._PICK:
+            return
+        section = copy.deepcopy(cfg.TRIGGER_PRESETS[self.preset.currentText()])
+        sync = {**asdict(SyncSettings()), **section.pop("sync"),
+                "scanner_start": Codes().scanner_start}
+        self.sync_form.set(sync)
+        self.trigger_form.set({**_trigger_defaults(), **section})
+        self.touched = True
+        self._refresh()
+
+    def _edited(self) -> None:
+        self.touched = True
+        self._refresh()
+
+    def section(self) -> dict:
+        """The triggers section the forms say (see :func:`fmri_gym.gui.triggers_section`)."""
+        codes = {k: v for k, v in asdict(Codes()).items() if k != "scanner_start"}
+        return gui.triggers_section(self.sync_form.get(), self.trigger_form.get(), codes)
+
+    def _refresh(self) -> None:
+        mode = self.sync_form.widgets["mode"].currentText()
+        self.sync_form.show_rows(["mode", *gui.SYNC_ROWS.get(mode, ())])
+        try:
+            section = self.section()
+            problems = cfg.trigger_problems(section)
+        except ValueError as exc:  # a number half typed, named in the message
+            section, problems = None, [str(exc)]
+        except KeyError:  # a form half refilled by a preset: its next change completes it
+            return
+        if not self.touched:
+            problems = ["pick a setup, or change a field: the defaults are not a choice"]
+        self.text.setText("\n".join(problems) if problems else gui.describe_triggers(section))
+        self.save.setEnabled(not problems)
+
+    def accept(self) -> None:
+        """Close with Save only when chosen and valid: a disabled button does not stop Enter."""
+        if self.save.isEnabled():
+            super().accept()
+
+
+def choose_triggers(path: str) -> dict | None:
+    """Ask for the trigger settings of a config that has none.
+
+    :param path: the config, named in the dialog (the caller saves the section).
+    :return: the ``triggers`` section chosen, or ``None`` if cancelled.
+    """
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(["fmri-gym"])
+    app.setStyle("Fusion")
+    dialog = _TriggerChoice(path)
+    if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+        return None
+    return dialog.section()
 
 
 def _trigger_defaults() -> dict:

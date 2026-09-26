@@ -26,7 +26,7 @@ import os
 import signal
 import sys
 
-from fmri_gym import Run
+from fmri_gym import Run, checks
 from fmri_gym.config import EXIT_QUIT, load_config, validate_config
 from fmri_gym.display import quit_like_esc
 
@@ -82,7 +82,13 @@ def main() -> None:
     if problems:
         raise ValueError(f"{args.curriculum}: " + "; ".join(problems))
 
+    rig_check = None
+    if checks.has_checks(config):  # a rig check: its rig file, and a line that opens, first
+        rig_check = checks.prepare(config, args.curriculum)
     run = Run.from_config(config, args)
+    if rig_check is not None:
+        run.logger.set_extra("rig", rig_check["rig"])
+        run.logger.set_extra("trigger_error", rig_check["trigger_error"])
     previous = signal.signal(signal.SIGINT, quit_like_esc)
     try:
         completed = run.play()
@@ -90,6 +96,9 @@ def main() -> None:
         run.close()
         # Last: a terminal's Ctrl+C can come twice (to uv and to us), the second one late.
         signal.signal(signal.SIGINT, previous)
+    if rig_check is not None:
+        # A failed test is a finding, listed in the report: the session goes on.
+        checks.finish(run, args.ses, args.data_root)
     if not completed:
         # A session script (set -e) must not start the next run after an ESC.
         sys.exit(EXIT_QUIT)

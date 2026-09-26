@@ -39,7 +39,7 @@ import os
 import re
 import shlex
 import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Sequence
 
 from . import bids
@@ -63,7 +63,8 @@ class Field:
 
     ``kind``: ``str`` | ``int`` | ``float`` | ``bool`` | ``choice`` (fixed
     list) | ``combo`` (list plus free text) | ``text`` (multi-line string,
-    always written) | ``lines`` (multi-line, one list item per line). For the
+    always written) | ``lines`` (multi-line, one list item per line) | ``list``
+    (one line, items separated by commas or spaces; numbers stay numbers). For the
     other kinds a blank entry means "not set", so the engine default applies;
     a ``bool`` is only written when it differs from ``default``.
     """
@@ -204,6 +205,63 @@ PHASE_FIELDS: dict[str, list[Field]] = {
         Field("n_points", "n_points", "int", tip="Likert scale points (default 7)."),
     ],
     "game": _GAME_FIELDS,
+    # The rig check's phases (fmri_gym/checks.py): blank = the quick check's value.
+    "check_display": [
+        Field("n", "flips", "int", tip="Flip intervals to measure (default 60)."),
+        Field("seconds", "seconds", "float",
+              tip="Flip for this long instead (the long check: 600, missed refreshes)."),
+    ],
+    "check_frames": [
+        Field("rates", "rates (fps)", "list",
+              tip="Frame rates to play the test pattern at, through the session's own game "
+                  "loop: the rates your games use, and one that does not divide the refresh."),
+        Field("seconds", "seconds per rate", "float", tip="Per rate and load (default 2)."),
+        Field("loads", "loads", "list",
+              tip="none, and/or cpu: every core kept busy while the frames play, to see "
+                  "how the pacing and the frame triggers hold up."),
+        Field("recording_hz", "recording (Hz)", "float",
+              tip="The recording's sampling rate (MEG/EEG): each frame code must last 2 "
+                  "samples. Blank: not checked."),
+    ],
+    "check_triggers": [
+        Field("repeat", "passes", "int", tip="Passes of every line and code sent to the "
+                                             "recording (default 1); only with a backend."),
+        Field("hold_ms", "hold (ms)", "float", tip="How long each code is held (default 40)."),
+        Field("gap_ms", "gap (ms)", "float", tip="Silence after each code (default 40)."),
+        Field("pulses", "scanner pulses", "int",
+              tip="Scanner pulses to count, when the run waits for the scanner (default 3)."),
+        Field("seconds", "pulse seconds", "float",
+              tip="Count pulses for this long instead (the long check: 600, clock drift)."),
+        Field("timeout_s", "timeout (s)", "float",
+              tip="Seconds allowed without a pulse before the test fails (default 60)."),
+    ],
+    "check_controls": [
+        Field("timeout_s", "timeout (s)", "float",
+              tip="Seconds to press each key when asked (default 10). The keys are on the "
+                  "Controls tab: a device's buttons, each with what it stands for."),
+    ],
+    "check_photodiode": [
+        Field("readout", "readout", "choice", ("soundcard", "recording"),
+              tip="soundcard: the diode on this PC's input 0, offsets printed here. "
+                  "recording: the diode in the MEG/EEG recording, matched offline to the "
+                  "frame triggers (the Triggers tab's line)."),
+        Field("input_device", "input device", tip="Sound-card input, index or name "
+                                                  "(blank: the default)."),
+        Field("mic", "microphone", "bool", default=False,
+              tip="A microphone at the ear on input 1: the clicks are timed when heard."),
+        Field("audio", "audio test", "bool", default=True,
+              tip="A tone burst on every other flash through the session's audio output, "
+                  "timed at the DAC."),
+        Field("n", "flashes", "int", tip="Flashes (default 10; the long check 850)."),
+        Field("on_ms", "on (ms)", "float", tip="White time per flash (default 50)."),
+        Field("gap_min_ms", "gap min (ms)", "float", tip="Shortest black gap (default 150)."),
+        Field("gap_max_ms", "gap max (ms)", "float", tip="Longest black gap (default 250)."),
+        Field("settle_ms", "settle (ms)", "float",
+              tip="Black before the first flash, for the input to settle (default 300)."),
+        Field("corner", "corner", "choice", ("br", "bl", "tr", "tl"),
+              tip="Where the patch is: under the diode."),
+        Field("patch_px", "patch (px)", "int", tip="Patch side (default 120)."),
+    ],
 }
 
 def parse_value(field: Field, raw: Any) -> Any:
@@ -220,6 +278,8 @@ def parse_value(field: Field, raw: Any) -> Any:
         return None
     if field.kind == "lines":
         return [line for line in text.split("\n") if line.strip()]
+    if field.kind == "list":
+        return [_item(item) for item in re.split(r"[,\s]+", text.strip()) if item]
     if field.kind not in ("int", "float"):
         return text.strip()
     try:
@@ -238,12 +298,22 @@ def _number(text: str, kind: str) -> int | float:
         return float(text)
 
 
+def _item(text: str) -> int | float | str:
+    """A ``list`` item: a number when it reads as one."""
+    try:
+        return _number(text, "float")
+    except ValueError:
+        return text
+
+
 def format_value(field: Field, value: Any) -> Any:
     """The inverse of :func:`parse_value`: config value -> widget value."""
     if field.kind == "bool":
         return bool(field.default if value is None else value)
     if value is None:
         return ""
+    if field.kind == "list" and isinstance(value, list):
+        return ", ".join(str(v) for v in value)
     if isinstance(value, (list, tuple)):
         return "\n".join(str(v) for v in value)
     return str(value)
@@ -389,6 +459,44 @@ def launch_values(form: dict) -> dict:
     return {"ses": None, "data_root": "data", **off, **form}
 
 
+def trigger_mismatches(steps: list[dict], configs: dict[str, dict]) -> list[str]:
+    """Runs of one session whose triggers differ: a session has one scanner and one line.
+
+    Each run keeps its own ``triggers`` section, so one edited on the Triggers
+    tab changes that run only; a rig check set to ``send`` before a game run
+    left at ``wait`` would test a line the session never uses.
+
+    :param steps: the session's lines; skipped ones and commands are left out.
+    :param configs: config path -> config.
+    :return: one problem naming each run's settings, or nothing when they agree.
+    """
+    seen: dict[str, list[str]] = {}
+    for step in steps:
+        if step["skip"] or "config" not in step:
+            continue
+        try:
+            s = asdict(TriggerSettings.from_dict(configs[step["config"]].get("triggers")))
+        except (TypeError, ValueError):
+            continue  # validate_config names what is wrong with it
+        s.pop("defaulted")
+        seen.setdefault(json.dumps(s, sort_keys=True), []).append(step["config"])
+    if len(seen) < 2:
+        return []
+    groups = "; ".join(f"{', '.join(paths)}: {_short_triggers(json.loads(key))}"
+                       for key, paths in seen.items())
+    return [f"the session's runs have different triggers ({groups}); a session has one "
+            "scanner and one trigger line: make them the same on the Triggers tab"]
+
+
+def _short_triggers(s: dict) -> str:
+    """``sync wait for '=', backend null`` / ``sync send, backend serial /dev/ttyUSB0``."""
+    sync = s["sync"]
+    start = f"sync wait for {sync['key']!r}" if sync["mode"] == "wait" else f"sync {sync['mode']}"
+    line = {"lsl": s["lsl_stream_name"], "serial": s["port"], "parallel": s["port"]}
+    where = f" {line[s['backend']]}" if line.get(s["backend"]) else ""
+    return f"{start}, backend {s['backend']}{where}"
+
+
 def phase_label(index: int, phase: dict) -> str:
     """One line for the curriculum list: ``"03  game  ale ALE/Pong-v5 (60 s)"``."""
     kind = phase["type"]
@@ -401,6 +509,10 @@ def phase_label(index: int, phase: dict) -> str:
         detail = (text[0] if text else "") if isinstance(text, list) else text.split("\n")[0]
     elif kind == "survey":
         detail = f"{len(phase.get('questions', []))} questions"
+    elif kind == "check_controls":
+        detail = " ".join(phase.get("keys", {})) or "no keys"
+    elif kind.startswith("check_"):
+        detail = "rig check"
     else:
         detail = f"{phase.get('duration', 2.0)} s"
     return f"{index:02d} {kind:<8} {detail[:26]}"

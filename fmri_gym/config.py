@@ -21,7 +21,9 @@ from typing import Any
 
 from .triggers import TriggerError, TriggerSettings
 
-PHASE_TYPES = ("fixation", "message", "game", "survey")
+#: The phases of a run; the ``check_*`` ones make a rig check (:mod:`fmri_gym.checks`).
+PHASE_TYPES = ("fixation", "message", "game", "survey", "check_display", "check_frames",
+               "check_triggers", "check_controls", "check_photodiode")
 SECTIONS = ("curriculum", "triggers")
 #: Exit status of ``fmri_play`` when the run was quit (ESC) before its end; a
 #: session script (``set -e``) stops on it instead of starting the next run.
@@ -166,6 +168,9 @@ def trigger_key_clashes(config: dict) -> list[str]:
 
 
 def _phase_problems(phase: dict) -> list[str]:
+    if phase["type"].startswith("check_"):
+        from .checks import phase_problems
+        return phase_problems(phase)
     if phase["type"] != "game":
         return []
     out = []

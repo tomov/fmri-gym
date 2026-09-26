@@ -409,6 +409,7 @@ fmri_gym/
   logging.py        # manifest.json + one compressed .npz per game block
   triggers.py       # run-start sync (wait/send/none) + MEG/EEG trigger codes over lsl/serial/parallel
   photodiode.py     # `python -m fmri_gym.photodiode`: flash a patch to measure the flip-to-photon offset
+  checks.py         # the rig check: its phases, the rig file, report.html/.md, rigchecks.tsv, `pool`
   adapters/
     base.py         # EnvAdapter + KeySpec flavors + FrameState (the seam)
     ale.py          # clone_state, getRAM, lossless indexed pixels
@@ -673,7 +674,7 @@ actually obtained (`vsync`, measured at start-up; `refresh_rate`).
   ```bash
   python -m fmri_gym.photodiode --fullscreen --config configs/demo_meg.json   # diode into the MEG/EEG amp
   python -m fmri_gym.photodiode --fullscreen --audio                          # diode into this PC's sound card
-  python -m fmri_gym.photodiode --fullscreen --audio --audio-click             # + mic on input 1: when sound is heard
+  python -m fmri_gym.photodiode --fullscreen --audio --audio-click --mic       # + mic on input 1: when sound is heard
   ```
 
   The first flashes a patch with the frame trigger on each white flip; match
@@ -682,7 +683,81 @@ actually obtained (`vsync`, measured at start-up; `refresh_rate`).
   records the diode on the sound-card input and prints the offsets itself
   (`--list-audio-devices` to pick the input). `--audio-click` also plays a tone
   burst on each white flip through the session's audio output and reports when
-  it reaches a microphone on input channel 1.
+  it reaches the DAC; with `--mic`, when a microphone on input channel 1 hears it.
+- **The rig check** runs all of these as one run: `configs/rig-check.json`, whose
+  curriculum holds check phases instead of games, played by `fmri-play` with the
+  window, trigger line and audio output a session opens. So the editor edits it
+  like any config -- its **Triggers** tab sets the line it tests (make it the
+  session's), its **Controls** tab the buttons it asks for (Use a device layout
+  to fill them in) -- and it can stand first in any session: add
+  `configs/rig-check.json` as its first run. A failed test does not stop the
+  check or the session: it is listed, with why, on screen, on the console and
+  in the report. On its own, the session `configs/rig-check.sh` plays the long
+  check (filed under `sub-rig`, as MEG-BIDS files empty-room recordings under
+  `sub-emptyroom`; its first line, the quick check, is skipped: un-skip it to
+  play that one): open it in the editor, `fmri-edit --session
+  configs/rig-check.sh`, and press Play, or run `sh configs/rig-check.sh`.
+
+  | phase | test | fails when |
+  |---|---|---|
+  | `check_display` | display | flips are not locked to the refresh (missed refreshes are counted) |
+  | `check_frames` | frames | a built-in test pattern, played as a game through the session's own game loop at each of `rates` fps and under each of `loads` (`cpu`: every core busy), loses a frame, shows one a refresh later than its rate allows, resets its pacing, or its frame triggers do not mark every frame in their cycle (and, given `recording_hz`, for 2 samples each) |
+  | `check_triggers` | triggers | the line does not open, LSL does not read back what was sent, or the scanner's pulses do not come or come irregularly (counted when the run waits for the scanner). This PC's ports and LSL are listed first, with a warning when none is usable. Codes sent over serial/parallel are printed: check them in the recording |
+  | `check_controls` | controls | a key is not read back through the event queue as itself (automatic), or is not pressed when asked for on screen (the input devices plugged in are listed) |
+  | `check_photodiode` | photodiode | the diode misses a flash, or sees only the flashes with a click (it hears sound). `"readout": "recording"`: matched offline to the frame triggers |
+  | | audio | a tone burst (every other flash, through the session's output) never reaches the DAC, or with `"mic": true` a microphone at the ear on input 1 misses one |
+
+  The rig-check configs ship with `"triggers": null`: no setup is anyone's
+  default. The first rig check asks for one -- a preset (fMRI, MEG, EEG,
+  behavioural) or your own -- and saves it in the config; the Triggers tab
+  changes it later. With no screen for the dialog it stops and says so.
+
+  Every check runs whichever fails, and each test gets its verdict. The screen
+  says what each check is doing -- which code goes out on which line, which
+  flash (and whether it carries a click), which rate under which load -- and
+  then its verdict. A session's runs must share one triggers section: the
+  editor's Check says so when they differ (each run keeps its own, so a change
+  on the Triggers tab applies to the selected run only).
+  `configs/rig-check.json` is the **quick** check, before every session: under a
+  minute, most of it pressing the buttons -- enough to show today's rig is the
+  one that was measured. `configs/rig-check-long.json` **measures** the rig,
+  once per rig and after any hardware, driver or OS change (about 25 min; the
+  frame test alone plays 60, 30, 20 and 50 fps for a minute each, idle and
+  under CPU load):
+  offsets to a fraction of a ms, their drift in ms/min (a sound card's clock
+  runs apart from the PC's), missed refreshes and pulses, the TR on this PC's
+  clock. With `sync.mode` `wait`, the check waits for the scanner like any
+  run: start a sequence, or the trigger box's test mode.
+
+  Each machine needs a **rig file**, `rig.json` (not in git): site, rig, PI's
+  initials, modality, and what software cannot see -- monitor or projector,
+  photodiode, sound path to the ear, trigger hardware. When it is missing or
+  invalid, the check opens a form to fill it in (the `gui` extra; Save stays
+  disabled until every field is valid) before the window; cancelled, or with no
+  screen, it stops. `python -m fmri_gym.checks rig` reopens the form when
+  the hardware changes; `RIG=<path>` points elsewhere.
+
+  The check's run folder holds, beside the run's own `manifest.json` (with the
+  rig, each check's numbers and each test's verdict) and one
+  `block-NN_check_<name>.npz` per check:
+
+  ```
+  report.html      for the people who run the rig: a verdict per test, the numbers,
+                   charts (flip intervals, each frame rate's intervals, every flash's
+                   offsets), and this rig's previous checks; one offline file
+  report.md        the same verdicts and numbers, as text
+  rigcheck.tsv     for pooling: one row, fixed columns, n/a where a test did not run
+  rigcheck.json    the columns' descriptions and units (BIDS sidecar)
+  ```
+
+  and at the data root, rebuilt after every check, **`data/rigchecks.tsv`** (+
+  its `.json` sidecar): every rig check filed there, one row each, oldest first.
+  A failed check is filed too, with each failed test and why. The rows are read
+  from each check's `manifest.json`, so checks filed by an earlier version line
+  up, with `n/a` in the columns they predate. Across sites:
+  `python -m fmri_gym.checks pool data/ /mnt/siteB/data/ --out rigchecks.tsv`.
+  `python -m fmri_gym.checks report <run folder>...` re-files checks already
+  run (their reports and the table) with this version.
 
 ## Output & data format
 

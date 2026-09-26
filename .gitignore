@@ -16,3 +16,6 @@ vendor/rush-hour-src/
 
 # Build metadata from pip install -e . / uv sync
 *.egg-info/
+
+# The rig check's description of this machine (its form fills it in; one per machine)
+/rig.json

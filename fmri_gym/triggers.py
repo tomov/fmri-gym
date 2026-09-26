@@ -419,6 +419,23 @@ class Triggers:
         """Close the transport."""
         self._backend.close()
 
+    def pulse(self, value: int, hold_s: float) -> float:
+        """Put an arbitrary ``value`` on the line for ``hold_s``, then clear it.
+
+        For testing the lines outside a session; a session sends only through
+        :meth:`frame` and :meth:`lifecycle`, which keep the code scheme.
+
+        :param value: the byte to send.
+        :param hold_s: seconds before the lines are cleared.
+        :return: seconds the send call itself took.
+        """
+        t0 = time.perf_counter()
+        self._backend.send(value)
+        took = time.perf_counter() - t0
+        time.sleep(hold_s)
+        self._backend.clear()
+        return took
+
     def status(self) -> str:
         """One line saying what this run will do, for the experimenter screen and the console.
 

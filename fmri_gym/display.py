@@ -288,7 +288,7 @@ class Display:
                 "fullscreen": self._fullscreen, "monitor": self._monitor, "vsync": self.vsync,
                 "refresh_rate": self.refresh_rate, "driver": pygame.display.get_driver()}
 
-    def measure_flips(self, n: int = 240) -> dict[str, float]:
+    def measure_flips(self, n: int = 240) -> dict[str, Any]:
         """Flip ``n`` times and summarise the intervals.
 
         With vsync the mean should be ``1000 / refresh_rate`` ms and the
@@ -296,7 +296,9 @@ class Display:
         without waiting for the blank.
 
         :param n: number of timed flips (after a short warm-up).
-        :return: ``mean_ms``, ``sd_ms``, ``min_ms``, ``max_ms``.
+        :return: ``mean_ms``, ``sd_ms``, ``min_ms``, ``max_ms``, ``late``: how
+            many intervals exceeded 1.5 median periods (a refresh was missed),
+            and the ``intervals_ms`` themselves.
         """
         for _ in range(30):
             self._present()
@@ -305,8 +307,10 @@ class Display:
             self.canvas.fill((i % 2 * 40,) * 3)
             stamps.append(self._present())
         d = [(b - a) * 1000 for a, b in zip(stamps, stamps[1:])]
+        period = statistics.median(d)
         return {"mean_ms": statistics.mean(d), "sd_ms": statistics.pstdev(d),
-                "min_ms": min(d), "max_ms": max(d)}
+                "min_ms": min(d), "max_ms": max(d), "late": sum(x > 1.5 * period for x in d),
+                "intervals_ms": d}
 
     def close(self) -> None:
         """Shut down pygame (closes the window)."""
@@ -361,8 +365,25 @@ def quit_like_esc(_signum: int, _frame: object) -> None:
           file=sys.stderr)
 
 
+def is_locked(info: dict[str, Any], stats: dict[str, Any]) -> bool:
+    """Whether flips are locked to the refresh: vsync on, the mean at the period, a tight spread.
+
+    :param info: :meth:`Display.describe`.
+    :param stats: :meth:`Display.measure_flips`.
+    """
+    if not (info["vsync"] and info["refresh_rate"]):
+        return False
+    expect = 1000.0 / info["refresh_rate"]
+    return bool(abs(stats["mean_ms"] - expect) < 0.1 * expect and stats["sd_ms"] < 1.0)
+
+
 def _selftest() -> None:
-    """``python -m fmri_gym.display``: report whether flips lock to the refresh."""
+    """``python -m fmri_gym.display``: report whether flips lock to the refresh.
+
+    With ``--outdir``, also writes ``display.npz`` (the intervals) and
+    ``display.json`` (the display and the statistics) there, and exits
+    non-zero when the flips are not locked: a rig check stops on it.
+    """
     import argparse
     p = argparse.ArgumentParser(description="Measure flip timing on this machine.")
     p.add_argument("--size", default="1024x768")
@@ -370,22 +391,45 @@ def _selftest() -> None:
     p.add_argument("--no-vsync", action="store_true")
     p.add_argument("--monitor", type=int, default=0)
     p.add_argument("--n", type=int, default=240)
+    p.add_argument("--seconds", type=float, help="flip for this long instead of --n flips")
+    p.add_argument("--outdir", help="write display.npz + display.json here; fail if not locked")
     args = p.parse_args()
     w, h = (int(x) for x in args.size.lower().split("x"))
     d = Display((w, h), fullscreen=args.fullscreen, vsync=not args.no_vsync,
                 monitor=args.monitor)
     info = d.describe()
+    if args.seconds:
+        args.n = int(args.seconds * (info["refresh_rate"] or 60))
     stats = d.measure_flips(args.n)
     d.close()
+    intervals = stats.pop("intervals_ms")
     expect = 1000.0 / info["refresh_rate"] if info["refresh_rate"] else float("nan")
     print(f"driver={info['driver']} size={info['size']} vsync={info['vsync']} "
           f"refresh={info['refresh_rate']} Hz (period {expect:.2f} ms)")
     print("flip interval: mean {mean_ms:.2f} ms  sd {sd_ms:.2f}  min {min_ms:.2f}  "
-          "max {max_ms:.2f}".format(**stats))
-    locked = (info["vsync"] and abs(stats["mean_ms"] - expect) < 0.1 * expect
-              and stats["sd_ms"] < 1.0)
+          "max {max_ms:.2f}  late (missed a refresh) {late}/{n}".format(n=args.n, **stats))
+    locked = is_locked(info, stats)
     print("verdict:", "LOCKED to the refresh" if locked else
           "NOT locked -- try --fullscreen, disable the desktop compositor, or check the GPU driver")
+    if not args.outdir:
+        return
+    _save_selftest(args.outdir, info, {"n": args.n, **stats}, locked, intervals)
+    if not locked:
+        raise RuntimeError("display: flips are NOT locked to the refresh; every timing "
+                           "measured after this would be meaningless")
+
+
+def _save_selftest(outdir: str, info: dict, stats: dict, locked: bool,
+                   intervals: list[float]) -> None:
+    import json
+    import os
+
+    import numpy as np
+    os.makedirs(outdir, exist_ok=True)
+    np.savez_compressed(os.path.join(outdir, "display.npz"),
+                        intervals_ms=np.asarray(intervals))
+    with open(os.path.join(outdir, "display.json"), "w") as f:
+        json.dump({"display": info, "flips": stats, "locked": locked}, f, indent=2)
 
 
 if __name__ == "__main__":

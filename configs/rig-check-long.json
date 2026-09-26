@@ -1,0 +1,62 @@
+{
+  "_note": "The long rig check, once per rig and after any hardware, driver or OS change: about 25 minutes. The display for 2 min; the frame test at 60, 30, 20 and 50 fps (50 divides no common refresh), 1 min each, idle and with every core busy; 20 passes of every code; 850 flashes. Offsets to a fraction of a ms, their drift, missed refreshes and pulses, the TR on this PC's clock.",
+  "triggers": null,
+  "curriculum": [
+    {
+      "type": "message",
+      "text": [
+        "Rig check",
+        "",
+        "Photodiode on the patch, bottom-right; microphone at the ear if there is one.",
+        "The controls check will ask for each button: press it on the participant's device.",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {
+      "type": "check_display",
+      "seconds": 120
+    },
+    {
+      "type": "check_frames",
+      "rates": [
+        60,
+        30,
+        20,
+        50
+      ],
+      "seconds": 60,
+      "loads": [
+        "none",
+        "cpu"
+      ]
+    },
+    {
+      "type": "check_triggers",
+      "seconds": 600,
+      "repeat": 20,
+      "hold_ms": 100,
+      "gap_ms": 400
+    },
+    {
+      "type": "check_controls",
+      "timeout_s": 10.0,
+      "keys": {
+        "1": "LEFT",
+        "2": "DOWN",
+        "3": "UP",
+        "4": "RIGHT"
+      }
+    },
+    {
+      "type": "check_photodiode",
+      "readout": "soundcard",
+      "n": 850,
+      "on_ms": 100,
+      "gap_min_ms": 400,
+      "gap_max_ms": 800,
+      "settle_ms": 1000
+    }
+  ],
+  "_triggers_note": "null until this rig's are set: the first rig check asks for them (a preset or your own) and saves them here; the Triggers tab changes them. They must be the session's own: with sync 'wait' the check waits for the scanner and counts its pulses."
+}
