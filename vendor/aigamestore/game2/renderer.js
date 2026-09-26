@@ -1,4 +1,4 @@
-import { gameState, CANVAS_WIDTH, CANVAS_HEIGHT, GROUND_Y, SLINGSHOT_X, SLINGSHOT_Y, BIRD_TYPES, LAUNCH_POWER_MULTIPLIER, GRAVITY, BIRD_AIR_FRICTION, MAX_PULL_DISTANCE } from './globals.js';
+import { gameState, CANVAS_WIDTH, CANVAS_HEIGHT, GROUND_Y, SLINGSHOT_X, SLINGSHOT_Y, BIRD_TYPES, LAUNCH_POWER_MULTIPLIER, GRAVITY, BIRD_AIR_FRICTION, MAX_PULL_DISTANCE, keyLabel, keysLabel } from './globals.js';
 
 export function renderGame(p) {
   // Background
@@ -39,19 +39,15 @@ function renderStartScreen(p) {
   p.fill(100, 255, 100);
   p.textAlign(p.CENTER, p.CENTER);
   p.textSize(24); // Slightly smaller font for the new title
-  p.text("press enter to begin", CANVAS_WIDTH / 2, 60); // Replaced and moved to top
-  
   // Adjusted Y positions for controls and bird abilities
   p.textSize(16);
   p.fill(255, 255, 150);
   p.text("CONTROLS:", CANVAS_WIDTH / 2, 120); // Moved up
   p.fill(255);
   p.textSize(12);
-  p.text("ARROW KEYS: Hold to adjust slingshot aim", CANVAS_WIDTH / 2, 140); // Moved up
-  p.text("SPACE: Launch the bird", CANVAS_WIDTH / 2, 160); // Moved up
-  p.text("Z: Activate bird's special ability", CANVAS_WIDTH / 2, 180); // Moved up
-  p.text("R: Restart", CANVAS_WIDTH / 2, 200); // Moved up
-  
+  p.text(`${keysLabel("ARROW KEYS", ["LEFT", "RIGHT", "UP", "DOWN"])}: Hold to adjust slingshot aim`, CANVAS_WIDTH / 2, 140); // Moved up
+  p.text(`${keyLabel("SPACE")}: Launch the bird`, CANVAS_WIDTH / 2, 160); // Moved up
+  p.text(`${keyLabel("Z")}: Activate bird's special ability`, CANVAS_WIDTH / 2, 180); // Moved up
   p.textSize(14);
   p.fill(255, 200, 100);
   p.text("BIRD ABILITIES:", CANVAS_WIDTH / 2, 225); // Moved up
@@ -483,17 +479,10 @@ function renderLevelCompleteScreen(p) {
   p.text(`Level Score: ${gameState.score - gameState.levelStartScore}`, CANVAS_WIDTH / 2, 180);
   p.text(`Total Score: ${gameState.score}`, CANVAS_WIDTH / 2, 210);
   
-  if (gameState.currentLevel < gameState.totalLevels) {
-    p.fill(255, 255, 100);
-    p.textSize(18);
-    p.text("PRESS ENTER FOR NEXT LEVEL", CANVAS_WIDTH / 2, 280);
-  } else {
+  if (gameState.currentLevel >= gameState.totalLevels) {
     p.fill(255, 215, 0);
     p.textSize(32);
     p.text("YOU WIN!", CANVAS_WIDTH / 2, 260);
-    p.fill(255, 255, 100);
-    p.textSize(18);
-    p.text("PRESS R TO RESTART", CANVAS_WIDTH / 2, 310);
   }
 }
 
@@ -517,8 +506,4 @@ function renderGameOverScreen(p) {
   p.textSize(20);
   p.text(`Final Score: ${gameState.score}`, CANVAS_WIDTH / 2, 180);
   p.text(`High Score: ${gameState.highScore}`, CANVAS_WIDTH / 2, 210);
-  
-  p.fill(255, 255, 100);
-  p.textSize(18);
-  p.text("PRESS R TO RESTART", CANVAS_WIDTH / 2, 280);
 }

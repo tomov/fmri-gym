@@ -154,6 +154,6 @@ function handleLevelComplete(p) {
   } else {
     // Next level
     gameState.level++;
-    gameState.levelTransitionTimer = 180; // 3 seconds
+    gameState.levelTransitionTimer = 300; // 3 s level complete, then 2 s get ready
   }
 }

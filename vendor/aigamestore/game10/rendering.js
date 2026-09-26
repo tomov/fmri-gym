@@ -1,5 +1,5 @@
 // rendering.js - Rendering functions
-import { gameState, GAME_PHASES, CANVAS_WIDTH, CANVAS_HEIGHT } from './globals.js';
+import { gameState, GAME_PHASES, CANVAS_WIDTH, CANVAS_HEIGHT, keyLabel, keysLabel } from './globals.js';
 
 export function renderStartScreen(p) {
   p.background(20, 15, 30);
@@ -10,7 +10,6 @@ export function renderStartScreen(p) {
   p.textSize(32);
   const blink = Math.floor(p.frameCount / 30) % 2;
   if (blink) {
-    p.text("press enter to begin", CANVAS_WIDTH / 2, 60);
   }
   
   // Subtitle removed as per instructions
@@ -28,12 +27,11 @@ export function renderStartScreen(p) {
     "- Hide when spotted to evade capture",
     "",
     "CONTROLS:",
-    "Arrow Keys - Move",
-    "Shift - Sprint",
-    "Space - Interact (doors, items, hide)",
-    "Z - Toggle flashlight (in dark levels)",
-    "ESC - Pause game",
-    "R - Restart to title"
+    `${keysLabel("Arrow Keys", ["LEFT", "RIGHT", "UP", "DOWN"])} - Move`,
+    `${keyLabel("LSHIFT", "Shift")} - Sprint`,
+    `${keyLabel("SPACE", "Space")} - Interact (doors, items, hide)`,
+    `${keyLabel("Z")} - Toggle flashlight (in dark levels)`,
+    `${keyLabel("ESCAPE", "ESC")} - Pause game`
   ];
   
   let y = 110; // Adjusted starting Y position for instructions
@@ -81,8 +79,6 @@ export function renderGameOverScreen(p, won) {
   // Instructions
   p.fill(220, 220, 240);
   p.textSize(14);
-  p.text("Press R to restart", CANVAS_WIDTH / 2, 250);
-  
   const blink = Math.floor(p.frameCount / 30) % 2;
   if (blink) {
     p.text("▼", CANVAS_WIDTH / 2, 280);

@@ -54,10 +54,10 @@ window.onload = function() {
 
         // Auto-restart logic
         if (!gameState.autoRestartTimer) {
-            gameState.autoRestartTimer = p.frameCount;
+            gameState.autoRestartTimer = p.millis();
         }
-        const framesToWait = gameState.frameRate; // 1 second
-        if (p.frameCount - gameState.autoRestartTimer > framesToWait) {
+        // In ms: gameState.frameRate is read in setup, before any frame, so it is 0
+        if (p.millis() - gameState.autoRestartTimer > 3000) { // 3 seconds
             resetGame(p, true); // Automatically restart the game, bypassing start screen
             gameState.autoRestartTimer = null; // Clear the timer after restart
         }

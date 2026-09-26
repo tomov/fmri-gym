@@ -34,6 +34,42 @@ export function resetGameToStartScreen(p) {
   });
 }
 
+/**
+ * Starts level 1 from the START screen. Called by ENTER, and by the auto-restart after game over.
+ * @param {object} p The p5 instance.
+ */
+export function startFromStartScreen(p) {
+  loadLevel(1, p);
+  gameState.gamePhase = GAME_PHASES.PLAYING;
+  p.logs.game_info.push({
+    data: { phase: gameState.gamePhase, level: gameState.currentLevel },
+    framecount: p.frameCount,
+    timestamp: Date.now()
+  });
+}
+
+/**
+ * Leaves LEVEL_COMPLETE: the next level, or the win screen after the last one.
+ * Called by the auto-advance timer in game.js, and by SPACE.
+ * @param {object} p The p5 instance.
+ */
+export function leaveLevelComplete(p) {
+  if (gameState.currentLevel < LEVELS.length) {
+    advanceToNextLevel(p);
+  } else {
+    gameState.gamePhase = GAME_PHASES.GAME_OVER_WIN;
+  }
+
+  p.logs.game_info.push({
+    data: {
+      phase: gameState.gamePhase,
+      level: gameState.currentLevel
+    },
+    framecount: p.frameCount,
+    timestamp: Date.now()
+  });
+}
+
 export function handleKeyPressed(p) {
   const key = p.key;
   const keyCode = p.keyCode;
@@ -49,13 +85,7 @@ export function handleKeyPressed(p) {
   // ENTER - Start game or resume from pause
   if (keyCode === 13) {
     if (gameState.gamePhase === GAME_PHASES.START) {
-      loadLevel(1, p);
-      gameState.gamePhase = GAME_PHASES.PLAYING;
-      p.logs.game_info.push({
-        data: { phase: gameState.gamePhase, level: gameState.currentLevel },
-        framecount: p.frameCount,
-        timestamp: Date.now()
-      });
+      startFromStartScreen(p);
     } else if (gameState.gamePhase === GAME_PHASES.PAUSED) {
       gameState.gamePhase = GAME_PHASES.PLAYING;
       p.logs.game_info.push({
@@ -98,20 +128,7 @@ export function handleKeyPressed(p) {
   
   // SPACE - Advance to next level (from LEVEL_COMPLETE phase)
   if (keyCode === 32 && gameState.gamePhase === GAME_PHASES.LEVEL_COMPLETE) {
-    if (gameState.currentLevel < LEVELS.length) {
-      advanceToNextLevel(p);
-    } else {
-      gameState.gamePhase = GAME_PHASES.GAME_OVER_WIN;
-    }
-    
-    p.logs.game_info.push({
-      data: { 
-        phase: gameState.gamePhase,
-        level: gameState.currentLevel
-      },
-      framecount: p.frameCount,
-      timestamp: Date.now()
-    });
+    leaveLevelComplete(p);
     return;
   }
   

@@ -4,7 +4,8 @@ import {
   gameState, 
   GAME_PHASES,
   CANVAS_WIDTH,
-  CANVAS_HEIGHT
+  CANVAS_HEIGHT,
+  keyLabel
 } from './globals.js';
 import { worldToScreen, isOnScreen } from './utils.js';
 
@@ -51,7 +52,7 @@ export function renderUI(p) {
   if (gameState.player && gameState.player.interacting) {
     p.textAlign(p.CENTER, p.TOP);
     p.fill(150, 200, 255);
-    p.text("[Z] Interacting", CANVAS_WIDTH / 2, 10);
+    p.text(`[${keyLabel("Z")}] Interacting`, CANVAS_WIDTH / 2, 10);
   }
   
   p.pop();
@@ -66,8 +67,6 @@ export function renderStartScreen(p) {
   p.textAlign(p.CENTER, p.CENTER);
   p.textSize(36); // Slightly smaller than old title, but prominent
   p.fill(150, 140, 180);
-  p.text("press enter to begin", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
-  
   p.pop();
 }
 
@@ -104,7 +103,5 @@ export function renderGameOverScreen(p) {
   const pulseAlpha = 150 + Math.sin(p.frameCount * 0.1) * 100;
   p.textSize(20);
   p.fill(100, 200, 255, pulseAlpha);
-  p.text("PRESS R TO RESTART", CANVAS_WIDTH / 2, 340);
-  
   p.pop();
 }

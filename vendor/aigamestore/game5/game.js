@@ -1,5 +1,5 @@
 import { gameState, GAME_PHASES, CANVAS_WIDTH, CANVAS_HEIGHT } from './globals.js';
-import { handleKeyPressed, handleKeyReleased, handlePlayerMovement, startGame } from './controls.js';
+import { handleKeyPressed, handleKeyReleased, handlePlayerMovement, startGame, resetToStart } from './controls.js';
 import { checkCollisions } from './collision.js';
 import { loadLevel, updateLevelTransition } from './levelManager.js';
 import { renderGame } from './rendering.js';
@@ -30,6 +30,19 @@ let gameInstance = new p5(p => {
   };
 
   p.draw = function() {
+    // Game over restarts by itself after 3 seconds, straight into a new game (R, then ENTER)
+    const gameOver = gameState.gamePhase === GAME_PHASES.GAME_OVER_WIN ||
+                     gameState.gamePhase === GAME_PHASES.GAME_OVER_LOSE;
+    if (gameOver) {
+      gameState.gameOverSince ??= p.millis();
+      if (p.millis() - gameState.gameOverSince >= 3000) {
+        resetToStart(p);
+        startGame(p);
+      }
+    } else {
+      gameState.gameOverSince = null;
+    }
+
     // Handle level loading
     if (gameState.gamePhase === GAME_PHASES.PLAYING && !gameState.player) {
       loadLevel(p, gameState.level);

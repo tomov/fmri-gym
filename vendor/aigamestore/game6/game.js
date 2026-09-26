@@ -17,7 +17,9 @@ import {
 import { 
   keys,
   handleKeyPressed, 
-  handleKeyReleased 
+  handleKeyReleased,
+  restartGame,
+  startGame
 } from './input.js';
 import { updateCamera } from './utils.js';
 
@@ -48,6 +50,19 @@ let gameInstance = new p5(p => {
   };
   
   p.draw = function() {
+    // Game over restarts by itself after 3 seconds, straight into a new game (R, then ENTER)
+    const gameOver = gameState.gamePhase === GAME_PHASES.GAME_OVER_WIN ||
+                     gameState.gamePhase === GAME_PHASES.GAME_OVER_LOSE;
+    if (gameOver) {
+      gameState.gameOverSince ??= p.millis();
+      if (p.millis() - gameState.gameOverSince >= 3000) {
+        restartGame(p);
+        startGame(p);
+      }
+    } else {
+      gameState.gameOverSince = null;
+    }
+
     // Handle different game phases
     switch (gameState.gamePhase) {
       case GAME_PHASES.START:

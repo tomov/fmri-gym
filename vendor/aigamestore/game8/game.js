@@ -62,7 +62,7 @@ let gameInstance = new p5(p => {
         gameState.autoRestartTimeoutId = setTimeout(() => {
           restartGame(p, 'PLAYING'); // Call restartGame to immediately start playing
           // autoRestartScheduled and autoRestartTimeoutId will be reset by restartGame itself
-        }, 1000); // 1 second delay
+        }, 3000); // 3 second delay
       }
     } else if (gameState.gamePhase === 'GAME_OVER_LOSE') {
       drawGameOverScreen(p, false);
@@ -72,7 +72,7 @@ let gameInstance = new p5(p => {
         gameState.autoRestartTimeoutId = setTimeout(() => {
           restartGame(p, 'PLAYING'); // Call restartGame to immediately start playing
           // autoRestartScheduled and autoRestartTimeoutId will be reset by restartGame itself
-        }, 1000); // 1 second delay
+        }, 3000); // 3 second delay
       }
     }
   };

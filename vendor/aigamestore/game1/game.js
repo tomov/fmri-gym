@@ -1,7 +1,7 @@
 // game.js - Main game file
 
 import { gameState, GAME_PHASES, CANVAS_WIDTH, CANVAS_HEIGHT, getGameState } from "./globals.js";
-import { handleKeyPressed, resetGameToStartScreen } from './input.js'; // Import resetGameToStartScreen
+import { handleKeyPressed, resetGameToStartScreen, leaveLevelComplete, startFromStartScreen } from './input.js'; // Import resetGameToStartScreen
 import { updateAnimation } from './gameLogic.js';
 import { 
   renderStartScreen, 
@@ -47,7 +47,8 @@ let gameInstance = new p5(p => {
       gameState.autoRestartTimeoutId = setTimeout(() => {
         resetGameToStartScreen(p); // Call the unified reset function
         // The resetGameToStartScreen function itself will clear autoRestartScheduled and autoRestartTimeoutId
-      }, 1000); // 1 second delay
+        startFromStartScreen(p); // Straight into a new game: no key needed on the start screen
+      }, 3000); // 3 second delay
     } else if (!isGameOverPhase && gameState.autoRestartScheduled) {
       // If we leave a game over state (e.g., via manual 'R' key) before timeout, clear the scheduled restart
       clearTimeout(gameState.autoRestartTimeoutId);
@@ -55,6 +56,17 @@ let gameInstance = new p5(p => {
       gameState.autoRestartTimeoutId = null;
     }
     // --- Auto-restart logic end ---
+
+    // Auto-advance from LEVEL_COMPLETE after 3 seconds, the same way game over restarts
+    if (gameState.gamePhase === GAME_PHASES.LEVEL_COMPLETE && !gameState.autoAdvanceScheduled) {
+      gameState.autoAdvanceScheduled = true;
+      setTimeout(() => {
+        gameState.autoAdvanceScheduled = false;
+        if (gameState.gamePhase === GAME_PHASES.LEVEL_COMPLETE) {
+          leaveLevelComplete(p);
+        }
+      }, 3000);
+    }
 
     // Update animations
     if (gameState.gamePhase === GAME_PHASES.PLAYING) {

@@ -27,16 +27,16 @@ export function renderUI() {
     const phase = gameState.gamePhase;
     
     if (phase === "START") {
-        drawScreen("", "press enter to begin", null);
+        drawScreen("", "", null);
     } else if (phase === "PLAYING") {
         drawHUD();
     } else if (phase === "PAUSED") {
         drawHUD();
         // Pause overlay and text removed per request
     } else if (phase === "GAME_OVER_WIN") {
-        drawScreen("MISSION ACCOMPLISHED", "Press R to Restart", `Score: ${gameState.score}`);
+        drawScreen("MISSION ACCOMPLISHED", `Score: ${gameState.score}`, null);
     } else if (phase === "GAME_OVER_LOSE") {
-        drawScreen("KIA - GAME OVER", "Press R to Retry", `Score: ${gameState.score}`);
+        drawScreen("KIA - GAME OVER", `Score: ${gameState.score}`, null);
     }
 }
 

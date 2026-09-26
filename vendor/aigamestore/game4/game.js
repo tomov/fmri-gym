@@ -79,8 +79,15 @@ const gameInstance = new p5(p => {
             case 'GAME_OVER_LOSE':
                 renderGame(p);
                 renderGameOverScreen(p);
+                // Restart by itself after 3 seconds, straight into a new game (R, then ENTER)
+                gameState.gameOverSince ??= currentTime;
+                if (currentTime - gameState.gameOverSince >= 3000) {
+                    window.resetGameInstance();
+                    gameState.gamePhase = 'PLAYING';
+                }
                 break;
         }
+        if (!gameState.gamePhase.startsWith('GAME_OVER')) gameState.gameOverSince = null;
     };
     
     function startPlaying() {

@@ -527,10 +527,9 @@ let gameInstance = new p5(p => {
         // Auto-restart logic
         if (!isReplayMode()) {
             if (gameState.autoRestartTimer === null) { // Initialize timer if not set
-                gameState.autoRestartTimer = p.frameCount;
+                gameState.autoRestartTimer = p.millis();
             }
-            const framesToWait = p.frameRate(); // 1 second (60 frames at 60fps)
-            if (p.frameCount - gameState.autoRestartTimer >= framesToWait) {
+            if (p.millis() - gameState.autoRestartTimer >= 3000) { // 3 seconds
                 // Clear the auto-restart timer immediately
                 gameState.autoRestartTimer = null; 
 

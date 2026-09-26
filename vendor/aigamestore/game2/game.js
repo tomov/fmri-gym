@@ -288,7 +288,7 @@ window.onload = function() {
                   }
                   gameState.autoRestartScheduled = false;
                   gameState.autoRestartTimeoutId = null;
-              }, 1000); // 1 second delay
+              }, 3000); // 3 second delay
           }
         } else {
           // Level complete
@@ -327,7 +327,7 @@ window.onload = function() {
                 }
                 gameState.autoRestartScheduled = false;
                 gameState.autoRestartTimeoutId = null;
-            }, 1000); // 1 second delay
+            }, 3000); // 3 second delay
         }
       }
     }

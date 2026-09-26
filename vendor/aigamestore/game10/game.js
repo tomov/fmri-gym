@@ -34,8 +34,50 @@ let gameInstance = new p5(p => {
     });
   };
 
+  function startFromStartScreen(p) {
+    gameState.gamePhase = GAME_PHASES.PLAYING;
+    gameState.level = 1;
+    gameState.score = 0;
+    loadLevel(1);
+    p.logs.game_info.push({
+      data: { phase: gameState.gamePhase, level: gameState.level },
+      framecount: p.frameCount,
+      timestamp: Date.now()
+    });
+  }
+
+  function restartToStartScreen(p) {
+    gameState.gamePhase = GAME_PHASES.START;
+    gameState.level = 1;
+    gameState.score = 0;
+    gameState.inventory = [];
+    gameState.hasFlashlight = false;
+    gameState.flashlightOn = false;
+    gameState.messages = [];
+    gameState.isRunning = false;
+
+    p.logs.game_info.push({
+      data: { phase: gameState.gamePhase, action: "restart" },
+      framecount: p.frameCount,
+      timestamp: Date.now()
+    });
+  }
+
   p.draw = function() {
     p.background(40, 35, 45);
+
+    // Game over restarts by itself after 3 seconds, straight into a new game (R, then ENTER)
+    const gameOver = gameState.gamePhase === GAME_PHASES.GAME_OVER_WIN ||
+                     gameState.gamePhase === GAME_PHASES.GAME_OVER_LOSE;
+    if (gameOver) {
+      gameState.gameOverSince ??= p.millis();
+      if (p.millis() - gameState.gameOverSince >= 3000) {
+        restartToStartScreen(p);
+        startFromStartScreen(p);
+      }
+    } else {
+      gameState.gameOverSince = null;
+    }
 
     if (gameState.gamePhase === GAME_PHASES.START) {
       renderStartScreen(p);
@@ -192,15 +234,7 @@ let gameInstance = new p5(p => {
     // Game phase transitions - Esc = pause, Enter = resume (when paused)
     if (p.keyCode === 13) { // ENTER - start or resume from pause
       if (gameState.gamePhase === GAME_PHASES.START) {
-        gameState.gamePhase = GAME_PHASES.PLAYING;
-        gameState.level = 1;
-        gameState.score = 0;
-        loadLevel(1);
-        p.logs.game_info.push({
-          data: { phase: gameState.gamePhase, level: gameState.level },
-          framecount: p.frameCount,
-          timestamp: Date.now()
-        });
+        startFromStartScreen(p);
       } else if (gameState.gamePhase === GAME_PHASES.PAUSED) {
         gameState.gamePhase = GAME_PHASES.PLAYING;
         p.logs.game_info.push({
@@ -226,20 +260,7 @@ let gameInstance = new p5(p => {
         });
       }
     } else if (p.keyCode === 82) { // R
-      gameState.gamePhase = GAME_PHASES.START;
-      gameState.level = 1;
-      gameState.score = 0;
-      gameState.inventory = [];
-      gameState.hasFlashlight = false;
-      gameState.flashlightOn = false;
-      gameState.messages = [];
-      gameState.isRunning = false;
-      
-      p.logs.game_info.push({
-        data: { phase: gameState.gamePhase, action: "restart" },
-        framecount: p.frameCount,
-        timestamp: Date.now()
-      });
+      restartToStartScreen(p);
     }
 
     // Gameplay controls

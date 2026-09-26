@@ -1,6 +1,6 @@
 // ui.js - UI rendering
 
-import { gameState, CANVAS_WIDTH, CANVAS_HEIGHT, LOSE_LINE_Y } from './globals.js';
+import { gameState, CANVAS_WIDTH, CANVAS_HEIGHT, LOSE_LINE_Y, keyLabel, keysLabel } from './globals.js';
 import { calculateShotBonus } from './levels.js';
 
 export function drawUI(p) {
@@ -38,14 +38,12 @@ export function drawStartScreen(p) {
   p.fill(255, 220, 100);
   p.textSize(36); // Make this prominent
   p.noStroke();
-  p.text('press enter to begin', CANVAS_WIDTH / 2, 150); // Centered and higher
-
   // Controls (kept as per request)
   p.fill(255);
   p.textSize(14);
-  p.text('ARROW KEYS: Aim', CANVAS_WIDTH / 2, 250); // Adjusted Y position
-  p.text('SPACE: Fire Bubble', CANVAS_WIDTH / 2, 270); // Adjusted Y position
-  p.text('Z: Swap Bubbles', CANVAS_WIDTH / 2, 290); // Adjusted Y position
+  p.text(`${keysLabel('ARROW KEYS', ['LEFT', 'RIGHT'])}: Aim`, CANVAS_WIDTH / 2, 250); // Adjusted Y position
+  p.text(`${keyLabel('SPACE')}: Fire Bubble`, CANVAS_WIDTH / 2, 270); // Adjusted Y position
+  p.text(`${keyLabel('Z')}: Swap Bubbles`, CANVAS_WIDTH / 2, 290); // Adjusted Y position
 
   p.pop();
 }
@@ -65,10 +63,6 @@ export function drawGameOverScreen(p, isWin) {
   p.fill(255);
   p.textSize(24);
   p.text(`FINAL SCORE: ${gameState.score}`, CANVAS_WIDTH / 2, 200);
-
-  p.fill(255, 255, 100);
-  p.textSize(20);
-  p.text('PRESS R TO RESTART', CANVAS_WIDTH / 2, 280);
 
   p.pop();
 }

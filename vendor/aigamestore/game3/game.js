@@ -70,6 +70,14 @@ function gameLoop() {
 }
 
 function update(dt) {
+    // Game over restarts by itself after 3 seconds, no key needed
+    if (gameState.gamePhase === "GAME_OVER_WIN" || gameState.gamePhase === "GAME_OVER_LOSE") {
+        gameState.gameOverTime = (gameState.gameOverTime || 0) + dt;
+        if (gameState.gameOverTime >= 3) gameState.input.restart = true;
+    } else {
+        gameState.gameOverTime = 0;
+    }
+
     if (gameState.input.restart) {
         restartGame();
         gameState.input.restart = false;

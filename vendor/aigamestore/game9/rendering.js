@@ -1,4 +1,4 @@
-import { gameState, CANVAS_WIDTH, CANVAS_HEIGHT, WEAPONS, ROBOT_MASTERS, GAME_PHASES } from './globals.js';
+import { gameState, CANVAS_WIDTH, CANVAS_HEIGHT, WEAPONS, ROBOT_MASTERS, GAME_PHASES, keyLabel, keysLabel } from './globals.js';
 
 export function drawGame(p) {
   // Draw stage
@@ -140,7 +140,7 @@ export function drawUI(p) {
   
   p.fill(200, 200, 200);
   p.textSize(8);
-  p.text('SHIFT: Switch Weapon', 15, 138);
+  p.text(`${keyLabel('LSHIFT', 'SHIFT')}: Switch Weapon`, 15, 138);
   p.pop();
 
   // Boss health bar
@@ -196,7 +196,6 @@ export function drawStartScreen(p) {
   p.fill(100, 255, 100, flashAlpha);
   p.textSize(36); // Made text larger to act as a title
   p.textAlign(p.CENTER, p.CENTER);
-  p.text('press enter to begin', CANVAS_WIDTH / 2, 100); // Centered at former title position
   p.pop();
 
   // Controls - Kept and repositioned slightly higher
@@ -211,11 +210,11 @@ export function drawStartScreen(p) {
   
   p.fill(200, 200, 200);
   p.textSize(11);
-  p.text('Arrow Keys: Move & Aim', CANVAS_WIDTH / 2 - 130, 230); // Adjusted Y
-  p.text('Z: Jump', CANVAS_WIDTH / 2 - 130, 245); // Adjusted Y
-  p.text('Space: Shoot', CANVAS_WIDTH / 2 - 130, 260); // Adjusted Y
-  p.text('Shift: Cycle Weapons', CANVAS_WIDTH / 2 - 130, 275); // Adjusted Y
-  p.text('ESC: Pause    R: Restart', CANVAS_WIDTH / 2 - 130, 290); // Adjusted Y
+  p.text(`${keysLabel('Arrow Keys', ['LEFT', 'RIGHT', 'UP', 'DOWN'])}: Move & Aim`, CANVAS_WIDTH / 2 - 130, 230); // Adjusted Y
+  p.text(`${keyLabel('Z')}: Jump`, CANVAS_WIDTH / 2 - 130, 245); // Adjusted Y
+  p.text(`${keyLabel('SPACE', 'Space')}: Shoot`, CANVAS_WIDTH / 2 - 130, 260); // Adjusted Y
+  p.text(`${keyLabel('LSHIFT', 'Shift')}: Cycle Weapons`, CANVAS_WIDTH / 2 - 130, 275); // Adjusted Y
+  p.text(`${keyLabel('ESCAPE', 'ESC')}: Pause`, CANVAS_WIDTH / 2 - 130, 290); // Adjusted Y
   p.pop();
 }
 
@@ -245,11 +244,5 @@ export function drawGameOver(p, won) {
   p.textSize(20);
   p.text(`FINAL SCORE: ${gameState.score}`, CANVAS_WIDTH / 2, 250);
   p.text(`Levels Completed: ${gameState.currentLevel - 1}/${gameState.totalLevels}`, CANVAS_WIDTH / 2, 280);
-  
-  // Restart prompt
-  const flashAlpha = (Math.sin(p.frameCount * 0.1) + 1) * 127.5;
-  p.fill(200, 200, 200, flashAlpha);
-  p.textSize(16);
-  p.text('PRESS R TO RESTART', CANVAS_WIDTH / 2, 330);
   p.pop();
 }

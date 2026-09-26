@@ -1,6 +1,6 @@
 // rendering.js - All rendering functions
 
-import { gameState, GAME_PHASES, CANVAS_WIDTH, CANVAS_HEIGHT, COLOR_MAP, LEVELS } from './globals.js';
+import { gameState, GAME_PHASES, CANVAS_WIDTH, CANVAS_HEIGHT, COLOR_MAP, LEVELS, keyLabel } from './globals.js';
 
 export function renderStartScreen(p) {
   p.background(20, 30, 50);
@@ -12,7 +12,6 @@ export function renderStartScreen(p) {
   p.textSize(48); // Larger text for the main prompt
   const pulse = p.sin(p.frameCount * 0.1) * 20 + 235;
   p.fill(pulse, 200, 100);
-  p.text('press enter to begin', CANVAS_WIDTH / 2, 100); // Moved up
   p.pop();
   
   // Instructions (kept as requested)
@@ -21,9 +20,9 @@ export function renderStartScreen(p) {
   p.textAlign(p.LEFT, p.CENTER);
   p.textSize(14);
   const instructY = 220;
-  p.text('← → : Navigate between tubes', 100, instructY);
-  p.text('SPACE : Select tube / Pour', 100, instructY + 25);
-  p.text('Z : Undo last move', 100, instructY + 50);
+  p.text(`${keyLabel('LEFT', '←')} ${keyLabel('RIGHT', '→')} : Navigate between tubes`, 100, instructY);
+  p.text(`${keyLabel('SPACE')} : Select tube / Pour`, 100, instructY + 25);
+  p.text(`${keyLabel('Z')} : Undo last move`, 100, instructY + 50);
   p.pop();
   
   // Original "Start prompt" removed as it's replaced by the new title message
@@ -151,21 +150,6 @@ export function renderLevelComplete(p) {
   p.text(`Level Score: +${levelScore}`, CANVAS_WIDTH / 2, 200);
   p.text(`Total Score: ${gameState.score}`, CANVAS_WIDTH / 2, 230);
   p.pop();
-  
-  // Continue prompt
-  p.push();
-  p.fill(255, 220, 100);
-  p.textAlign(p.CENTER, p.CENTER);
-  p.textSize(20);
-  const pulse = p.sin(p.frameCount * 0.1) * 20 + 235;
-  p.fill(pulse, 200, 100);
-  
-  if (gameState.currentLevel < LEVELS.length) {
-    p.text('PRESS SPACE FOR NEXT LEVEL', CANVAS_WIDTH / 2, 320);
-  } else {
-    p.text('PRESS SPACE TO FINISH', CANVAS_WIDTH / 2, 320);
-  }
-  p.pop();
 }
 
 export function renderGameOverWin(p) {
@@ -201,14 +185,6 @@ export function renderGameOverWin(p) {
   p.text('You completed all 9 levels!', CANVAS_WIDTH / 2, 160);
   p.text(`Final Score: ${gameState.score}`, CANVAS_WIDTH / 2, 210);
   p.pop();
-  
-  // Restart prompt
-  p.push();
-  p.fill(255, 220, 100);
-  p.textAlign(p.CENTER, p.CENTER);
-  p.textSize(20);
-  p.text('PRESS R TO RESTART', CANVAS_WIDTH / 2, 320);
-  p.pop();
 }
 
 export function renderGameOverLose(p) {
@@ -231,14 +207,6 @@ export function renderGameOverLose(p) {
   p.textSize(20);
   p.text(`Level ${gameState.currentLevel} (${difficulty}) - Out of moves!`, CANVAS_WIDTH / 2, 180);
   p.text(`Score: ${gameState.score}`, CANVAS_WIDTH / 2, 220);
-  p.pop();
-  
-  // Restart prompt
-  p.push();
-  p.fill(255, 220, 100);
-  p.textAlign(p.CENTER, p.CENTER);
-  p.textSize(20);
-  p.text('PRESS R TO RESTART', CANVAS_WIDTH / 2, 320);
   p.pop();
 }
 

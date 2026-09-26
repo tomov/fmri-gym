@@ -62,7 +62,7 @@ export function handleKeyReleased(p, keyCode) {
   if (keyCode === 90) keys.interact = false;
 }
 
-function startGame(p) {
+export function startGame(p) {
   gameState.gamePhase = GAME_PHASES.PLAYING;
   p.logs.game_info.push({
     data: { gamePhase: gameState.gamePhase },
@@ -91,7 +91,7 @@ function resumeGame(p) {
   });
 }
 
-function restartGame(p) {
+export function restartGame(p) {
   gameState.gamePhase = GAME_PHASES.START;
   gameState.score = 0;
   gameState.deaths = 0;

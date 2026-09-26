@@ -190,6 +190,14 @@ export const COLOR_MAP = {
   'cyan': [0, 220, 220]
 };
 
+const keyLabels = new URLSearchParams(window.location.search);
+
+// Label for a game key on screen: `?label_SPACE=3` lets a host that remaps keys
+// (e.g. a scanner button box) show the key the player actually presses.
+export function keyLabel(name, fallback = name) {
+  return keyLabels.get(`label_${name}`) ?? fallback;
+}
+
 export function getGameState() {
   return gameState;
 }

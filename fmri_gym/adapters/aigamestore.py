@@ -13,14 +13,20 @@ Per step it holds exactly the keys the keymap names, screenshots the <canvas>
 for the display, and reads ``window.getGameState()`` -- every game exposes one --
 for the score (reward is its delta) and the ``gamePhase`` (START / PLAYING /
 LEVEL_COMPLETE / GAME_OVER_WIN / ...), which gives termination and the variables
-to log.
+to log. Game over does not end the episode: the episode lasts until the game
+goes back to its START screen, which the next ``reset`` then leaves. The vendored
+games never do that on their own -- level clears and game overs move on after 3 s
+straight into PLAYING, with no key -- so in practice a block is one episode and a
+reload never throws away the subject's progress.
 
 Keys are the one thing NOT passed through. A game hard-codes its keyCodes in
 p5's ``keyPressed``, but a subject in the scanner holds a button box, so combo
 VALUES here are the keys the *game* wants and combo keys are whatever the
-subject actually presses: ``"keys": {"B1": "LEFT", "B3": "SPACE"}``. Mind that
-the games also PAINT their control hints onto the canvas ("PRESS SPACE FOR NEXT
-LEVEL"), which no remap can rewrite -- so the message phase should say which
+subject actually presses: ``"keys": {"B1": "LEFT", "B3": "SPACE"}``. The games
+also PAINT their control hints onto the canvas ("PRESS SPACE FOR NEXT LEVEL").
+The vendored games relabel those from ``label_<KEY>`` query parameters, which
+``_make`` fills from ``keys`` (if two keys stand in for one game key, the last
+one names it); for a game loaded from a URL, the message phase should say which
 button stands in for which key.
 
 Not supported: seeding (the games draw from ``Math.random`` with no seed hook,
@@ -45,6 +51,7 @@ import io
 import os
 import socketserver
 import threading
+import urllib.parse
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -81,6 +88,7 @@ class _Browser:
     server: socketserver.TCPServer
     held: set[str] = field(default_factory=set)
     score: float = 0.0
+    phase: str = ""
 
 
 class AIGameStoreAdapter(EnvAdapter):
@@ -97,6 +105,10 @@ class AIGameStoreAdapter(EnvAdapter):
         server, base_url = _serve(spec.get("games_dir", _VENDOR))
         game = spec["game"]
         url = game if game.startswith("http") else f"{base_url}/{game}/index.html"
+        labels = {f"label_{want}": pressed for pressed, want in spec.get("keys", {}).items()
+                  if pressed != want}
+        if labels:
+            url += ("&" if "?" in url else "?") + urllib.parse.urlencode(labels)
 
         playwright = sync_playwright().start()
         channel = spec.get("browser_channel", "chrome")
@@ -134,13 +146,15 @@ class AIGameStoreAdapter(EnvAdapter):
         state = _state(page)
         self.env.held = set()
         self.env.score = _score(state, 0.0)
+        self.env.phase = _phase(state, "START")
         return None, {"state": state}
 
     def step(self, action: Any) -> tuple[Any, float, bool, bool, dict]:
         """Hold exactly the keys ``action`` names, then read the game's state.
 
         :param action: "+"-joined game keys from the keymap ("" = nothing held).
-        :return: ``(None, score delta, game over, False, {"state": ...})``.
+        :return: ``(None, score delta, episode over, False, {"state": ...})``;
+            see :func:`_episode_over`.
         """
         page = self.env.page
         want = set(action.split("+")) if action else set()
@@ -155,9 +169,9 @@ class AIGameStoreAdapter(EnvAdapter):
         state = _state(page)
         score = _score(state, self.env.score)
         reward, self.env.score = score - self.env.score, score
-        # LEVEL_COMPLETE is deliberately NOT terminal: the subject presses on.
-        phase = str((state or {}).get("gamePhase", ""))
-        done = phase.startswith("GAME_OVER") or phase == "ENDED"
+        phase = _phase(state, self.env.phase)
+        done = _episode_over(self.env.phase, phase)
+        self.env.phase = phase
         return None, reward, done, False, {"state": state}
 
     def render(self) -> np.ndarray:
@@ -253,6 +267,25 @@ def _state(page: Page) -> dict | None:
     except Exception:
         return None
     return state if isinstance(state, dict) else None
+
+
+def _phase(state: dict | None, default: str) -> str:
+    """Return the ``gamePhase`` in ``state``, or ``default`` if it could not be read.
+
+    Keeping the last phase through an unreadable frame stops a reload blip from
+    reading as a phase change.
+    """
+    return str(state.get("gamePhase", "")) if state else default
+
+
+def _episode_over(before: str, after: str) -> bool:
+    """Whether the step from phase ``before`` to ``after`` ends the episode.
+
+    :param before: the phase at the previous step (or reset).
+    :param after: the phase at this step.
+    :return: ``True`` when the game returns to START, or ends.
+    """
+    return (after == "START" and before != "START") or after == "ENDED"
 
 
 def _score(state: dict | None, default: float) -> float:

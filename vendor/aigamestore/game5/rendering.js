@@ -1,4 +1,4 @@
-import { gameState, GAME_PHASES, CANVAS_WIDTH, CANVAS_HEIGHT } from './globals.js';
+import { gameState, GAME_PHASES, CANVAS_WIDTH, CANVAS_HEIGHT, keyLabel } from './globals.js';
 
 export function renderGame(p) {
   p.background(30, 25, 35);
@@ -26,7 +26,6 @@ function renderStartScreen(p) {
   p.fill(150, 255, 150); // Brighter green for prominence
   const blink = Math.floor(p.frameCount / 30) % 2 === 0;
   if (blink) {
-    p.text('press enter to begin', CANVAS_WIDTH / 2, 100); // New position for title message
   }
   
   // Description (preserved)
@@ -44,11 +43,9 @@ function renderStartScreen(p) {
   p.fill(220, 220, 220);
   p.textAlign(p.LEFT, p.CENTER);
   const instrX = 150;
-  p.text('← →  Move Left/Right', instrX, 260);
-  p.text('↑      Jump', instrX, 285);
-  p.text('ESC   Pause Game', instrX, 310);
-  p.text('R       Restart to Menu', instrX, 335);
-  
+  p.text(`${keyLabel('LEFT', '←')} ${keyLabel('RIGHT', '→')}  Move Left/Right`, instrX, 260);
+  p.text(`${keyLabel('UP', '↑')}      Jump`, instrX, 285);
+  p.text(`${keyLabel('ESCAPE', 'ESC')}   Pause Game`, instrX, 310);
   // High Score (preserved)
   p.textAlign(p.CENTER, p.CENTER);
   p.textSize(16);
@@ -141,8 +138,6 @@ function renderGameOverWin(p) {
   
   p.textSize(18);
   p.fill(200, 200, 200);
-  p.text('PRESS R TO RESTART', CANVAS_WIDTH / 2, 320);
-  
   p.pop();
 }
 
@@ -161,8 +156,6 @@ function renderGameOverLose(p) {
   
   p.textSize(18);
   p.fill(200, 200, 200);
-  p.text('PRESS R TO RESTART', CANVAS_WIDTH / 2, 300);
-  
   p.pop();
 }
 
@@ -175,7 +168,7 @@ function renderLevelTransition(p) {
   p.textAlign(p.CENTER, p.CENTER);
   
   if (gameState.levelTransitionTimer > 120) {
-    // First 1 second - show completion
+    // First 3 seconds - show completion
     p.fill(100, 255, 100);
     p.textSize(36);
     p.text(`LEVEL ${prevLevel} COMPLETE!`, CANVAS_WIDTH / 2, 140);

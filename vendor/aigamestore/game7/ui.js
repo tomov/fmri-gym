@@ -1,4 +1,4 @@
-import { CANVAS_WIDTH, CANVAS_HEIGHT, gameState } from './globals.js';
+import { CANVAS_WIDTH, CANVAS_HEIGHT, gameState, keyLabel, keysLabel } from './globals.js';
 
 export function drawUI(p) {
   p.push();
@@ -117,12 +117,12 @@ export function drawStartScreen(p) {
   p.fill(255);
   p.textAlign(p.CENTER, p.CENTER);
   p.textSize(40);
-  p.text("press enter to begin", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 20);
-  
   p.textSize(14);
   p.text("CONTROLS:", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 50);
-  p.text("Arrow Keys: Move | Z: Shoot | SPACE: Sprint | SHIFT: Take Cover", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 70);
-  p.text("1-5: Switch Weapons | ESC: Pause | R: Restart", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 90);
+  const arrows = keysLabel("Arrow Keys", ["LEFT", "RIGHT", "UP", "DOWN"]);
+  const weapons = keysLabel("1-5", ["1", "2", "3", "4", "5"]);
+  p.text(`${arrows}: Move | ${keyLabel("Z")}: Shoot | ${keyLabel("SPACE")}: Sprint | ${keyLabel("LSHIFT", "SHIFT")}: Take Cover`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 70);
+  p.text(`${weapons}: Switch Weapons | ${keyLabel("ESCAPE", "ESC")}: Pause`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 90);
   
   p.pop();
 }
@@ -157,14 +157,6 @@ export function drawGameOverScreen(p, won) {
   p.text(`TIME: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 30);
   
   p.text(`ENEMIES ELIMINATED: ${gameState.enemiesKilled}`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 60);
-  
-  p.textSize(20);
-  if (Math.floor(p.frameCount / 30) % 2 === 0) {
-    if (won) {
-      p.text("PRESS ENTER FOR NEXT LEVEL", CANVAS_WIDTH / 2, CANVAS_HEIGHT * 3 / 4 - 20);
-    }
-    p.text("PRESS R TO RESTART", CANVAS_WIDTH / 2, CANVAS_HEIGHT * 3 / 4 + 10);
-  }
   
   p.pop();
 }

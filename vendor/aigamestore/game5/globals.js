@@ -34,6 +34,14 @@ if (typeof window !== 'undefined' && window.localStorage) {
   }
 }
 
+const keyLabels = new URLSearchParams(window.location.search);
+
+// Label for a game key on screen: `?label_UP=3` lets a host that remaps keys
+// (e.g. a scanner button box) show the key the player actually presses.
+export function keyLabel(name, fallback = name) {
+  return keyLabels.get(`label_${name}`) ?? fallback;
+}
+
 // Expose gameState globally
 if (typeof window !== 'undefined') {
   window.getGameState = () => gameState;

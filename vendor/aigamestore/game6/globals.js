@@ -52,6 +52,14 @@ export const ENTITY_TYPES = {
   MOVING_PLATFORM: "MOVING_PLATFORM"
 };
 
+const keyLabels = new URLSearchParams(window.location.search);
+
+// Label for a game key on screen: `?label_R=3` lets a host that remaps keys
+// (e.g. a scanner button box) show the key the player actually presses.
+export function keyLabel(name, fallback = name) {
+  return keyLabels.get(`label_${name}`) ?? fallback;
+}
+
 // Expose getGameState globally
 window.getGameState = function() {
   return gameState;
