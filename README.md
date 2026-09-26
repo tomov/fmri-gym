@@ -393,6 +393,17 @@ cmake -S ../stk-code -B ../stk-code/build -DCMAKE_BUILD_TYPE=Release && cmake --
 uv pip install -e ../stk-code/python    # or pip install -e, in the same env
 ```
 
+**Temporary:** the released binary (`gym-v0.1.1`) reads its frame from a window
+that is never mapped, whose contents X11 leaves undefined -- on some drivers
+(seen on an NVIDIA Quadro T2000, proprietary, GNOME/X11) every frame is then the
+same frozen picture while the logged state advances normally. The engine fix is
+[chrplr/stk-code#1](https://github.com/chrplr/stk-code/pull/1) (hidden mode
+renders into its own framebuffer object). Until it is merged and released, build
+that branch and install its client as above -- nothing in fmri-gym changes, the
+adapter is unaware. Note that `uv sync` puts the released wheel back, so re-run
+the `uv pip install -e` line after one. Once a new pack ships, a plain
+`supertuxkart-gym` upgrade is all anyone needs and this paragraph can go.
+
 Either way the binary can be overridden with `STK_ENV_BIN`, and
 `STK_ENV_OFFLINE=1` forbids the download outright. It needs a real OpenGL
 display (the frame is the game's rendering). `fps` must equal the game's physics
