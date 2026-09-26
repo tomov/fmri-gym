@@ -195,11 +195,17 @@ Controls: arrow keys (N/E/S/W). Needs `setuptools<81` (already a core dependency
 ### SuperTuxKart
 
 ```bash
-uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/supertuxkart__race.json --ses 1 --run 1
+uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/supertuxkart__race.json --ses 1 --run 1   # pystk2
+uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/stk_gym__race.json --ses 1 --run 1        # the current game (see README)
 ```
 
 Needs a real GL display (does **not** work under `SDL_VIDEODRIVER=dummy`).
 Controls: arrows steer/accelerate/brake, SPACE fire, Z drift, X nitro.
+
+On NVIDIA's proprietary driver the game's hidden window is never drawn into, so
+`stk_gym` would show one frozen frame; the adapter detects that on the first
+block, warns, and relaunches the game with its window on screen behind ours,
+which does render (`"hidden": true` / `false` on the game phase overrides it).
 
 ## Tips
 
