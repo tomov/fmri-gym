@@ -144,8 +144,7 @@ class PassthroughKeySpec(KeySpec):
 
     For backends with no action space to index into, where ``step()`` turns the
     named inputs into engine input (browser games press the corresponding
-    keyboard keys for real; supertuxkart assembles a steer/accelerate/brake
-    action struct). Combo values are input NAMES, so the adapter defaults are
+    keyboard keys for real). Combo values are input NAMES, so the adapter defaults are
     usually identity (``{"SPACE"} -> "SPACE"``) while a curriculum keymap can
     point any physical key at any input (``{"B3"} -> "SPACE"``) -- which is what
     lets a scanner button box drive a game built around a keyboard.

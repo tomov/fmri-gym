@@ -49,7 +49,7 @@ from .triggers import (SYNC_MODES, TRIGGER_BACKENDS, TriggerSettings)
 #: Suggestions for a game phase's ``backend`` (free text is accepted too; the
 #: adapter registry, not this list, decides what exists).
 BACKENDS = ("ale", "retro", "gym", "vgdl", "crafter", "minihack", "nethack", "vizdoom",
-            "overcooked", "baba", "rushhour", "supertuxkart", "aigamestore")
+            "overcooked", "baba", "rushhour", "stk_gym", "aigamestore")
 
 
 # ---------------------------------------------------------------------------

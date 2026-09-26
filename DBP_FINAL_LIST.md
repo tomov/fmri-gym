@@ -16,7 +16,7 @@ are skipped: no Gymnasium interface.)
 | Puzzle | **Rush Hour** | `rushhour` (Go engine + colored board) | `dbp_games/rushhour__easy.json` | ✅ |
 | Language | **Baba Is You** | `baba` (baba-is-ai) | `dbp_games/baba__make_win.json` | ✅ |
 | Adventure | **MiniHack** | `minihack` | `dbp_games/minihack__room5x5.json` | ✅ |
-| Sports/racing | **SuperTuxKart** | `supertuxkart` (pystk2, 3D) | `dbp_games/supertuxkart__race.json` | ✅ |
+| Sports/racing | **SuperTuxKart** | `stk_gym` (stk-code fork's gym server, 3D) | `dbp_games/stk_gym__race.json` | ✅ |
 | Social | **Overcooked** | `overcooked` (overcooked_ai) | `dbp_games/overcooked__cramped_room.json` | ✅ |
 | Interactive fiction | Zork* | — (no Gymnasium) | — | ⏭️ skipped |
 | Motor/music | Stepmania* | — (no Gymnasium) | — | ⏭️ skipped |
@@ -35,10 +35,13 @@ Each was verified to render a real frame (PNG spot-checks for the SuperTuxKart
    against COOM's `conf.cfg`/`.wad` files from a `COOM_REPO` checkout, never
    importing the COOM package itself (see `dbp_games/coom__pitfall.json`, etc.).
 
-2. **SuperTuxKart needs a real GL display.** pystk2-gymnasium is state-only
-   (no pixels), so we drive `pystk2` directly for the 3D render — but Irrlicht
-   needs a real GL context (works on `DISPLAY=:1`, **not** under headless
-   `SDL_VIDEODRIVER=dummy`). Fine for the fMRI presentation machine.
+2. **SuperTuxKart needs a real GL display.** The frame *is* the game's own
+   rendering, and Irrlicht needs a real GL context (works on `DISPLAY=:1`,
+   **not** under headless `SDL_VIDEODRIVER=dummy`). Fine for the fMRI
+   presentation machine. This slot was first filled by pystk2-gymnasium, which
+   is state-only (no pixels) and needed its own control mapping; the `stk_gym`
+   backend replaced it with the fork's gym server, whose env serves the pixels
+   and takes held keys directly (see README).
 
 3. **Rush Hour brings its own Go engine.** `rushhour-gym` (PyPI, the `rushhour`
    extra) downloads the matching `rushhour-env` binary into

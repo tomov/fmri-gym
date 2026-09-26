@@ -37,8 +37,7 @@ coom = ["vizdoom"]  # coom backend drives vizdoom.DoomGame directly; needs a COO
 overcooked = ["overcooked-ai"]
 baba = ["baba @ git+https://github.com/nacloos/baba-is-ai.git"]
 rushhour = ["rushhour-gym>=0.6.0"]
-supertuxkart = ["pystk2-gymnasium"]  # needs a real GL display at runtime
-# The chrplr/stk-code fork's client. The wheel is pure Python; it fetches the
+# SuperTuxKart is the chrplr/stk-code fork's client. The wheel is pure Python; it fetches the
 # game and a trimmed asset pack (254 MiB) from the matching GitHub release on
 # first use, into ~/.cache/supertuxkart-gym. Linux x86_64 only for now, and it
 # needs a real GL display, because the observation is the game's own rendering.
@@ -60,7 +59,7 @@ gui = ["PySide6-Essentials>=6.6"]
 # therefore not listed: craftium (prebuilt wheel on its GitHub releases) and
 # VGDL (a repo checkout on PYTHONPATH; see README "Running VGDL games").
 dbp = [
-    "fmri-gym[vizdoom,aigamestore,crafter,rushhour,baba,minihack,supertuxkart,stk_gym,overcooked]",
+    "fmri-gym[vizdoom,aigamestore,crafter,rushhour,baba,minihack,stk_gym,overcooked]",
 ]
 all = [
     "fmri-gym[dbp,ale,retro,nethack,box2d,mujoco,shimmy,tilematch,triggers,gui]",

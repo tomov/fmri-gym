@@ -22,8 +22,7 @@ through small pluggable **adapters**:
 | `overcooked`  | Overcooked co-op cooking (social) | overcooked_ai |
 | `baba`        | Baba Is You (rule-manipulation puzzle) | baba-is-ai |
 | `rushhour`    | Rush Hour sliding-block puzzle | `rushhour-gym` (PyPI; fetches its Go engine) |
-| `supertuxkart`| SuperTuxKart 3D racing (needs a real GL display) | pystk2 |
-| `stk_gym`     | SuperTuxKart, the current game: frames from the game's gym server, keys to its player controller (needs a real GL display) | [chrplr/stk-code](https://github.com/chrplr/stk-code) fork |
+| `stk_gym`     | SuperTuxKart 3D racing: frames from the game's gym server, keys to its player controller (needs a real GL display) | [chrplr/stk-code](https://github.com/chrplr/stk-code) fork |
 
 > **All backends run in ONE env and ONE process.** Verified: a single session
 > with ALE + retro + gym + VGDL blocks back-to-back, and each of Crafter /
@@ -63,7 +62,7 @@ python fmri_play.py --subject sub-01 --dummy-trigger --curriculum configs/dbp_ga
 Atari ROMs ship with `ale-py`. For the `retro` backend you must supply and
 import game ROMs once — see [Running stable-retro games](#running-stable-retro-games).
 For the `vgdl` backend see [Running VGDL games](#running-vgdl-games);
-for Rush Hour, [Running Rush-Hour](#running-rush-hour); for the current
+for Rush Hour, [Running Rush-Hour](#running-rush-hour); for
 SuperTuxKart, [Running SuperTuxKart from the stk-code fork](#running-supertuxkart-from-the-stk-code-fork-stk_gym).
 
 ## Quick start
@@ -155,8 +154,7 @@ the right per-game keymap/settings baked in. Coverage by class:
 | `overcooked__` | 1 | cramped_room (co-op cooking; other layouts) |
 | `baba__` | 1 | make_win (rule-manipulation puzzle; other ids) |
 | `rushhour__` | 1 | easy (sliding-block puzzle). `rushhour__complete.json` is the full self-paced session of Rush-Hour's own program, then the rest of the library: all 49 puzzles, the first 12 easiest-first and the other 37 in a fixed shuffled order, one game phase each, with ready screens and solved feedback as message phases |
-| `supertuxkart__` | 1 | race (3D racing; needs a real GL display) |
-| `stk_gym__` | 1 | race (the current SuperTuxKart via its gym server; needs the fork built and a real GL display) |
+| `stk_gym__` | 1 | race (SuperTuxKart via its gym server; needs a real GL display) |
 | `retro__` | 3 | tobutobugirldx, nomolos, anguna (need ROMs imported) |
 
 Each config carries `_game` / `_note` (per-game setup reminders). Games use
@@ -370,8 +368,9 @@ window that is created hidden, every step brings the frame back and fmri-gym
 shows it; the held keys go to the game's own player controller, so steering
 ramps and skids latch as they do for a keyboard. Participant and model are in
 front of the same env object, and a block replays from `episode_seeds` +
-`actions`. The adapter is a keymap and the fields to log. The older `supertuxkart`
-backend (pystk2) is untouched; the two coexist.
+`actions`. The adapter is a keymap and the fields to log. (This replaced an
+earlier pystk2-gymnasium backend, which had no pixel obs and needed its own
+control mapping, so human and model play were not the same interface.)
 
 ```bash
 uv pip install "fmri-gym[stk_gym]"      # or: pip install supertuxkart-gym
@@ -431,7 +430,7 @@ fmri_gym/
     nethack.py      # base NLE: TTY grid -> RGB; vi-key movement; blstats
     aigamestore.py  # p5.js browser games via Playwright: canvas->RGB, getGameState
     rushhour.py     # Go engine via rushhour-gym; select+slide UI, rushui look, Rush-Hour's log columns; one puzzle per block
-    stk_gym.py      # the current SuperTuxKart via stk_gym: frames from the game's hidden window, held keys as the env's action
+    stk_gym.py      # SuperTuxKart via stk_gym: frames from the game's hidden window, held keys as the env's action
 fmri_play.py        # CLI entry point
 configs/            # example curricula
 vendor/aigamestore/ # the 10 public AI GameStore games (p5.js/HTML/JS)
@@ -580,7 +579,7 @@ which differ only in how they combine the matching combos:
 | --- | --- | --- |
 | `SingleKeySpec` | the most specific held combo | ale, gym, vgdl, crafter, nethack, … |
 | `MultiKeySpec` | OR of every held combo's buttons | retro, vizdoom, stk_gym (MultiBinary) |
-| `PassthroughKeySpec` | the held key names, `"+"`-joined | aigamestore, supertuxkart |
+| `PassthroughKeySpec` | the held key names, `"+"`-joined | aigamestore |
 
 ### Remapping keys (the `keys` field)
 
