@@ -9,7 +9,7 @@ for an exact savestate. The checkout is found through the phase's ``repo`` or
 ``VGDL_REPO`` and must be importable (``PYTHONPATH``).
 
 A phase's ``keys`` index the fork's fixed action order: 0 = UP, 1 = DOWN,
-2 = LEFT, 3 = RIGHT, 4 = NO_OP, 5 = SPACE; ``noop`` is 4.
+2 = LEFT, 3 = RIGHT, 4 = NO_OP, 5 = SPACE; the no-key entry is ``"": 4``.
 
 Phase fields (backend "vgdl"): ``game`` (``aliens``, ``beesAndBirds``, ...;
 the ``games/<game>_v0/`` directory), ``level`` (default 0), ``block_size``

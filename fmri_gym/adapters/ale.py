@@ -7,7 +7,8 @@ Exposes the Atari-specific bits behind the standard EnvAdapter interface:
 
 The phase's ``keys`` are indices into the game's own action set, which differs
 per game: ``gym.make(id).unwrapped.get_action_meanings()`` lists it (Pong:
-NOOP, FIRE, RIGHT, LEFT, RIGHTFIRE, LEFTFIRE). ``noop`` is 0 for every game.
+NOOP, FIRE, RIGHT, LEFT, RIGHTFIRE, LEFTFIRE). NOOP is 0 for every game, so
+``"": 0`` is the no-key entry.
 """
 
 from __future__ import annotations

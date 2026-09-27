@@ -58,8 +58,8 @@ _GAME_KEYS_HINT = (
     "fmri_gym/keys.py (UP, DOWN, LEFT, RIGHT, SPACE, RETURN, LSHIFT, A-Z, 0-9, F1-F12, ...), "
     "joined with + for a combo. The action is what the env takes: a Discrete index, or for a "
     "MultiBinary env the index of the button the key holds down (quote a string that looks "
-    "like a number). A real-time Discrete phase also needs \"noop\", the action sent with no "
-    "key held, in the phase's extra JSON.")
+    "like a number). A real-time Discrete phase also needs a row with a blank key: the action "
+    "sent with no key held.")
 _CHECK_KEYS_HINT = (
     "The keys the rig check asks for, one at a time, on the participant's device: each "
     "button's key (a pygame name: 1, B, LEFT...), and what it stands for, shown when it is "
@@ -260,7 +260,7 @@ class _KeyTable(QtWidgets.QTableWidget):
 
     def __init__(self) -> None:
         super().__init__(0, 2)
-        self.setHorizontalHeaderLabels(["key(s)   e.g. UP or LEFT+SPACE",
+        self.setHorizontalHeaderLabels(["key(s)   e.g. UP or LEFT+SPACE; blank = no key held",
                                         "action   e.g. 2 or [1,0,0]"])
         self.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
         self.verticalHeader().hide()
@@ -284,7 +284,7 @@ class _KeyTable(QtWidgets.QTableWidget):
         self.setCurrentCell(-1, -1)
 
     def get(self) -> dict:
-        """The bindings; rows with a blank key are ignored.
+        """The bindings; a blank key is the no-key action, and an empty row is ignored.
 
         :raises ValueError: if a key has no action.
         """
@@ -292,7 +292,7 @@ class _KeyTable(QtWidgets.QTableWidget):
         out = {}
         for row in range(self.rowCount()):
             key, action = (self.item(row, col).text().strip() for col in (0, 1))
-            if not key:
+            if not key and not action:
                 continue
             if not action:
                 raise ValueError(f"keys: {key.upper()} has no action")
@@ -1957,7 +1957,7 @@ def _engine_rate(phase: dict) -> float | None:
     """Build the phase's adapter (which checks its keys against the env) and read its own rate.
 
     :return: the native fps; ``None`` for an engine with no clock of its own.
-    :raises Exception: whatever the engine or the :class:`~.adapters.base.Keymap` refuses.
+    :raises Exception: whatever the engine or the :mod:`~.adapters.keymap` refuses.
     """
     from .adapters import get_adapter
 

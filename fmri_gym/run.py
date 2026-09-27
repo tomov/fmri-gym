@@ -524,7 +524,7 @@ class Run:
 
         :param phase: game-phase config (``backend``, ``game``, ``mode``,
             ``duration`` / ``n_episodes``, ``fps``, ``seed``, ``state_stride``,
-            ``turn_based``, ``keys``, ``noop``, …).
+            ``turn_based``, ``keys``, …).
         :param index: phase index in the curriculum (for the manifest).
         :raises KeyboardInterrupt: if the subject quits mid-block.
         """

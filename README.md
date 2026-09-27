@@ -280,7 +280,7 @@ Every scenario always exposes exactly 4 buttons (`TURN_LEFT`, `TURN_RIGHT`,
 `MOVE_FORWARD`, plus one of `JUMP`/`ATTACK`/`SPEED`/`USE`), driven through
 COOM's own 12-action table (turn x move x execute), so a phase's `keys` are
 indices into it -- 8 = turn left, 4 = turn right, 2 = forward, 1 = the 4th
-button, sums for combos, `noop` 0; each `coom__*.json` spells its map out.
+button, sums for combos, `"": 0` for no key; each `coom__*.json` spells its map out.
 COOM blocks log the raw ViZDoom `game_variables`
 (health, ammo, position, ...) as an analysis variable; there's no in-memory
 savestate, so reconstruction is via seed + action replay like most backends.
@@ -444,7 +444,8 @@ fmri_gym/
   photodiode.py     # `python -m fmri_gym.photodiode`: flash a patch to measure the flip-to-photon offset
   checks.py         # the rig check: its phases, the rig file, report.html/.md, rigchecks.tsv, `pool`
   adapters/
-    base.py         # EnvAdapter + Keymap + FrameState (the seam)
+    base.py         # EnvAdapter + FrameState (the seam)
+    keymap.py       # the phase's keys -> actions, one Keymap per action space
     ale.py          # clone_state, getRAM, lossless indexed pixels
     retro.py        # em.get_state, get_ram, decoded info vars, console-button keymap
     default.py      # ANY gym env: rgb frames, seed+replay, obs-as-state
@@ -584,8 +585,8 @@ it at the desk.
  "state": "Level1",             // retro: named savestate/level (optional)
  "scenario": null,              // retro: scenario name (optional)
  "level": 0,                    // vgdl: level index; also uses "game","block_size"
- "keys": {"LEFT": 0, "RIGHT": 1}, // REQUIRED: key -> env action, the whole map (see below)
- "noop": 0,                     // real-time Discrete phases: the action sent with no key held
+ "keys": {"": 0, "LEFT": 0, "RIGHT": 1}, // REQUIRED: key -> env action, the whole map;
+                                //   "" is the action sent with no key held (see below)
  "save_pixels": false}          // also store lossless pixels, where the backend can
 ```
 
@@ -601,21 +602,21 @@ refused before the window opens. `keys` is a dict of `"<key(s)>": <action>`:
   a name not in that table is refused, since it could never be pressed. Join
   keys with `+` for a combo (`"UP+SPACE"`).
 - The action is what the env's `step` takes, as JSON, and the rule is the
-  env's action space (`fmri_gym/adapters/base.py`, `Keymap`):
+  env's action space (`fmri_gym/adapters/keymap.py`, one class per space):
   - **`MultiBinary`** (retro, vizdoom, stk_gym, aigamestore): the value is the
     **index of the button** the key holds down; every held key sets its bit,
     so keys combine as on a controller, and nothing held is every button up.
     An index outside the space is refused when the env is built, and so is a
-    `noop` (nothing held already means no button).
+    `""` entry (nothing held already means no button).
   - **`Discrete`** (ale, coom, vgdl, crafter, minihack, baba, rushhour, gym)
     or **`Box`** (gym): the value is the action itself, an index or a list
     (`"LEFT": [-1.0, 0.0]`). The most specific combo whose keys are all held
-    wins (`"UP+SPACE"` over `"UP"`), and the phase's **`noop`** is sent on a
-    frame with no key held. `noop` is required unless the phase is
+    wins (`"UP+SPACE"` over `"UP"`), and the **`""`** entry is what a frame
+    with no key held sends. `""` is required unless the phase is
     `turn_based`, where nothing is sent between presses: these spaces have
     no action that means "do nothing" everywhere (FrozenLake's 0 is LEFT,
-    MiniHack's is "move N"). A value or `noop` outside the space is refused
-    when the env is built.
+    MiniHack's is "move N"). A value outside the space is refused when the
+    env is built.
   - Any other action space is refused when the env is built.
 
 Each adapter's module docstring says what its indices mean, and each config's
@@ -632,7 +633,7 @@ gym.make("ALE/Pong-v5").unwrapped.get_action_meanings()
 ```jsonc
 {"type": "game", "backend": "ale", "game": "ALE/Pong-v5",
  "mode": "duration", "duration": 30.0,
- "keys": {"UP": 2, "DOWN": 3, "SPACE": 1, "UP+SPACE": 4, "DOWN+SPACE": 5}, "noop": 0}
+ "keys": {"": 0, "UP": 2, "DOWN": 3, "SPACE": 1, "UP+SPACE": 4, "DOWN+SPACE": 5}}
 ```
 
 The editor's Controls tab edits the table and, with *Check with the engine*,

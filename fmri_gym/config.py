@@ -193,15 +193,16 @@ def _keys_problems(phase: dict) -> list[str]:
     There is no default map: which key does what differs between sites (a
     keyboard here, a gamepad that types keys there), so the file states it in
     full. A name outside :data:`~fmri_gym.keys.KEY_NAMES` can never be pressed,
-    and the binding would be dead without a word. Whether the values fit the
-    env's action space is checked when the env is built (:class:`Keymap`).
+    and the binding would be dead without a word; ``""`` is the no-key action.
+    Whether the values fit the env's action space is checked when the env is
+    built (:mod:`fmri_gym.adapters.keymap`).
     """
     keys = phase.get("keys")
     if not isinstance(keys, dict) or not keys:
-        return ['keys: missing; map each key to the env action it sends, e.g. {"LEFT": 3, '
-                '"RIGHT": 2, "UP+SPACE": 5} (names as in fmri_gym/keys.py; there is no default '
-                "map)"]
-    unknown = sorted({k for combo in keys for k in combo.split("+")} - KEY_NAMES)
+        return ['keys: missing; map each key to the env action it sends, e.g. {"": 0, "LEFT": 3, '
+                '"RIGHT": 2, "UP+SPACE": 5} ("" is no key held; names as in fmri_gym/keys.py; '
+                "there is no default map)"]
+    unknown = sorted({k for combo in keys if combo for k in combo.split("+")} - KEY_NAMES)
     if unknown:
         return [f"keys: {unknown} are not key names; use those in fmri_gym/keys.py (UP, SPACE, "
                 "RETURN, LSHIFT, A-Z, 0-9, F1-F12, KP0-KP9, ...)"]

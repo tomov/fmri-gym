@@ -11,7 +11,8 @@ fmri_gym/display.py              CORE  one pygame window: frames, text, fixation
 fmri_gym/keys.py                 CORE  pygame keycode to key NAME ("LEFT", "SPACE")
 fmri_gym/logging.py              CORE  manifest.json + one .npz per game block
 fmri_gym/menu.py                 CORE  hold-a-key pause menu: reset / forfeit / resume (opt-in per phase)
-fmri_gym/adapters/base.py        CORE  EnvAdapter + Keymap (the phase's keys) + FrameState: the seam
+fmri_gym/adapters/base.py        CORE  EnvAdapter + FrameState: the seam
+fmri_gym/adapters/keymap.py      CORE  the phase's keys, one Keymap per action space
 fmri_gym/adapters/<BACKEND>.py   YOU   one small wrapper per game engine
 configs/dbp_games/<GAME>.json    YOU   one curriculum per game
 ```
@@ -54,7 +55,7 @@ that, ask whether the extra code belongs upstream in the env.
 
 ## Rule 2: changes to core libraries are a last resort, and stay generic
 
-Before editing `run.py`, `display.py`, `keys.py`, `logging.py`, or `base.py`,
+Before editing `run.py`, `display.py`, `keys.py`, `logging.py`, `base.py`, or `keymap.py`,
 please try to solve the problem in your adapter. If you cannot:
 
 - Keep it **additive and default-off**, so no existing backend changes behaviour.
@@ -70,7 +71,7 @@ please try to solve the problem in your adapter. If you cannot:
 - **Each method should ideally fit on one screen** (~40 lines). If it doesn't, extract a helper with a name
   that says what it does. `run._episode` and `_game` are at the upper limit already; let's try to not to expand them, if possible. 
 - **Stay within two levels of nesting.** Use guard clauses and early `return`/`continue`
-  instead of `else` ladders — see `_poll_keys_until` and `Keymap.__init__`.
+  instead of `else` ladders — see `_poll_keys_until` and `make_keymap`.
 - **Module docstring explains *why*.** Every file here opens with the reasoning a
   newcomer needs: why this backend and not COOM, why `pixel_crop` and not `pixel`, what is
   deliberately not supported. Keep doing that; it is the most valuable text in the repo.
@@ -139,11 +140,12 @@ right. There is no test suite yet; a run against a real config is the test.
 ## Things that are easy to get wrong
 
 - **Key names are pygame names, upper-cased, without `K_`** (`"LEFT"`, `"SPACE"`, `"Z"`).
-  Add unlisted keys to `_NAMES` in `keys.py` rather than mapping keycodes yourself;
+  Add unlisted keys to `_PYGAME_KEY_NAMES` in `keys.py` rather than mapping keycodes yourself;
   `validate_config` refuses a config that names a key outside that table.
 - **Every game phase writes its whole `keys` map; there is no default.** A `MultiBinary`
   env takes button indices (held keys combine), anything else takes the action itself and
-  a real-time phase also needs `noop`. Don't add a per-backend default or a merge step:
+  a real-time phase also needs the `""` entry, the action for no key held. One class per
+  action space in `adapters/keymap.py`. Don't add a per-backend default or a merge step:
   the map depends on the site's input device, not on the engine.
 - **Copy observations you keep.** Several envs reuse their observation buffers, so
   `capture` must `.copy()` anything it stores (see `minihack.py`).
