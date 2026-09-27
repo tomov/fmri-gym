@@ -27,7 +27,7 @@ from gymnasium import spaces
 
 
 class CrafterEnv(gym.Env):
-    """One Crafter world.
+    """One Crafter world. Wraps the Crafter (legacy) gym env.
 
     :param kwargs: ``crafter.Env``'s own: ``area`` (world size, default
         ``(64, 64)``), ``view`` (tiles shown, ``(9, 9)``), ``size`` (frame in

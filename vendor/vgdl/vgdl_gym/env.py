@@ -3,11 +3,11 @@
 The fork's ``VGDLEnv`` is a ``gymnasium.Env`` already, ported from old gym,
 but with habits of its own: it is built from game and level FILES, its
 ``reset`` and ``step`` take a ``with_img`` flag and no seed (seeding is
-``game.set_seed``), ``render`` opens a pygame window (``display.set_mode`` on
-whatever window the process already has, shrinking it to the game's size), and
+``game.set_seed``), ``render`` calls ``pygame.display.set_mode`` (opening a
+window, or resizing the one the process has to the game's size), and
 ``close`` quits pygame altogether. This wrapper takes a game name, a level and
 a checkout, seeds on ``reset(seed=)``, draws on an offscreen surface, and
-leaves the display alone.
+never touches ``pygame.display``.
 
 Games live at ``<repo>/games/<game>_v0/<game>.txt`` and ``<game>_lvl<level>.txt``
 (``aliens``, ``beesAndBirds``, ``avoidGeorge``, ``jaws``, ``missile_command``,
@@ -32,7 +32,8 @@ import numpy as np
 
 
 class VGDLEnv(gym.Wrapper):
-    """One VGDL game at one level.
+    """One VGDL game at one level. Wraps around the fork's ``VGDLEnv`` env, 
+    which has a non standard API and undesirably modifies the pygame window.
 
     :param game: game name, the ``<game>_v0`` directory under ``games/``.
     :param level: level index, ``<game>_lvl<level>.txt``.
@@ -90,7 +91,8 @@ class VGDLEnv(gym.Wrapper):
         return renderer.get_image()
 
     def close(self) -> None:
-        """Nothing to close: the fork's ``close`` would quit pygame, which is the caller's."""
+        """Nothing to close: the offscreen surface is a plain object, and the fork's
+        ``close`` would quit pygame for the whole process."""
 
     def get_state(self) -> Any:
         """The game's exact, picklable state; :meth:`set_state` takes it back."""
