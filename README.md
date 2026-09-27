@@ -605,13 +605,18 @@ refused before the window opens. `keys` is a dict of `"<key(s)>": <action>`:
   - **`MultiBinary`** (retro, vizdoom, stk_gym, aigamestore): the value is the
     **index of the button** the key holds down; every held key sets its bit,
     so keys combine as on a controller, and nothing held is every button up.
-    An index outside the space is refused when the env is built.
-  - **anything else** (`Discrete` mostly: ale, coom, vgdl, crafter, minihack,
-    baba, rushhour, gym): the value is the action itself. The most specific
-    combo whose keys are all held wins (`"UP+SPACE"` over `"UP"`), and the
-    phase's **`noop`** is sent on a frame with no key held. `noop` is required
-    unless the phase is `turn_based`, where nothing is sent between presses.
-    A `Box` env (gym) takes a list, e.g. `"LEFT": [-1.0, 0.0]`.
+    An index outside the space is refused when the env is built, and so is a
+    `noop` (nothing held already means no button).
+  - **`Discrete`** (ale, coom, vgdl, crafter, minihack, baba, rushhour, gym)
+    or **`Box`** (gym): the value is the action itself, an index or a list
+    (`"LEFT": [-1.0, 0.0]`). The most specific combo whose keys are all held
+    wins (`"UP+SPACE"` over `"UP"`), and the phase's **`noop`** is sent on a
+    frame with no key held. `noop` is required unless the phase is
+    `turn_based`, where nothing is sent between presses: these spaces have
+    no action that means "do nothing" everywhere (FrozenLake's 0 is LEFT,
+    MiniHack's is "move N"). A value or `noop` outside the space is refused
+    when the env is built.
+  - Any other action space is refused when the env is built.
 
 Each adapter's module docstring says what its indices mean, and each config's
 `_keys_note` spells out the map it uses. For an Atari game, read its meanings:

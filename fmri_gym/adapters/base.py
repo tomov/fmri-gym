@@ -18,42 +18,56 @@ class Keymap:
     default map and nothing is merged in: which key does what differs from
     site to site, so the file states all of it.
 
-    - ``MultiBinary`` action space (``n_buttons`` given): a value is the index
-      of the button that key holds down, and every held key sets its button,
-      so keys combine as on a controller. Nothing held is every button up.
-    - anything else (``Discrete`` mostly): a value is the action itself; the
-      most specific combo whose keys are all held wins, and the phase's
-      ``noop`` is sent when none is. ``noop`` is required unless the phase is
-      ``turn_based``, where nothing is sent between presses.
+    - ``MultiBinary(n)``: a value is the index (0..n-1) of the button that key
+      holds down, and every held key sets its button, so keys combine as on a
+      controller. Nothing held is every button up, so there is no ``noop``.
+    - ``Discrete`` or ``Box``: a value is an action of that space (an index, a
+      list); the most specific combo whose keys are all held wins, and
+      ``noop`` is sent when none is. No action of these spaces means "do
+      nothing" everywhere (0 is FrozenLake's LEFT, MiniHack's "move N"), so a
+      real-time phase has to name it.
 
-    :param spec: the game-phase config (``validate_config`` has already checked
-        that ``keys`` is there and its names are real keys).
-    :param n_buttons: the env's button count for a ``MultiBinary`` space, else
-        ``None``.
-    :raises ValueError: a button index out of range, or a missing ``noop``.
+    :param key_spec: the phase's ``keys`` (``validate_config`` has already
+        checked that its names are real keys).
+    :param env: the env the actions go to; its ``action_space`` is kept.
+    :param noop: the phase's ``noop``, or ``None`` if it gives none.
+    :raises TypeError: an action space other than those three.
+    :raises ValueError: a value that is not an action of the space, or a
+        ``noop`` for a ``MultiBinary`` space.
     """
 
-    def __init__(self, spec: dict, n_buttons: int | None) -> None:
-        keys: dict[str, Any] = spec["keys"]
-        self.n_buttons = n_buttons
-        self.combos = {frozenset(combo.split("+")): action for combo, action in keys.items()}
-        if n_buttons is not None:
-            bad = {k: v for k, v in keys.items()
-                   if not isinstance(v, int) or isinstance(v, bool) or not 0 <= v < n_buttons}
+    def __init__(self, key_spec: dict[str, Any], env: gym.Env, noop: Any | None) -> None:
+        self.action_space = env.action_space
+        self.combos = {frozenset(combo.split("+")): action for combo, action in key_spec.items()}
+        if isinstance(self.action_space, spaces.MultiBinary):
+            n = self.action_space.n
+            bad = {k: v for k, v in key_spec.items()
+                   if not isinstance(v, int) or isinstance(v, bool) or not 0 <= v < n}
             if bad:
-                raise ValueError(f"keys: {bad}: the env's action is MultiBinary({n_buttons}), so "
-                                 f"each value is the index (0..{n_buttons - 1}) of the button "
-                                 "that key holds down")
-            self.noop: Any = [0] * n_buttons
+                raise ValueError(f"keys: {bad}: the env's action is MultiBinary({n}), so each "
+                                 f"value is the index (0..{n - 1}) of the button that key holds "
+                                 "down")
+            if noop is not None:
+                raise ValueError(f'"noop": {noop!r}: the env\'s action is MultiBinary({n}), whose '
+                                 "no-key action is every button up; remove it")
+            self.noop: Any = [0] * n
             return
-        if spec.get("turn_based"):
-            self.noop = None
-            return
-        if "noop" not in spec:
-            raise ValueError('"noop": missing; state the action sent on a frame with no key held '
-                             '(0 for most Discrete envs), or set "turn_based": true to step only '
-                             "on key presses")
-        self.noop = spec["noop"]
+        if not isinstance(self.action_space, (spaces.Discrete, spaces.Box)):
+            raise TypeError(f"keys: the env's action space is {self.action_space}; a keymap "
+                            "drives MultiBinary, Discrete or Box only")
+        bad = {k: v for k, v in key_spec.items() if not self._is_action(v)}
+        if bad:
+            raise ValueError(f"keys: {bad} are not actions of the env's {self.action_space}")
+        if noop is not None and not self._is_action(noop):
+            raise ValueError(f'"noop": {noop!r} is not an action of the env\'s '
+                             f"{self.action_space}")
+        self.noop = noop
+
+    def _is_action(self, value: Any) -> bool:
+        """Whether a config value (an int, or a list for ``Box``) is an action of the space."""
+        if isinstance(self.action_space, spaces.Box):
+            value = np.asarray(value, dtype=self.action_space.dtype)
+        return self.action_space.contains(value)
 
     def resolve(self, held: frozenset[str]) -> Any:
         """The action for the keys held this frame.
@@ -62,8 +76,8 @@ class Keymap:
         :return: the button vector, or the most specific matched combo's
             action, or ``noop``.
         """
-        if self.n_buttons is not None:
-            vec = [0] * self.n_buttons
+        if isinstance(self.action_space, spaces.MultiBinary):
+            vec = [0] * self.action_space.n
             for keys, button in self.combos.items():
                 if keys <= held:
                     vec[button] = 1
@@ -74,12 +88,6 @@ class Keymap:
     def turn_actions(self) -> dict[str, Any]:
         """``{key: action}`` for the single-key entries: turn-based play steps on one press."""
         return {next(iter(keys)): self.resolve(keys) for keys in self.combos if len(keys) == 1}
-
-
-def _n_buttons(env: gym.Env) -> int | None:
-    """The env's button count if its action space is ``MultiBinary``, else ``None``."""
-    space = env.action_space
-    return int(space.n) if isinstance(space, spaces.MultiBinary) else None
 
 
 @dataclass
@@ -150,10 +158,16 @@ class EnvAdapter:
 
         :param spec: game-phase config dict from the curriculum (already
             validated for the keys this backend cares about).
+        :raises ValueError: a real-time phase whose keymap has no ``noop``.
         """
         self.spec = spec
         self.env = self._make(spec)
-        self.keymap = Keymap(spec, _n_buttons(self.env))
+        self.keymap = Keymap(spec["keys"], self.env, spec.get("noop"))
+        if self.keymap.noop is None and not spec.get("turn_based", False):
+            raise ValueError(f'"noop": missing; the env\'s action space is '
+                             f"{self.keymap.action_space}, so state the action sent on a frame "
+                             'with no key held, or set "turn_based": true to step only on key '
+                             "presses")
 
     def _make(self, spec: dict) -> gym.Env:
         """Create and return the underlying env for one game block.
