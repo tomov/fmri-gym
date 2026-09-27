@@ -18,8 +18,7 @@ through small pluggable **adapters**:
 | `nethack`     | NetHack (`NetHack*-v0`; TTY rendered to pixels) | nle |
 | `aigamestore` | AI GameStore browser games (`game1`…`game10`), lock-stepped | aigamestore-gym (`vendor/aigamestore/`) |
 | `vizdoom`     | Doom action-shooter scenarios (COOM's engine) | ViZDoom |
-| `coom`        | COOM's own continual-RL scenarios (`pitfall`, `chainsaw`, …), read as ViZDoom scenario assets from a `COOM_REPO` checkout (COOM package itself not installed -- conflicting `gymnasium` pin) | ViZDoom |
-| `overcooked`  | Overcooked co-op cooking (social) | overcooked_ai |
+| `coom`        | COOM's own continual-RL scenarios (`pitfall`, `chainsaw`, …), from a `COOM_REPO` checkout (COOM package itself not installed -- conflicting `gymnasium` pin) | coom-gym (`vendor/coom/`) |
 | `baba`        | Baba Is You (rule-manipulation puzzle) | baba-is-ai |
 | `rushhour`    | Rush Hour sliding-block puzzle | `rushhour-gym` (PyPI; fetches its Go engine) |
 | `stk_gym`     | SuperTuxKart 3D racing: frames from the game's gym server, keys to its player controller (needs a real GL display) | [chrplr/stk-code](https://github.com/chrplr/stk-code) fork |
@@ -43,11 +42,11 @@ With [uv](https://docs.astral.sh/uv/):
 
 ```bash
 sudo apt install libportaudio2               # PortAudio; every backend needs it
-uv sync --extra dbp                          # .venv/ with the nine DBP backends, pinned by uv.lock
+uv sync --extra dbp                          # .venv/ with the DBP backends, pinned by uv.lock
 uv run fmri-play --subject sub-01 --dummy-trigger --curriculum configs/dbp_games/atari__pong.json --ses 1 --run 1
 ```
 
-`dbp` is the nine DBP games. Each backend is also its own extra (`ale`,
+`dbp` is the DBP games. Each backend is also its own extra (`ale`,
 `retro`, `vizdoom`, `minihack`, `rushhour`, …), and `--extra all` installs
 every backend.
 
@@ -151,7 +150,6 @@ the right per-game keymap/settings baked in. Coverage by class:
 | `craftium__` | 1 | choptree (Luanti voxel; other ids: Room/Speleo/OpenWorld/…) |
 | `vizdoom__` | 10 | basic, deadly_corridor, defend_center, defend_line, health_gathering_supreme, my_way_home, predict_position, take_cover, deathmatch (Doom; COOM's engine; other `Vizdoom*-v1` scenarios work too), plus `take_cover_defend_line` running two of them back to back in one session |
 | `coom__` | 9 | pitfall, chainsaw, hide_and_seek, health_gathering, arms_dealer, parkour, raise_the_roof, run_and_gun, floor_is_lava (needs the COOM repo checkout) |
-| `overcooked__` | 1 | cramped_room (co-op cooking; other layouts) |
 | `baba__` | 1 | make_win (rule-manipulation puzzle; other ids) |
 | `rushhour__` | 1 | easy (sliding-block puzzle). `rushhour__complete.json` is the full self-paced session of Rush-Hour's own program, then the rest of the library: all 49 puzzles, the first 12 easiest-first and the other 37 in a fixed shuffled order, one game phase each, with ready screens and solved feedback as message phases |
 | `stk_gym__` | 1 | race (SuperTuxKart via its gym server; needs a real GL display) |
@@ -260,29 +258,19 @@ backend already covers (DeadlyCorridor, DefendCenter, ...).
 
 COOM's own Python package pins `gymnasium==0.28.1`, which conflicts with
 minihack's `gymnasium==1.2` pin in this shared env, so **the COOM package is
-never installed or imported**. Instead the `coom` backend drives
-`vizdoom.DoomGame` (the `vizdoom` extra) directly against COOM's own scenario
-config/WAD files, read straight off disk from a checkout:
+never installed or imported**. The gym env is **`coom-gym`**
+(`vendor/coom/`, the `coom` extra; also in `dbp`), which drives
+`vizdoom.DoomGame` on the scenario files of a COOM checkout:
 
-1. Clone COOM as an adjacent repo:
+```bash
+git clone https://github.com/TTomilin/COOM.git ../COOM
+export COOM_REPO=../COOM     # or --coom-repo ../COOM, or a phase's "repo" field
+uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__pitfall.json --ses 1 --run 1
+```
 
-   ```bash
-   git clone https://github.com/TTomilin/COOM.git ../COOM
-   ```
-
-2. Point the framework at the checkout (no install, no `PYTHONPATH` needed --
-   only the scenario asset files under `COOM/env/scenarios/` are read) and run
-   a COOM curriculum:
-
-   ```bash
-   COOM_REPO=../COOM \
-     uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__pitfall.json --ses 1 --run 1
-   ```
-
-   `COOM_REPO` locates `<repo>/COOM/env/scenarios/<scenario>/conf.cfg` and
-   `<task>.wad` (`env_kwargs.task`, default `"default"`; some scenarios like
-   `run_and_gun` ship extra task variants -- `blue`, `red`, `hard`, ...); a
-   phase can also override it per block with a `"repo"` field.
+The env reads `<repo>/COOM/env/scenarios/<scenario>/conf.cfg` and `<task>.wad`
+(`env_kwargs.task`, default `"default"`; `run_and_gun` also ships `blue`,
+`red`, `hard`, ...). Without a checkout path the run stops at start-up.
 
 Every scenario always exposes exactly 4 buttons (`TURN_LEFT`, `TURN_RIGHT`,
 `MOVE_FORWARD`, plus one of `JUMP`/`ATTACK`/`SPEED`/`USE`), driven through
@@ -461,11 +449,13 @@ fmri_gym/
     minihack.py     # pixel obs + compass keymap; blstats/glyphs/message
     nethack.py      # base NLE: TTY grid -> RGB; vi-key movement; blstats
     aigamestore.py  # AI GameStore via aigamestore-gym: held keys as the env's action, state_* from getGameState
+    coom.py         # COOM via coom-gym: Discrete(12) actions, game variables and PCM logged
     rushhour.py     # Go engine via rushhour-gym; select+slide UI, rushui look, Rush-Hour's log columns; one puzzle per block
     stk_gym.py      # SuperTuxKart via stk_gym: frames from the game's hidden window, held keys as the env's action
 fmri_play.py        # CLI entry point
 configs/            # example curricula
 vendor/aigamestore/ # the 10 public AI GameStore games (HTML/JS) + aigamestore_gym, their lock-stepped gym env
+vendor/coom/        # coom_gym: COOM scenarios as a Gymnasium env, on a COOM checkout's WADs
 ```
 
 The loop (`run.py`) only ever calls the adapter — never `env.unwrapped`, an
@@ -479,6 +469,10 @@ class EnvAdapter:
     def capture(self, obs, info)  -> FrameState    # per-frame state to log
     def restore(self, blob)       -> None          # inverse of capture().blob
 ```
+
+`self.env` is always a `gymnasium.Env` (or an old `gym.Env`). A game that
+has no such env gets one under `vendor/` (see `vendor/aigamestore/`,
+`vendor/coom/`), not in its adapter.
 
 `FrameState` carries a standard shape for **every** backend:
 - `blob`: opaque bytes that `restore()` turns back into this exact state

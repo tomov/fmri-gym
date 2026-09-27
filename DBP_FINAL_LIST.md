@@ -1,9 +1,9 @@
 # DBP final game list — integration status
 
 The games settled on for the DBP study, and how each runs in **fmri-gym**.
-All 9 (excluding the `*` no-gymnasium ones) are verified working end-to-end —
+All 8 (excluding the `*` no-gymnasium ones) are verified working end-to-end —
 each renders a real frame and runs through the framework. (Zork and Stepmania
-are skipped: no Gymnasium interface.)
+have no Gymnasium interface; Overcooked's env is not a Gymnasium env.)
 
 ## Results
 
@@ -17,8 +17,8 @@ are skipped: no Gymnasium interface.)
 | Language | **Baba Is You** | `baba` (baba-is-ai) | `dbp_games/baba__make_win.json` | ✅ |
 | Adventure | **MiniHack** | `minihack` | `dbp_games/minihack__room5x5.json` | ✅ |
 | Sports/racing | **SuperTuxKart** | `stk_gym` (stk-code fork's gym server, 3D) | `dbp_games/stk_gym__race.json` | ✅ |
-| Social | **Overcooked** | `overcooked` (overcooked_ai) | `dbp_games/overcooked__cramped_room.json` | ✅ |
 | Interactive fiction | Zork* | — (no Gymnasium) | — | ⏭️ skipped |
+| Social | Overcooked* | — (`overcooked_ai` is not a Gymnasium env) | — | ⏭️ skipped |
 | Motor/music | Stepmania* | — (no Gymnasium) | — | ⏭️ skipped |
 
 Each was verified to render a real frame (PNG spot-checks for the SuperTuxKart

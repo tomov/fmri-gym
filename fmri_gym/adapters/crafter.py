@@ -20,16 +20,15 @@ from __future__ import annotations
 
 from typing import Any
 
-import gymnasium as gym
 import numpy as np
 
-from .base import EnvAdapter, FrameState
+from .base import Env, EnvAdapter, FrameState
 
 
 class CrafterAdapter(EnvAdapter):
     name: str = "crafter"
 
-    def _make(self, spec: dict) -> gym.Env:
+    def _make(self, spec: dict) -> Env:
         import crafter
         # crafter.Env seeds at construction; size/view/area/length via env_kwargs.
         # Default size is 64x64 (RL-benchmark pixel art); bump size for a

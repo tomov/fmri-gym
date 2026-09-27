@@ -25,13 +25,13 @@ from typing import Any
 import numpy as np
 import gymnasium as gym
 
-from .base import EnvAdapter, FrameState
+from .base import Env, EnvAdapter, FrameState
 
 
 class MiniHackAdapter(EnvAdapter):
     name: str = "minihack"
 
-    def _make(self, spec: dict) -> gym.Env:
+    def _make(self, spec: dict) -> Env:
         import minihack  # noqa: F401  (registers MiniHack-* env ids)
         # Prefer the agent-centered square crop for display; the full terminal
         # ("pixel") only looks good with "full_screen": true.

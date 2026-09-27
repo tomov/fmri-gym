@@ -24,7 +24,7 @@ from typing import Any
 import numpy as np
 import gymnasium as gym
 
-from .base import EnvAdapter, FrameState
+from .base import Env, EnvAdapter, FrameState
 
 # NetHack TTY palette (16 colors), indexed by tty_colors (0..15).
 _TTY_PALETTE = np.array([
@@ -38,7 +38,7 @@ _TTY_PALETTE = np.array([
 class NetHackAdapter(EnvAdapter):
     name: str = "nethack"
 
-    def _make(self, spec: dict) -> gym.Env:
+    def _make(self, spec: dict) -> Env:
         import nle  # noqa: F401  (registers NetHack*-v0 env ids)
         env = gym.make(spec.get("game", "NetHackScore-v0"))
         self._cell = spec.get("cell_px", 10)  # pixel size of one TTY cell

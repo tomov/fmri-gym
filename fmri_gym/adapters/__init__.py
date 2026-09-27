@@ -48,9 +48,6 @@ def get_adapter(backend: str, spec: dict) -> EnvAdapter:
     if backend == "baba":
         from .baba import BabaAdapter
         return BabaAdapter(spec)
-    if backend == "overcooked":
-        from .overcooked import OvercookedAdapter
-        return OvercookedAdapter(spec)
     if backend == "vizdoom":
         from .vizdoom import VizDoomAdapter
         return VizDoomAdapter(spec)

@@ -36,13 +36,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from .base import EnvAdapter, FrameState
+from .base import Env, EnvAdapter, FrameState
 
 
 class AIGameStoreAdapter(EnvAdapter):
     name: str = "aigamestore"
 
-    def _make(self, spec: dict) -> Any:
+    def _make(self, spec: dict) -> Env:
         from aigamestore_gym import GAME_KEYS, AIGameStoreEnv
 
         # "game6/level3" -> game6, level 3; an episode is one level.

@@ -23,17 +23,16 @@ from __future__ import annotations
 
 from typing import Any
 
-import gymnasium as gym
 import numpy as np
 import stable_retro as retro
 
-from .base import EnvAdapter, FrameState, Sound
+from .base import Env, EnvAdapter, FrameState, Sound
 
 
 class RetroAdapter(EnvAdapter):
     name: str = "retro"
 
-    def _make(self, spec: dict) -> gym.Env:
+    def _make(self, spec: dict) -> Env:
         # save_pixels accepted for interface symmetry; retro frames are already
         # reconstructable from the per-frame state, so pixels aren't stored.
         self.save_pixels = bool(spec.get("save_pixels", False))

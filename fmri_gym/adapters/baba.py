@@ -16,13 +16,13 @@ from typing import Any
 
 import numpy as np
 
-from .base import EnvAdapter, FrameState
+from .base import Env, EnvAdapter, FrameState
 
 
 class BabaAdapter(EnvAdapter):
     name: str = "baba"
 
-    def _make(self, spec: dict) -> Any:
+    def _make(self, spec: dict) -> Env:
         import baba
         return baba.make(spec.get("game", "env/make_win"))
 

@@ -72,7 +72,7 @@ on game-over) → fixation. Output lands in `data/sub-01/ses-<ses>/beh/sub-01_se
 
 Runtime: experimenter screen (**SPACE**) → "Waiting for scanner..." → trigger `=` → curriculum.
 
-stable-retro games play their native audio, and ViZDoom does when its config sets
+stable-retro games play their native audio, and ViZDoom and COOM do when their config sets
 `env_kwargs.audio_buffer_enabled`. Add `--no-audio` to mute every game, or set
 `"audio": false` on a game phase to mute that block; logged audio is unchanged.
 Sound plays through the system's default output, a constant delay after its
@@ -107,25 +107,25 @@ config's controls message lists exactly what that scenario accepts.
 
 ### COOM
 
-COOM's own Doom scenarios (not the stock ViZDoom ones above). Set-up is a
-checkout — the COOM package itself is never installed (its `gymnasium` pin
-conflicts), only its scenario assets are read:
+COOM's own Doom scenarios (not the stock ViZDoom ones above). The env ships
+here as `coom-gym` (`vendor/coom/`, part of the `dbp` extra); it only needs
+a COOM checkout for the scenario files:
 
 ```bash
 git clone https://github.com/TTomilin/COOM.git ../COOM
-export COOM_REPO=../COOM          # or pass --coom-repo ../COOM per run
+export COOM_REPO=../COOM          # in every new shell, or pass --coom-repo ../COOM per run
 ```
 
 ```bash
-uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__pitfall.json          # cross a corridor of randomized pits
-uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__chainsaw.json         # hunt maze enemies at melee range
-uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__run_and_gun.json      # find and shoot maze enemies
-uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__health_gathering.json # draining floor; collect health kits
-uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__hide_and_seek.json    # evade enemies, grab kits when low
-uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__arms_dealer.json      # collect weapons, deliver to platforms
-uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__floor_is_lava.json    # stay on the briefly-appearing platforms
-uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__parkour.json          # jump the gaps and ledges
-uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__raise_the_roof.json   # press wall switches before the ceiling crushes you
+uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__pitfall.json --ses 1 --run 1          # cross a corridor of randomized pits
+uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__chainsaw.json --ses 1 --run 1         # hunt maze enemies at melee range
+uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__run_and_gun.json --ses 1 --run 1      # find and shoot maze enemies
+uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__health_gathering.json --ses 1 --run 1 # draining floor; collect health kits
+uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__hide_and_seek.json --ses 1 --run 1    # evade enemies, grab kits when low
+uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__arms_dealer.json --ses 1 --run 1      # collect weapons, deliver to platforms
+uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__floor_is_lava.json --ses 1 --run 1    # stay on the briefly-appearing platforms
+uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__parkour.json --ses 1 --run 1          # jump the gaps and ledges
+uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__raise_the_roof.json --ses 1 --run 1   # press wall switches before the ceiling crushes you
 ```
 
 Controls: UP moves forward, LEFT/RIGHT turn, and the scenario's one extra

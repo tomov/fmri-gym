@@ -36,13 +36,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from .base import EnvAdapter, FrameState
+from .base import Env, EnvAdapter, FrameState
 
 
 class STKGymAdapter(EnvAdapter):
     name: str = "stk_gym"
 
-    def _make(self, spec: dict) -> Any:
+    def _make(self, spec: dict) -> Env:
         import stk_gym
 
         env = stk_gym.StkEnv(

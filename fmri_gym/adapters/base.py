@@ -3,10 +3,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+import gymnasium
 import numpy as np
 from gymnasium import spaces
+
+# Old ``gym.Env`` (baba, crafter) and ``gymnasium.Env`` share ``action_space``,
+# ``reset``, ``step``, ``render`` and ``close``. ``gym`` is not a core
+# dependency, so the union is what type checkers see; at runtime the name is
+# ``gymnasium.Env`` and annotations are not evaluated.
+if TYPE_CHECKING:
+    import gym
+
+    Env = gymnasium.Env | gym.Env
+else:
+    Env = gymnasium.Env
 
 
 class Keymap:
@@ -75,9 +87,9 @@ class Keymap:
         return {next(iter(keys)): self.resolve(keys) for keys in self.combos if len(keys) == 1}
 
 
-def _n_buttons(env: Any) -> int | None:
+def _n_buttons(env: Env) -> int | None:
     """The env's button count if its action space is ``MultiBinary``, else ``None``."""
-    space = getattr(env, "action_space", None)
+    space = env.action_space
     return int(space.n) if isinstance(space, spaces.MultiBinary) else None
 
 
@@ -135,9 +147,11 @@ class EnvAdapter:
     identical across ALE / stable-retro / plain gym.
 
     :ivar spec: the game-phase config dict this env was built from.
-    :ivar env: the underlying engine environment (kept private to the wrapper).
+    :ivar env: the underlying ``gymnasium.Env`` or old ``gym.Env``.
     :ivar keymap: the phase's ``keys`` as a :class:`Keymap`.
     """
+
+    env: Env
 
     #: short id used in filenames / manifest, e.g. "ale", "retro", "gym"
     name: str = "base"
@@ -152,11 +166,13 @@ class EnvAdapter:
         self.env = self._make(spec)
         self.keymap = Keymap(spec, _n_buttons(self.env))
 
-    def _make(self, spec: dict) -> Any:
-        """Create and return the underlying engine env for one game block.
+    def _make(self, spec: dict) -> Env:
+        """Create and return the underlying env for one game block.
 
-        Must produce an env that renders RGB frames (``render_mode="rgb_array"``
-        for Gymnasium envs). May also initialise per-block state on ``self``.
+        A ``gymnasium.Env`` or an old ``gym.Env``: both have ``action_space``,
+        ``reset``, ``step``, ``render`` and ``close``. Must produce RGB frames
+        (``render_mode="rgb_array"`` for Gymnasium envs). May also initialise
+        per-block state on ``self``.
 
         :param spec: game-phase config dict from the curriculum.
         :return: the underlying environment, stored as ``self.env``.
@@ -261,10 +277,5 @@ class EnvAdapter:
         return None
 
     def close(self) -> None:
-        """Close the underlying env if it exposes ``close()``.
-
-        Not every env exposes ``close()`` (e.g. overcooked's OvercookedEnv).
-        """
-        closer = getattr(self.env, "close", None)
-        if callable(closer):
-            closer()
+        """Close the underlying env."""
+        self.env.close()

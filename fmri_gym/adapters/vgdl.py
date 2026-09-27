@@ -32,10 +32,9 @@ import pickle
 import sys
 from typing import Any
 
-import gymnasium as gym
 import numpy as np
 
-from .base import EnvAdapter, FrameState
+from .base import Env, EnvAdapter, FrameState
 
 
 class VGDLAdapter(EnvAdapter):
@@ -53,7 +52,7 @@ class VGDLAdapter(EnvAdapter):
         from src.vgdl.interfaces.gym.env import VGDLEnv
         self._VGDLEnv = VGDLEnv
 
-    def _make(self, spec: dict) -> gym.Env:
+    def _make(self, spec: dict) -> Env:
         self.repo = spec.get("repo") or os.environ.get("VGDL_REPO")
         self.save_pixels = bool(spec.get("save_pixels", False))
         self._VGDLEnv = None
@@ -77,7 +76,7 @@ class VGDLAdapter(EnvAdapter):
         self._attach_offscreen_renderer(env)
         return env
 
-    def _attach_offscreen_renderer(self, env: gym.Env) -> None:
+    def _attach_offscreen_renderer(self, env: Env) -> None:
         import pygame
         from src.vgdl.render import PygameRenderer
         r = PygameRenderer(env.game, env.render_block_size)
