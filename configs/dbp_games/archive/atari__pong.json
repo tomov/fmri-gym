@@ -3,7 +3,7 @@
   "curriculum": [
     {"type": "message", "text": "Atari: Pong", "duration": 2.0},
     {"type": "fixation", "duration": 1.0},
-    {"backend": "ale", "game": "ALE/Pong-v5", "fps": 30, "keys": {"UP": 2, "DOWN": 3}, "type": "game", "mode": "duration", "duration": 300.0},
+    {"backend": "ale", "game": "ALE/Pong-v5", "fps": 30, "keys": {"SPACE": 1, "RIGHT": 2, "LEFT": 3, "RIGHT+SPACE": 4, "LEFT+SPACE": 5, "UP": 2, "DOWN": 3}, "noop": 0, "type": "game", "mode": "duration", "duration": 300.0},
     {"type": "fixation", "duration": 2.0}
   ]
 }

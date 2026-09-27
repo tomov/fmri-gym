@@ -19,6 +19,7 @@ import copy
 import json
 from typing import Any
 
+from .keys import KEY_NAMES
 from .menu import menu_problems
 from .triggers import TriggerError, TriggerSettings
 
@@ -180,9 +181,31 @@ def _phase_problems(phase: dict) -> list[str]:
     if phase.get("mode", "duration") not in ("duration", "episode"):
         out.append(f"mode: expected 'duration' or 'episode', got {phase.get('mode')!r}")
     out.extend(_fps_problems(phase))
+    out.extend(_keys_problems(phase))
     if "menu" in phase:
         out.extend(menu_problems(phase["menu"]))
     return out
+
+
+def _keys_problems(phase: dict) -> list[str]:
+    """``keys`` is required, and each name in it must be a key that can be pressed.
+
+    There is no default map: which key does what differs between sites (a
+    keyboard here, a gamepad that types keys there), so the file states it in
+    full. A name outside :data:`~fmri_gym.keys.KEY_NAMES` can never be pressed,
+    and the binding would be dead without a word. Whether the values fit the
+    env's action space is checked when the env is built (:class:`Keymap`).
+    """
+    keys = phase.get("keys")
+    if not isinstance(keys, dict) or not keys:
+        return ['keys: missing; map each key to the env action it sends, e.g. {"LEFT": 3, '
+                '"RIGHT": 2, "UP+SPACE": 5} (names as in fmri_gym/keys.py; there is no default '
+                "map)"]
+    unknown = sorted({k for combo in keys for k in combo.split("+")} - KEY_NAMES)
+    if unknown:
+        return [f"keys: {unknown} are not key names; use those in fmri_gym/keys.py (UP, SPACE, "
+                "RETURN, LSHIFT, A-Z, 0-9, F1-F12, KP0-KP9, ...)"]
+    return []
 
 
 def _fps_problems(phase: dict) -> list[str]:
@@ -190,8 +213,8 @@ def _fps_problems(phase: dict) -> list[str]:
 
     It was the engine's own rate when the phase left it out, so the same file
     played at a different speed depending on the backend underneath it -- and
-    silently changed rate when that backend did. The editor's Controls tab
-    shows what the engine runs at, to write here.
+    silently changed rate when that backend did. The manifest reports the
+    engine's own rate against it after a run.
     """
     fps = phase.get("fps")
     if fps is None:

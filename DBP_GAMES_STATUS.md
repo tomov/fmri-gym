@@ -12,7 +12,7 @@ Legend: ✅ verified · 🟡 runs, display-only · ⚠️ needs assets · ❌ do
 
 | Game | config | backend | status | one-liner |
 |---|---|---|---|---|
-| Atari | `atari` | ale | ✅ verified | any `ALE/*` id; keymap auto-derived |
+| Atari | `atari` | ale | ✅ verified | any `ALE/*` id; `keys` index its action meanings |
 | VGDL | `vgdl` | vgdl | ✅ verified | needs the gymnasium-ported fork checkout |
 | Crafter | `crafter` | crafter | ✅ verified | new adapter (old-gym API); obs is the frame; logs achievements |
 | MiniHack | `minihack` | minihack | ✅ verified | new adapter; pixel obs + 8-way compass; logs blstats/glyphs/message |

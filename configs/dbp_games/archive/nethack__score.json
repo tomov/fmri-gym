@@ -4,7 +4,7 @@
   "curriculum": [
     {"type": "message", "text": "NetHack: NetHackScore-v0", "duration": 2.0},
     {"type": "fixation", "duration": 1.0},
-    {"type": "game", "backend": "nethack", "game": "NetHackScore-v0", "mode": "duration", "duration": 300.0, "fps": 10},
+    {"type": "game", "backend": "nethack", "game": "NetHackScore-v0", "keys": {"UP": 1, "RIGHT": 2, "DOWN": 3, "LEFT": 4, "RETURN": 0}, "turn_based": true, "mode": "duration", "duration": 300.0, "fps": 10},
     {"type": "fixation", "duration": 2.0}
   ]
 }

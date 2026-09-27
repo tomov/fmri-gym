@@ -7,7 +7,8 @@ observation is the entire 80-column NetHack terminal (336x1264, ~3.8:1) in which
 a small room fills only a few percent of the frame, so aspect-fitting it makes
 the game look tiny. Set the phase field "full_screen": true to display the whole
 `pixel` frame instead. Actions are 8 compass directions (N,E,S,W,NE,SE,SW,NW ->
-Discrete(8)); arrows map to the cardinal ones.
+Discrete(8), indices 0..7), which a phase's ``keys`` index; some tasks append
+more (Eat: 29 = eat). Play ``turn_based``: there is no no-op (0 is "move N").
 
 No savestate API -> reconstruction is via seed + action replay (deterministic
 under reset(seed=)). The full obs dict (glyphs, blstats, message, ...) is the
@@ -24,11 +25,7 @@ from typing import Any
 import numpy as np
 import gymnasium as gym
 
-from .keyspec import SingleKeySpec
 from .base import EnvAdapter, FrameState
-
-# Cardinal arrows -> compass action indices (N=0, E=1, S=2, W=3).
-_KEYS = {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3}
 
 
 class MiniHackAdapter(EnvAdapter):
@@ -46,10 +43,6 @@ class MiniHackAdapter(EnvAdapter):
         env = gym.make(spec["game"], observation_keys=keys)
         self._last = None
         return env
-
-    def _keyspec(self) -> SingleKeySpec:
-        combos = {frozenset([k]): v for k, v in _KEYS.items()}
-        return SingleKeySpec(combos=combos, noop=0)
 
     def reset(self, seed: int | None) -> tuple[Any, dict]:
         # Explicitly seed NetHack's core and dispersion RNGs for reproducible

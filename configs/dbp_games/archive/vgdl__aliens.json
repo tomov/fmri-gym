@@ -4,7 +4,7 @@
   "curriculum": [
     {"type": "message", "text": "VGDL: aliens", "duration": 2.0},
     {"type": "fixation", "duration": 1.0},
-    {"backend": "vgdl", "game": "aliens", "level": 0, "block_size": 25, "fps": 15, "type": "game", "mode": "duration", "duration": 300.0},
+    {"backend": "vgdl", "game": "aliens", "keys": {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3, "SPACE": 5}, "noop": 4, "level": 0, "block_size": 25, "fps": 15, "type": "game", "mode": "duration", "duration": 300.0},
     {"type": "fixation", "duration": 2.0}
   ]
 }

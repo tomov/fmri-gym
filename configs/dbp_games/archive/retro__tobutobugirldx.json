@@ -4,7 +4,7 @@
   "curriculum": [
     {"type": "message", "text": "stable-retro: TobuTobuGirlDX-GameBoy", "duration": 2.0},
     {"type": "fixation", "duration": 1.0},
-    {"backend": "retro", "game": "TobuTobuGirlDX-GameBoy", "fps": 60, "state_stride": 15, "type": "game", "mode": "duration", "duration": 300.0},
+    {"backend": "retro", "game": "TobuTobuGirlDX-GameBoy", "keys": {"Z": 8, "X": 0, "UP": 4, "DOWN": 5, "LEFT": 6, "RIGHT": 7, "RETURN": 3, "TAB": 2}, "fps": 60, "state_stride": 15, "type": "game", "mode": "duration", "duration": 300.0},
     {"type": "fixation", "duration": 2.0}
   ]
 }

@@ -3,13 +3,15 @@
 Distinct from the `minihack` backend: base NLE (`NetHack*-v0`) does NOT provide a
 `pixel` observation -- only the ASCII terminal (`tty_chars` / `tty_colors`, a
 24x80 grid) plus `glyphs`/`blstats`/`message`, with a Discrete(23) action space
-whose values are ASCII keycodes (NetHack's vi-keys: k/l/j/h = N/E/S/W, etc.).
+whose values are ASCII keycodes (NetHack's vi-keys: k/l/j/h = N/E/S/W, etc.). A
+phase's ``keys`` are indices into that list (``env.unwrapped.actions``; for
+NetHackScore-v0: 0 = MORE (Enter), 1 = N, 2 = E, 3 = S, 4 = W). Play it
+``turn_based``: NetHack has no no-op.
 
 NetHack is a terminal game, so we render the TTY buffer to a pixel frame (a
 monospace text grid) for display -- faithful to how the game actually looks.
-Arrow keys map to the 4 cardinal movement actions; `blstats` (score, HP, depth,
-...) are logged as analysis variables. No pixel obs and no savestate over the
-gym API -> reconstruction is seed + action replay.
+`blstats` (score, HP, depth, ...) are logged as analysis variables. No pixel obs
+and no savestate over the gym API -> reconstruction is seed + action replay.
 
 Requires: `pip install nle` (already present if minihack is installed) and
 `setuptools<81` (pkg_resources).
@@ -22,7 +24,6 @@ from typing import Any
 import numpy as np
 import gymnasium as gym
 
-from .keyspec import SingleKeySpec
 from .base import EnvAdapter, FrameState
 
 # NetHack TTY palette (16 colors), indexed by tty_colors (0..15).
@@ -33,10 +34,6 @@ _TTY_PALETTE = np.array([
     (85, 85, 255), (255, 85, 255), (85, 255, 255), (255, 255, 255),
 ], dtype=np.uint8)
 
-# Arrow-key names -> the ASCII keycode NLE uses for that compass move
-# (vi-keys: h=west 104, j=south 106, k=north 107, l=east 108).
-_ARROW_TO_KEYCODE = {"UP": 107, "RIGHT": 108, "DOWN": 106, "LEFT": 104}
-
 
 class NetHackAdapter(EnvAdapter):
     name: str = "nethack"
@@ -44,25 +41,9 @@ class NetHackAdapter(EnvAdapter):
     def _make(self, spec: dict) -> gym.Env:
         import nle  # noqa: F401  (registers NetHack*-v0 env ids)
         env = gym.make(spec.get("game", "NetHackScore-v0"))
-        # Map each arrow's target keycode to its Discrete action index (the
-        # action list holds the keycodes as its values/enum).
-        actions = list(env.unwrapped.actions)
-        code_to_idx = {int(a): i for i, a in enumerate(actions)}
-        self._key_to_action = {}
-        for name, code in _ARROW_TO_KEYCODE.items():
-            if code in code_to_idx:
-                self._key_to_action[name] = code_to_idx[code]
-        # ENTER (13) is handy for menus/prompts.
-        if 13 in code_to_idx:
-            self._key_to_action["RETURN"] = code_to_idx[13]
         self._cell = spec.get("cell_px", 10)  # pixel size of one TTY cell
         self._last = None
         return env
-
-    def _keyspec(self) -> SingleKeySpec:
-        combos = {frozenset([k]): v for k, v in self._key_to_action.items()}
-        # noop: NLE has no true no-op; default to the first action.
-        return SingleKeySpec(combos=combos, noop=0)
 
     def reset(self, seed: int | None) -> tuple[Any, dict]:
         obs, info = self.env.reset(seed=seed)

@@ -38,10 +38,7 @@
       "mode": "duration",
       "duration": 60.0,
       "fps": 30,
-      "keys": {
-        "UP": 2,
-        "DOWN": 3
-      }
+      "keys": {"SPACE": 1, "RIGHT": 2, "LEFT": 3, "RIGHT+SPACE": 4, "LEFT+SPACE": 5, "UP": 2, "DOWN": 3}, "noop": 0
     },
     {
       "type": "fixation",

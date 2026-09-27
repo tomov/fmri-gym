@@ -7,7 +7,10 @@ with overcooked's StateVisualizer (a pygame surface -> RGB). Reward is the
 sparse soup-delivery reward; deliveries are logged.
 
 overcooked_ai's env is not a Gymnasium env, so this wraps OvercookedEnv
-directly (old-style 4-tuple step, joint actions).
+directly (old-style 4-tuple step, joint actions). Its actions are the moves as
+``(dx, dy)`` and ``"interact"``, so a phase writes ``"keys": {"UP": [0, -1],
+"DOWN": [0, 1], "LEFT": [-1, 0], "RIGHT": [1, 0], "SPACE": "interact"}`` and
+``"noop": [0, 0]`` (stay).
 """
 
 from __future__ import annotations
@@ -16,7 +19,6 @@ from typing import Any
 
 import numpy as np
 
-from .keyspec import SingleKeySpec
 from .base import EnvAdapter, FrameState
 
 
@@ -38,13 +40,6 @@ class OvercookedAdapter(EnvAdapter):
         self._partner = spec.get("partner", "stay")
         return OvercookedEnv.from_mdp(self._mdp, horizon=spec.get("horizon", 1000))
 
-    def _keyspec(self) -> SingleKeySpec:
-        A = self._Action
-        combos = {frozenset(["UP"]): (0, -1), frozenset(["DOWN"]): (0, 1),
-                  frozenset(["LEFT"]): (-1, 0), frozenset(["RIGHT"]): (1, 0),
-                  frozenset(["SPACE"]): "interact"}
-        return SingleKeySpec(combos=combos, noop=(0, 0))
-
     def reset(self, seed: int | None) -> tuple[Any, dict]:
         self.env.reset()
         return self.env.state, {}
@@ -55,6 +50,8 @@ class OvercookedAdapter(EnvAdapter):
         if self._partner == "random":
             import random
             partner = random.choice(A.ALL_ACTIONS)
+        if isinstance(action, list):  # a move from the JSON keys, as the hashable tuple
+            action = tuple(action)
         next_state, reward, done, info = self.env.step((action, partner))
         return next_state, float(reward), bool(done), False, info
 

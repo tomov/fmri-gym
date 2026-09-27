@@ -4,7 +4,7 @@
   "curriculum": [
     {"type": "message", "text": "MuJoCo: InvertedPendulum-v5", "duration": 2.0},
     {"type": "fixation", "duration": 1.0},
-    {"backend": "gym", "game": "InvertedPendulum-v5", "fps": 30, "type": "game", "mode": "duration", "duration": 300.0},
+    {"backend": "gym", "game": "InvertedPendulum-v5", "keys": {"RIGHT": [3.0], "LEFT": [-3.0]}, "noop": [0.0], "fps": 30, "type": "game", "mode": "duration", "duration": 300.0},
     {"type": "fixation", "duration": 2.0}
   ]
 }

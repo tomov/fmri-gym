@@ -1,10 +1,13 @@
 """ALE (Atari 2600) EnvAdapter.
 
 Exposes the Atari-specific bits behind the standard EnvAdapter interface:
-- keymap from the game's own action meanings;
 - per-frame exact savestate via clone_state (restorable, determinism-free);
 - state variables: the 128-byte console RAM (+ optional lossless indexed pixels)
   surfaced through FrameState.variables.
+
+The phase's ``keys`` are indices into the game's own action set, which differs
+per game: ``gym.make(id).unwrapped.get_action_meanings()`` lists it (Pong:
+NOOP, FIRE, RIGHT, LEFT, RIGHTFIRE, LEFTFIRE). ``noop`` is 0 for every game.
 """
 
 from __future__ import annotations
@@ -15,14 +18,7 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 
-from .keyspec import SingleKeySpec
 from .base import EnvAdapter, FrameState
-
-_DIRECTIONS = {
-    "UP": ("UP",), "DOWN": ("DOWN",), "LEFT": ("LEFT",), "RIGHT": ("RIGHT",),
-    "UPRIGHT": ("UP", "RIGHT"), "UPLEFT": ("UP", "LEFT"),
-    "DOWNRIGHT": ("DOWN", "RIGHT"), "DOWNLEFT": ("DOWN", "LEFT"),
-}
 
 
 class ALEAdapter(EnvAdapter):
@@ -47,20 +43,6 @@ class ALEAdapter(EnvAdapter):
         fixed 30 whatever the frameskip, which is half the speed of the machine.
         """
         return 60.0
-
-    def _keyspec(self) -> SingleKeySpec:
-        combos = {}
-        for action, meaning in enumerate(self.env.unwrapped.get_action_meanings()):
-            if meaning == "NOOP":
-                continue
-            fire = meaning.endswith("FIRE")
-            direction = meaning[:-4] if fire and meaning != "FIRE" else meaning
-            keys = _DIRECTIONS.get(direction, ())
-            if fire:
-                keys = keys + ("SPACE",)
-            if keys:
-                combos[frozenset(keys)] = action
-        return SingleKeySpec(combos=combos, noop=0)
 
     def capture(self, obs: Any, info: dict, want_blob: bool = True) -> FrameState:
         ale = self.env.unwrapped.ale

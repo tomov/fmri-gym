@@ -1,7 +1,7 @@
 {
   "_game": "ViZDoom: Deadly Corridor (Doom action-shooter; COOM engine) -- full movement",
   "_note": "pip install vizdoom. Fight down a corridor to the vest at the end; enemies attack from side alcoves. Unlike DefendCenter this scenario HAS move buttons, so you can walk forward/back and strafe.",
-  "_keys_note": "Action indices are scenario-specific. For VizdoomDeadlyCorridor-v1 the Discrete(8) map is 0=noop, 1=TURN_RIGHT, 2=TURN_LEFT, 3=MOVE_BACKWARD, 4=MOVE_FORWARD, 5=ATTACK, 6=MOVE_RIGHT, 7=MOVE_LEFT (verify with env.unwrapped.button_map). 'keys' are always these Discrete indices; env_kwargs.max_buttons_pressed picks how held keys combine: 0 = MultiBinary (keys OR together, e.g. move forward while turning), 1 = Discrete (one key wins). The controls the subject sees are a plain 'message' phase; keep its text in sync with 'keys' by hand.",
+  "_keys_note": "The env's action is MultiBinary over the scenario's buttons (env_kwargs.max_buttons_pressed 0), so 'keys' values are button indices in the scenario's available_buttons order -- VizdoomDeadlyCorridor-v1: 0=MOVE_LEFT, 1=MOVE_RIGHT, 2=ATTACK, 3=MOVE_FORWARD, 4=MOVE_BACKWARD, 5=TURN_LEFT, 6=TURN_RIGHT. Held keys combine (turn while shooting). The controls the subject sees are a plain 'message' phase; keep its text in sync with 'keys' by hand.",
   "_keys_reference": "https://github.com/Farama-Foundation/ViZDoom/blob/main/scenarios/deadly_corridor.cfg",
   "_audio_note": "env_kwargs.audio_buffer_enabled turns Doom's sound on: it arrives in obs['audio'], is played through the session's speakers, and is logged per frame. Doom makes 1/35 s of sound per step, so fps * env_kwargs.frame_skip must be 35: the session stops the block otherwise, because sound could not follow the frames. This scenario used to run at fps 20, i.e. in slow motion; 35 is Doom's own tic rate, so the corridor now plays at the speed the scenario was designed for.",
   "curriculum": [
@@ -28,7 +28,7 @@
     {
       "type": "game", "backend": "vizdoom", "game": "VizdoomDeadlyCorridor-v1",
       "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
-      "keys": {"UP": 4, "DOWN": 3, "LEFT": 2, "RIGHT": 1, "Z": 6, "X": 7, "SPACE": 5},
+      "keys": {"UP": 3, "DOWN": 4, "LEFT": 5, "RIGHT": 6, "Z": 0, "X": 1, "SPACE": 2},
       "mode": "duration", "duration": 300.0, "fps": 35
     },
     {"type": "fixation", "duration": 2.0}

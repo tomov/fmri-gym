@@ -25,8 +25,7 @@
     {"type": "fixation", "duration": 1.0},
     {
       "type": "game", "backend": "minihack", "game": "MiniHack-Eat-v0",
-      "keys": {"UP": 0, "DOWN": 2, "LEFT": 3, "RIGHT": 1, "Y": 7, "U": 4, "B": 6, "N": 5,
-               "E": 29},
+      "keys": {"UP": 0, "DOWN": 2, "LEFT": 3, "RIGHT": 1, "Y": 7, "U": 4, "B": 6, "N": 5, "E": 29},
       "mode": "duration", "duration": 300.0, "fps": 15, "turn_based": true
     },
     {"type": "fixation", "duration": 2.0}

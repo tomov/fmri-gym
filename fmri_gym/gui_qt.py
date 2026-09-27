@@ -54,10 +54,12 @@ _QT_KEYS = {Qt.Key.Key_Up: "UP", Qt.Key.Key_Down: "DOWN", Qt.Key.Key_Left: "LEFT
             Qt.Key.Key_Period: "PERIOD"}
 
 _GAME_KEYS_HINT = (
-    "Overrides of the backend's default keyboard map for this phase. Keys are pygame "
-    "names (UP, DOWN, LEFT, RIGHT, SPACE, RETURN, A-Z, 0-9), joined with + for combos; "
-    "the action is what the env expects (an int for Discrete; quote a string that "
-    "looks like a number). Unmentioned keys keep the backend default.")
+    "The phase's whole keyboard map: there is no default. Keys are the names in "
+    "fmri_gym/keys.py (UP, DOWN, LEFT, RIGHT, SPACE, RETURN, LSHIFT, A-Z, 0-9, F1-F12, ...), "
+    "joined with + for a combo. The action is what the env takes: a Discrete index, or for a "
+    "MultiBinary env the index of the button the key holds down (quote a string that looks "
+    "like a number). A real-time Discrete phase also needs \"noop\", the action sent with no "
+    "key held, in the phase's extra JSON.")
 _CHECK_KEYS_HINT = (
     "The keys the rig check asks for, one at a time, on the participant's device: each "
     "button's key (a pygame name: 1, B, LEFT...), and what it stands for, shown when it is "
@@ -124,7 +126,7 @@ def _closed_by_ctrl_c(app: QtWidgets.QApplication) -> Iterator[list[bool]]:
 
 
 def key_name(event: QtGui.QKeyEvent) -> str | None:
-    """A key press -> KeySpec key NAME, or ``None`` if it is not a game key."""
+    """A key press -> the key NAME a phase's ``keys`` use, or ``None`` if it is not one."""
     if event.key() in _QT_KEYS:
         return _QT_KEYS[event.key()]
     text = event.text()
@@ -339,7 +341,6 @@ class _Editor(QtWidgets.QMainWindow):
         self.ctl_index: int | None = None
         self.phase_form: _Form | None = None
         self.extra_text: QtWidgets.QPlainTextEdit | None = None
-        self._defaults: dict = {}
         # The view each panel shows, and the text a text view was last filled with: a
         # text view is stored back only when edited, so an untouched one changes nothing.
         self._session_view, self._run_view = _LIST, _PHASES
@@ -614,23 +615,21 @@ class _Editor(QtWidgets.QMainWindow):
             _button("Add binding", self.key_table.add_row),
             _button("Press a key...", self._capture_key),
             _button("Remove binding", self.key_table.remove_selected),
-            _button("Show backend defaults", self._show_defaults),
-            _button("Use defaults as bindings", self._use_defaults)))
+            _button("Check with the engine", self._check_keys)))
         layout.addLayout(self._layout_row())
-        self.defaults_text = QtWidgets.QPlainTextEdit()
-        self.defaults_text.setReadOnly(True)
-        self.defaults_text.setFont(_mono())
-        layout.addWidget(self.defaults_text, 1)
+        self.check_text = QtWidgets.QPlainTextEdit()
+        self.check_text.setReadOnly(True)
+        self.check_text.setFont(_mono())
+        layout.addWidget(self.check_text, 1)
         return page
 
     def _layout_row(self) -> QtWidgets.QHBoxLayout:
         self.layout_pick = QtWidgets.QComboBox()
         self.layout_pick.addItems(list(gui.DEVICE_LAYOUTS))
-        self.layout_pick.setToolTip("Keyboard: every game plays with its own keys, always -- "
-                                    "Use shows them. A device is read as a keyboard too: Use adds "
-                                    "its buttons to this phase, each with the action of the game "
-                                    "key it stands for (1 = LEFT on a button box). The keyboard "
-                                    "keeps working; edit the added rows like any other.")
+        self.layout_pick.setToolTip("A response device read as a keyboard. For a game phase, Use "
+                                    "adds its buttons to the table, each with the action of the "
+                                    "game key it stands for (1 = LEFT on a button box); for a "
+                                    "controls check, Use lists its buttons as the keys to test.")
         return _row(QtWidgets.QLabel("layout"), self.layout_pick, _button("Use", self._add_layout))
 
     def _tab_triggers(self) -> QtWidgets.QWidget:
@@ -1310,7 +1309,7 @@ class _Editor(QtWidgets.QMainWindow):
     def _add_game_extras(self, body: QtWidgets.QVBoxLayout, phase: dict, extra: dict) -> None:
         """Under a game phase's form: its ``keys`` (read-only here) and the other fields as JSON."""
         keys = ", ".join(f"{k}={gui.format_action(v)}" for k, v in phase.get("keys", {}).items())
-        label = QtWidgets.QLabel(f"keys: {keys or 'backend defaults'}   (edit on the Controls tab)")
+        label = QtWidgets.QLabel(f"keys: {keys or 'NONE (required)'}   (edit on the Controls tab)")
         label.setObjectName("hint")
         label.setWordWrap(True)
         body.addWidget(label)
@@ -1423,8 +1422,7 @@ class _Editor(QtWidgets.QMainWindow):
         self.ctl_index = self._game_indices()[index]
         self.key_table.set(self.phases[self.ctl_index].get("keys", {}))
         self.ctl_hint.setText(_CHECK_KEYS_HINT if self._ctl_is_check() else _GAME_KEYS_HINT)
-        self.defaults_text.setPlainText("")
-        self._defaults = {}
+        self.check_text.setPlainText("")
 
     def _commit_keys(self) -> None:
         if self.ctl_index is None or self.ctl_index >= len(self.phases):
@@ -1446,82 +1444,70 @@ class _Editor(QtWidgets.QMainWindow):
         elif dialog.refused is not None:
             self._error(f"{dialog.refused!r} is not a key the games can read")
 
-    def _show_defaults(self) -> None:
+    def _check_keys(self) -> None:
+        """Build the phase's env with the table's keys: what fmri-play would refuse, and its rate."""
         if self.ctl_index is None:
             return
-        if self._ctl_is_check():
-            self.defaults_text.setPlainText(
-                "A controls check has no game, so no defaults: its keys are the buttons to "
-                "press, each with what it stands for (shown on screen when asked). Pick the "
-                "device below and Use it, or add keys with Press a key...")
+        try:
+            phase = {**self.phases[self.ctl_index], "keys": self.key_table.get()}
+        except ValueError as exc:
+            self._error(str(exc))
             return
-        phase = {k: v for k, v in self.phases[self.ctl_index].items() if k != "keys"}
-        self.defaults_text.setPlainText(f"loading {phase.get('game')}...")
+        problems = cfg.validate_config({"curriculum": [phase]})
+        if problems:
+            self.check_text.setPlainText("\n".join(problems))
+            return
+        if self._ctl_is_check():
+            self.check_text.setPlainText("the keys to test read fine")
+            return
+        self.check_text.setPlainText(f"loading {phase.get('game')}...")
         QtWidgets.QApplication.processEvents()
         try:
-            self._defaults, native = _backend_defaults(phase)
+            native = _engine_rate(phase)
         except Exception as exc:  # noqa: BLE001 -- any engine error: show it, keep the editor alive
-            self._defaults = {}
-            self.defaults_text.setPlainText(f"could not build the adapter: {exc}")
+            self.check_text.setPlainText(f"the engine refuses this phase: {exc}")
             return
-        body = "\n".join(f"{k:<16} {gui.format_action(v)}" for k, v in self._defaults.items())
-        rate = (f"{native:g} steps/s, this engine's own rate: write it in fps to play the game "
-                "at its real speed" if native is not None else
+        rate = (f"{native:g} steps/s is this engine's own rate: write it in fps to play the "
+                "game at its real speed" if native is not None else
                 "no rate of its own: fps is yours to pick (30 suits most)")
-        self.defaults_text.setPlainText(f"{phase.get('backend')} defaults for "
-                                        f"{phase.get('game')}:\n{body}\n{rate}")
+        self.check_text.setPlainText(f"{phase.get('backend')} {phase.get('game')}: the keys fit "
+                                     f"its action space.\n{rate}")
 
     def _add_layout(self) -> None:
-        """Add the picked device's keys: the game's keyboard map, translated to its buttons."""
+        """Add the picked device's keys: the table's own map, translated to its buttons."""
         if self.ctl_index is None:
             return
         name = self.layout_pick.currentText()
         if self._ctl_is_check():
             self._check_layout(name)
             return
-        if not self._defaults:
-            self._show_defaults()  # builds the adapter: the game's own map
-        if not self._defaults:
-            return  # _show_defaults said why
         try:
             table = {gui.combo_name(k): v for k, v in self.key_table.get().items()}
         except ValueError as exc:
             self._error(str(exc))
             return
-        game_map = {**self._defaults, **table}
-        keyboard = not gui.DEVICE_LAYOUTS[name]
-        if keyboard:
-            self.defaults_text.setPlainText(
-                "Keyboard: this phase plays with\n" + "\n".join(
-                    f"  {k:<14} {gui.format_action(v)}" for k, v in game_map.items())
-                + "\n(the game's own map, with this phase's keys over it; it always works, "
-                "beside any device)")
+        if not gui.DEVICE_LAYOUTS[name]:
+            self.check_text.setPlainText("Keyboard: the table is the map; nothing to translate")
             return
-        added = gui.translate_keys(game_map, gui.DEVICE_LAYOUTS[name])
+        added = gui.translate_keys(table, gui.DEVICE_LAYOUTS[name])
         self.key_table.set({**table, **added})
         buttons = set(gui.DEVICE_LAYOUTS[name].values())
-        unbound = [k for k in self._defaults if not set(k.split("+")) <= buttons]
+        unbound = [k for k in table if not set(k.split("+")) <= buttons]
         text = f"{name}: added " + ", ".join(f"{k}={gui.format_action(v)}" for k, v in added.items())
         if unbound:
             text += f"\nno button for: {', '.join(unbound)} (still on the keyboard)"
-        self.defaults_text.setPlainText(text)
+        self.check_text.setPlainText(text)
 
     def _check_layout(self, name: str) -> None:
         """A controls check tests the device's buttons themselves, each named for its key."""
         layout = gui.DEVICE_LAYOUTS[name]
         if not layout:
-            self.defaults_text.setPlainText("Keyboard: add the keys to test with Press a key..., "
-                                            "each with what it stands for")
+            self.check_text.setPlainText("Keyboard: add the keys to test with Press a key..., "
+                                         "each with what it stands for")
             return
         self.key_table.set(dict(layout))
-        self.defaults_text.setPlainText(f"{name}: the check asks for "
-                                        + ", ".join(f"{k} ({v})" for k, v in layout.items()))
-
-    def _use_defaults(self) -> None:
-        if not self._defaults:
-            self._show_defaults()
-        if self._defaults:
-            self.key_table.set(self._defaults)
+        self.check_text.setPlainText(f"{name}: the check asks for "
+                                     + ", ".join(f"{k} ({v})" for k, v in layout.items()))
 
     # -- triggers tab ------------------------------------------------------
 
@@ -1967,18 +1953,16 @@ def _trigger_defaults() -> dict:
     return d
 
 
-def _backend_defaults(phase: dict) -> tuple[dict[str, Any], float | None]:
-    """Build the phase's adapter: its default key map (combos included) and its own rate.
+def _engine_rate(phase: dict) -> float | None:
+    """Build the phase's adapter (which checks its keys against the env) and read its own rate.
 
-    :return: ``({combo: action}, native fps)``; the rate is ``None`` for an
-        engine with no clock of its own, which is what a blank ``fps`` then means.
+    :return: the native fps; ``None`` for an engine with no clock of its own.
+    :raises Exception: whatever the engine or the :class:`~.adapters.base.Keymap` refuses.
     """
     from .adapters import get_adapter
 
     adapter = get_adapter(phase.get("backend", "gym"), phase)
     try:
-        combos = adapter.keyspec.combos
-        return ({"+".join(sorted(ks)): adapter.keyspec.resolve(ks) for ks in combos},
-                adapter.native_fps())
+        return adapter.native_fps()
     finally:
         adapter.close()

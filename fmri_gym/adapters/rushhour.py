@@ -8,8 +8,11 @@ The env this adapter drives is ``RushHourHuman-v0``: the experiment program's
 own interface -- the eight meta-actions of its button scheme (choose a car,
 slide it), its picture (``rgb_array``: board, white outline and legal-slide
 arrows on the chosen car, status line) and the columns of its results file in
-``info``. All of that lives in the package; this adapter is the keymap plus
-the ``info`` fields to log.
+``info``. All of that lives in the package; this adapter is the ``info``
+fields to log. A phase's ``keys`` index the eight meta-actions: 0..3 choose the
+car up/down/left/right, 4/5 choose the previous/next car, 6/7 slide it back
+(left/up) / forward (right/down). ``rushhour_gym.human.DEFAULT_KEYS`` is the
+program's own keyboard layout, to copy from.
 
 One game block is one puzzle: the phase's ``puzzle`` (``"p07"``; the library
 is numbered easiest first) or ``puzzle_indices`` / ``min_moves_range`` picks
@@ -31,7 +34,6 @@ from __future__ import annotations
 from typing import Any
 
 from .base import EnvAdapter, FrameState
-from .keyspec import SingleKeySpec
 
 _ENV_ID = "RushHourHuman-v0"
 _ENV_KWARGS = ("puzzle", "puzzle_indices", "min_moves_range", "movable_only", "binary")
@@ -56,11 +58,6 @@ class RushHourAdapter(EnvAdapter):
                 f"not {game!r}; the agent ids have no keymap a participant can use")
         kwargs = {k: spec[k] for k in _ENV_KWARGS if k in spec}
         return gym.make(_ENV_ID, render_mode="rgb_array", **kwargs)
-
-    def _keyspec(self) -> SingleKeySpec:
-        from rushhour_gym.human import DEFAULT_KEYS, NOOP
-        combos = {frozenset([k]): v for k, v in DEFAULT_KEYS.items()}
-        return SingleKeySpec(combos=combos, noop=NOOP)
 
     def capture(
         self, obs: Any, info: dict, want_blob: bool = True

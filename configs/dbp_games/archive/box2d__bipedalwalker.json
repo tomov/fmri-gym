@@ -4,7 +4,7 @@
   "curriculum": [
     {"type": "message", "text": "Box2D: BipedalWalker-v3", "duration": 2.0},
     {"type": "fixation", "duration": 1.0},
-    {"backend": "gym", "game": "BipedalWalker-v3", "fps": 30, "type": "game", "mode": "duration", "duration": 300.0},
+    {"backend": "gym", "game": "BipedalWalker-v3", "keys": {"RIGHT": [1.0, 0.0, 0.0, 0.0], "LEFT": [-1.0, 0.0, 0.0, 0.0], "UP": [0.0, 1.0, 0.0, 0.0], "DOWN": [0.0, -1.0, 0.0, 0.0]}, "noop": [0.0, 0.0, 0.0, 0.0], "fps": 30, "type": "game", "mode": "duration", "duration": 300.0},
     {"type": "fixation", "duration": 2.0}
   ]
 }

@@ -20,10 +20,13 @@ Every COOM scenario exposes exactly 4 buttons, always in the order
 (JUMP/ATTACK/SPEED/USE) -- this is what lets COOM train one continual-learning
 agent across all of them via a single unified action table (COOM's own
 `build_multi_discrete_actions`, despite the name, is actually a Discrete(12)
-space: 3 turn states x 2 move states x 2 execute states). We rebuild that same
-12-action table here from whatever buttons the loaded scenario reports, so
-the human keymap (and any curriculum `keys` override) lines up with COOM's
-own action indices without hardcoding a per-scenario button table.
+space: 3 turn states x 2 move states x 2 execute states). We use that same
+12-action table here, so a phase's `keys` are COOM's own action indices:
+index = turn * 4 + move * 2 + execute, with turn 0 = none, 1 = right, 2 = left.
+So 0 = noop, 1 = execute, 2 = forward, 3 = forward + execute, 4 = right,
+6 = right + forward, 8 = left, 10 = left + forward. "Execute" is the 4th button
+(JUMP for pitfall and parkour, ATTACK for chainsaw and run_and_gun, SPEED for
+the rest but raise_the_roof, whose is USE).
 
 `step()` returns ViZDoom's raw (near-zero) reward; COOM's actual reward
 shaping lives in Python wrapper classes we deliberately don't use here. Game
@@ -44,10 +47,6 @@ from typing import Any
 import numpy as np
 
 from .base import EnvAdapter, FrameState, Sound
-from .keyspec import KeySpec, SingleKeySpec
-
-# Physical key for each possible 4th (execute) button.
-_EXECUTE_KEY = {"JUMP": "SPACE", "ATTACK": "SPACE", "SPEED": "LSHIFT", "USE": "E"}
 
 
 def _build_actions() -> list[list[bool]]:
@@ -59,7 +58,6 @@ def _build_actions() -> list[list[bool]]:
 
 
 _ACTIONS = _build_actions()
-_NOOP = _ACTIONS.index([False, False, False, False])
 
 
 def _configure_audio(game: Any, spec: dict) -> None:
@@ -103,7 +101,8 @@ class COOMAdapter(EnvAdapter):
             (e.g. "pitfall"), ``env_kwargs.task`` picks the WAD variant
             (default "default", e.g. "hard" for run_and_gun's "blue"/"red"/...).
         :return: an initialised ``vizdoom.DoomGame``, stored as ``self.env``.
-        :raises RuntimeError: if no COOM repo checkout path is configured.
+        :raises RuntimeError: if no COOM repo checkout path is configured, or
+            the scenario does not have COOM's 4-button layout.
         """
         import vizdoom as vzd  # optional dep, only needed by this backend
 
@@ -125,43 +124,13 @@ class COOMAdapter(EnvAdapter):
         game.set_seed(env_kwargs.get("seed", 0))
         _configure_audio(game, spec)
         game.init()
+        buttons = [str(b).split(".")[-1] for b in game.get_available_buttons()]
+        if len(buttons) != 4:
+            game.close()
+            raise RuntimeError(f"COOM's 12-action table needs 4 buttons (TURN_LEFT, TURN_RIGHT, "
+                               f"MOVE_FORWARD, <execute>); {scenario!r} reports {buttons!r}")
         self._last_frame: np.ndarray | None = None
         return game
-
-    def _keyspec(self) -> KeySpec:
-        """Derive the keymap from the scenario's own button list.
-
-        :return: arrows to turn/move, plus the scenario's 4th button on its
-            mapped key (:data:`_EXECUTE_KEY`), both alone and combined with UP.
-        :raises RuntimeError: if the scenario doesn't report COOM's standard
-            4-button layout, or its 4th button has no default key mapped.
-        """
-        game = self.spec["game"]
-        button_names = [str(b).split(".")[-1] for b in self.env.get_available_buttons()]
-        if len(button_names) != 4:
-            raise RuntimeError(f"COOM adapter expects 4 buttons (TURN_LEFT, "
-                               f"TURN_RIGHT, MOVE_FORWARD, <execute>); {game!r} "
-                               f"reports {button_names!r}.")
-        execute_button = button_names[3]
-        if execute_button not in _EXECUTE_KEY:
-            raise RuntimeError(f"No default key for {game!r}'s {execute_button!r} "
-                               f"button; add one to _EXECUTE_KEY or pass 'keys'.")
-        execute_key = _EXECUTE_KEY[execute_button]
-
-        def action_for(*, turn_left=False, turn_right=False,
-                       move=False, execute=False) -> int:
-            return _ACTIONS.index([turn_left, turn_right, move, execute])
-
-        combos = {
-            frozenset(["LEFT"]): action_for(turn_left=True),
-            frozenset(["RIGHT"]): action_for(turn_right=True),
-            frozenset(["UP"]): action_for(move=True),
-            frozenset(["LEFT", "UP"]): action_for(turn_left=True, move=True),
-            frozenset(["RIGHT", "UP"]): action_for(turn_right=True, move=True),
-            frozenset([execute_key]): action_for(execute=True),
-            frozenset(["UP", execute_key]): action_for(move=True, execute=True),
-        }
-        return SingleKeySpec(combos=combos, noop=_NOOP)
 
     def reset(self, seed: int | None) -> tuple[Any, dict]:
         """Start a new episode, optionally reseeding the scenario's RNG."""

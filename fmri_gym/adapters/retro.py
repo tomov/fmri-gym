@@ -1,7 +1,10 @@
 """stable-retro adapter (NES / SNES / Genesis / GB / ... via libretro).
 
 Maps stable-retro behind the standard EnvAdapter interface:
-- keymap: keyboard -> the game's console buttons (MultiBinary action vector);
+- the action is MultiBinary over the console's buttons, so a phase's ``keys``
+  are button indices in the core's order (``env.unwrapped.buttons``; Genesis:
+  B, A, MODE, START, UP, DOWN, LEFT, RIGHT, C, Y, X, Z; NES / Game Boy: B, -,
+  SELECT, START, UP, DOWN, LEFT, RIGHT, A) and held keys combine;
 - per-frame exact savestate via em.get_state()/set_state() (bit-exact, verified);
 - state variables: the console RAM plus the game's decoded `info` variables
   (score/lives/... from the integration's data.json), surfaced uniformly.
@@ -25,18 +28,6 @@ import numpy as np
 import stable_retro as retro
 
 from .base import EnvAdapter, FrameState, Sound
-from .keyspec import MultiKeySpec
-
-# Keyboard -> console button. Same scheme as the interactive retro player.
-# We map by button NAME; each game reports its own button ordering via
-# env.buttons, so the adapter builds the action vector for that ordering.
-_KEY_TO_BUTTON = {
-    "Z": ("BUTTON", "A"), "X": ("B",), "C": ("C",),
-    "A": ("X",), "S": ("Y",), "D": ("Z",),
-    "Q": ("L",), "W": ("R",),
-    "UP": ("UP",), "DOWN": ("DOWN",), "LEFT": ("LEFT",), "RIGHT": ("RIGHT",),
-    "RETURN": ("START", "RESET"), "TAB": ("MODE", "SELECT"),
-}
 
 
 class RetroAdapter(EnvAdapter):
@@ -49,27 +40,6 @@ class RetroAdapter(EnvAdapter):
         return retro.make(
             game=spec["game"], scenario=spec.get("scenario"),
             render_mode="rgb_array")
-
-    def _keyspec(self) -> MultiKeySpec:
-        buttons = list(self.env.unwrapped.buttons)   # e.g. ["B","A","MODE",...,"C"]
-        btn_index = {b: i for i, b in enumerate(buttons)}
-
-        def action_for(held_key: str) -> list[int]:
-            vec = [0] * len(buttons)
-            for target in _KEY_TO_BUTTON.get(held_key, ()):
-                if target in btn_index:
-                    vec[btn_index[target]] = 1
-            return vec
-
-        # Console buttons need true simultaneity, so combo values are button
-        # vectors that MultiKeySpec ORs together: holding RIGHT+Z fires while
-        # moving. Combo values are vectors already, hence no button_map.
-        combos = {}
-        for key in _KEY_TO_BUTTON:
-            vec = action_for(key)
-            if any(vec):
-                combos[frozenset([key])] = vec
-        return MultiKeySpec(combos=combos, noop=[0] * len(buttons))
 
     def reset(self, seed: int | None) -> tuple[Any, dict]:
         state = self.spec.get("state")

@@ -430,7 +430,7 @@ class Run:
         frames["episode_seeds"].append(seed)
         terminated = truncated = False
         ep_frame = 0
-        key_to_action = adapter.keyspec.key_to_action_map() if turn_based else None
+        key_to_action = adapter.keymap.turn_actions() if turn_based else None
         key_log = frames["key_events"]
 
         ## Reset environment and show initial state
@@ -464,7 +464,7 @@ class Run:
             if turn_based and action is None:
                 continue                        # block ended without a press
             if not turn_based:
-                action = adapter.keyspec.resolve(held_key_names())
+                action = adapter.keymap.resolve(held_key_names())
 
             obs, reward, terminated, truncated, info = adapter.step(action)
             t_step = self.clock.run_time()
@@ -524,7 +524,7 @@ class Run:
 
         :param phase: game-phase config (``backend``, ``game``, ``mode``,
             ``duration`` / ``n_episodes``, ``fps``, ``seed``, ``state_stride``,
-            ``turn_based``, optional ``keys`` overrides, …).
+            ``turn_based``, ``keys``, ``noop``, …).
         :param index: phase index in the curriculum (for the manifest).
         :raises KeyboardInterrupt: if the subject quits mid-block.
         """

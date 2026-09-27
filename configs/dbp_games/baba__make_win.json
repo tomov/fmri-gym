@@ -25,7 +25,7 @@
     {
       "type": "game", "backend": "baba", "game": "env/make_win",
       "keys": {"UP": 1, "RIGHT": 2, "DOWN": 3, "LEFT": 4},
-      "menu": {"key": "X", "hold": 5.0, "after": 15.0,
+      "menu": {"key": "X", "hold": 3.0, "after": 0.0,
                "options": ["reset", "forfeit", "resume"],
                "move": ["UP", "DOWN"], "confirm": "SPACE"},
       "mode": "duration", "duration": 300.0, "fps": 15, "turn_based": true

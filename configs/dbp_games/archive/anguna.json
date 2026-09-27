@@ -15,7 +15,7 @@
     {
       "type": "game",
       "backend": "retro",
-      "game": "Anguna-GbAdvance",
+      "game": "Anguna-GbAdvance", "keys": {"Z": 8, "X": 0, "Q": 10, "W": 11, "UP": 4, "DOWN": 5, "LEFT": 6, "RIGHT": 7, "RETURN": 3, "TAB": 2},
       "mode": "duration",
       "duration": 30.0,
       "fps": 60,

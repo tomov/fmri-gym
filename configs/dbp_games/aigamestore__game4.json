@@ -2,7 +2,7 @@
   "_game": "AI GameStore game4 (jetpack runner)",
   "_note": "uv sync --extra aigamestore: the vendored aigamestore-gym env (vendor/aigamestore), which needs a Chromium browser (system Chrome by default). Lock-stepped: fps must equal 60 / frame_skip (10 with the default frame_skip 6).",
   "_levels_note": "No levels (an endless runner): each episode is one run, and ends when it is lost.",
-  "_keys_note": "MultiKeySpec over the game's keys: curriculum 'keys' map a physical key (the JSON key -- a scanner button, say) to the key the GAME listens for (the value, e.g. 'SPACE'); held keys combine, and the logged action is the env's 0/1 vector over its keys. Hold SPACE or UP to thrust / fly; avoid zappers and missiles. The on-canvas hints are relabelled to the pressed key by the env; keep the message Controls text in sync with 'keys' by hand.",
+  "_keys_note": "The env's action is MultiBinary over the game's keys, in aigamestore_gym.GAME_KEYS order -- game4: 0=SPACE, 1=UP -- so 'keys' values are those indices (the JSON key is what the subject presses) and held keys combine. The env relabels the on-canvas hints to the pressed key; keep the message Controls text in sync with 'keys' by hand.",
   "_keys_reference": "https://github.com/tomov/fmri-gym/blob/main/vendor/aigamestore/game4/input.js",
   "curriculum": [
     {
@@ -23,7 +23,7 @@
     {"type": "fixation", "duration": 1.0},
     {
       "type": "game", "backend": "aigamestore", "game": "game4",
-      "keys": {"SPACE": "SPACE", "UP": "UP"},
+      "keys": {"SPACE": 0, "UP": 1},
       "mode": "duration", "duration": 300, "fps": 10
     },
     {"type": "fixation", "duration": 2.0}

@@ -14,7 +14,8 @@ VGDL specifics handled here:
 - step takes an int action + with_img kwarg; reset takes with_img;
 - render uses old-gym's render(mode='rgb_array');
 - exact savestate via env.get_state()/set_state() (picklable hidden state);
-- fixed action set UP/DOWN/LEFT/RIGHT/NO_OP/SPACE -> indices 0..5.
+- fixed action set UP/DOWN/LEFT/RIGHT/NO_OP/SPACE -> indices 0..5, which a
+  phase's "keys" name; "noop" is 4.
 
 Curriculum phase fields (backend "vgdl"):
     repo   : path to the language_and_experience checkout (or set VGDL_REPO env)
@@ -34,12 +35,7 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 
-from .keyspec import SingleKeySpec
 from .base import EnvAdapter, FrameState
-
-# Fixed VGDL action order (verified from get_action_meanings / core.py).
-_VGDL_ACTIONS = ["UP", "DOWN", "LEFT", "RIGHT", "NO_OP", "SPACE"]
-_KEYS = {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3, "SPACE": 5}
 
 
 class VGDLAdapter(EnvAdapter):
@@ -90,10 +86,6 @@ class VGDLAdapter(EnvAdapter):
         r.screen.fill((255, 255, 255))
         r.background = r.screen.copy()
         env.renderer = r
-
-    def _keyspec(self) -> SingleKeySpec:
-        combos = {frozenset([k]): idx for k, idx in _KEYS.items()}
-        return SingleKeySpec(combos=combos, noop=_VGDL_ACTIONS.index("NO_OP"))
 
     def reset(self, seed: int | None) -> tuple[Any, dict]:
         if seed is not None:

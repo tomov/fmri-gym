@@ -15,10 +15,11 @@ or a level clear (the env's rule; see its docstring). A curriculum therefore
 lists one game phase per level it wants played. ``"game": "game6"`` is level 1;
 game4 has no levels and takes no ``/level``.
 
-Keys: combo VALUES are the game's key names (``"LEFT"``, ``"SPACE"``, ...) and
-combo keys are what the subject presses, so ``"keys": {"B1": "LEFT"}`` binds a
-button box. The games paint control hints on the canvas; the env relabels them
-from the same map, so the hint names the button the subject actually presses.
+Keys: a phase's ``keys`` values are indices into the game's key list
+(``aigamestore_gym.GAME_KEYS``; game1: LEFT, RIGHT, SPACE, Z), the order of the
+MultiBinary action. The games paint control hints on the canvas; the env
+relabels them from the same map, so a hint names the key the subject presses
+where it differs from the game's own.
 
 Timing: lock-stepped, one ``step`` per fmri-gym frame, so ``fps`` must equal
 ``60 / frame_skip`` (10 by default); ``_make`` refuses a config where they
@@ -36,18 +37,21 @@ from __future__ import annotations
 from typing import Any
 
 from .base import EnvAdapter, FrameState
-from .keyspec import MultiKeySpec
 
 
 class AIGameStoreAdapter(EnvAdapter):
     name: str = "aigamestore"
 
     def _make(self, spec: dict) -> Any:
-        from aigamestore_gym import AIGameStoreEnv
+        from aigamestore_gym import GAME_KEYS, AIGameStoreEnv
 
-        keys = spec.get("keys", {})
         # "game6/level3" -> game6, level 3; an episode is one level.
         game, _, level = spec["game"].partition("/level")
+        game_keys = spec.get("game_keys", GAME_KEYS.get(game, []))
+        # Hints name the pressed key where it differs from the game's own; an
+        # index the game has no key for is left to the Keymap to refuse.
+        labels = {game_keys[i]: pressed for pressed, i in spec["keys"].items()
+                  if isinstance(i, int) and 0 <= i < len(game_keys) and game_keys[i] != pressed}
         env = AIGameStoreEnv(
             game,
             level=int(level) if level else None,
@@ -55,29 +59,15 @@ class AIGameStoreAdapter(EnvAdapter):
             frame_skip=int(spec.get("frame_skip", 6)),
             headless=not spec.get("headed", False),
             browser_channel=spec.get("browser_channel", "chrome"),
-            # Hints name the pressed key where it differs from the game's own.
-            key_labels={want: pressed for pressed, want in keys.items() if pressed != want},
+            key_labels=labels,
             games_dir=spec.get("games_dir"),
         )
-        unknown = set(keys.values()) - set(env.keys)
         fps = spec["fps"]
-        if unknown or env.metadata["render_fps"] != fps:
-            env.close()
-        if unknown:
-            raise ValueError(f"keys {sorted(unknown)} are not keys of {spec['game']}: {env.keys}")
         if env.metadata["render_fps"] != fps:
+            env.close()
             raise ValueError(f"fps={fps} but the game steps at {env.metadata['render_fps']:g} Hz "
                              f"(60 / frame_skip {env.frame_skip}); set frame_skip so they match")
         return env
-
-    def _keyspec(self) -> MultiKeySpec:
-        # Combo values are the game's key names; button_map turns each into the
-        # env's 0/1 vector, so a curriculum keymap stays written in key names.
-        n = len(self.env.keys)
-        button_map = {k: [int(i == j) for j in range(n)] for i, k in enumerate(self.env.keys)}
-        button_map["NOOP"] = [0] * n
-        return MultiKeySpec(combos={frozenset([k]): k for k in self.env.keys}, noop="NOOP",
-                            button_map=button_map)
 
     def native_fps(self) -> float:
         return self.env.metadata["render_fps"]

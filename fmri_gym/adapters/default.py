@@ -4,7 +4,8 @@ No engine-specific savestate is assumed. Reconstruction relies on the env being
 deterministic under a fixed seed + action sequence (true for most gym envs); we
 store the seed and per-frame actions, and the observation itself as the
 analysis "state" (for many envs, e.g. CartPole, the observation IS the full
-state). Discrete and Box action spaces both get a sensible default keymap.
+state). A phase's "keys" are written as the env's action space takes them: an
+index for Discrete, a list for Box (turned into an array of the space's dtype).
 
 For old-`gym` (pre-Gymnasium) envs, pass them through shimmy -- see
 make_via_shimmy() -- and everything else here still applies.
@@ -18,7 +19,6 @@ import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 
-from .keyspec import SingleKeySpec
 from .base import EnvAdapter, FrameState
 
 
@@ -39,39 +39,11 @@ class DefaultAdapter(EnvAdapter):
             return _make_via_shimmy(spec["game"], **kwargs)
         return gym.make(spec["game"], **kwargs)
 
-    def _keyspec(self) -> SingleKeySpec:
-        # Allow a curriculum to hand-specify a mapping: {"keys": {"LEFT": 0, ...}}
-        # or {"keys": {"LEFT+SPACE": 2}} for combos.
+    def step(self, action: Any) -> tuple[Any, float, bool, bool, dict]:
         space = self.env.action_space
-        combos, noop = {}, None
-
-        if isinstance(space, spaces.Discrete):
-            n = int(space.n)
-            noop = 0
-            # Generic arrows->first-N-actions mapping; games with meaningful
-            # action semantics should override via the curriculum "keys" field.
-            arrows = ["LEFT", "RIGHT", "UP", "DOWN"]
-            for i, key in enumerate(arrows):
-                if i < n:
-                    combos[frozenset([key])] = i
-        elif isinstance(space, spaces.Box):
-            # Map arrow keys to +/- on the first (up to 2) continuous dims.
-            lo, hi = np.asarray(space.low), np.asarray(space.high)
-            noop = np.zeros(space.shape, dtype=space.dtype)
-            def vec(dim: int, sign: int) -> np.ndarray:
-                v = np.zeros(space.shape, dtype=space.dtype)
-                v[dim] = (hi[dim] if sign > 0 else lo[dim])
-                return v
-            if space.shape[0] >= 1:
-                combos[frozenset(["RIGHT"])] = vec(0, +1)
-                combos[frozenset(["LEFT"])] = vec(0, -1)
-            if space.shape[0] >= 2:
-                combos[frozenset(["UP"])] = vec(1, +1)
-                combos[frozenset(["DOWN"])] = vec(1, -1)
-        else:
-            raise TypeError(f"DefaultAdapter can't map action space {space!r}; "
-                            "provide a custom adapter.")
-        return SingleKeySpec(combos=combos, noop=noop)
+        if isinstance(space, spaces.Box):
+            action = np.asarray(action, dtype=space.dtype)
+        return self.env.step(action)
 
     def capture(
         self, obs: Any, info: dict, want_blob: bool = True

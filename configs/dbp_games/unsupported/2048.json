@@ -21,12 +21,7 @@
       "n_episodes": 3,
       "max_duration": 120.0,
       "fps": 5,
-      "keys": {
-        "UP": 0,
-        "RIGHT": 1,
-        "DOWN": 2,
-        "LEFT": 3
-      },
+      "keys": {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3}, "turn_based": true,
       "_source": "https://github.com/rgal/gym-2048",
       "_status": "unverified",
       "_note": "pip install gym-2048; `import gym_2048` registers 2048-v0. Discrete(4): 0=up,1=right,2=down,3=left. Verify mapping (older gym; may need shimmy / source port)."

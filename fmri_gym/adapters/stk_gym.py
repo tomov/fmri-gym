@@ -10,11 +10,12 @@ that is created hidden (never mapped, so it neither steals focus nor gets resize
 by the window manager) and every ``step`` brings the frame back, HUD included, at
 the requested ``screensize``; ``display.py`` scales it to the screen. With
 ``action_mode="keys"`` the env's action *is* the set of keys held -- a
-``MultiBinary(8)`` over left, right, up, down, nitro, skid, fire, rescue -- and
-the game's own player controller turns it into controls, so steering ramps and
-skids latch exactly as they do for a keyboard. The participant and a model are
-therefore in front of the same env, and a block replays from ``episode_seeds`` +
-``actions`` (with the same launch ``seed``: see ``stk_gym``'s README).
+``MultiBinary(8)`` over left, right, up, down, nitro, skid, fire, rescue, the
+indices a phase's ``keys`` name -- and the game's own player controller turns
+it into controls, so steering ramps and skids latch exactly as they do for a
+keyboard. The participant and a model are therefore in front of the same env,
+and a block replays from ``episode_seeds`` + ``actions`` (with the same launch
+``seed``: see ``stk_gym``'s README).
 
 Timing: the game is lock-stepped, one ``step`` per fmri-gym frame, so
 ``fps`` here must equal the game's physics rate divided by ``frame_skip``
@@ -36,11 +37,6 @@ from __future__ import annotations
 from typing import Any
 
 from .base import EnvAdapter, FrameState
-from .keyspec import MultiKeySpec
-
-# One pygame key per entry of stk_gym's KEYS (left, right, up, down, nitro,
-# skid, fire, rescue), in that order: SuperTuxKart's own default bindings.
-_KEYS = ["LEFT", "RIGHT", "UP", "DOWN", "N", "V", "SPACE", "BACKSPACE"]
 
 
 class STKGymAdapter(EnvAdapter):
@@ -74,14 +70,6 @@ class STKGymAdapter(EnvAdapter):
                 f"{env.engine.meta['frames']}); set frame_skip so they match"
             )
         return env
-
-    def _keyspec(self) -> MultiKeySpec:
-        # Held keys combine (steer while accelerating), so combo values are 0/1
-        # vectors that MultiKeySpec ORs together -- the env's own action.
-        n = len(_KEYS)
-        combos = {frozenset([k]): [int(i == j) for j in range(n)]
-                  for i, k in enumerate(_KEYS)}
-        return MultiKeySpec(combos=combos, noop=[0] * n)
 
     def capture(self, obs: Any, info: dict, want_blob: bool = True) -> FrameState:
         # Every SAMPLE_FIELDS column every frame (NaN when the game did not

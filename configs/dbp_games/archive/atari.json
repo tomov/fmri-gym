@@ -19,7 +19,7 @@
       "mode": "duration",
       "duration": 30.0,
       "fps": 30,
-      "keys": {"UP": 2, "DOWN": 3},
+      "keys": {"SPACE": 1, "RIGHT": 2, "LEFT": 3, "RIGHT+SPACE": 4, "LEFT+SPACE": 5, "UP": 2, "DOWN": 3}, "noop": 0,
       "_source": "https://ale.farama.org/environments/",
       "_status": "verified",
       "_note": "Any ALE/* env id works; keymap auto-derived from action meanings (arrows move, SPACE fires). Here we remap Pong's paddle (RIGHT=2/LEFT=3) onto UP/DOWN. Find action indices via env.unwrapped.get_action_meanings()."

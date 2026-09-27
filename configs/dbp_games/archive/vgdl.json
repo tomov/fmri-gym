@@ -15,7 +15,7 @@
     {
       "type": "game",
       "backend": "vgdl",
-      "game": "aliens",
+      "game": "aliens", "keys": {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3, "SPACE": 5}, "noop": 4,
       "level": 0,
       "block_size": 25,
       "mode": "duration",

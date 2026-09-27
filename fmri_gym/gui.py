@@ -173,8 +173,8 @@ _GAME_FIELDS = [
     Field("fps", "fps", "float",
           tip="Steps per second. Required: every block states its own rate. The engine's own "
               "rate plays the game at its real speed and fits its sound (60 for consoles and "
-              "Atari, 35 / frame_skip for Doom); Controls > backend defaults shows what this "
-              "engine runs at. Pick one that divides the monitor's refresh."),
+              "Atari, 35 / frame_skip for Doom); Controls > Check with the engine shows what "
+              "this engine runs at. Pick one that divides the monitor's refresh."),
     Field("turn_based", "turn_based", "bool", default=False,
           tip="Step only on a key press instead of every frame (grid / text games)."),
     Field("seed", "seed", "int",
@@ -409,8 +409,8 @@ def window_sizes(width: int, height: int) -> list[str]:
 
 
 #: Response devices that type keys, and the game key each button stands for. Every input is
-#: a key press, so a device is a translation of the game's own keyboard map; the Controls tab
-#: adds its keys to a phase's ``keys``, to edit there. A device's scanner trigger (Current
+#: a key press, so a device is a translation of a phase's keyboard map; the Controls tab adds
+#: its keys to a phase's ``keys``, and a controls check lists its buttons to test. A device's scanner trigger (Current
 #: Designs: 5 in digit mode, t in letter mode) is left out: it arrives at every volume.
 DEVICE_LAYOUTS: dict[str, dict[str, str]] = {
     # The keyboard needs no translation: every game plays with its own map, always.

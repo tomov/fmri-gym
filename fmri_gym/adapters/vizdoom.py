@@ -12,11 +12,12 @@ The env's observation is a dict {"screen": (H,W,3) uint8, "gamevariables": ...};
 `env.render()` (rgb_array) returns the screen for display, and we log
 gamevariables (health, ammo, ...) as an analysis variable.
 
-Actions are the scenario's small Discrete(n) button set, and keymaps (both the
-default one below and curriculum `keys` overrides) are ALWAYS Discrete action
-indices. Setting `env_kwargs.max_buttons_pressed` to 0 switches the env to a
-MultiBinary action space so several buttons can be pressed at once; the keymap
-is unchanged, we just OR the buttons of every held key (e.g. forward + turn).
+Actions: with `env_kwargs.max_buttons_pressed` 0 (what every config here
+uses) the action space is MultiBinary over the scenario's buttons, so a phase's
+`keys` are button indices in the scenario's `available_buttons` order (see its
+.cfg; DefendCenter: TURN_LEFT, TURN_RIGHT, ATTACK) and held keys combine
+(forward + turn). Without it the space is the wrapper's Discrete(n), whose index
+k presses button n-k (index 0 is the no-op), and `keys` are those indices.
 
 A few scenarios (Deathmatch, the full-game maps) also declare *delta* buttons
 -- the mouse axes -- which makes ViZDoom's action space a
@@ -36,31 +37,12 @@ with gaps, above it lags further behind every frame.
 
 from __future__ import annotations
 
-import itertools
 from typing import Any
 
 import gymnasium as gym
 import numpy as np
 
 from .base import EnvAdapter, FrameState, Sound
-from .keyspec import KeySpec, MultiKeySpec, SingleKeySpec
-
-# Physical key -> preferred Doom button (first available for the scenario wins).
-# The gymnasium wrapper's Discrete action i presses the buttons set in
-# env.unwrapped.button_map[i]; index 0 is the no-op (all buttons up).
-# See e.g. https://github.com/Farama-Foundation/ViZDoom/blob/main/scenarios/deathmatch.cfg
-_DEFAULT_KEY_TO_BUTTON_MAP: dict[str, list[str]] = {
-    "UP": ["MOVE_FORWARD"],
-    "DOWN": ["MOVE_BACKWARD"],
-    "LEFT": ["TURN_LEFT"],
-    "RIGHT": ["TURN_RIGHT"],
-    "Z": ["MOVE_LEFT"],
-    "X": ["MOVE_RIGHT"],
-    "SPACE": ["ATTACK"],
-    "ENTER": ["USE"],
-    "N": ["SELECT_PREV_WEAPON"],
-    "M": ["SELECT_NEXT_WEAPON"],
-}
 
 
 class _KeyboardOnlyAction(gym.ActionWrapper):
@@ -87,70 +69,6 @@ class _KeyboardOnlyAction(gym.ActionWrapper):
         return {"binary": action, "continuous": self._axes}
 
 
-def _get_button_map(env: gym.Env) -> list[list[int]]:
-    """Return ``Discrete action index -> per-button 0/1 row`` for this scenario.
-
-    ViZDoom only builds ``env.unwrapped.button_map`` for a Discrete action
-    space; under MultiBinary (``max_buttons_pressed=0``) we rebuild the same
-    single-button table, so Discrete indices mean the same thing in both modes.
-
-    :param env: a ViZDoom Gymnasium environment.
-    :return: one 0/1 row per Discrete action index.
-    """
-    button_map = getattr(env.unwrapped, "button_map", None)
-    if button_map is not None:
-        return [[int(v) for v in row] for row in np.asarray(button_map)]
-    n = env.unwrapped.num_binary_buttons
-    return [list(row) for row in itertools.product((0, 1), repeat=n)
-            if sum(row) <= 1]
-
-
-def _get_button_to_action_map(env: gym.Env) -> dict[str, int]:
-    """Map each available Doom button name to its Discrete action index.
-
-    Only single-button rows of the button map are included; the first index
-    for each button wins.
-
-    :param env: a ViZDoom Gymnasium environment.
-    :return: ``{BUTTON_NAME: discrete_action_index}``.
-    """
-    u = env.unwrapped
-    # ViZDoom reorders the scenario's buttons to put the delta (mouse) ones
-    # first, and the button map only covers the binary ones that follow them.
-    names = [str(b).split(".")[-1]
-             for b in u.game.get_available_buttons()][u.num_delta_buttons:]
-    out: dict[str, int] = {}
-    for i, row in enumerate(_get_button_map(env)):
-        on = [names[j] for j, v in enumerate(row) if v]
-        if len(on) == 1 and on[0] not in out:
-            out[on[0]] = i
-    return out
-
-
-def _get_default_key_to_action_map(env: gym.Env) -> KeySpec:
-    """Build the default keyboard->action :class:`KeySpec` for this scenario.
-
-    For each physical key in :data:`_DEFAULT_KEY_TO_BUTTON_MAP`, picks the
-    first preferred Doom button that exists in the env's button map.
-
-    :param env: a ViZDoom Gymnasium environment.
-    :return: a :class:`KeySpec` with single-key combos and ``noop=0``, both
-        given as Discrete action indices. MultiBinary envs get a
-        :class:`MultiKeySpec` that ORs the buttons of every held key.
-    """
-    btn_idx = _get_button_to_action_map(env)
-    combos: dict[frozenset[str], int] = {}
-    for key, prefs in _DEFAULT_KEY_TO_BUTTON_MAP.items():
-        for b in prefs:
-            if b in btn_idx:
-                combos[frozenset([key])] = btn_idx[b]
-                break
-    if isinstance(env.action_space, gym.spaces.MultiBinary):
-        return MultiKeySpec(combos=combos, noop=0,
-                            button_map=_get_button_map(env))
-    return SingleKeySpec(combos=combos, noop=0)
-
-
 class VizDoomAdapter(EnvAdapter):
     name: str = "vizdoom"
 
@@ -173,9 +91,6 @@ class VizDoomAdapter(EnvAdapter):
         if isinstance(env.action_space, gym.spaces.Dict):
             return _KeyboardOnlyAction(env)
         return env
-
-    def _keyspec(self) -> KeySpec:
-        return _get_default_key_to_action_map(self.env)
 
     def render(self) -> np.ndarray:
         return np.asarray(self.env.render())

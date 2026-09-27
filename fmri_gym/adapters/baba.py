@@ -3,8 +3,8 @@
 A Baba-Is-You-style puzzle where you push word blocks to rewrite the rules.
 baba-is-ai (nacloos/baba-is-ai) uses the OLD gym API (obs-only reset, 4-tuple
 step) and is created via baba.make("env/<id>"); render("rgb_array") gives a
-256x256 frame. Actions are Discrete(5) via BabaIsYouEnv.Actions:
-idle=0, up=1, right=2, down=3, left=4.
+256x256 frame. Actions are Discrete(5) via BabaIsYouEnv.Actions (baba/grid.py):
+idle=0, up=1, right=2, down=3, left=4 -- what a phase's ``keys`` index.
 
 We normalize the old-gym shape to the gymnasium contract the loop expects and
 display the rendered frame. No savestate -> seed + action replay.
@@ -16,12 +16,7 @@ from typing import Any
 
 import numpy as np
 
-from .keyspec import SingleKeySpec
 from .base import EnvAdapter, FrameState
-
-# BabaIsYouEnv.Actions (baba/grid.py): idle=0, up=1, right=2, down=3, left=4.
-# (baba.envs.ACTIONS is a separate name->delta dict used for planning, not indices.)
-_DEFAULT_KEYMAP: dict[str, int] = {"UP": 1, "RIGHT": 2, "DOWN": 3, "LEFT": 4}
 
 
 class BabaAdapter(EnvAdapter):
@@ -30,10 +25,6 @@ class BabaAdapter(EnvAdapter):
     def _make(self, spec: dict) -> Any:
         import baba
         return baba.make(spec.get("game", "env/make_win"))
-
-    def _keyspec(self) -> SingleKeySpec:
-        combos = {frozenset([k]): v for k, v in _DEFAULT_KEYMAP.items()}
-        return SingleKeySpec(combos=combos, noop=0)
 
     def reset(self, seed: int | None) -> tuple[Any, dict]:
         try:

@@ -116,10 +116,10 @@ default output at start-up and logged. A game with sound must run at its engine'
 own frame rate (ViZDoom: `fps * frame_skip == 35`; Genesis cores: 59.92), or the
 block stops and names the fps that fits.
 
-Note: **MuJoCo and Box2D use continuous (`Box`) action spaces** — the default
-keymap pushes arrows to each dim's limit, so they render and log fine but aren't
-really human-playable without a per-game control scheme. Everything else in
-these families is keyboard-playable.
+Note: **MuJoCo and Box2D use continuous (`Box`) action spaces** — their configs
+write list actions that push the first dims to their limits (`"LEFT": [-1.0, 0.0,
+...]`), so they render and log fine but aren't really human-playable without a
+per-game control scheme. Everything else in these families is keyboard-playable.
 
 ### Per-game configs (`configs/dbp_games/`)
 
@@ -285,10 +285,11 @@ config/WAD files, read straight off disk from a checkout:
    phase can also override it per block with a `"repo"` field.
 
 Every scenario always exposes exactly 4 buttons (`TURN_LEFT`, `TURN_RIGHT`,
-`MOVE_FORWARD`, plus one of `JUMP`/`ATTACK`/`SPEED`/`USE`), so the backend
-derives a sensible default keymap automatically (arrows to turn/move, that
-4th button on SPACE/LSHIFT/E) -- no curriculum `keys` override needed unless
-you want to remap it. COOM blocks log the raw ViZDoom `game_variables`
+`MOVE_FORWARD`, plus one of `JUMP`/`ATTACK`/`SPEED`/`USE`), driven through
+COOM's own 12-action table (turn x move x execute), so a phase's `keys` are
+indices into it -- 8 = turn left, 4 = turn right, 2 = forward, 1 = the 4th
+button, sums for combos, `noop` 0; each `coom__*.json` spells its map out.
+COOM blocks log the raw ViZDoom `game_variables`
 (health, ammo, position, ...) as an analysis variable; there's no in-memory
 savestate, so reconstruction is via seed + action replay like most backends.
 The nine COOM curricula enable audio via `env_kwargs.audio_buffer_enabled`.
@@ -358,8 +359,9 @@ otherwise), `headed` (show the browser window), `browser_channel` (`"chrome"`
 default, or `null` for the bundled Chromium), `games_dir` (override the
 vendored dir). A curriculum lists one game phase per level it wants played
 (`configs/dbp_games/aigamestore__game1.json` has all nine of Water Sort's).
-`keys` values are the game's key names, so `{"B1": "SPACE"}`
-binds a button; the env relabels the on-canvas hints to match.
+`keys` values are indices into the game's key list (`aigamestore_gym.GAME_KEYS`;
+game1: LEFT, RIGHT, SPACE, Z), so `{"B": 2}` puts the game's SPACE on the B key;
+the env relabels the on-canvas hints to match.
 
 ## Running Rush-Hour
 
@@ -450,7 +452,7 @@ fmri_gym/
   photodiode.py     # `python -m fmri_gym.photodiode`: flash a patch to measure the flip-to-photon offset
   checks.py         # the rig check: its phases, the rig file, report.html/.md, rigchecks.tsv, `pool`
   adapters/
-    base.py         # EnvAdapter + KeySpec flavors + FrameState (the seam)
+    base.py         # EnvAdapter + Keymap + FrameState (the seam)
     ale.py          # clone_state, getRAM, lossless indexed pixels
     retro.py        # em.get_state, get_ram, decoded info vars, console-button keymap
     default.py      # ANY gym env: rgb frames, seed+replay, obs-as-state
@@ -473,7 +475,6 @@ emulator, or an engine module. Each engine-specific concern lives behind
 ```python
 class EnvAdapter:
     def _make(self, spec)         -> gym.Env       # build the env for a block
-    def _keyspec(self)            -> KeySpec       # held keys -> action
     def reset(self, seed)         -> (obs, info)
     def capture(self, obs, info)  -> FrameState    # per-frame state to log
     def restore(self, blob)       -> None          # inverse of capture().blob
@@ -567,7 +568,7 @@ it at the desk.
  "fps": 30,                     // required: steps (and frames) per second. The engine's own rate
                                 // (console cores and Atari ~60, Doom 35 / frame_skip) plays the game
                                 // at its real speed and fits its sound; the editor's Controls tab
-                                // shows it. Any other value plays the game slower or faster: the
+                                // (Check with the engine) shows it. Any other value plays the game slower or faster: the
                                 // manifest logs "speed" and the console says so when it is not 1
  "turn_based": false,           // step only on a key PRESS, not per frame (grid/toy_text games)
  "seed": 1234,                  // optional base seed: episodes play with seed, seed+1, ...
@@ -581,47 +582,37 @@ it at the desk.
  "state": "Level1",             // retro: named savestate/level (optional)
  "scenario": null,              // retro: scenario name (optional)
  "level": 0,                    // vgdl: level index; also uses "game","block_size"
- "keys": {"LEFT": 0, "RIGHT": 1}, // override keyboard->action map (see below)
+ "keys": {"LEFT": 0, "RIGHT": 1}, // REQUIRED: key -> env action, the whole map (see below)
+ "noop": 0,                     // real-time Discrete phases: the action sent with no key held
  "save_pixels": false}          // also store lossless pixels, where the backend can
 ```
 
-### Keymaps
+### Keys (the `keys` field)
 
-Each backend builds a default keyboard→action map:
+Every game phase states its whole keyboard map. **There is no default**: which
+key does what differs between sites (a keyboard at the desk, a gamepad that
+types keys in the scanner), so the file says it, and a phase without `keys` is
+refused before the window opens. `keys` is a dict of `"<key(s)>": <action>`:
 
-- **ale**: built from the game's action meanings (arrows move, SPACE fires).
-- **retro**: keyboard → console buttons (arrows move; Z/X/C = A/B/C; ENTER =
-  start); multiple held keys combine (e.g. RIGHT+Z).
-- **vizdoom**: arrows move/turn, Z/X strafe, SPACE shoots. Held keys combine
-  when the scenario is made with `"env_kwargs": {"max_buttons_pressed": 0}`
-  (a `MultiBinary` space — walk forward while turning); `keys` are the
-  scenario's `Discrete` action indices either way. Scenarios that also declare
-  the mouse axes (Deathmatch, the full-game maps) get those axes dropped, since
-  the scanner has no mouse: turning is `TURN_LEFT`/`TURN_RIGHT`.
-- **gym**: a generic default (arrows → first Discrete actions, or ±limits on
-  Box dims). Because a bare `Discrete(n)` has no inherent meaning, **specify
-  `keys` per game** for anything non-obvious.
+- The key is a name from `fmri_gym/keys.py` (`UP`, `DOWN`, `LEFT`, `RIGHT`,
+  `SPACE`, `RETURN`, `LSHIFT`, `A`–`Z`, `0`–`9`, `F1`–`F12`, `KP0`–`KP9`, …);
+  a name not in that table is refused, since it could never be pressed. Join
+  keys with `+` for a combo (`"UP+SPACE"`).
+- The action is what the env's `step` takes, as JSON, and the rule is the
+  env's action space (`fmri_gym/adapters/base.py`, `Keymap`):
+  - **`MultiBinary`** (retro, vizdoom, stk_gym, aigamestore): the value is the
+    **index of the button** the key holds down; every held key sets its bit,
+    so keys combine as on a controller, and nothing held is every button up.
+    An index outside the space is refused when the env is built.
+  - **anything else** (`Discrete` mostly: ale, coom, vgdl, crafter, minihack,
+    baba, rushhour, gym): the value is the action itself. The most specific
+    combo whose keys are all held wins (`"UP+SPACE"` over `"UP"`), and the
+    phase's **`noop`** is sent on a frame with no key held. `noop` is required
+    unless the phase is `turn_based`, where nothing is sent between presses.
+    A `Box` env (gym) takes a list, e.g. `"LEFT": [-1.0, 0.0]`.
 
-A backend picks one of three keymap flavors (`fmri_gym/adapters/base.py`),
-which differ only in how they combine the matching combos:
-
-| Flavor | Action sent | Used by |
-| --- | --- | --- |
-| `SingleKeySpec` | the most specific held combo | ale, gym, vgdl, crafter, nethack, … |
-| `MultiKeySpec` | OR of every held combo's buttons | retro, vizdoom, stk_gym, aigamestore (MultiBinary) |
-| `PassthroughKeySpec` | the held key names, `"+"`-joined | (none at the moment) |
-
-### Remapping keys (the `keys` field)
-
-Any game phase can override the mapping with a `keys` dict of
-`"<key(s)>": <action>`. The keys are pygame names (`UP`, `DOWN`, `LEFT`,
-`RIGHT`, `SPACE`, `RETURN`, letters `A`–`Z`, digits) and `<action>` is the
-action the env expects — an **integer** for a `Discrete` space (ale, gym,
-vgdl, …). Combine keys with `+` (e.g. `"UP+SPACE"`). A combo overrides its
-parts: with `SingleKeySpec` the most specific fully-held combo wins, and with
-`MultiKeySpec` a held combo replaces (rather than ORs with) its own parts.
-
-To find the action indices for an Atari game, read its meanings:
+Each adapter's module docstring says what its indices mean, and each config's
+`_keys_note` spells out the map it uses. For an Atari game, read its meanings:
 
 ```python
 import gymnasium as gym, ale_py; gym.register_envs(ale_py)
@@ -634,11 +625,12 @@ gym.make("ALE/Pong-v5").unwrapped.get_action_meanings()
 ```jsonc
 {"type": "game", "backend": "ale", "game": "ALE/Pong-v5",
  "mode": "duration", "duration": 30.0,
- "keys": {"UP": 2, "DOWN": 3}}      // UP = paddle up, DOWN = paddle down; SPACE still serves (FIRE=1)
+ "keys": {"UP": 2, "DOWN": 3, "SPACE": 1, "UP+SPACE": 4, "DOWN+SPACE": 5}, "noop": 0}
 ```
 
-`configs/dbp_games/atari__pong.json` and `configs/demo_mixed.json` both use this mapping.
-CartPole similarly uses `{"LEFT": 0, "RIGHT": 1}`.
+The editor's Controls tab edits the table and, with *Check with the engine*,
+builds the env to confirm the keys fit its action space (and shows the engine's
+own rate for `fps`).
 
 ### The pause menu (the `menu` field)
 

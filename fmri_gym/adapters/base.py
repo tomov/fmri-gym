@@ -1,4 +1,4 @@
-"""FrameState, Sound, and the EnvAdapter base class."""
+"""Keymap, FrameState, Sound, and the EnvAdapter base class."""
 
 from __future__ import annotations
 
@@ -6,8 +6,79 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
+from gymnasium import spaces
 
-from .keyspec import KeySpec
+
+class Keymap:
+    """The phase's ``keys``: what the subject presses -> what ``step`` gets.
+
+    ``keys`` maps a key NAME (:mod:`fmri_gym.keys`), or several joined with
+    ``"+"``, to the action to send, written as the env takes it. There is no
+    default map and nothing is merged in: which key does what differs from
+    site to site, so the file states all of it.
+
+    - ``MultiBinary`` action space (``n_buttons`` given): a value is the index
+      of the button that key holds down, and every held key sets its button,
+      so keys combine as on a controller. Nothing held is every button up.
+    - anything else (``Discrete`` mostly): a value is the action itself; the
+      most specific combo whose keys are all held wins, and the phase's
+      ``noop`` is sent when none is. ``noop`` is required unless the phase is
+      ``turn_based``, where nothing is sent between presses.
+
+    :param spec: the game-phase config (``validate_config`` has already checked
+        that ``keys`` is there and its names are real keys).
+    :param n_buttons: the env's button count for a ``MultiBinary`` space, else
+        ``None``.
+    :raises ValueError: a button index out of range, or a missing ``noop``.
+    """
+
+    def __init__(self, spec: dict, n_buttons: int | None) -> None:
+        keys: dict[str, Any] = spec["keys"]
+        self.n_buttons = n_buttons
+        self.combos = {frozenset(combo.split("+")): action for combo, action in keys.items()}
+        if n_buttons is not None:
+            bad = {k: v for k, v in keys.items()
+                   if not isinstance(v, int) or isinstance(v, bool) or not 0 <= v < n_buttons}
+            if bad:
+                raise ValueError(f"keys: {bad}: the env's action is MultiBinary({n_buttons}), so "
+                                 f"each value is the index (0..{n_buttons - 1}) of the button "
+                                 "that key holds down")
+            self.noop: Any = [0] * n_buttons
+            return
+        if spec.get("turn_based"):
+            self.noop = None
+            return
+        if "noop" not in spec:
+            raise ValueError('"noop": missing; state the action sent on a frame with no key held '
+                             '(0 for most Discrete envs), or set "turn_based": true to step only '
+                             "on key presses")
+        self.noop = spec["noop"]
+
+    def resolve(self, held: frozenset[str]) -> Any:
+        """The action for the keys held this frame.
+
+        :param held: the pressed keys' NAMES.
+        :return: the button vector, or the most specific matched combo's
+            action, or ``noop``.
+        """
+        if self.n_buttons is not None:
+            vec = [0] * self.n_buttons
+            for keys, button in self.combos.items():
+                if keys <= held:
+                    vec[button] = 1
+            return vec
+        matched = [keys for keys in self.combos if keys <= held]
+        return self.combos[max(matched, key=len)] if matched else self.noop
+
+    def turn_actions(self) -> dict[str, Any]:
+        """``{key: action}`` for the single-key entries: turn-based play steps on one press."""
+        return {next(iter(keys)): self.resolve(keys) for keys in self.combos if len(keys) == 1}
+
+
+def _n_buttons(env: Any) -> int | None:
+    """The env's button count if its action space is ``MultiBinary``, else ``None``."""
+    space = getattr(env, "action_space", None)
+    return int(space.n) if isinstance(space, spaces.MultiBinary) else None
 
 
 @dataclass
@@ -58,16 +129,14 @@ class EnvAdapter:
     :func:`fmri_gym.adapters.get_adapter`), so per-block state lives naturally
     on ``self`` with no risk of leaking between blocks.
 
-    Subclasses override :meth:`_make` (build the engine env) and
-    :meth:`_keyspec` (default keyboard map), plus whichever of the hooks
-    below they need; state is returned in a STANDARD shape (a
+    Subclasses override :meth:`_make` (build the engine env) plus whichever of
+    the hooks below they need; state is returned in a STANDARD shape (a
     :class:`FrameState`) so the logger and any downstream analysis code are
     identical across ALE / stable-retro / plain gym.
 
     :ivar spec: the game-phase config dict this env was built from.
     :ivar env: the underlying engine environment (kept private to the wrapper).
-    :ivar keyspec: keyboard->action mapping, with curriculum ``keys`` overrides
-        already applied.
+    :ivar keymap: the phase's ``keys`` as a :class:`Keymap`.
     """
 
     #: short id used in filenames / manifest, e.g. "ale", "retro", "gym"
@@ -81,9 +150,7 @@ class EnvAdapter:
         """
         self.spec = spec
         self.env = self._make(spec)
-        self.keyspec = self._keyspec()
-        if spec.get("keys"):
-            self.keyspec.apply_overrides(spec["keys"])
+        self.keymap = Keymap(spec, _n_buttons(self.env))
 
     def _make(self, spec: dict) -> Any:
         """Create and return the underlying engine env for one game block.
@@ -93,20 +160,6 @@ class EnvAdapter:
 
         :param spec: game-phase config dict from the curriculum.
         :return: the underlying environment, stored as ``self.env``.
-        :raises NotImplementedError: always in the base class.
-        """
-        raise NotImplementedError
-
-    def _keyspec(self) -> KeySpec:
-        """Return the default keyboard->action mapping for this env.
-
-        Called once from :meth:`__init__`; the result is stored as
-        :attr:`keyspec` after curriculum ``keys`` overrides are applied.
-
-        :return: a concrete :class:`KeySpec` -- :class:`SingleKeySpec` for a
-            ``Discrete`` space, :class:`MultiKeySpec` when held keys should
-            combine, :class:`PassthroughKeySpec` when ``step`` takes the names
-            of the engine inputs to apply.
         :raises NotImplementedError: always in the base class.
         """
         raise NotImplementedError

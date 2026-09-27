@@ -4,7 +4,7 @@
   "curriculum": [
     {"type": "message", "text": "Overcooked: cramped_room", "duration": 2.0},
     {"type": "fixation", "duration": 1.0},
-    {"type": "game", "backend": "overcooked", "game": "cramped_room", "mode": "duration", "duration": 300.0, "fps": 10},
+    {"type": "game", "backend": "overcooked", "game": "cramped_room", "keys": {"UP": [0, -1], "DOWN": [0, 1], "LEFT": [-1, 0], "RIGHT": [1, 0], "SPACE": "interact"}, "noop": [0, 0], "mode": "duration", "duration": 300.0, "fps": 10},
     {"type": "fixation", "duration": 2.0}
   ]
 }
