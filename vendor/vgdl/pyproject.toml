@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vgdl-gym"
+version = "0.1.0"
+description = "VGDL games (the language_and_experience fork) as standard Gymnasium envs."
+readme = "README.md"
+requires-python = ">=3.10"
+# The games themselves come from a checkout of the fork (VGDL_REPO), not from an index.
+dependencies = ["gymnasium", "numpy", "pygame-ce"]
+
+[tool.setuptools]
+packages = ["vgdl_gym"]

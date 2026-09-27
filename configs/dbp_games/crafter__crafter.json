@@ -1,6 +1,6 @@
 {
   "_game": "Crafter",
-  "_note": "pip install crafter.",
+  "_note": "uv sync --extra crafter (crafter-gym, vendor/crafter/, pulls crafter).",
   "_keys_note": "Crafter's Discrete(17) map is 0=noop, 1=move_left, 2=move_right, 3=move_up, 4=move_down, 5=do, 6=sleep, 7=place_stone, 8=place_table, 9=place_furnace, 10=place_plant, 11=make_wood_pickaxe, 12=make_stone_pickaxe, 13=make_iron_pickaxe, 14=make_wood_sword, 15=make_stone_sword, 16=make_iron_sword. Curriculum 'keys' are Discrete action indices (same as the adapter default). Place/make are reachable by extending 'keys'. Keep the message Controls text in sync with 'keys' by hand.",
   "_keys_reference": "https://github.com/danijar/crafter/blob/master/crafter/data.yaml",
   "curriculum": [

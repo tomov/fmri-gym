@@ -28,7 +28,10 @@ no longer playing the same game and the comparison is void.
 
 An adapter is lightweight glue that takes a gym env and makes it fMRI-friendly. Ideally, it should do only these things:
 
-- build the env (`_make`) and, if needed, normalize a non-Gymnasium API (`reset`/`step`)
+- build the env (`_make`): a `gymnasium.Env`, always. If the game's own env speaks
+  another API (old `gym`, a bare engine, a `with_img=` of its own), a thin Gymnasium env
+  under `vendor/` puts the contract in front of it (`vendor/baba/`, `vendor/crafter/`,
+  `vendor/vgdl/`, `vendor/coom/`); the adapter never normalizes `reset`/`step` itself
 - say in the module docstring what the env's action indices mean, so a config can
   write its `keys` (there is no default keyboard map: the config states all of it)
 - produce an RGB frame for the screen (`render`)
@@ -116,6 +119,9 @@ something else: the participant's hour is gone and nobody knew. So:
    says what the action indices in its `keys` mean.
 4. `pyproject.toml` — one extra under `[project.optional-dependencies]` (and a
    mention in `dbp` / `all` if it belongs there), then `uv lock` to refresh `uv.lock`.
+   A game without a Gymnasium env gets one first, as its own small package under
+   `vendor/<GAME>/` (`pyproject.toml`, `README.md`, `<game>_gym/{__init__,env}.py`, a
+   `gym.register` id), listed in `[tool.uv.sources]`; the extra installs that package.
 5. `README.md` — only if the backend needs setup beyond `pip install` (a repo checkout, a
    binary, an env var).
 

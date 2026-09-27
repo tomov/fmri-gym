@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "baba-gym"
+version = "0.1.0"
+description = "Baba Is You (baba-is-ai) as a Gymnasium env."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "gymnasium",
+    "numpy",
+    "baba @ git+https://github.com/nacloos/baba-is-ai.git",
+]
+
+[tool.setuptools]
+packages = ["baba_gym"]

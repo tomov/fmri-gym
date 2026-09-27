@@ -18,13 +18,13 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 
-from .base import Env, EnvAdapter, FrameState
+from .base import EnvAdapter, FrameState
 
 
 class ALEAdapter(EnvAdapter):
     name: str = "ale"
 
-    def _make(self, spec: dict) -> Env:
+    def _make(self, spec: dict) -> gym.Env:
         import ale_py
         gym.register_envs(ale_py)
         # Set "save_pixels": true in the phase for lossless indexed-pixel logging.

@@ -33,7 +33,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from .base import Env, EnvAdapter, FrameState
+import gymnasium as gym
+
+from .base import EnvAdapter, FrameState
 
 _ENV_ID = "RushHourHuman-v0"
 _ENV_KWARGS = ("puzzle", "puzzle_indices", "min_moves_range", "movable_only", "binary")
@@ -48,8 +50,7 @@ _LOGGED = ("event", "phase", "puzzle", "puzzle_index", "min_moves",
 class RushHourAdapter(EnvAdapter):
     name: str = "rushhour"
 
-    def _make(self, spec: dict) -> Env:
-        import gymnasium as gym
+    def _make(self, spec: dict) -> gym.Env:
         import rushhour_gym  # noqa: F401  (registers RushHour*-v0)
         game = spec.get("game", _ENV_ID)
         if game != _ENV_ID:

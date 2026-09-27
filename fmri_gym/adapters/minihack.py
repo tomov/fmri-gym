@@ -22,16 +22,16 @@ from __future__ import annotations
 
 from typing import Any
 
-import numpy as np
 import gymnasium as gym
+import numpy as np
 
-from .base import Env, EnvAdapter, FrameState
+from .base import EnvAdapter, FrameState
 
 
 class MiniHackAdapter(EnvAdapter):
     name: str = "minihack"
 
-    def _make(self, spec: dict) -> Env:
+    def _make(self, spec: dict) -> gym.Env:
         import minihack  # noqa: F401  (registers MiniHack-* env ids)
         # Prefer the agent-centered square crop for display; the full terminal
         # ("pixel") only looks good with "full_screen": true.

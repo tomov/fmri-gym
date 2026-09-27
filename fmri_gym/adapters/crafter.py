@@ -1,75 +1,41 @@
-"""Crafter adapter (danijar/crafter).
+"""Crafter adapter (danijar/crafter), via ``crafter-gym``.
 
-Crafter uses the OLD gym API shape -- reset() returns obs only, step() returns a
-4-tuple (obs, reward, done, info) with no `truncated`, and it doesn't register
-cleanly under gymnasium. We wrap crafter.Env directly and normalize it to the
-gymnasium contract the session loop expects.
+``crafter_gym`` (``vendor/crafter/``) is the Gymnasium env: ``crafter.Env``
+speaks the old ``gym`` API and is seeded at construction only, and that
+package puts the Gymnasium contract in front of it (``reset(seed=)`` rebuilds
+the world). The observation IS the RGB frame (64x64 by default; sharper with
+``env_kwargs.size``), so ``render()`` returns it.
 
-The observation IS the RGB frame (default 64x64x3; bump via
-env_kwargs.size), so render() just returns obs. Crafter has no savestate
-API; reconstruction is via seed + action replay (deterministic given
-crafter.Env(seed=...)). A phase's "keys" index crafter's Discrete(17) space
-(crafter/data.yaml): 0=noop, 1=move_left, 2=move_right, 3=move_up,
-4=move_down, 5=do, 6=sleep, 7=place_stone, 8=place_table, 9=place_furnace,
-10=place_plant, 11=make_wood_pickaxe, 12=make_stone_pickaxe,
-13=make_iron_pickaxe, 14=make_wood_sword, 15=make_stone_sword,
-16=make_iron_sword.
+A phase's ``keys`` index crafter's Discrete(17) space (crafter/data.yaml):
+0 = noop, 1 = move_left, 2 = move_right, 3 = move_up, 4 = move_down, 5 = do,
+6 = sleep, 7 = place_stone, 8 = place_table, 9 = place_furnace,
+10 = place_plant, 11 = make_wood_pickaxe, 12 = make_stone_pickaxe,
+13 = make_iron_pickaxe, 14 = make_wood_sword, 15 = make_stone_sword,
+16 = make_iron_sword. ``env_kwargs`` are ``crafter.Env``'s (``size``, ``area``,
+``view``, ``length``, ...). No savestate -> seed + action replay; the
+achievements are logged each frame.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-import numpy as np
+import gymnasium as gym
 
-from .base import Env, EnvAdapter, FrameState
+from .base import EnvAdapter, FrameState
 
 
 class CrafterAdapter(EnvAdapter):
     name: str = "crafter"
 
-    def _make(self, spec: dict) -> Env:
-        import crafter
-        # crafter.Env seeds at construction; size/view/area/length via env_kwargs.
-        # Default size is 64x64 (RL-benchmark pixel art); bump size for a
-        # sharper on-screen render (textures are redrawn at the new tile size).
-        self._last_obs = None
-        return crafter.Env(**spec.get("env_kwargs", {}))
+    def _make(self, spec: dict) -> gym.Env:
+        from crafter_gym import CrafterEnv
 
-    def reset(self, seed: int | None) -> tuple[Any, dict]:
-        # crafter.Env has no reset(seed=...) -- its RNG is fixed at construction
-        # (crafter.Env(..., seed=...)) and never changes after. Re-seeding an
-        # episode is done by rebuilding the env
-        import crafter
-        self.env.close()
-        env_kwargs = dict(self.spec.get("env_kwargs", {}))
-        if seed is not None:
-            env_kwargs["seed"] = seed
-        self.env = crafter.Env(**env_kwargs)
-        obs = self.env.reset()
-        if isinstance(obs, tuple):  # be tolerant if a newer crafter returns (obs, info)
-            obs, info = obs
-        else:
-            info = {}
-        self._last_obs = np.asarray(obs)
-        return self._last_obs, info
+        return CrafterEnv(**spec.get("env_kwargs", {}))
 
-    def step(self, action: Any) -> tuple[Any, float, bool, bool, dict]:
-        obs, reward, done, info = self.env.step(int(action))
-        self._last_obs = np.asarray(obs)
-        # Map old-gym `done` onto gymnasium (terminated, truncated).
-        return self._last_obs, reward, bool(done), False, info
-
-    def render(self) -> np.ndarray:
-        # obs is the RGB frame; avoids a second render call.
-        return self._last_obs
-
-    def capture(
-        self, obs: Any, info: dict, want_blob: bool = True
-    ) -> FrameState:
-        # No savestate API -> rely on seed + action replay. Log the achievements
-        # dict (crafter's semantic progress signal) when present.
+    def capture(self, obs: Any, info: dict, want_blob: bool = True) -> FrameState:
+        # The achievements dict is crafter's semantic progress signal.
         variables = {}
-        if isinstance(info, dict) and "achievements" in info:
+        if "achievements" in info:
             variables["achievements"] = list(info["achievements"].values())
         return FrameState(blob=None, variables=variables)

@@ -42,7 +42,7 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 
-from .base import Env, EnvAdapter, FrameState, Sound
+from .base import EnvAdapter, FrameState, Sound
 
 
 class _KeyboardOnlyAction(gym.ActionWrapper):
@@ -72,7 +72,7 @@ class _KeyboardOnlyAction(gym.ActionWrapper):
 class VizDoomAdapter(EnvAdapter):
     name: str = "vizdoom"
 
-    def _make(self, spec: dict) -> Env:
+    def _make(self, spec: dict) -> gym.Env:
         """Create a ViZDoom Gymnasium environment for one game block.
 
         :param spec: game-phase config dict from the curriculum.

@@ -1,6 +1,6 @@
 {
   "_game": "Baba Is You: make_win (language / rule-manipulation puzzle)",
-  "_note": "pip install git+https://github.com/nacloos/baba-is-ai.git. Env ids: env/make_win, env/goto_win, env/you_win, and distractor variants. Push word blocks to rewrite the rules.",
+  "_note": "uv sync --extra baba (baba-gym, vendor/baba/, pulls baba-is-ai from GitHub). Env ids: env/make_win, env/goto_win, env/you_win, and distractor variants. Push word blocks to rewrite the rules.",
   "_keys_note": "BabaIsYouEnv.Actions (baba/grid.py): 0=idle, 1=up, 2=right, 3=down, 4=left. Keep the message Controls text in sync with 'keys' by hand.",
   "_keys_reference": "https://github.com/nacloos/baba-is-ai/blob/main/baba/grid.py",
   "_menu_note": "A puzzle can be pushed into a dead end, so after 15 s of play holding X for 5 s pauses the game and offers Restart / Give up / Resume (UP/DOWN to choose, SPACE to select). See fmri_gym/menu.py.",

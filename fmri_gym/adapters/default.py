@@ -15,17 +15,17 @@ from __future__ import annotations
 
 from typing import Any
 
-import numpy as np
 import gymnasium as gym
+import numpy as np
 from gymnasium import spaces
 
-from .base import Env, EnvAdapter, FrameState
+from .base import EnvAdapter, FrameState
 
 
 class DefaultAdapter(EnvAdapter):
     name: str = "gym"
 
-    def _make(self, spec: dict) -> Env:
+    def _make(self, spec: dict) -> gym.Env:
         # Many third-party envs only register their ids as a side effect of
         # importing their package (crafter, minihack, tile_match_gym, ...).
         # A curriculum can name that module via "import_module".
@@ -54,7 +54,7 @@ class DefaultAdapter(EnvAdapter):
         return FrameState(blob=None, variables=variables)
 
 
-def _make_via_shimmy(game_id: str, **kwargs: Any) -> Env:
+def _make_via_shimmy(game_id: str, **kwargs: Any) -> gym.Env:
     """Wrap an old-`gym` env id as a Gymnasium env using shimmy."""
     import shimmy  # noqa: F401  (registers compatibility envs on import)
     # Gymnasium exposes the v0.21 compat entrypoint once shimmy is installed.

@@ -12,14 +12,14 @@ through small pluggable **adapters**:
 | `ale`         | Atari 2600 (`ALE/Pong-v5`, …) | ALE / Stella |
 | `retro`       | NES / SNES / Genesis / GB / … (`Airstriker-Genesis-v0`, …) | stable-retro / libretro |
 | `gym`         | **any** Gymnasium env (`CartPole-v1`, MuJoCo, Box2D, toy_text, …); old-`gym` envs via shimmy | various |
-| `vgdl`        | VGDL games (`aliens`, `beesAndBirds`, …) | py-vgdl / pygame |
-| `crafter`     | Crafter (open-world survival) | crafter |
+| `vgdl`        | VGDL games (`aliens`, `beesAndBirds`, …), from a `VGDL_REPO` checkout | vgdl-gym (`vendor/vgdl/`) over the language_and_experience fork |
+| `crafter`     | Crafter (open-world survival) | crafter-gym (`vendor/crafter/`) over crafter |
 | `minihack`    | MiniHack tasks (pixel obs) | minihack / NLE |
 | `nethack`     | NetHack (`NetHack*-v0`; TTY rendered to pixels) | nle |
 | `aigamestore` | AI GameStore browser games (`game1`…`game10`), lock-stepped | aigamestore-gym (`vendor/aigamestore/`) |
 | `vizdoom`     | Doom action-shooter scenarios (COOM's engine) | ViZDoom |
 | `coom`        | COOM's own continual-RL scenarios (`pitfall`, `chainsaw`, …), from a `COOM_REPO` checkout (COOM package itself not installed -- conflicting `gymnasium` pin) | coom-gym (`vendor/coom/`) |
-| `baba`        | Baba Is You (rule-manipulation puzzle) | baba-is-ai |
+| `baba`        | Baba Is You (rule-manipulation puzzle) | baba-gym (`vendor/baba/`) over baba-is-ai |
 | `rushhour`    | Rush Hour sliding-block puzzle | `rushhour-gym` (PyPI; fetches its Go engine) |
 | `stk_gym`     | SuperTuxKart 3D racing: frames from the game's gym server, keys to its player controller (needs a real GL display) | [chrplr/stk-code](https://github.com/chrplr/stk-code) fork |
 
@@ -228,10 +228,14 @@ same `fmri-gym` env works.
    git clone -b dbp https://github.com/tomov/language_and_experience.git ../language_and_experience
    ```
 
-2. Point the framework at the checkout and add it to `PYTHONPATH` (so
-   `src.vgdl...` is importable), then run a VGDL curriculum:
+2. Install the `vgdl` extra -- **`vgdl-gym`** (`vendor/vgdl/`), the standard
+   Gymnasium env over the fork's `VGDLEnv` (a game name and level in,
+   `reset(seed=)`, an offscreen `render()`) -- then point the framework at the
+   checkout, add it to `PYTHONPATH` (so `src.vgdl...` is importable), and run
+   a VGDL curriculum:
 
    ```bash
+   uv sync --extra vgdl               # or: pip install -e vendor/vgdl
    VGDL_REPO=../language_and_experience \
    PYTHONPATH=../language_and_experience \
      uv run fmri-play --subject sub-01 --curriculum configs/demo_vgdl_all.json --ses 1 --run 1
@@ -444,8 +448,8 @@ fmri_gym/
     ale.py          # clone_state, getRAM, lossless indexed pixels
     retro.py        # em.get_state, get_ram, decoded info vars, console-button keymap
     default.py      # ANY gym env: rgb frames, seed+replay, obs-as-state
-    vgdl.py         # VGDLEnv: get_state/set_state, symbolic grid + events
-    crafter.py      # old-gym-API wrapper; obs is the frame; achievements
+    vgdl.py         # VGDL via vgdl-gym: get_state/set_state savestate, symbolic grid + events
+    crafter.py      # Crafter via crafter-gym: obs is the frame; achievements
     minihack.py     # pixel obs + compass keymap; blstats/glyphs/message
     nethack.py      # base NLE: TTY grid -> RGB; vi-key movement; blstats
     aigamestore.py  # AI GameStore via aigamestore-gym: held keys as the env's action, state_* from getGameState
@@ -456,6 +460,9 @@ fmri_play.py        # CLI entry point
 configs/            # example curricula
 vendor/aigamestore/ # the 10 public AI GameStore games (HTML/JS) + aigamestore_gym, their lock-stepped gym env
 vendor/coom/        # coom_gym: COOM scenarios as a Gymnasium env, on a COOM checkout's WADs
+vendor/baba/        # baba_gym: the Gymnasium contract in front of baba-is-ai's old-gym env
+vendor/crafter/     # crafter_gym: the same for crafter.Env, with reset(seed=)
+vendor/vgdl/        # vgdl_gym: a standard env over the language_and_experience fork's VGDLEnv
 ```
 
 The loop (`run.py`) only ever calls the adapter — never `env.unwrapped`, an
@@ -470,9 +477,10 @@ class EnvAdapter:
     def restore(self, blob)       -> None          # inverse of capture().blob
 ```
 
-`self.env` is always a `gymnasium.Env` (or an old `gym.Env`). A game that
-has no such env gets one under `vendor/` (see `vendor/aigamestore/`,
-`vendor/coom/`), not in its adapter.
+`self.env` is always a `gymnasium.Env`. A game that has no such env -- a bare
+engine, an old-`gym` env, a gymnasium env with habits of its own -- gets a thin
+one under `vendor/` (see `vendor/coom/`, `vendor/baba/`, `vendor/vgdl/`), not
+in its adapter; the adapter is then `_make` plus what to log.
 
 `FrameState` carries a standard shape for **every** backend:
 - `blob`: opaque bytes that `restore()` turns back into this exact state
@@ -904,14 +912,19 @@ backend; stable-retro titles use the `retro` backend; and the VGDL games use the
 `vgdl` backend (their source was ported from old `gym` to gymnasium so they run
 in the same numpy-2 env).
 
-**old-`gym` games (e.g. chess, hanoi, Sokoban, Baba, NetHack).** Two options:
-(a) **port the source to gymnasium**, as done for VGDL — usually a small
-mechanical diff (swap `gym`→`gymnasium`, fix removed `np.*` aliases and
-`pkg_resources`); or (b) run them via **shimmy** with `"legacy_gym": true`
-(routed via `GymV21Environment-v0`) in a dedicated `numpy<2` env. Note shimmy's
-v0.21 compat calls the removed `.seed()` and `gym==0.26` is incompatible with
-`numpy>=2`, so (a) is usually cleaner. The `legacy_gym` code path exists in
-`default.py`.
+**old-`gym` games (e.g. chess, hanoi, Sokoban).** Three options:
+(a) **a thin Gymnasium env under `vendor/`** that holds the old env and
+presents the contract in front of it -- `reset(seed=)` returning `(obs, info)`,
+a 5-tuple `step`, a `render()` without a mode -- as done for Baba
+(`vendor/baba/`, 70 lines) and Crafter (`vendor/crafter/`); the game's own
+package is untouched and the adapter stays `_make` plus what to log. This is
+the usual answer. (b) **port the source to gymnasium**, as done for VGDL —
+usually a small mechanical diff (swap `gym`→`gymnasium`, fix removed `np.*`
+aliases and `pkg_resources`); or (c) run them via **shimmy** with
+`"legacy_gym": true` (routed via `GymV21Environment-v0`) in a dedicated
+`numpy<2` env. Note shimmy's v0.21 compat calls the removed `.seed()` and
+`gym==0.26` is incompatible with `numpy>=2`, so (a) or (b) is usually cleaner.
+The `legacy_gym` code path exists in `default.py`.
 
 **Porting an old-`gym` game to gymnasium (the VGDL recipe).** The whole change
 was: `import gym`→`import gymnasium as gym` across the env/registration/play

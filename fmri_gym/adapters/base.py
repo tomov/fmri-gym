@@ -3,22 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-import gymnasium
+import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
-
-# Old ``gym.Env`` (baba, crafter) and ``gymnasium.Env`` share ``action_space``,
-# ``reset``, ``step``, ``render`` and ``close``. ``gym`` is not a core
-# dependency, so the union is what type checkers see; at runtime the name is
-# ``gymnasium.Env`` and annotations are not evaluated.
-if TYPE_CHECKING:
-    import gym
-
-    Env = gymnasium.Env | gym.Env
-else:
-    Env = gymnasium.Env
 
 
 class Keymap:
@@ -87,7 +76,7 @@ class Keymap:
         return {next(iter(keys)): self.resolve(keys) for keys in self.combos if len(keys) == 1}
 
 
-def _n_buttons(env: Env) -> int | None:
+def _n_buttons(env: gym.Env) -> int | None:
     """The env's button count if its action space is ``MultiBinary``, else ``None``."""
     space = env.action_space
     return int(space.n) if isinstance(space, spaces.MultiBinary) else None
@@ -147,11 +136,11 @@ class EnvAdapter:
     identical across ALE / stable-retro / plain gym.
 
     :ivar spec: the game-phase config dict this env was built from.
-    :ivar env: the underlying ``gymnasium.Env`` or old ``gym.Env``.
+    :ivar env: the underlying ``gymnasium.Env``.
     :ivar keymap: the phase's ``keys`` as a :class:`Keymap`.
     """
 
-    env: Env
+    env: gym.Env
 
     #: short id used in filenames / manifest, e.g. "ale", "retro", "gym"
     name: str = "base"
@@ -166,12 +155,13 @@ class EnvAdapter:
         self.env = self._make(spec)
         self.keymap = Keymap(spec, _n_buttons(self.env))
 
-    def _make(self, spec: dict) -> Env:
+    def _make(self, spec: dict) -> gym.Env:
         """Create and return the underlying env for one game block.
 
-        A ``gymnasium.Env`` or an old ``gym.Env``: both have ``action_space``,
-        ``reset``, ``step``, ``render`` and ``close``. Must produce RGB frames
-        (``render_mode="rgb_array"`` for Gymnasium envs). May also initialise
+        A ``gymnasium.Env`` whose ``render()`` gives an RGB frame
+        (``render_mode="rgb_array"``). A game whose own env speaks another API
+        (old ``gym``, a bare engine) gets a thin Gymnasium env under ``vendor/``
+        first; the adapter never papers over that itself. May also initialise
         per-block state on ``self``.
 
         :param spec: game-phase config dict from the curriculum.
@@ -194,8 +184,8 @@ class EnvAdapter:
     def step(self, action: Any) -> tuple[Any, float, bool, bool, dict]:
         """Advance one frame.
 
-        Default is the Gymnasium contract; subclasses with non-standard
-        signatures (e.g. VGDL's ``step(a, with_img=)``) override this.
+        The Gymnasium contract; a subclass overrides it only to shape the
+        action first (e.g. a list from the config into the space's dtype).
 
         :param action: action to apply (type depends on the env).
         :return: ``(obs, reward, terminated, truncated, info)``.
@@ -230,9 +220,10 @@ class EnvAdapter:
     def render(self) -> np.ndarray:
         """Return the current RGB frame ``(H, W, 3)`` uint8 for display.
 
-        Default assumes the Gymnasium contract (``env.render()`` with the env
-        made using ``render_mode="rgb_array"``). Subclasses for non-standard
-        envs override this (e.g. old-gym's ``env.render(mode="rgb_array")``).
+        The Gymnasium contract (``env.render()`` with the env made using
+        ``render_mode="rgb_array"``). A subclass overrides it when the picture
+        is not the env's render (a terminal drawn to pixels, a pixel
+        observation).
 
         :return: RGB frame as a numpy array.
         """

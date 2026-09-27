@@ -11,10 +11,10 @@ have no Gymnasium interface; Overcooked's env is not a Gymnasium env.)
 |---|---|---|---|---|
 | Action/shooter | **COOM** | `vizdoom` (COOM's exact Doom engine) | `dbp_games/vizdoom__defend_center.json` … (9 stock scenarios + 1 pair) | ✅ |
 | Action/shooter, Puzzle | **AI GameStore** | `aigamestore` (p5.js via headless browser) | `dbp_games/aigamestore__game1.json` … | ✅ |
-| Building/open-world | **Crafter** | `crafter` | `dbp_games/crafter__crafter.json` | ✅ |
+| Building/open-world | **Crafter** | `crafter` (crafter-gym, `vendor/crafter/`, over crafter's old-gym env) | `dbp_games/crafter__crafter.json` | ✅ |
 | Building/open-world | **Craftium** | `gym` + `import_module` (Luanti voxel) | `dbp_games/craftium__choptree.json` | ✅ |
 | Puzzle | **Rush Hour** | `rushhour` (Go engine + colored board) | `dbp_games/rushhour__easy.json` | ✅ |
-| Language | **Baba Is You** | `baba` (baba-is-ai) | `dbp_games/baba__make_win.json` | ✅ |
+| Language | **Baba Is You** | `baba` (baba-gym, `vendor/baba/`, over baba-is-ai's old-gym env) | `dbp_games/baba__make_win.json` | ✅ |
 | Adventure | **MiniHack** | `minihack` | `dbp_games/minihack__room5x5.json` | ✅ |
 | Sports/racing | **SuperTuxKart** | `stk_gym` (stk-code fork's gym server, 3D) | `dbp_games/stk_gym__race.json` | ✅ |
 | Interactive fiction | Zork* | — (no Gymnasium) | — | ⏭️ skipped |
