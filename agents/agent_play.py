@@ -27,7 +27,7 @@ from collections import Counter
 
 from policies import Policy, RandomPolicy, VLMPolicy
 
-from fmri_gym import Clock, Logger, get_adapter
+from fmri_gym import Clock, Logger, get_adapter, resume
 from fmri_gym.config import load_config, validate_config
 
 
@@ -72,7 +72,10 @@ def build_policy(args, adapter) -> Policy:
 
 def play_episode(adapter, policy: Policy, logger: Logger, clock: Clock, *,
                  seed: int, episode_id: int, state_stride: int, fps: float,
-                 turn_based: bool, max_frames: int) -> tuple[dict, int]:
+                 turn_based: bool, max_frames: int,
+                 carry: resume.Carry | None = None, slot: str | None = None,
+                 resume_dir: str | None = None,
+                 provenance: dict | None = None) -> tuple[dict, int]:
     """Run one episode under ``policy``, logging every frame.
 
     Mirrors ``Run._episode`` field for field, minus everything that is about a
@@ -91,12 +94,22 @@ def play_episode(adapter, policy: Policy, logger: Logger, clock: Clock, *,
         by itself are not put to the policy either
         (:meth:`~fmri_gym.adapters.base.EnvAdapter.autoplay`).
     :param max_frames: stop the episode after this many frames.
+    :param carry: a world an earlier block left off in
+        (:mod:`fmri_gym.resume`), restored over the one ``seed`` opens.
+    :param slot: the slot this block hands its world on in, if the frame
+        budget is what ends this episode.
+    :param resume_dir: the folder those slots live in.
+    :param provenance: what the slot's file records about where the world
+        came from.
     :return: the episode's ``episode_end`` record, as logged, and the number
         of frames the policy pressed nothing on.
     """
     policy.reset()
     observation, info = adapter.reset(seed)
-    logger.log(type="episode_start", episode_id=episode_id, seed=seed)
+    if carry is not None:
+        adapter.restore(carry.blob)
+    logger.log(type="episode_start", episode_id=episode_id, seed=seed,
+               resumed=carry is not None)
 
     terminated = truncated = False
     score = 0.0                         # the episode's cumulative reward
@@ -151,6 +164,16 @@ def play_episode(adapter, policy: Policy, logger: Logger, clock: Clock, *,
     end = {"episode_id": episode_id, "outcome": outcome, "terminated": bool(terminated),
            "truncated": bool(truncated), "score": score, "n_pacing_resets": 0}
     logger.log(type="episode_end", **end)
+    # ... and the same rule about which world is still the player's: only the
+    # one the budget interrupted carries on into the next block that names
+    # this slot. A model chains among its own blocks, not into a subject's:
+    # the folder is per run (--resume-dir), like the session folder is.
+    if slot is not None and outcome == "playing" and ep_frame:
+        resume.save(resume_dir, slot,
+                    adapter.capture(observation, info, want_blob=True).blob,
+                    {**(provenance or {}), "episode_id": episode_id, "n_frames": ep_frame,
+                     "score": score, "run_time": clock.run_time(),
+                     "wall_time": clock.wall_time()})
     return end, skipped
 
 
@@ -175,7 +198,30 @@ def play_block(phase: dict, index: int, args, logger: Logger,
     adapter = get_adapter(backend, {**phase, "cue_overlay": True})
     policy = build_policy(args, adapter)
 
+    # The world this block continues, on the same terms the run loop resumes
+    # one: the model plays the worlds the subject plays, so a block the config
+    # says carries over carries over here too, or neither player's blocks mean
+    # the same thing. Whether the backend can is known only now (built env).
+    slot = resume.slot_of(phase)
+    carry = None
+    if slot is not None:
+        if not resume.supported(adapter):
+            raise ValueError(f'game phase {index}: "resume": {slot!r}, but the {backend} '
+                             "adapter has no savestate to resume from (EnvAdapter.restore)")
+        carry = resume.load(args.resume_dir, slot)
+        print(f"  resume slot {slot!r}: "
+              f"{'continuing ' + carry.path if carry else 'no world yet, starting one'}")
+    resumed_from = resume.describe(carry)
+    provenance = {"subject": args.subject, "backend": backend, "game": phase["game"],
+                  "block": index, "policy": args.policy}
+
     data_dir = logger.open_block(index, backend, phase["game"], phase, base_seed)
+    if carry is not None:
+        # The block keeps its own copy of the world it was handed; the frame a
+        # resumed episode opens on is in no `frame` line this block would
+        # otherwise hold. Same line the run loop writes.
+        logger.log(type="resume", slot=slot, source=carry.header, path=carry.path,
+                   state=carry.blob)
     episodes: list[dict] = []           # each episode's episode_end record
     skipped = 0
     for episode_id in range(args.n_episodes):
@@ -184,7 +230,11 @@ def play_block(phase: dict, index: int, args, logger: Logger,
             adapter, policy, logger, clock, seed=base_seed + episode_id,
             episode_id=episode_id, state_stride=state_stride,
             fps=phase["fps"], turn_based=bool(phase.get("turn_based", False)),
-            max_frames=args.max_frames)
+            max_frames=args.max_frames,
+            # Only the first: the episodes after it are there because that
+            # world ended, and an ended world is not resumed.
+            carry=carry if episode_id == 0 else None, slot=slot,
+            resume_dir=args.resume_dir, provenance=provenance)
         episodes.append(end)
         skipped += n_skipped
         print(f"  episode {episode_id} (seed {base_seed + episode_id}): "
@@ -203,6 +253,7 @@ def play_block(phase: dict, index: int, args, logger: Logger,
         # named something that is not a key, or the call never came back.
         "skipped_frames": skipped, "invalid_replies": policy.invalid,
         "dropped_calls": policy.dropped,
+        **({"resume": slot, "resumed_from": resumed_from} if slot else {}),
     }
     logger.close_block(**summary, audio={}, extra=extra)
     logger.log_phase({"index": index, "type": "game", "backend": backend,
@@ -222,6 +273,11 @@ def main() -> None:
     p.add_argument("--n-episodes", type=int, default=1)
     p.add_argument("--max-frames", type=int, default=1000)
     p.add_argument("--policy-seed", type=int, default=0)
+    p.add_argument("--resume-dir",
+                   help="where blocks that name a \"resume\" slot keep the world they left "
+                        "off in (default: <outdir>/resume, so a curriculum's blocks continue "
+                        "each other but two commands do not). Point two commands at the same "
+                        "folder to chain them, as a session's runs are chained.")
     args = p.parse_args()
 
     config = load_config(args.curriculum)
@@ -232,6 +288,7 @@ def main() -> None:
     curriculum = config["curriculum"]
     outdir = args.outdir or os.path.join(
         "data", f"{args.subject}_{time.strftime('%Y%m%d-%H%M%S')}")
+    args.resume_dir = args.resume_dir or os.path.join(outdir, "resume")
     clock = Clock()
     # No scanner here, so the run's zero is simply when it started: the time
     # columns stay the same shape as a human run's, measured from that.
