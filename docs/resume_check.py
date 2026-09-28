@@ -13,12 +13,14 @@ refused, and which backends have the savestate a resume is made of. Part 2 runs
 ``fmri_play.py`` twice into one session and checks that what run 1 wrote is
 byte-for-byte what run 2 was handed, that run 2's own world then moved past it,
 and that the two blocks are different games despite the same pinned seed, which
-is what proves run 2 did not simply open the seed's world. Part 3 runs a third
-block whose episode the *game* ends and checks the slot is left alone: only an
-episode the block's clock cut off carries on. Part 4 is the one surprise in the
-feature: a restored world ignores the block's ``env_kwargs``, because it comes
-back exactly as it was pickled, so the run says so out loud rather than letting
-an edited config read as if it had taken.
+is what proves run 2 did not simply open the seed's world. Part 3 is the one
+surprise in the feature: a restored world ignores the block's ``env_kwargs``,
+because it comes back exactly as it was pickled, so the run says so out loud
+rather than letting an edited config read as if it had taken. Part 4 is the
+other half of the rule: a block whose episode the *game* ends loses the slot
+with it, and the block after that opens a world of its own, because only an
+ending that belongs to the scanner's clock is one the game should not charge
+for.
 
 The curriculum is the real level-4 config with three fields changed -- a shorter
 duration, a smaller frame, and real-time pacing instead of turn-based, so a
@@ -26,7 +28,7 @@ headless run steps without a person pressing buttons. Everything else, the
 resume field included, is whatever ``configs/dbp_games/crafter__crafter_L4.json``
 says today.
 
-Last run 2026-09-28 on this branch: 4 blocks, 21 checks, 0 failures.
+Last run 2026-09-28 on this branch: 5 blocks, 26 checks, 0 failures.
 """
 
 import hashlib
@@ -233,29 +235,6 @@ def part2(curriculum: str, data_root: str) -> str:
 
 
 def part3(curriculum: str, data_root: str, slot: str) -> None:
-    """A world the game ended does not overwrite the slot.
-
-    :param curriculum: the short level-4 config, played to a real ending here.
-    :param data_root: the BIDS root the runs share.
-    :param slot: the slot file part 2 left.
-    """
-    print("part 3: an episode the game ended")
-    ended = curriculum.replace(".json", "_ended.json")
-    config = json.load(open(curriculum))
-    # No clock: the block runs until the game ends the episode, which for a
-    # player who presses nothing but noop means dying of thirst.
-    config["curriculum"][0].update(mode="episode", n_episodes=1)
-    json.dump(config, open(ended, "w"))
-    before = hashlib.sha256(open(slot, "rb").read()).hexdigest()
-    block = np.load(play(ended, data_root, 3)[0], allow_pickle=True)
-    after = hashlib.sha256(open(slot, "rb").read()).hexdigest()
-    check("the block still resumed", bool(block["episode_resumed"].all()))
-    check("the game ended its episode", str(block["episode_outcome"][-1]) != "playing",
-          str(block["episode_outcome"][-1]))
-    check("and the slot was left alone", before == after, before[:12])
-
-
-def part4(curriculum: str, data_root: str, slot: str) -> None:
     """A restored world keeps the ``env_kwargs`` it was built with, and says so.
 
     ``restore`` replaces the env the block just built, so the block's own
@@ -267,24 +246,63 @@ def part4(curriculum: str, data_root: str, slot: str) -> None:
     :param data_root: the BIDS root the runs share.
     :param slot: the slot file part 2 left.
     """
-    print("part 4: env_kwargs a restored world will not honour")
+    print("part 3: env_kwargs a restored world will not honour")
     drifted = curriculum.replace(".json", "_drift.json")
     config = json.load(open(curriculum))
     kwargs = {**config["curriculum"][0]["env_kwargs"], "length": 20}
     config["curriculum"][0]["env_kwargs"] = kwargs
     json.dump(config, open(drifted, "w"))
     was = world_length(resume.load(os.path.dirname(slot), "crafter_L4").blob)
-    path, said = play(drifted, data_root, 4)
+    path, said = play(drifted, data_root, 3)
     block = np.load(path, allow_pickle=True)
     check("the run warned that the config would not take",
           "WARNING" in said and "length" in said)
     check("and the world kept the cap it was opened with",
           world_length(last_anchor(block)) == was == 0,
           f"length {kwargs['length']} in the config, {was} in the world")
+    # The header follows the world, not the config of whichever block last
+    # held it, or the warning would repeat for every block from here on.
+    check("the slot still says what the world was opened with",
+          (resume.load(os.path.dirname(slot), "crafter_L4").header
+           .get("env_kwargs", {}).get("length")) == 0)
+
+
+def part4(curriculum: str, data_root: str, slot: str) -> None:
+    """An ending the game chose ends the thread of play with it.
+
+    The block's clock is the scanner's, and carrying a world across it is what
+    keeps the scanner from changing crafter. A death is crafter's own, so it
+    has to still cost what crafter charges for it: the slot goes, and the next
+    block of that name opens a world of its own rather than putting the subject
+    back where the block they died in began.
+
+    :param curriculum: the short level-4 config, played to a real ending here.
+    :param data_root: the BIDS root the runs share.
+    :param slot: the slot file the runs share.
+    """
+    print("part 4: an episode the game ended")
+    ended = curriculum.replace(".json", "_ended.json")
+    config = json.load(open(curriculum))
+    # No clock: the block runs until the game ends the episode, which for a
+    # player who presses nothing but noop means dying of thirst.
+    config["curriculum"][0].update(mode="episode", n_episodes=1)
+    json.dump(config, open(ended, "w"))
+    path, said = play(ended, data_root, 4)
+    block = np.load(path, allow_pickle=True)
+    check("a block back on the original config is not warned at", "WARNING" not in said)
+    check("the block still resumed", bool(block["episode_resumed"].all()))
+    check("the game ended its episode", str(block["episode_outcome"][-1]) != "playing",
+          str(block["episode_outcome"][-1]))
+    check("and the world went with it", not os.path.exists(slot))
+
+    after, said = play(curriculum, data_root, 5)
+    check("so the next block of that name opened its own",
+          not np.load(after, allow_pickle=True)["episode_resumed"].any()
+          and "no world yet" in said)
 
 
 def main() -> None:
-    """Run all three parts and exit non-zero on any failure."""
+    """Run all four parts and exit non-zero on any failure."""
     work = tempfile.mkdtemp(prefix="resume-check-")
     try:
         part1()

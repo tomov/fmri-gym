@@ -166,14 +166,19 @@ def play_episode(adapter, policy: Policy, logger: Logger, clock: Clock, *,
     logger.log(type="episode_end", **end)
     # ... and the same rule about which world is still the player's: only the
     # one the budget interrupted carries on into the next block that names
-    # this slot. A model chains among its own blocks, not into a subject's:
-    # the folder is per run (--resume-dir), like the session folder is.
-    if slot is not None and outcome == "playing" and ep_frame:
+    # this slot, and an ending the game chose ends the thread of play instead.
+    # A model chains among its own blocks, not into a subject's: the folder is
+    # per run (--resume-dir), like the session folder is.
+    if slot is not None and ep_frame and outcome == "playing":
         resume.save(resume_dir, slot,
                     adapter.capture(observation, info, want_blob=True).blob,
                     {**(provenance or {}), "episode_id": episode_id, "n_frames": ep_frame,
                      "score": score, "run_time": clock.run_time(),
                      "wall_time": clock.wall_time()})
+    elif slot is not None and ep_frame:
+        gone = resume.clear(resume_dir, slot)
+        if gone:
+            print(f"  {slot}'s world is over ({outcome}); the next block opens a new one")
     return end, skipped
 
 
@@ -216,8 +221,8 @@ def play_block(phase: dict, index: int, args, logger: Logger,
             print(f"  {drift}")
     resumed_from = resume.describe(carry)
     provenance = {"subject": args.subject, "backend": backend, "game": phase["game"],
-                  "block": index, "env_kwargs": phase.get("env_kwargs") or {},
-                  "policy": args.policy}
+                  "block": index, "policy": args.policy,
+                  "env_kwargs": resume.opened_with(carry, phase.get("env_kwargs") or {})}
 
     data_dir = logger.open_block(index, backend, phase["game"], phase, base_seed)
     if carry is not None:

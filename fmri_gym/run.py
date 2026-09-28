@@ -664,14 +664,19 @@ class Run:
         # "playing" is the block's clock ending an episode the game had not
         # finished, so it is the only outcome whose world is still the
         # subject's -- and, being the clock, it can only be the block's last
-        # episode: one write per block. A world that died, was won, was
-        # restarted or was forfeited is over, and the slot keeps what it has,
-        # so the next block hands the subject the last world they were living in.
+        # episode: one write per block. Every other ending belongs to the game
+        # and ends the thread of play with it, so the slot is cleared and the
+        # next block of that name opens a new world from its seed. Leaving the
+        # file would hand a subject who died the world their block began in,
+        # which is a checkpoint crafter does not have: this feature exists so
+        # the scanner's clock does not change the game, not so that death
+        # stops costing anything. "quit" is the exception and is left alone:
+        # an experimenter stopping the run is not the game ending.
         # ``ep_frame``: a block the subject never acted in has no step's `info`
         # to capture with (a reset's is empty), and nothing happened in it
         # anyway -- the slot keeps the world it already had, which is the one
         # that was on screen.
-        if slot is not None and outcome == "playing" and ep_frame:
+        if slot is not None and ep_frame and outcome == "playing":
             path = resume.save(self.resume_dir, slot,
                                adapter.capture(observation, info, want_blob=True).blob,
                                {**(provenance or {}), "episode_id": episode_id,
@@ -679,6 +684,11 @@ class Run:
                                 "run_time": self.clock.run_time(),
                                 "wall_time": self.clock.wall_time()})
             print(f"phase: {slot} left off in this world -> {path}", file=sys.stderr)
+        elif slot is not None and ep_frame and outcome != "quit":
+            gone = resume.clear(self.resume_dir, slot)
+            if gone:
+                print(f"phase: {slot}'s world is over ({outcome}); the next block of that "
+                      f"name opens a new one -> removed {gone}", file=sys.stderr)
         if message and outcome_duration > 0:
             self.audio.stop()               # the episode's last sounds, still queued
             self.display.draw_text(f"Final score: {score:g}\n{message}")
@@ -806,8 +816,12 @@ class Run:
         resumed_from = resume.describe(carry)
         # What the slot's file records about where its world came from, and
         # what it was built to be, so the next block can tell it has drifted.
+        # A world that was restored was built by whichever block opened it, and
+        # keeps saying so: writing this block's env_kwargs would make the next
+        # block agree with a config this world never obeyed.
         provenance = {"subject": self.subject, "backend": backend, "game": phase["game"],
-                      "block": index, "env_kwargs": phase.get("env_kwargs") or {},
+                      "block": index,
+                      "env_kwargs": resume.opened_with(carry, phase.get("env_kwargs") or {}),
                       "run": (self.logger.manifest.get("run") or {}).get("label")}
 
         data_dir = self.logger.open_block(index, backend, phase["game"], phase, base_seed)

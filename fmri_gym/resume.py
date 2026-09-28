@@ -151,6 +151,30 @@ def save(folder: str, slot: str, blob: bytes, header: dict) -> str:
     return path
 
 
+def clear(folder: str, slot: str) -> str | None:
+    """End this thread of play: the next block of the slot opens a new world.
+
+    A death, a win, a restart from the menu or a forfeit is the *game* ending
+    the episode, and the block's clock had nothing to do with it. Leaving the
+    file would put the subject back where the block they died in began, which
+    is a checkpoint the game does not have: continuity across blocks exists so
+    that the scanner's clock does not change crafter, not so that dying stops
+    costing anything.
+
+    Nothing is lost with it. The world it held is the one the dying block
+    restored, so that block's own npz holds the same bytes in ``resume_state``.
+
+    :param folder: the session's ``resume/`` folder.
+    :param slot: the slot name.
+    :return: the path removed, or ``None`` if there was no world to end.
+    """
+    path = path_of(folder, slot)
+    if not os.path.exists(path):
+        return None
+    os.remove(path)
+    return path
+
+
 def load(folder: str, slot: str) -> Carry | None:
     """This slot's world, or ``None`` if there is none to continue.
 
@@ -185,6 +209,22 @@ def load(folder: str, slot: str) -> Carry | None:
                          f"{header.get('n_bytes')}: the file was not finished being written. "
                          "Delete it to start this world fresh")
     return Carry(header=header, blob=blob, path=path)
+
+
+def opened_with(carry: Carry | None, env_kwargs: dict) -> dict:
+    """The ``env_kwargs`` a block's world is actually living under.
+
+    A block that opens a world opens it from its own config; a block that
+    continues one inherits whatever that world was opened with, however its own
+    config reads, so the record follows the world and not the file.
+
+    :param carry: the world this block restored, or ``None``.
+    :param env_kwargs: what this block's config asks the env for.
+    :return: the fields the world was built with.
+    """
+    if carry is not None and isinstance(carry.header.get("env_kwargs"), dict):
+        return carry.header["env_kwargs"]
+    return env_kwargs
 
 
 def env_drift(carry: Carry | None, env_kwargs: dict) -> list[str]:
