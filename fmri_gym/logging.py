@@ -143,12 +143,16 @@ class Logger:
                  game=game, phase=phase, base_seed=base_seed)
         return name
 
-    def log(self, **record: Any) -> None:
+    def log(self, state: bytes | None = None, **record: Any) -> None:
         """Append one line to the open block's ``events.jsonl``.
 
+        :param state: an opaque savestate to store on the line as ``state``:
+            zlib'd, then base64 (both done by the writer process, off the
+            caller's loop), the way :meth:`log_frame` stores a frame's.
         :param record: the line's fields; give it a ``type``.
         """
-        self._queue.put({"op": "line", "block": self._block, "line": record})
+        self._queue.put({"op": "line", "block": self._block, "line": record,
+                         "state": state})
 
     def log_frame(self, fields: dict, frame: Any = None, state: bytes | None = None) -> None:
         """Append one ``frame`` line, and the rendered frame when the stride says so.
