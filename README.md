@@ -388,6 +388,13 @@ They assume `sub-01` and a 1024x768 window, and take the subject's next free ses
  "mode": "duration",            // "duration" = replay until time up; "episode" = play N episodes
  "duration": 30.0,              // seconds (duration mode)
  "n_episodes": 1,               // episodes (episode mode)
+ "pass_score": 100,             // episode mode, optional: the score (the episode's cumulative
+                                // reward -- what a model plays for) an episode must reach to count
+                                // towards n_episodes; one below it replays the same instance, so
+                                // the block ends on a pass, at max_duration, or from the menu
+ "show_score": true,            // print the running score over the frame's top-left corner
+ "result_screen": 2.0,          // seconds the final score (and pass / try again) shows after an
+                                // episode the env ended; 0 = none
  "max_duration": 300.0,         // hard wall-clock safety cap (episode mode)
  "fps": 30,                     // required: steps (and frames) per second. The engine's own rate
                                 // (console cores and Atari ~60, Doom 35 / frame_skip) plays the game

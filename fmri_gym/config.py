@@ -176,6 +176,18 @@ def _phase_problems(phase: dict) -> list[str]:
         out.append("game: missing env id")
     if phase.get("mode", "duration") not in ("duration", "episode"):
         out.append(f"mode: expected 'duration' or 'episode', got {phase.get('mode')!r}")
+    # pass_score gates n_episodes, so it means nothing to a block that ends on
+    # the clock. Whether the number separates anything is the game's business.
+    if "pass_score" in phase:
+        if not isinstance(phase["pass_score"], (int, float)) or isinstance(phase["pass_score"], bool):
+            out.append(f"pass_score: expected a number, got {phase['pass_score']!r}")
+        elif phase.get("mode", "duration") != "episode":
+            out.append("pass_score: only in mode 'episode' (a duration block ends on the clock)")
+    if "result_screen" in phase and not (
+            isinstance(phase["result_screen"], (int, float)) and phase["result_screen"] >= 0):
+        out.append(f"result_screen: expected seconds >= 0, got {phase['result_screen']!r}")
+    if "show_score" in phase and not isinstance(phase["show_score"], bool):
+        out.append(f"show_score: expected true or false, got {phase['show_score']!r}")
     out.extend(_fps_problems(phase))
     out.extend(_keys_problems(phase))
     if "menu" in phase:

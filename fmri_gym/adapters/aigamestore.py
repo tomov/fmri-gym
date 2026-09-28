@@ -15,6 +15,15 @@ or a level clear (the env's rule; see its docstring). A curriculum therefore
 lists one game phase per level it wants played. ``"game": "game6"`` is level 1;
 game4 has no levels and takes no ``/level``.
 
+The reward is the game's own score delta, so a phase's ``pass_score`` (the
+score an episode must reach to count; below it the level comes back) is a
+score in the game's units. Whether a threshold separates a cleared level from
+a lost one is the game's design: game1 scores only on a clear (100+), game3
+exactly 100 per enemy with a level cleared at all of them, game5 pays 1000+
+on a clear against at most 600 of cheese, game6 (no losing state) exactly 500
+at the last checkpoint. In game2, 7, 8, 9 and 10 play itself scores without
+bound, so no threshold does, and their configs set none.
+
 Keys: a phase's ``keys`` values are indices into the game's key list
 (``aigamestore_gym.GAME_KEYS``; game1: LEFT, RIGHT, SPACE, Z), the order of the
 MultiBinary action. The games paint control hints on the canvas; the env

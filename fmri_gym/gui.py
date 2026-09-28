@@ -168,6 +168,10 @@ _GAME_FIELDS = [
           tip="duration = play (and replay) until the time is up; episode = play n_episodes."),
     Field("duration", "duration (s)", "float", tip="duration mode: block length in seconds."),
     Field("n_episodes", "n_episodes", "int", tip="episode mode: how many episodes."),
+    Field("pass_score", "pass_score", "float",
+          tip="episode mode: the score (cumulative reward) an episode must reach to count "
+              "toward n_episodes. One below it replays the same instance, so the block ends "
+              "on a pass, at max_duration, or from the menu. Blank = every episode counts."),
     Field("max_duration", "max_duration (s)", "float",
           tip="episode mode: hard wall-clock cap for the block."),
     Field("fps", "fps", "float",
@@ -189,6 +193,11 @@ _GAME_FIELDS = [
     Field("audio", "audio", "bool", default=True,
           tip="Play the game's sound in this block. Off mutes the speakers; audio the env "
               "returns is still logged."),
+    Field("show_score", "show_score", "bool", default=True,
+          tip="Print the running score (cumulative reward) over the frame's top-left corner."),
+    Field("result_screen", "result_screen (s)", "float",
+          tip="Seconds the final score (and pass / try again) is shown after an episode the "
+              "env ended (default 2; 0 = none)."),
 ]
 
 PHASE_FIELDS: dict[str, list[Field]] = {
@@ -502,7 +511,8 @@ def phase_label(index: int, phase: dict) -> str:
     kind = phase["type"]
     if kind == "game":
         length = (f"{phase.get('duration', 30.0):g}s" if phase.get("mode", "duration") == "duration"
-                  else f"{phase.get('n_episodes', 1)}ep")
+                  else f"{phase.get('n_episodes', 1)}ep"
+                       f"{' to ' + format(phase['pass_score'], 'g') if 'pass_score' in phase else ''}")
         detail = f"{str(phase.get('game', '?')).split('/')[-1]} {length}"
     elif kind == "message":
         text = phase.get("text", "")

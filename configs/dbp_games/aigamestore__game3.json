@@ -1,7 +1,7 @@
 {
   "_game": "AI GameStore game3 (twin-stick / top-down shooter)",
   "_note": "uv sync --extra aigamestore: the vendored aigamestore-gym env (gym/aigamestore), which needs a Chromium browser (system Chrome by default). Lock-stepped: fps must equal 60 / frame_skip (10 with the default frame_skip 6). Three.js + canvas HUD.",
-  "_levels_note": "An episode is one level: it ends on a win, a loss or a level clear, and reset() restarts the same level. Levels 1..7 are listed, one phase each; drop or reorder them as the session needs.",
+  "_levels_note": "An episode is one level: it ends on a win, a loss or a level clear, and reset() restarts the same level. Levels 1..7 are listed, one phase each; drop or reorder them as the session needs. Each block is one episode (mode 'episode', n_episodes 1) with a pass_score of 100 per enemy in the level (3, 5, 6, 4, 7, 9, 13 enemies: the score a level cleared at all of them reaches exactly): the score is the episode's cumulative reward (the game's own score), and an episode below the passing score replays the same level, so the levels run back to back at the subject's own pace and the block ends on a pass or at max_duration. The running score is shown over the frame and the final score after each episode.",
   "_keys_note": "The env's action is MultiBinary over the game's keys, in aigamestore_gym.GAME_KEYS order -- game3: 0=W, 1=A, 2=S, 3=D, 4=LEFT, 5=RIGHT, 6=UP, 7=DOWN, 8=SPACE, 9=Z, 10=LSHIFT -- so 'keys' values are those indices (the JSON key is what the subject presses) and held keys combine. The env relabels the on-canvas hints to the pressed key; keep the message Controls text in sync with 'keys' by hand.",
   "_keys_reference": "https://github.com/tomov/fmri-gym/blob/main/gym/aigamestore/game3/input.js",
   "curriculum": [
@@ -28,37 +28,37 @@
     {
       "type": "game", "backend": "aigamestore", "game": "game3/level1",
       "keys": {"W": 0, "A": 1, "S": 2, "D": 3, "LEFT": 4, "RIGHT": 5, "UP": 6, "DOWN": 7, "SPACE": 8, "Z": 9, "LSHIFT": 10},
-      "mode": "duration", "duration": 42.9, "fps": 10
+      "mode": "episode", "n_episodes": 1, "pass_score": 300, "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game3/level2",
       "keys": {"W": 0, "A": 1, "S": 2, "D": 3, "LEFT": 4, "RIGHT": 5, "UP": 6, "DOWN": 7, "SPACE": 8, "Z": 9, "LSHIFT": 10},
-      "mode": "duration", "duration": 42.9, "fps": 10
+      "mode": "episode", "n_episodes": 1, "pass_score": 500, "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game3/level3",
       "keys": {"W": 0, "A": 1, "S": 2, "D": 3, "LEFT": 4, "RIGHT": 5, "UP": 6, "DOWN": 7, "SPACE": 8, "Z": 9, "LSHIFT": 10},
-      "mode": "duration", "duration": 42.9, "fps": 10
+      "mode": "episode", "n_episodes": 1, "pass_score": 600, "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game3/level4",
       "keys": {"W": 0, "A": 1, "S": 2, "D": 3, "LEFT": 4, "RIGHT": 5, "UP": 6, "DOWN": 7, "SPACE": 8, "Z": 9, "LSHIFT": 10},
-      "mode": "duration", "duration": 42.9, "fps": 10
+      "mode": "episode", "n_episodes": 1, "pass_score": 400, "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game3/level5",
       "keys": {"W": 0, "A": 1, "S": 2, "D": 3, "LEFT": 4, "RIGHT": 5, "UP": 6, "DOWN": 7, "SPACE": 8, "Z": 9, "LSHIFT": 10},
-      "mode": "duration", "duration": 42.9, "fps": 10
+      "mode": "episode", "n_episodes": 1, "pass_score": 700, "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game3/level6",
       "keys": {"W": 0, "A": 1, "S": 2, "D": 3, "LEFT": 4, "RIGHT": 5, "UP": 6, "DOWN": 7, "SPACE": 8, "Z": 9, "LSHIFT": 10},
-      "mode": "duration", "duration": 42.9, "fps": 10
+      "mode": "episode", "n_episodes": 1, "pass_score": 900, "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game3/level7",
       "keys": {"W": 0, "A": 1, "S": 2, "D": 3, "LEFT": 4, "RIGHT": 5, "UP": 6, "DOWN": 7, "SPACE": 8, "Z": 9, "LSHIFT": 10},
-      "mode": "duration", "duration": 42.9, "fps": 10
+      "mode": "episode", "n_episodes": 1, "pass_score": 1300, "max_duration": 120.0, "fps": 10
     },
     {"type": "fixation", "duration": 2.0}
   ]

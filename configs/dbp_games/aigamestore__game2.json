@@ -1,7 +1,7 @@
 {
   "_game": "AI GameStore game2 (Angry-Birds-like)",
   "_note": "uv sync --extra aigamestore: the vendored aigamestore-gym env (gym/aigamestore), which needs a Chromium browser (system Chrome by default). Lock-stepped: fps must equal 60 / frame_skip (10 with the default frame_skip 6).",
-  "_levels_note": "An episode is one level: it ends on a win, a loss or a level clear, and reset() restarts the same level. Levels 1..9 are listed, one phase each; drop or reorder them as the session needs.",
+  "_levels_note": "An episode is one level: it ends on a win, a loss or a level clear, and reset() restarts the same level. Levels 1..9 are listed, one phase each; drop or reorder them as the session needs. Each block is one episode (mode 'episode', n_episodes 1) and ends with it. No pass_score: here play itself scores without bound (kills, pops, pickups), so no threshold separates a cleared level from a lost one, and a lost level ends the block as a cleared one does. The running score is shown over the frame and the final score after each episode.",
   "_keys_note": "The env's action is MultiBinary over the game's keys, in aigamestore_gym.GAME_KEYS order -- game2: 0=LEFT, 1=RIGHT, 2=UP, 3=DOWN, 4=SPACE, 5=Z -- so 'keys' values are those indices (the JSON key is what the subject presses) and held keys combine. The env relabels the on-canvas hints to the pressed key; keep the message Controls text in sync with 'keys' by hand.",
   "_keys_reference": "https://github.com/tomov/fmri-gym/blob/main/gym/aigamestore/game2/input.js",
   "curriculum": [
@@ -26,47 +26,47 @@
     {
       "type": "game", "backend": "aigamestore", "game": "game2/level1",
       "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
-      "mode": "duration", "duration": 33.3, "fps": 10
+      "mode": "episode", "n_episodes": 1, "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game2/level2",
       "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
-      "mode": "duration", "duration": 33.3, "fps": 10
+      "mode": "episode", "n_episodes": 1, "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game2/level3",
       "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
-      "mode": "duration", "duration": 33.3, "fps": 10
+      "mode": "episode", "n_episodes": 1, "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game2/level4",
       "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
-      "mode": "duration", "duration": 33.3, "fps": 10
+      "mode": "episode", "n_episodes": 1, "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game2/level5",
       "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
-      "mode": "duration", "duration": 33.3, "fps": 10
+      "mode": "episode", "n_episodes": 1, "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game2/level6",
       "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
-      "mode": "duration", "duration": 33.3, "fps": 10
+      "mode": "episode", "n_episodes": 1, "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game2/level7",
       "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
-      "mode": "duration", "duration": 33.3, "fps": 10
+      "mode": "episode", "n_episodes": 1, "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game2/level8",
       "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
-      "mode": "duration", "duration": 33.3, "fps": 10
+      "mode": "episode", "n_episodes": 1, "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game2/level9",
       "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
-      "mode": "duration", "duration": 33.3, "fps": 10
+      "mode": "episode", "n_episodes": 1, "max_duration": 120.0, "fps": 10
     },
     {"type": "fixation", "duration": 2.0}
   ]

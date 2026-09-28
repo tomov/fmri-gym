@@ -98,6 +98,9 @@ class Logger:
             # Opaque per-frame savestate blobs (object array of bytes|None).
             states=np.array(frames["state_blob"], dtype=object),
             episode_seeds=np.asarray(frames["episode_seeds"], dtype=np.int64),
+            # Each episode's score -- its cumulative reward -- one per episode_seeds
+            # (an episode the subject quit or restarted keeps what it had).
+            episode_score=np.asarray(frames["episode_score"], dtype=np.float64),
             backend=backend,
             game=game,
         )

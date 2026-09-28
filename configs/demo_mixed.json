@@ -27,7 +27,7 @@
     {"type": "game", "backend": "gym", "game": "CarRacing-v3", "keys": {"": [0.0, 0.0, 0.0], "RIGHT": [1.0, 0.0, 0.0], "LEFT": [-1.0, 0.0, 0.0], "UP": [0.0, 1.0, 0.0], "DOWN": [0.0, 0.0, 1.0]}, "mode": "episode", "n_episodes": 1, "max_duration": 15.0, "fps": 30},
     {"type": "message", "text": "Water Sort (AI GameStore, p5.js)", "duration": 2.0},
     {"type": "fixation", "duration": 2.0},
-    {"type": "game", "backend": "aigamestore", "game": "game1", "keys": {"LEFT": 0, "RIGHT": 1, "SPACE": 2, "Z": 3}, "mode": "duration", "duration": 15.0, "fps": 10},
+    {"type": "game", "backend": "aigamestore", "game": "game1", "keys": {"LEFT": 0, "RIGHT": 1, "SPACE": 2, "Z": 3}, "mode": "episode", "n_episodes": 1, "max_duration": 120.0, "fps": 10},
     {"type": "fixation", "duration": 4.0},
     {"type": "survey", "questions": ["I was fully absorbed in the games.", "The games were too difficult."]}
   ]

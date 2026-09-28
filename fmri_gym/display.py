@@ -95,6 +95,7 @@ class Display:
                   file=sys.stderr)
         self.font = pygame.font.Font(pygame.font.get_default_font(), 28)
         self.fix_font = pygame.font.Font(pygame.font.get_default_font(), 80)
+        self._hud: tuple[str | None, pygame.Surface | None] = (None, None)  # draw_frame's cached overlay
 
     def _open(self) -> pygame.Surface:
         """Open the window, trying for a vsync-locked flip.
@@ -191,20 +192,30 @@ class Display:
             return
         time.sleep(max(0.0, min(poll, deadline - time.perf_counter())))
 
-    def draw_frame(self, rgb: np.ndarray) -> float:
+    def draw_frame(self, rgb: np.ndarray, hud: str | None = None) -> float:
         """Blit an RGB frame, aspect-fit and centered with black pad.
 
         :param rgb: frame array shaped ``(H, W, 3)``.
+        :param hud: a line to print above the frame, flush with its right edge
+            (the running score), or ``None`` for none. With one, the frame is
+            fit below a strip the height of the text, so the two never overlap.
         :return: ``perf_counter`` of the flip that showed it.
         """
         self.canvas.fill(BG_COLOR)
         h, w = rgb.shape[:2]
         surf = pygame.surfarray.make_surface(rgb.transpose(1, 0, 2))  # -> (W,H)
-        scale = min(self.size[0] / w, self.size[1] / h)
+        strip = self.font.get_linesize() + 8 if hud else 0
+        scale = min(self.size[0] / w, (self.size[1] - strip) / h)
         dw, dh = int(w * scale), int(h * scale)
         surf = pygame.transform.scale(surf, (dw, dh))
-        rect = surf.get_rect(center=(self.size[0] // 2, self.size[1] // 2))
+        rect = surf.get_rect(center=(self.size[0] // 2, strip + (self.size[1] - strip) // 2))
         self.canvas.blit(surf, rect.topleft)
+        if hud:
+            # Rendered once per distinct string: it only changes when the score does.
+            if hud != self._hud[0]:
+                self._hud = (hud, self.font.render(hud, True, TEXT_COLOR, BG_COLOR))
+            self.canvas.blit(self._hud[1], self._hud[1].get_rect(
+                bottomright=(rect.right, rect.top - 4)))
         return self._present()
 
     def _wrap(self, font: pygame.font.Font, line: str, max_w: int) -> list[str]:
