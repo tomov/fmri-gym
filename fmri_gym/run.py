@@ -802,10 +802,15 @@ class Run:
             print(f"phase {index}: resume slot {slot!r}: "
                   f"{'continuing ' + carry.path if carry else 'no world yet, starting one'}",
                   file=sys.stderr)
+            # The restored world was built once, by whichever block opened it.
+            drift = carry and resume.drift_warning(carry, phase.get("env_kwargs") or {}, slot)
+            if drift:
+                print(f"phase {index}: {drift}", file=sys.stderr)
         resumed_from = resume.describe(carry)
-        # What the slot's file records about where its world came from.
+        # What the slot's file records about where its world came from, and
+        # what it was built to be, so the next block can tell it has drifted.
         provenance = {"subject": self.subject, "backend": backend, "game": phase["game"],
-                      "block": index,
+                      "block": index, "env_kwargs": phase.get("env_kwargs") or {},
                       "run": (self.logger.manifest.get("run") or {}).get("label")}
 
         data_dir = self.logger.open_block(index, backend, phase["game"], phase, base_seed)
