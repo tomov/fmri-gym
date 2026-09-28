@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Any
 
 import pygame
 
-from . import bids, pad
+from . import bids, pad, resume
 from .adapters import get_adapter
 from .audio import Audio
 from .config import fold_cli_options
@@ -223,7 +223,8 @@ def _wait_for_duration(display: Display, duration: float) -> None:
 
 
 def _final_outcome(
-    adapter: EnvAdapter, outcome: str, terminated: bool, truncated: bool
+    adapter: EnvAdapter, outcome: str, terminated: bool, truncated: bool,
+    resumes: bool = False,
 ) -> tuple[str, str]:
     """Settle how the episode ended: its outcome's name and the line for the subject.
 
@@ -237,6 +238,10 @@ def _final_outcome(
         the env's own end or the block's clock.
     :param terminated: the last step's ``terminated``.
     :param truncated: the last step's ``truncated``.
+    :param resumes: whether this block hands its world to the next one (its
+        ``"resume"`` slot). What the subject is told about a block the clock
+        cut off depends on it: only a block that carries over can promise the
+        world back.
     :return: ``(outcome, message)``; the message is ``""`` on a quit.
     """
     if outcome == "quit":
@@ -246,7 +251,8 @@ def _final_outcome(
     else:
         outcome, message = adapter.outcome(terminated, truncated)
         if outcome == "playing":        # the block's clock, not the game, ended it
-            message = "Block ended. Game will resume in the next block" # TODO actually implement `resume`
+            message = ("Block ended. Your game will continue in the next block" if resumes
+                       else "Block ended")
     return outcome, message
 
 
@@ -262,6 +268,7 @@ class Run:
         audio: Audio | None = None,
         triggers: Triggers | None = None,
         dummy_trigger: bool = False,
+        resume_dir: str | None = None,
     ) -> None:
         """Set up clock, logger, and phase dispatch for one subject.
 
@@ -276,12 +283,17 @@ class Run:
             and the audio. ``None`` = the fMRI default: wait for ``=``, send
             no trigger codes.
         :param dummy_trigger: if ``True``, skip real experimenter/scanner waits.
+        :param resume_dir: the session's folder of carried-over worlds
+            (:mod:`fmri_gym.resume`), which is a session's and not a run's.
+            ``None`` = nothing carries over, and a phase that asks to
+            (``"resume"``) is refused when its block starts.
         """
         self.subject = subject
         self.curriculum = curriculum
         self.display = display
         self.audio = audio or Audio()
         self.dummy_trigger = dummy_trigger
+        self.resume_dir = resume_dir
         self.clock = Clock()
         self.logger = Logger(outdir, subject, curriculum, self.clock)
         self.logger.set_extra("display", display.describe())
@@ -330,7 +342,8 @@ class Run:
         display = Display(size=(width, height), fullscreen=args.fullscreen,
                           vsync=not args.no_vsync, monitor=args.monitor)
         run = cls(args.subject, curriculum, display, out.folder, audio=audio,
-                  triggers=triggers, dummy_trigger=args.dummy_trigger)
+                  triggers=triggers, dummy_trigger=args.dummy_trigger,
+                  resume_dir=bids.resume_dir(args.data_root, args.subject, args.ses))
         run.logger.set_extra("run", {"label": out.label, "attempt": out.attempt})
         run.logger.set_extra("seeds", seeds)
         run.logger.set_extra("pad", pad_status)   # which controller answered, and as what
@@ -474,11 +487,16 @@ class Run:
         play_sound: bool,
         menu: Menu | None,
         outcome_duration: float,
+        carry: resume.Carry | None = None,
+        slot: str | None = None,
+        provenance: dict | None = None,
     ) -> dict:
         """Run one episode, logging every frame.
 
         :param adapter: wrapped env for reset/step/render/sound/capture.
-        :param seed: RNG seed for this episode's ``reset``.
+        :param seed: RNG seed for this episode's ``reset``. A resumed episode
+            (``carry``) still takes one, and still logs it, but plays the world
+            in the blob rather than the one that seed opens.
         :param episode_id: index of this episode within the game block.
         :param turn_based: if True, advance only on mapped keydowns.
         :param latched: real-time only: let a fresh keydown win over held keys.
@@ -491,6 +509,13 @@ class Run:
             phase's ``audio``); muting never changes what is logged.
         :param menu: the block's :class:`~.menu.Menu`, or ``None``.
         :param outcome_duration: seconds the final score and outcome are shown.
+        :param carry: a world an earlier block left off in
+            (:mod:`fmri_gym.resume`), restored over the one ``seed`` opens.
+            ``None`` = this episode starts the world.
+        :param slot: the slot this block hands its world on in, if the block's
+            clock is what ends this episode. ``None`` = nothing is carried.
+        :param provenance: what the slot's file should record about where the
+            world came from (run, block, backend, game).
         :return: the episode's ``episode_end`` record, as recorded:
             ``episode_id``, ``outcome`` (one of the adapter's,
             :meth:`~.adapters.base.EnvAdapter.outcome`: ``"won"``, ``"lost"``,
@@ -525,7 +550,20 @@ class Run:
 
         ## Reset environment and show initial state
         observation, info = adapter.reset(seed)
-        self.logger.log(type="episode_start", episode_id=episode_id, seed=seed)
+        if carry is not None:
+            # Over the world the seed just opened, before a pixel of it is
+            # shown: the subject sees the world they left, not a flash of a new
+            # one. `observation` and `info` are the fresh world's and are never
+            # read again -- the first _show renders the env itself, and the loop
+            # overwrites both from the first step.
+            adapter.restore(carry.blob)
+            print(f"phase: resuming {carry.header.get('slot')} from {carry.path}", file=sys.stderr)
+        # `resumed`: a resumed episode's seed opened a world nobody played, so
+        # replaying the episode from that seed and these actions gives a
+        # different game. Without the field nothing in the record says so; the
+        # world it was actually handed is the block's `resume` line.
+        self.logger.log(type="episode_start", episode_id=episode_id, seed=seed,
+                        resumed=carry is not None)
         self.display.call_on_flip(self.triggers.episode_start)
         # Paced from the flip, so a slow reset does not become a burst of
         # catch-up frames. The reset frame's sound is not played: it is not a
@@ -621,10 +659,29 @@ class Run:
             ep_frame += 1
 
         ## Final outcome
-        outcome, message = _final_outcome(adapter, outcome, terminated, truncated)
+        outcome, message = _final_outcome(adapter, outcome, terminated, truncated,
+                                          resumes=slot is not None)
         end = {"episode_id": episode_id, "outcome": outcome, "terminated": bool(terminated),
                "truncated": bool(truncated), "score": score, "n_pacing_resets": n_pacing_resets}
         self.logger.log(type="episode_end", **end)
+        # "playing" is the block's clock ending an episode the game had not
+        # finished, so it is the only outcome whose world is still the
+        # subject's -- and, being the clock, it can only be the block's last
+        # episode: one write per block. A world that died, was won, was
+        # restarted or was forfeited is over, and the slot keeps what it has,
+        # so the next block hands the subject the last world they were living in.
+        # ``ep_frame``: a block the subject never acted in has no step's `info`
+        # to capture with (a reset's is empty), and nothing happened in it
+        # anyway -- the slot keeps the world it already had, which is the one
+        # that was on screen.
+        if slot is not None and outcome == "playing" and ep_frame:
+            path = resume.save(self.resume_dir, slot,
+                               adapter.capture(observation, info, want_blob=True).blob,
+                               {**(provenance or {}), "episode_id": episode_id,
+                                "n_frames": ep_frame, "score": score,
+                                "run_time": self.clock.run_time(),
+                                "wall_time": self.clock.wall_time()})
+            print(f"phase: {slot} left off in this world -> {path}", file=sys.stderr)
         if message and outcome_duration > 0:
             self.audio.stop()               # the episode's last sounds, still queued
             self.display.draw_text(f"Final score: {score:g}\n{message}")
@@ -723,7 +780,44 @@ class Run:
             f"Loading {phase.get('text') or phase.get('game', 'game')} …")
         adapter = get_adapter(backend, phase)
         speed = {} if turn_based else self._speed(adapter, fps, index, phase["game"])
+        ## The world this block continues, if it continues one
+        # Whether a backend can resume takes a built env to know, so it is
+        # settled here rather than in validate_config: a block that asks to
+        # carry its world on a backend with no savestate would quietly start
+        # fresh every time, and the config would read as if it had not. Before
+        # open_block, so a refusal leaves no half-written block behind.
+        slot = resume.slot_of(phase)
+        carry = None
+        if slot is not None:
+            if not resume.supported(adapter):
+                raise ValueError(
+                    f'game phase {index}: "resume": {slot!r}, but the {backend} adapter has no '
+                    "savestate to resume from (EnvAdapter.restore); today crafter, retro, ale "
+                    "and vgdl do. Drop the field to play this block from its seed")
+            if self.resume_dir is None:
+                raise ValueError(f'game phase {index}: "resume": {slot!r}, but this run was '
+                                 "built with no session folder to keep worlds in "
+                                 "(Run(resume_dir=...))")
+            carry = resume.load(self.resume_dir, slot)
+            print(f"phase {index}: resume slot {slot!r}: "
+                  f"{'continuing ' + carry.path if carry else 'no world yet, starting one'}",
+                  file=sys.stderr)
+        resumed_from = resume.describe(carry)
+        # What the slot's file records about where its world came from.
+        provenance = {"subject": self.subject, "backend": backend, "game": phase["game"],
+                      "block": index,
+                      "run": (self.logger.manifest.get("run") or {}).get("label")}
+
         data_dir = self.logger.open_block(index, backend, phase["game"], phase, base_seed)
+        if carry is not None:
+            # The block keeps its own copy of the world it was handed. The
+            # frame a resumed episode opens on is in no `frame` line this block
+            # would otherwise hold: anchors are taken after a step, and the
+            # block that saved this world is in another block's events.jsonl,
+            # possibly another run's folder, and its last frame is an anchor
+            # only at stride 1.
+            self.logger.log(type="resume", slot=slot, source=carry.header,
+                            path=carry.path, state=carry.blob)
 
         ## Init loop over episodes
         locked = self.display.vsync and self.display.refresh_rate
@@ -748,9 +842,14 @@ class Run:
                 turn_based=turn_based, latched=latched, live_hud=live_hud,
                 dt=dt, state_stride=state_stride,
                 block_end=block_end, play_sound=play_sound, menu=menu,
-                outcome_duration=outcome_duration)
+                outcome_duration=outcome_duration,
+                carry=carry, slot=slot, provenance=provenance)
             episodes.append(end)
             outcome = end["outcome"]
+            # Only the block's first episode continues a world: the ones after
+            # it are there because that world ended (death, a win, a restart),
+            # and an ended world is not resumed.
+            carry = None
             # An episode's last sounds are still queued when it ends; drop them
             # so they do not play over the next episode or the next fixation.
             self.audio.stop()
@@ -776,6 +875,9 @@ class Run:
             "outcomes": dict(Counter(e["outcome"] for e in episodes)),
             "n_pacing_resets": sum(e["n_pacing_resets"] for e in episodes),
             "total_reward": sum(e["score"] for e in episodes),
+            # The slot this block carried its world on, and the world it was
+            # handed (:mod:`fmri_gym.resume`); absent when nothing carried.
+            **({"resume": slot, "resumed_from": resumed_from} if slot else {}),
         }
         self.logger.close_block(**summary, audio=audio, extra=extra)
         self.logger.log_phase({
