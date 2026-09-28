@@ -211,9 +211,13 @@ def play_block(phase: dict, index: int, args, logger: Logger,
         carry = resume.load(args.resume_dir, slot)
         print(f"  resume slot {slot!r}: "
               f"{'continuing ' + carry.path if carry else 'no world yet, starting one'}")
+        drift = carry and resume.drift_warning(carry, phase.get("env_kwargs") or {}, slot)
+        if drift:
+            print(f"  {drift}")
     resumed_from = resume.describe(carry)
     provenance = {"subject": args.subject, "backend": backend, "game": phase["game"],
-                  "block": index, "policy": args.policy}
+                  "block": index, "env_kwargs": phase.get("env_kwargs") or {},
+                  "policy": args.policy}
 
     data_dir = logger.open_block(index, backend, phase["game"], phase, base_seed)
     if carry is not None:

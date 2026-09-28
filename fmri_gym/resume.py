@@ -187,6 +187,49 @@ def load(folder: str, slot: str) -> Carry | None:
     return Carry(header=header, blob=blob, path=path)
 
 
+def env_drift(carry: Carry | None, env_kwargs: dict) -> list[str]:
+    """Which of this block's ``env_kwargs`` the world it restores will not honour.
+
+    A restored world comes back exactly as it was pickled, the arguments it was
+    built with included. The block does build an env from its own
+    ``env_kwargs`` first, but ``restore`` then replaces it, so editing ``size``
+    or ``length`` in the config of a block that resumes changes nothing at all
+    until the thread of play starts over. Measured on crafter 2026-09-28: a
+    block configured ``length: 20`` restored a world whose ``_length`` was
+    still the ``0`` it was opened with. That is a quiet wrong answer unless
+    somebody says it out loud, which is what this is for.
+
+    :param carry: the world being restored, or ``None``.
+    :param env_kwargs: what this block's config asks the env for.
+    :return: the fields that differ from the ones the world was built with,
+        empty when they agree or when the file predates this header.
+    """
+    if carry is None:
+        return []
+    was = carry.header.get("env_kwargs")
+    if not isinstance(was, dict):
+        return []
+    return sorted(k for k in set(was) | set(env_kwargs) if was.get(k) != env_kwargs.get(k))
+
+
+def drift_warning(carry: Carry, env_kwargs: dict, slot: str) -> str | None:
+    """What to print when a block asks a restored world for something it is not.
+
+    :param carry: the world being restored.
+    :param env_kwargs: what this block's config asks the env for.
+    :param slot: the slot name.
+    :return: a one-line warning, or ``None`` when there is nothing to warn about.
+    """
+    drift = env_drift(carry, env_kwargs)
+    if not drift:
+        return None
+    was = carry.header.get("env_kwargs") or {}
+    fields = "; ".join(f"{k} is {was.get(k)!r} in the world, {env_kwargs.get(k)!r} in the config"
+                       for k in drift)
+    return (f"WARNING {slot} continues a world built with different env_kwargs ({fields}). "
+            f"The world keeps its own: delete {carry.path} to open one this config describes")
+
+
 def describe(carry: Carry | None) -> Any:
     """What the manifest says about a block's resume, in one value.
 
