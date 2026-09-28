@@ -415,6 +415,16 @@ They assume `sub-01` and a 1024x768 window, and take the subject's next free ses
                                 // no sound. A duration block ends on the wall clock whether anyone
                                 // presses or not, so without this a subject who is thinking reads
                                 // the time their last press left behind
+ "resume": "crafter_L4",        // optional: the thread of play this block continues. The block
+                                // opens the world the last block of the same name left off in, and
+                                // leaves its own there for the next -- but only when the block's
+                                // clock is what stopped the episode (outcome "playing"). A death,
+                                // a win, a restart or a forfeit ends that world and the next block
+                                // starts one from its seed. Backends with a savestate only
+                                // (crafter, retro, ale, vgdl): any other is refused when the block
+                                // starts. The name is the file, not the game, so two blocks that
+                                // should be one continuous world say the same name and two levels
+                                // of one game must not. See "Resuming a world" below
  "seed": 1234,                  // optional base seed: episodes play with seed, seed+1, ...
                                 // Pinned, every participant and run gets the same episodes.
                                 // Left out, it is derived from the run (sub/ses/task/run) and
@@ -559,6 +569,7 @@ data/sub-01/ses-001/beh/sub-01_ses-001_task-pong_run-001/
 data/sub-01/ses-001/beh/sub-01_ses-001_task-pong_run-002/        the same task again
 data/sub-01/ses-001/beh/sub-01_ses-001_task-pong_run-002_02/     ... re-acquired
 data/sub-01/ses-001/beh/sub-01_ses-001_task-crafter_run-001/
+data/sub-01/ses-001/resume/crafter_L4.state                      the world run-001 left off in
 ```
 
 The task is the config's file name (letters and digits); `--subject` must be `sub-<letters/digits>`. `--ses` and `--run` are **required**: the numbers come from the session design (the script's `SES=` line and each run's place in it), never from what is on disk, so they survive a session that was interrupted, resumed or re-acquired. `--data-root` moves the tree (default `data`).
@@ -574,12 +585,13 @@ The names follow BIDS apart from that suffix, the contents not yet (no `_beh.tsv
     | `type` | fields |
     |--------|--------|
     | `block_start` | first line: `format`, `version`, `subject`, `block_index`, `backend`, `game`, `phase` (the config), `base_seed` |
-    | `episode_start` | `episode_id`, `seed` |
+    | `episode_start` | `episode_id`, `seed`, `resumed` (the episode was handed a world an earlier block left off in, so its seed names a world nobody played and a seed replay of it is a different game) |
     | `frame` | `frame` (index in the block), `episode_id`, `ep_frame` (index in the episode), `action`, `reward`, `terminated`, `truncated`, `run_time` (seconds since the trigger, after the step), `flip_time` (of the **flip that showed the frame**: its onset; vsync-locked when the display reports `vsync: true`), `wall_time` (Unix), `variables` (the backend's: `ram` for ale/retro, `info_*` for retro, `obs` for gym, …), and when present `env_action` (an adapter's own reading of the keys, e.g. Rush Hour), `trigger` (the code sent on that flip), `audio_chunk` (the chunk this frame's sound was queued as, -1 none; in blocks that play sound), `state` (a savestate, zlib'd then base64, every `state_stride` frames) |
+    | `resume` | `slot`, `path`, `source` (the slot file's header: which run, block and episode left the world there), `state` (the world itself, as `restore()` wants it, zlib'd then base64). One line, right after `block_start`, only in a block that resumed a world |
     | `input_event` | `run_time`, `name`, `down`: every key press/release during the block, stamped on arrival (~1 ms), independent of the frame grid; the pause menu's included |
     | `pacing_reset` | `flip_time`, `late`: a flip that ended a stall of more than a frame, and how many seconds late it was; the frame schedule restarted there instead of catching up with a burst of short frames (none in a clean block; why frames fall behind is open, issue #43) |
     | `episode_end` | `episode_id`, `outcome` (`won`, `lost`, `terminated`, `truncated`, `playing` for the block's clock; `quit`, `reset`, `forfeit` for the subject's) , `terminated`, `truncated`, `score`, `n_pacing_resets` |
-    | `block_end` | last line: `n_episodes`, `n_frames`, `outcomes`, `n_pacing_resets`, `total_reward` (the manifest entry's summary), `audio` (when the block played sound: `onsets`, `[chunk, run_time]` when each chunk reached the DAC, so a frame's sound onset is the entry for its `audio_chunk` and `onset - flip_time` the audio delay achieved; `delay_ms`, `resyncs`, `trimmed_samples`), `extra` (the adapter's block extras, e.g. an ALE palette) |
+    | `block_end` | last line: `n_episodes`, `n_frames`, `outcomes`, `n_pacing_resets`, `total_reward`, and in a block that carried a world `resume` (the slot) with `resumed_from` (the header of the world it opened, `null` when it opened the first one) — the manifest entry's summary —, `audio` (when the block played sound: `onsets`, `[chunk, run_time]` when each chunk reached the DAC, so a frame's sound onset is the entry for its `audio_chunk` and `onset - flip_time` the audio delay achieved; `delay_ms`, `resyncs`, `trimmed_samples`), `extra` (the adapter's block extras, e.g. an ALE palette) |
 
   - **`frames.h5`** — the rendered frames, `frames` `(N, H, W, C)` gzip'd one chunk per frame plus `frame_index` `(N,)`, the `frame` of each row: every `frame_stride`-th frame (default every one; `0` keeps none). `fmri_gym.logging.read_frames` / `read_frame` read them.
 
@@ -619,6 +631,16 @@ adapter, plan = reconstruct_episode(block, episode_id=0)
 
 > ⚠️ **Crafter replays only on a fork.** Every tenth step stock crafter rebalances creatures per chunk by iterating a Python *set* of objects, so which animal is despawned follows object `id()` and two runs of the same seed and the same action list diverge: terrain is identical, creatures are not. Measured 2026-09-28 on stock 1.8.3, replaying one episode's 225 actions in a second process that differed only in `PYTHONHASHSEED`: the two left each other at step 30, and the episode ended a step apart. Ordering that list by position is the whole fix, and it lives in [`chengfanbrain/crafter@deterministic`](https://github.com/chengfanbrain/crafter/tree/deterministic), which `gym/crafter/pyproject.toml` pins as a direct reference resolved to a commit in `uv.lock` (nothing to clone into `external/`). The same measurement on that build: a 750-frame block of 5 episodes replayed from `episode_seeds` + `actions` into every logged pixel and the whole logged symbolic state, 750 frames of 750, and all 32 savestate anchors restored and then played their episode out identically, which is what a model rollout from a subject's own state needs. The block's `frames.h5` keeps the displayed frames regardless, and those pixels are the record that does not depend on whoever opens the block later having the fork installed. What that block cost at size 384 and 2.5 fps, measured with per-frame zlib: a median frame is 7.4 KB, but crafter mixes per-pixel noise into the view at night, so its 107 night frames ran to 212 KB and the pixels came to 22.5 MB; the 32 anchors pickle to 2.3 MB each, nearly all of it the observation space's constant bounds and the cached frame, and compress to 1.8 MB. That night noise is drawn from the RNG the creatures use, so a `render()` outside the step loop would shift every later draw; nothing renders out of band, because `CrafterEnv` hands back the frame `step` already produced.
 
+### Resuming a world (the `resume` field)
+
+A level starts where it starts, and an open-ended game does not: crafter's world is the one the subject has been living in, and 300 s of it is a first morning. A game phase that names a slot — `"resume": "crafter_L4"` — opens the world the last block of that name left off in, and leaves its own there for the next. That is the whole feature; it adds no savestate machinery, and reuses the one the block log is already made of ([`EnvAdapter.capture(..., want_blob=True)`](fmri_gym/adapters/base.py) and `restore`), so a backend without a savestate is refused when the block starts rather than quietly starting fresh. Today that means crafter, retro, ale and vgdl.
+
+The world is written to `<data-root>/sub-01/ses-NNN/resume/<slot>.state`, beside `beh/` and not in it: the run folders are the data, and this is the handoff between them. It is per **session**, because a session's runs are separate `fmri-play` commands and the world has to survive between processes. One JSON header line then the raw blob, written to a temporary file and renamed, so a reader sees the old world or the new one and never half of one; a file that was being written when the machine died fails its own length and digest check, and the block says so instead of restoring it.
+
+**Only an episode the block's clock cut off carries on** (outcome `playing`). A death, a win, a restart from the menu and a forfeit all end that world, and the next block of the slot opens a new one from its seed — so a subject who dies at minute four of five starts the next block fresh, which is the game's own rule, and a subject who is still alive keeps their tools. Being the clock, `playing` can only be a block's last episode, so a block writes at most once. A slot is a *thread of play*, not a game: crafter's four rig levels are all `CrafterMenu-v0`, so a name derived from the backend and the game id would hand level 4's world to a level 1 block, and levels must name different slots while two blocks that should be one continuous world name the same one.
+
+What this costs an analysis: a resumed episode's `seed` names a world nobody played, so reconstruction 2 above (seed + action replay) does not apply to it. The episode's `episode_start` line marks it (`resumed`) and the block's own `resume` line holds the world it was given, so it reconstructs by `restore()` of that `state` and replaying the actions: reconstruction 1, from the block's own `events.jsonl`, with no dependency on the run that saved it. Deleting the `resume/` folder loses the continuity and nothing else.
+
 ## Playing a block with a model
 
 `agents/agent_play.py` runs the same curriculum with a policy where `fmri_play.py` puts a person. It shares everything that defines the task (the config, the adapter, the episode seeds, the Logger and its log schema) and none of the session loop, which exists for a scanner: trigger wait, fps pacing, a window, a key queue.
@@ -630,6 +652,8 @@ export ANTHROPIC_API_KEY=...      # `--policy vlm` refuses to start without it
 python agents/agent_play.py --curriculum configs/dbp_games/crafter__crafter_L4.json \
     --policy vlm --model claude-sonnet-5 --history 4 --max-frames 60
 ```
+
+A block whose config names a `"resume"` slot carries its world here too, or the two players would not be playing the same blocks; `--resume-dir` says where those worlds are kept, and defaults to `<outdir>/resume`, so one command's blocks continue each other and two commands do not. Point two commands at the same folder to chain them, the way a session's runs are chained.
 
 The key is read before the first frame rather than at the first request: a block whose every call came back 401 would otherwise run to the end and log a model that chose to stand still. A call that fails later costs one frame, recorded as a noop and counted in the phase log as `dropped_calls`, beside `invalid_replies` (a reply that named no key) and `skipped_frames` (a turn-based block, where pressing nothing steps nothing).
 
