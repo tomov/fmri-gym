@@ -433,7 +433,7 @@ class Run:
         recorder = EpisodeRecorder(
             path = os.path.join(self.outdir, f"episode-{episode_id:02d}.mkv"),
             frame_size = adapter.render().shape,
-            audio_layout = None#'stereo' if play_sound else None,
+            audio_layout = 'stereo' if play_sound else None,
         )
         recorder.start()
         record_step_start = next_t

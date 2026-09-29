@@ -31,10 +31,11 @@ class EpisodeRecorder():
         self.video_stream.pix_fmt = video_stream_pix_fmt
 
         if audio_layout is not None:
+            self.audio_sample_rate=audio_sample_rate
             self.audio_stream = self.container.add_stream(audio_codec, rate=audio_sample_rate)
             self.audio_stream.layout = audio_layout
             self.audio_stream.codec_context.format = audio_sample_format
-
+            self.last_audio_pts = 0
 
         self.steps = queue.Queue()
         self.lock = threading.Lock()
@@ -76,14 +77,14 @@ class EpisodeRecorder():
             self.container.mux(packet)
 
         if hasattr(self, 'audio_stream') and audio is not None:
-            a_frame = av.AudioFrame(
-                samples=audio.shape[0],
+            a_frame = av.AudioFrame.from_ndarray(
+                audio.reshape(1,-1),
                 format=self.audio_stream.codec_context.format,
                 layout=self.audio_stream.layout,
             )
-            a_frame.planes[0].update(audio.tobytes())
-            #a_frame.planes[1].update(audio[:,1].tobytes())
-            a_frame.pts = pts
+            #a_frame.pts = None #self.last_audio_pts
+            self.last_audio_pts += audio.shape[1]
+            a_frame.sample_rate = self.audio_sample_rate
             for packet in self.audio_stream.encode(a_frame):
                 self.container.mux(packet)
 
