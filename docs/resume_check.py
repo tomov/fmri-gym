@@ -9,14 +9,16 @@ BIDS session -- and nothing here stubs the env, the logger or the loop.
     python docs/resume_check.py
 
 Part 1 is the slot file on its own: a round trip, the four ways a file is
-refused, and which backends have the savestate a resume is made of. Part 2 runs
+refused, and which backends have the savestate a resume is made of. Part 2 is
+the adapter state a restore has to rebuild rather than inherit, which is where
+the only bug this feature has had lived (issue #73). Part 3 runs
 ``fmri_play.py`` twice into one session and checks that what run 1 wrote is
 byte-for-byte what run 2 was handed, that run 2's own world then moved past it,
 and that the two blocks are different games despite the same pinned seed, which
-is what proves run 2 did not simply open the seed's world. Part 3 is the one
+is what proves run 2 did not simply open the seed's world. Part 4 is the one
 surprise in the feature: a restored world ignores the block's ``env_kwargs``,
 because it comes back exactly as it was pickled, so the run says so out loud
-rather than letting an edited config read as if it had taken. Part 4 is the
+rather than letting an edited config read as if it had taken. Part 5 is the
 other half of the rule: a block whose episode the *game* ends loses the slot
 with it, and the block after that opens a world of its own, because only an
 ending that belongs to the scanner's clock is one the game should not charge
@@ -28,9 +30,15 @@ headless run steps without a person pressing buttons. Everything else, the
 resume field included, is whatever ``configs/dbp_games/crafter__crafter_L4.json``
 says today.
 
-Last run 2026-09-28 on this branch: 5 blocks, 26 checks, 0 failures.
+What the block's own record is read through: a resumed episode is marked
+``resumed`` on its ``episode_start`` line, and the world it was handed is the
+block's one ``resume`` line, whose ``state`` is zlib'd then base64 the way a
+frame's anchor is.
+
+Last run 2026-09-30 on this branch: 5 blocks, 30 checks, 0 failures.
 """
 
+import base64
 import hashlib
 import json
 import os
@@ -39,6 +47,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import zlib
 
 import numpy as np
 
@@ -48,6 +57,7 @@ sys.path.insert(0, ROOT)
 from fmri_gym import resume  # noqa: E402
 from fmri_gym.adapters import get_adapter  # noqa: E402
 from fmri_gym.config import load_config, validate_config  # noqa: E402
+from fmri_gym.logging import read_events  # noqa: E402
 
 L4 = os.path.join(ROOT, "configs", "dbp_games", "crafter__crafter_L4.json")
 #: Enough frames to be a world and few enough to be a test.
@@ -93,7 +103,7 @@ def play(curriculum: str, data_root: str, run: int) -> tuple[str, str]:
     :param curriculum: the config to play.
     :param data_root: the BIDS root all the runs share.
     :param run: the run number.
-    :return: the block's ``.npz`` path, and what the run said on stderr.
+    :return: the block's folder, and what the run said on stderr.
     :raises RuntimeError: if the process failed or wrote no block.
     """
     env = {**os.environ, "SDL_VIDEODRIVER": "dummy", "SDL_AUDIODRIVER": "dummy",
@@ -110,10 +120,49 @@ def play(curriculum: str, data_root: str, run: int) -> tuple[str, str]:
             print(f"    {line.strip()}")
     beh = os.path.join(data_root, "sub-01", "ses-001", "beh")
     folder = [d for d in sorted(os.listdir(beh)) if d.endswith(f"run-{run:03d}")][0]
-    blocks = [f for f in os.listdir(os.path.join(beh, folder)) if f.endswith(".npz")]
+    run_dir = os.path.join(beh, folder)
+    blocks = [d for d in sorted(os.listdir(run_dir)) if d.startswith("block-")]
     if not blocks:
         raise RuntimeError(f"run {run} wrote no block")
-    return os.path.join(beh, folder, blocks[0]), proc.stderr
+    return os.path.join(run_dir, blocks[0]), proc.stderr
+
+
+def lines_of(block: str, kind: str) -> list[dict]:
+    """Every line of one type in a block's ``events.jsonl``.
+
+    :param block: the block's folder.
+    :param kind: the ``type`` field to keep.
+    :return: those lines, in the order they were written.
+    """
+    return [e for e in read_events(block) if e.get("type") == kind]
+
+
+def state_of(line: dict) -> bytes:
+    """The savestate on a record line, as ``restore()`` wants it.
+
+    :param line: a ``frame`` or ``resume`` line carrying ``state``.
+    :return: the blob, un-base64'd and decompressed.
+    """
+    return zlib.decompress(base64.b64decode(line["state"]))
+
+
+def resumed_world(block: str) -> bytes | None:
+    """The world a block was handed, from its own record.
+
+    :param block: the block's folder.
+    :return: the blob on its ``resume`` line, or ``None`` if it opened its own.
+    """
+    got = lines_of(block, "resume")
+    return state_of(got[0]) if got else None
+
+
+def last_anchor(block: str) -> bytes:
+    """The last savestate anchor in a block.
+
+    :param block: the block's folder.
+    :return: the anchor's blob.
+    """
+    return state_of([f for f in lines_of(block, "frame") if f.get("state")][-1])
 
 
 def world_step(blob: bytes) -> int:
@@ -132,15 +181,6 @@ def world_length(blob: bytes) -> int:
     :return: crafter's own ``length``, 0 for no cap.
     """
     return pickle.loads(blob).env.game._length
-
-
-def last_anchor(block: np.lib.npyio.NpzFile) -> bytes:
-    """The last savestate anchor in a block.
-
-    :param block: a loaded block npz.
-    :return: the anchor's blob.
-    """
-    return [s for s in block["states"] if s is not None][-1]
 
 
 def part1() -> None:
@@ -201,40 +241,96 @@ def refuses(folder: str, slot: str, wanted: str) -> bool:
     return False
 
 
-def part2(curriculum: str, data_root: str) -> str:
+def part2() -> None:
+    """What a restore has to rebuild, not inherit (issue #73).
+
+    A savestate is the env, and the adapter around it keeps state of its own:
+    which achievements it has already cued. ``restore`` replaces the env, so
+    that record has to be rebuilt from the restored game or it describes the
+    world the adapter was looking at a moment ago. Both ways that shows are
+    checked here, because both are silent: the achievement count the subject
+    reads would start at zero in a world that is past that, and the first step
+    would fire the ``score`` chime for an achievement unlocked in an earlier
+    block, which ``capture`` then writes into the record as a reward event that
+    never happened.
+    """
+    print("part 2: the adapter state a restore rebuilds")
+    phase = [p for p in load_config(L4)["curriculum"] if p["type"] == "game"][0]
+    phase = {**phase, "env_kwargs": {**phase["env_kwargs"], "size": [128, 128]}}
+    saver = get_adapter("crafter", phase)
+    try:
+        saver.reset(0)
+        # Unlocked by hand rather than played to: this is about the bookkeeping
+        # around a world that already has achievements, and which one it is, or
+        # how many presses it takes a noop-pressing player to earn it, is not
+        # the subject of the check.
+        observation, _, _, _, info = saver.step(0)
+        saver._game._player.achievements["collect_wood"] = 1
+        blob = saver.capture(observation, info, want_blob=True).blob
+    finally:
+        saver.close()
+
+    loader = get_adapter("crafter", phase)
+    try:
+        loader.reset(0)
+        loader.restore(blob)
+        count = loader.hud(0.0, DURATION)[-1]
+        check("a restored world's achievements are the world's, not the adapter's",
+              count.startswith("1 /"), f"hud says {count!r}")
+        observation, _, _, _, info = loader.step(0)
+        cue = loader.capture(observation, info, want_blob=False).variables["cue"]
+        check("and an old achievement is not cued again as a new one",
+              cue != "score", f"cue {cue!r}")
+        # The other way round: the cue still works on the far side of a
+        # restore, so the check above is not passing because nothing can fire.
+        loader._game._player.achievements["eat_cow"] = 1
+        observation, _, _, _, info = loader.step(0)
+        cue = loader.capture(observation, info, want_blob=False).variables["cue"]
+        check("while an achievement actually unlocked after a restore is",
+              cue == "score", f"cue {cue!r}")
+    finally:
+        loader.close()
+
+
+def part3(curriculum: str, data_root: str) -> str:
     """Two processes, one session: the world run 1 ends in is the one run 2 opens.
 
     :param curriculum: the short level-4 config.
     :param data_root: the BIDS root the runs share.
     :return: the slot file's path.
     """
-    print("part 2: two processes, one session")
-    one = np.load(play(curriculum, data_root, 1)[0], allow_pickle=True)
+    print("part 3: two processes, one session")
+    one = play(curriculum, data_root, 1)[0]
     slot = os.path.join(data_root, "sub-01", "ses-001", "resume", "crafter_L4.state")
     check("run 1 left a world behind", os.path.exists(slot))
     left = resume.load(os.path.dirname(slot), "crafter_L4").blob
-    check("run 1 opened no world", not one["episode_resumed"].any()
-          and "resume_state" not in one.files)
+    check("run 1 opened no world",
+          not any(e["resumed"] for e in lines_of(one, "episode_start"))
+          and resumed_world(one) is None)
 
-    block, said = play(curriculum, data_root, 2)
-    two = np.load(block, allow_pickle=True)
-    check("run 2 is marked resumed", bool(two["episode_resumed"].all()))
+    two, said = play(curriculum, data_root, 2)
+    check("run 2 is marked resumed",
+          all(e["resumed"] for e in lines_of(two, "episode_start")))
     check("and it had nothing to warn run 2 about", "WARNING" not in said)
-    check("run 2 was handed exactly what run 1 wrote",
-          "resume_state" in two.files and two["resume_state"].tobytes() == left,
+    check("run 2 was handed exactly what run 1 wrote", resumed_world(two) == left,
           f"{world_step(left)} steps in")
     check("run 2 then played past it",
           world_step(last_anchor(two)) > world_step(left),
           f"{world_step(last_anchor(two))} > {world_step(left)}")
-    same_seed = list(one["episode_seeds"]) == list(two["episode_seeds"])
-    digest = [hashlib.sha256(np.asarray(b["semantic"][0]).tobytes()).hexdigest()[:12]
-              for b in (one, two)]
-    check("and it is not the world that seed opens", same_seed and digest[0] != digest[1],
-          f"seed {one['episode_seeds'][0]} both runs, first frames {digest[0]} vs {digest[1]}")
+    seeds = [[e["seed"] for e in lines_of(b, "episode_start")] for b in (one, two)]
+    digest = [hashlib.sha256(np.asarray(lines_of(b, "frame")[0]["variables"]["semantic"])
+                             .tobytes()).hexdigest()[:12] for b in (one, two)]
+    check("and it is not the world that seed opens",
+          seeds[0] == seeds[1] and digest[0] != digest[1],
+          f"seed {seeds[0][0]} both runs, first frames {digest[0]} vs {digest[1]}")
+    # The slot's own bytes are on the block's resume line, so an analysis that
+    # has the block does not need the run that wrote the world.
+    check("and the block carries the world in its own record",
+          resumed_world(two) is not None and world_step(resumed_world(two)) == world_step(left))
     return slot
 
 
-def part3(curriculum: str, data_root: str, slot: str) -> None:
+def part4(curriculum: str, data_root: str, slot: str) -> None:
     """A restored world keeps the ``env_kwargs`` it was built with, and says so.
 
     ``restore`` replaces the env the block just built, so the block's own
@@ -244,17 +340,16 @@ def part3(curriculum: str, data_root: str, slot: str) -> None:
 
     :param curriculum: the short level-4 config, edited to disagree here.
     :param data_root: the BIDS root the runs share.
-    :param slot: the slot file part 2 left.
+    :param slot: the slot file part 3 left.
     """
-    print("part 3: env_kwargs a restored world will not honour")
+    print("part 4: env_kwargs a restored world will not honour")
     drifted = curriculum.replace(".json", "_drift.json")
     config = json.load(open(curriculum))
     kwargs = {**config["curriculum"][0]["env_kwargs"], "length": 20}
     config["curriculum"][0]["env_kwargs"] = kwargs
     json.dump(config, open(drifted, "w"))
     was = world_length(resume.load(os.path.dirname(slot), "crafter_L4").blob)
-    path, said = play(drifted, data_root, 3)
-    block = np.load(path, allow_pickle=True)
+    block, said = play(drifted, data_root, 3)
     check("the run warned that the config would not take",
           "WARNING" in said and "length" in said)
     check("and the world kept the cap it was opened with",
@@ -267,7 +362,7 @@ def part3(curriculum: str, data_root: str, slot: str) -> None:
            .get("env_kwargs", {}).get("length")) == 0)
 
 
-def part4(curriculum: str, data_root: str, slot: str) -> None:
+def part5(curriculum: str, data_root: str, slot: str) -> None:
     """An ending the game chose ends the thread of play with it.
 
     The block's clock is the scanner's, and carrying a world across it is what
@@ -280,37 +375,38 @@ def part4(curriculum: str, data_root: str, slot: str) -> None:
     :param data_root: the BIDS root the runs share.
     :param slot: the slot file the runs share.
     """
-    print("part 4: an episode the game ended")
+    print("part 5: an episode the game ended")
     ended = curriculum.replace(".json", "_ended.json")
     config = json.load(open(curriculum))
     # No clock: the block runs until the game ends the episode, which for a
     # player who presses nothing but noop means dying of thirst.
     config["curriculum"][0].update(mode="episode", n_episodes=1)
     json.dump(config, open(ended, "w"))
-    path, said = play(ended, data_root, 4)
-    block = np.load(path, allow_pickle=True)
+    block, said = play(ended, data_root, 4)
     check("a block back on the original config is not warned at", "WARNING" not in said)
-    check("the block still resumed", bool(block["episode_resumed"].all()))
-    check("the game ended its episode", str(block["episode_outcome"][-1]) != "playing",
-          str(block["episode_outcome"][-1]))
+    check("the block still resumed",
+          all(e["resumed"] for e in lines_of(block, "episode_start")))
+    outcome = lines_of(block, "episode_end")[-1]["outcome"]
+    check("the game ended its episode", outcome != "playing", outcome)
     check("and the world went with it", not os.path.exists(slot))
 
     after, said = play(curriculum, data_root, 5)
     check("so the next block of that name opened its own",
-          not np.load(after, allow_pickle=True)["episode_resumed"].any()
+          not any(e["resumed"] for e in lines_of(after, "episode_start"))
           and "no world yet" in said)
 
 
 def main() -> None:
-    """Run all four parts and exit non-zero on any failure."""
+    """Run all five parts and exit non-zero on any failure."""
     work = tempfile.mkdtemp(prefix="resume-check-")
     try:
         part1()
+        part2()
         curriculum = short_curriculum(os.path.join(work, "l4_short.json"))
         data_root = os.path.join(work, "data")
-        slot = part2(curriculum, data_root)
-        part3(curriculum, data_root, slot)
+        slot = part3(curriculum, data_root)
         part4(curriculum, data_root, slot)
+        part5(curriculum, data_root, slot)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     print(f"\n{len(failures)} failures" if failures else "\nall checks passed")

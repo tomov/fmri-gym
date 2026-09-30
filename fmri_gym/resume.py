@@ -162,7 +162,7 @@ def clear(folder: str, slot: str) -> str | None:
     costing anything.
 
     Nothing is lost with it. The world it held is the one the dying block
-    restored, so that block's own npz holds the same bytes in ``resume_state``.
+    restored, so that block's own ``resume`` line holds the same bytes.
 
     :param folder: the session's ``resume/`` folder.
     :param slot: the slot name.
