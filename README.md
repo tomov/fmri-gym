@@ -600,19 +600,18 @@ The names follow BIDS apart from that suffix, the contents not yet (no `_beh.tsv
 ### Reconstruction (all verified bit-exact)
 
 1. **Per-frame state** (ale, retro): restore the `state` of a `frame` line → exact frame, no determinism assumption.
-2. **Seed + action replay** (any deterministic env, incl. gym): an episode's `seed` + its `action`s reproduce it frame-for-frame: `fmri_gym.replay.reconstruct_episode(block)`.
+2. **Seed + action replay** (any deterministic env, incl. gym): an episode's `seed` + its `action`s reproduce it frame-for-frame: `fmri_gym.replay.reconstruct_episode(block)`. An episode marked `resumed` starts from the block's `resume` line instead of from its seed, which `reconstruct_episode` does for you.
 3. **Stored pixels**: `frames.h5` *is* what was on screen, before the HUD.
 
 ```python
-import base64, pickle, zlib, gymnasium as gym, ale_py, stable_retro as retro
-from fmri_gym.logging import read_events
+import pickle, gymnasium as gym, ale_py, stable_retro as retro
+from fmri_gym.logging import read_events, read_state
 from fmri_gym.replay import frame_arrays, reconstruct_episode
 gym.register_envs(ale_py)
 
 block = "data/sub-01/ses-001/beh/sub-01_ses-001_task-pong_run-001/block-00_ale_Pong-v5"
 a = frame_arrays(block)                    # a["action"], a["reward"], a["ram"], ... one row per frame
-states = [zlib.decompress(base64.b64decode(e["state"])) if "state" in e else None
-          for e in read_events(block) if e["type"] == "frame"]
+states = [read_state(e) for e in read_events(block) if e["type"] == "frame"]
 
 # ALE: restore any frame's exact state
 env = gym.make("ALE/Pong-v5", render_mode="rgb_array", frameskip=1, repeat_action_probability=0.0); env.reset()
@@ -641,7 +640,7 @@ The world is written to `<data-root>/sub-01/ses-NNN/resume/<slot>.state`, beside
 
 **A restored world keeps the `env_kwargs` it was opened with.** The block does build an env from its own config first, but `restore` then replaces it, so a thread of play is fixed at the moment it opens: editing `size` or `length` in a config that resumes changes nothing until the slot file is deleted. Measured on crafter 2026-09-28: a block configured `"length": 20` restored a world whose engine `_length` was still the `0` it had been opened with. Quietly doing nothing is the dangerous half of that, so a block that asks a restored world for something it is not prints `WARNING <slot> continues a world built with different env_kwargs`, names the fields, and plays on with the world's own. Everything that is not `env_kwargs` is unaffected: `duration`, `fps`, `turn_based`, `state_stride` and the rest belong to the block rather than to the world, and take normally.
 
-What this costs an analysis: a resumed episode's `seed` names a world nobody played, so reconstruction 2 above (seed + action replay) does not apply to it. The episode's `episode_start` line marks it (`resumed`) and the block's own `resume` line holds the world it was given, so it reconstructs by `restore()` of that `state` and replaying the actions: reconstruction 1, from the block's own `events.jsonl`, with no dependency on the run that saved it. Deleting the `resume/` folder loses the continuity and nothing else.
+What this costs an analysis: a resumed episode's `seed` names a world nobody played, so reconstruction 2 above (seed + action replay) does not apply to it. The episode's `episode_start` line marks it (`resumed`) and the block's own `resume` line holds the world it was given, so it reconstructs by `restore()` of that `state` and replaying the actions: reconstruction 1, from the block's own `events.jsonl`, with no dependency on the run that saved it. `reconstruction_plan` reads both fields and `reconstruct_episode` starts from the world when they are set, so an analysis does not have to know which blocks resumed; what it must not do is replay `plan["seed"]` itself without looking at `plan["resumed"]`. Deleting the `resume/` folder loses the continuity and nothing else.
 
 ## Playing a block with a model
 

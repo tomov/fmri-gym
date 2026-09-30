@@ -374,6 +374,20 @@ def read_events(block: str) -> list[dict]:
     return events
 
 
+def read_state(line: dict) -> bytes | None:
+    """The savestate on one record line, as ``restore()`` wants it.
+
+    The inverse of what the writer does to a ``state`` (see :meth:`Logger.log`
+    and :meth:`Logger.log_frame`). Here so that reading one back is not a
+    matter of knowing that it is zlib'd and then base64.
+
+    :param line: a record from :func:`read_events`.
+    :return: the blob, or ``None`` if that line carries no savestate.
+    """
+    state = line.get("state")
+    return zlib.decompress(base64.b64decode(state)) if state is not None else None
+
+
 def read_frames(block: str) -> tuple[np.ndarray, np.ndarray]:
     """A block's recorded frames.
 

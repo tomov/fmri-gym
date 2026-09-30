@@ -15,7 +15,10 @@ the only bug this feature has had lived (issue #73). Part 3 runs
 ``fmri_play.py`` twice into one session and checks that what run 1 wrote is
 byte-for-byte what run 2 was handed, that run 2's own world then moved past it,
 and that the two blocks are different games despite the same pinned seed, which
-is what proves run 2 did not simply open the seed's world. Part 4 is the one
+is what proves run 2 did not simply open the seed's world. It then reconstructs
+run 2's episode the way an analysis would, since a record is worth what can be
+rebuilt from it, and the seed replay every other episode reconstructs by is the
+one thing a resumed episode silently gets wrong. Part 4 is the one
 surprise in the feature: a restored world ignores the block's ``env_kwargs``,
 because it comes back exactly as it was pickled, so the run says so out loud
 rather than letting an edited config read as if it had taken. Part 5 is the
@@ -35,10 +38,9 @@ What the block's own record is read through: a resumed episode is marked
 block's one ``resume`` line, whose ``state`` is zlib'd then base64 the way a
 frame's anchor is.
 
-Last run 2026-09-30 on this branch: 5 blocks, 30 checks, 0 failures.
+Last run 2026-09-30 on this branch: 5 blocks, 33 checks, 0 failures.
 """
 
-import base64
 import hashlib
 import json
 import os
@@ -47,17 +49,25 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import zlib
 
 import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
+import crafter_gym  # noqa: E402
 from fmri_gym import resume  # noqa: E402
 from fmri_gym.adapters import get_adapter  # noqa: E402
 from fmri_gym.config import load_config, validate_config  # noqa: E402
-from fmri_gym.logging import read_events  # noqa: E402
+from fmri_gym.logging import read_events, read_state  # noqa: E402
+from fmri_gym.replay import reconstruct_episode, reconstruction_plan  # noqa: E402
+
+# Unpickling a savestate imports crafter, and the repo's own gym/ directory
+# shadows old gym for a process started at the repo root, which is what
+# `crafter_gym.import_crafter` deals with. Done here rather than left to the
+# first `get_adapter` call so that reading a block back does not depend on a
+# check that builds an env having run before it.
+crafter_gym.import_crafter()
 
 L4 = os.path.join(ROOT, "configs", "dbp_games", "crafter__crafter_L4.json")
 #: Enough frames to be a world and few enough to be a test.
@@ -137,15 +147,6 @@ def lines_of(block: str, kind: str) -> list[dict]:
     return [e for e in read_events(block) if e.get("type") == kind]
 
 
-def state_of(line: dict) -> bytes:
-    """The savestate on a record line, as ``restore()`` wants it.
-
-    :param line: a ``frame`` or ``resume`` line carrying ``state``.
-    :return: the blob, un-base64'd and decompressed.
-    """
-    return zlib.decompress(base64.b64decode(line["state"]))
-
-
 def resumed_world(block: str) -> bytes | None:
     """The world a block was handed, from its own record.
 
@@ -153,7 +154,7 @@ def resumed_world(block: str) -> bytes | None:
     :return: the blob on its ``resume`` line, or ``None`` if it opened its own.
     """
     got = lines_of(block, "resume")
-    return state_of(got[0]) if got else None
+    return read_state(got[0]) if got else None
 
 
 def last_anchor(block: str) -> bytes:
@@ -162,7 +163,25 @@ def last_anchor(block: str) -> bytes:
     :param block: the block's folder.
     :return: the anchor's blob.
     """
-    return state_of([f for f in lines_of(block, "frame") if f.get("state")][-1])
+    return read_state([f for f in lines_of(block, "frame") if f.get("state")][-1])
+
+
+def world_map(adapter: object) -> np.ndarray:
+    """What a live world looks like, in the same terms the record logs.
+
+    :param adapter: a crafter adapter mid-episode.
+    :return: its semantic grid, as a ``frame`` line's ``variables["semantic"]``.
+    """
+    return np.asarray(adapter._game._sem_view())
+
+
+def map_digest(grid: object) -> str:
+    """A semantic grid as twelve hex digits, so two can be printed side by side.
+
+    :param grid: the grid, live or as the record's nested lists.
+    :return: the first 12 hex digits of its sha256.
+    """
+    return hashlib.sha256(np.asarray(grid, dtype=np.int64).tobytes()).hexdigest()[:12]
 
 
 def world_step(blob: bytes) -> int:
@@ -318,8 +337,8 @@ def part3(curriculum: str, data_root: str) -> str:
           world_step(last_anchor(two)) > world_step(left),
           f"{world_step(last_anchor(two))} > {world_step(left)}")
     seeds = [[e["seed"] for e in lines_of(b, "episode_start")] for b in (one, two)]
-    digest = [hashlib.sha256(np.asarray(lines_of(b, "frame")[0]["variables"]["semantic"])
-                             .tobytes()).hexdigest()[:12] for b in (one, two)]
+    digest = [map_digest(lines_of(b, "frame")[0]["variables"]["semantic"])
+              for b in (one, two)]
     check("and it is not the world that seed opens",
           seeds[0] == seeds[1] and digest[0] != digest[1],
           f"seed {seeds[0][0]} both runs, first frames {digest[0]} vs {digest[1]}")
@@ -327,6 +346,34 @@ def part3(curriculum: str, data_root: str) -> str:
     # has the block does not need the run that wrote the world.
     check("and the block carries the world in its own record",
           resumed_world(two) is not None and world_step(resumed_world(two)) == world_step(left))
+
+    # The record is worth what can be rebuilt from it, and the seed replay
+    # every other episode reconstructs by is the one thing that is wrong here.
+    plan = reconstruction_plan(two)
+    check("the block's replay plan starts from that world and not from the seed",
+          plan["resumed"] and plan["state"] == left)
+    ended_at = lines_of(two, "frame")[-1]["variables"]["semantic"]
+    adapter, _ = reconstruct_episode(two)
+    try:
+        landed, steps = world_map(adapter), adapter._game._step
+        check("and replaying it lands on the world the block's last frame logged",
+              map_digest(landed) == map_digest(ended_at)
+              and steps == world_step(left) + len(plan["actions"]),
+              f"{map_digest(landed)} at engine step {steps}")
+    finally:
+        adapter.close()
+    # The negative half: a seed replay of this episode does not merely lose the
+    # step count, it rebuilds a world that was never on screen.
+    blind = get_adapter("crafter", read_events(two)[0]["phase"])
+    try:
+        blind.reset(plan["seed"])
+        for action in plan["actions"]:
+            blind.step(action)
+        check("while the same seed and the same actions without it do not",
+              map_digest(world_map(blind)) != map_digest(ended_at),
+              f"{map_digest(world_map(blind))} instead")
+    finally:
+        blind.close()
     return slot
 
 
