@@ -136,5 +136,28 @@ class CrafterEnv(gym.Env):
         """Return the latest frame -- the observation is the picture."""
         return self._frame
 
+    def redraw(self) -> np.ndarray:
+        """Draw the current state again, replacing the latest frame.
+
+        For a caller that changes what the game looks like between a reset and
+        the frame the player is shown: ``crafter.Env.reset`` generates the
+        world and renders it in the same call, so the frame a level wrapper
+        inherits was drawn before its rules existed
+        (:mod:`crafter_gym.levels`).
+
+        Only ever at the start of an episode. A render is not free of the
+        game's randomness: the engine mixes per-pixel noise into the view at
+        night, drawn from ``world.random``, the stream the creatures share
+        (``engine.LocalView._light``), so a redraw mid-episode would shift
+        every later draw and the episode would stop replaying from its seed.
+        The noise is drawn only below daylight 0.5, which the engine's clock
+        reaches between steps 148 and 272 of each 300-step day; at step 0
+        daylight is 0.797 and a redraw there costs nothing.
+
+        :return: the new frame, which :meth:`render` now returns too.
+        """
+        self._frame = self.game.render()
+        return self._frame
+
     def close(self) -> None:
         """Nothing to close: crafter draws into arrays."""

@@ -1,0 +1,55 @@
+{
+  "_game": "Crafter (level 1: affordance, eight buttons)",
+  "_note": "uv sync --extra crafter (crafter-gym, gym/crafter/, pulls crafter), then pip install --force-reinstall 'crafter @ git+https://github.com/chengfanbrain/crafter.git@deterministic' -- a fork of 1.8.3 whose single change is that a seed plus an action list replays exactly. Plain PyPI crafter runs this config fine and plays identically to a subject, but its blocks cannot be replayed, so a model cannot be given the same episode. This is the paradigm's level 1 (affordance): nothing hostile exists, the four life stats are frozen at 9 and hidden from the HUD, and nothing but lava can kill. What is left is what the world affords -- which materials give way to a bare hand, what a table makes reachable -- learnt without a clock running out. The rules are the env's (gym/crafter/crafter_gym/levels.py, 'level' in env_kwargs below) and not this file's, so a model meets the same game: see _level_note.",
+  "_shared_notes": "Every field of the game phase below is level 4's, except env_kwargs.level, resume, and the page above the game. The notes that explain those shared fields -- the eight buttons and the menu, turn-based pacing, frame size, savestate stride, the live HUD, the score line, the three cues, and why there is one interface for all of them -- are in configs/dbp_games/crafter__crafter_L4.json and are deliberately not copied here, because four copies of a paragraph drift apart and the one thing a level is allowed to change is the game.",
+  "_level_note": "The level is a gymnasium.Wrapper under the menu (crafter_gym.levels.LevelWrapper), and the table it reads is the rig's own (crafter-for-brain-scan v0.33, core.py:LEVELS), field for field. L1 is hostiles=False, homeostatic_death=False, hidden_items=(health, food, drink, energy), frozen_stats=True. In practice: zombies, skeletons and arrows are cleared out of the world worldgen just made and the engine's ten-step creature rebalance is filtered so none come back; _update_life_stats is a no-op, so hunger, thirst and fatigue never move food, drink or energy off 9; a health decrement from a missing necessity is refused; the four icons are blanked out of the item panel without moving any other icon, since the engine skips an item below 1 and draws the rest at their own index; and the sleep button, which stock crafter ignores at full energy, is honoured as a one-tick nap so it is not a silent no-op in the one level whose energy never drops. Two things still end an episode: lava, which zeroes health in the action phase before any of these rules run, and nothing else. Death itself is unchanged in every level: health cannot regenerate from 0 (stock crafter can add a point on the very tick a death set it there, which would make the episode's end unreliable), and the view is tinted red while the player is dead, which is the engine's own commented-out tint and the one death signal that survives a hidden health icon. The same seed gives the same terrain in all four levels: a peaceful world is a world generated like any other with the hostiles deleted afterwards, so worldgen draws the same randomness either way.",
+  "_not_here_note": "This is the level's game, not the rig's level-1 session. The task chain (TASK: collect wood ... one milestone at a time, the skip task menu entry, the task row above the frame) is cue text, a HUD row and an extra action rather than a game rule, so it spans the adapter and the menu's action space and is not in fmri-gym yet; LEVELS carries its 'tasks' flag and nothing reads it. The rig's rollback-on-death for L1 (core.py:DEATH_RESTORE_LEVELS, play rolled back a few seconds instead of the episode ending) is not here either: it is session policy rather than a rule -- agent rollouts keep the standard reset-on-death episode -- so it belongs beside resume as a phase field and not in the level.",
+  "_cue_open_question": "cues is true, as in level 4, so a press the engine refused makes a sound. In a level whose whole point is learning what works that is arguably a hint rather than feedback. It is left on because an L1 that differs from L4 in more than its rules is harder to compare, and because the subject can hear it in the rig too; turn it off here if the pilot says the sound is doing the learning.",
+  "_resume_note": "resume names the thread of play this block continues, and the block picks up the world the last block of the same name left off in, but only when the block's clock was what stopped the episode: a death or a forfeit ends that world and the next block opens a new one from its seed. The name is this level's own, because all four levels are the same env id (CrafterMenu-v0) and one shared name would hand L4's world to an L1 block. 300 s of turn-based play is a first morning, and the tech tree a level-1 subject is here to learn is longer than that, so without this a session is five first mornings. The level is carried in env_kwargs, so it is in the slot file's header too: a block whose level does not match the world it is about to continue is told so by name before it plays (fmri_gym/resume.py:env_drift). What comes back is the world's own rules and not this config's, because restore replaces the env the block just built -- which is the whole reason a level is a wrapper's parameter and not a patch an adapter applies to a live player.",
+  "_instructions_note": "The page is level 4's with its opening lines replaced by the rig's own (core.py:INSTRUCTIONS page 1: explore and try things, the game shows you what works), which is what L1 is. The controls are the same eight buttons and the same menu, so a subject who practised in the rig keeps their fingers. No page mentions the life stats, hidden or otherwise, and none names a mechanic: what a rule does is the game's job to show. In a session that plays the levels in order these lines are where the rig's LEVEL_INTROS go, except that the rig shows them between levels ('The next rounds are different') while a config played on its own has to say it up front.",
+  "curriculum": [
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Crafter",
+        "",
+        "Explore the world and try things.",
+        "The game itself will show you what works.",
+        "",
+        "The world waits for you: it moves one step each",
+        "time you press a button, and not otherwise.",
+        "",
+        "Controls (8 buttons):",
+        "   ARROWS      move",
+        "   D           interact / attack / collect",
+        "   S           sleep",
+        "   W           next menu item",
+        "   A           do the menu item",
+        "",
+        "The menu holds the ten actions with no button of",
+        "their own: place stone, table, furnace, plant, and",
+        "make a wood / stone / iron pickaxe or sword. W",
+        "moves the cursor and shows it over your character;",
+        "A performs it. Moving the cursor also costs a turn.",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {"type": "fixation", "duration": 1.0},
+    {
+      "type": "game", "backend": "crafter", "game": "CrafterMenu-v0",
+      "env_kwargs": {"size": [384, 384], "length": 0, "level": "L1_affordance"},
+      "keys": {
+        "LEFT": 1, "RIGHT": 2, "UP": 3, "DOWN": 4, "D": 5, "S": 6,
+        "W": 17, "A": 18
+      },
+      "mode": "duration", "duration": 300.0, "fps": 15,
+      "turn_based": true, "latched_keys": false, "live_hud": true,
+      "state_stride": 25, "show_score": true,
+      "cues": true, "cue_overlay": false, "seed": 0,
+      "resume": "crafter_L1"
+    },
+    {"type": "fixation", "duration": 2.0}
+  ]
+}
