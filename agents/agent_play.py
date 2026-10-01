@@ -196,6 +196,12 @@ def play_block(phase: dict, index: int, args, logger: Logger,
     backend = phase.get("backend", "gym")
     base_seed = phase.get("seed", 1000 + index)
     state_stride = max(1, int(phase.get("state_stride", 1)))
+    # A phase's "rewind" is read by nothing here, deliberately: rolling a death
+    # back is session policy and not a rule of the game (fmri_gym.rewind), and
+    # it exists because a subject cannot be given back the minute of scanner
+    # time that walking back out to where they were costs. A rollout has no
+    # such minute, so it dies when the game kills it, which is the parity the
+    # four levels exist to keep.
     # A policy has no ears. Whatever the block's config plays to a subject as a
     # sound, it reads as a line of text, so the two players are told the same
     # things; scanner configs keep that line off the screen to hold the gaze on
