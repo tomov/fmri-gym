@@ -190,7 +190,10 @@ def world_step(blob: bytes) -> int:
     :param blob: a crafter savestate, as ``restore()`` wants it.
     :return: the engine's own step counter.
     """
-    return pickle.loads(blob).env.game._step
+    # Through unwrapped, because what the savestate holds is the env the phase
+    # built: the menu wrapper, and under it the level's wrapper when the phase
+    # names a level (crafter_gym.levels).
+    return pickle.loads(blob).unwrapped.game._step
 
 
 def world_length(blob: bytes) -> int:
@@ -199,7 +202,7 @@ def world_length(blob: bytes) -> int:
     :param blob: a crafter savestate, as ``restore()`` wants it.
     :return: crafter's own ``length``, 0 for no cap.
     """
-    return pickle.loads(blob).env.game._length
+    return pickle.loads(blob).unwrapped.game._length
 
 
 def part1() -> None:
