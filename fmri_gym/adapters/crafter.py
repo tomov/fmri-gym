@@ -9,6 +9,15 @@ the eight buttons of a scanner button box. Both are the environment's business
 rather than this file's: an adapter that owned the interface would stop a model
 from meeting the game a subject met.
 
+So are the paradigm's four levels, for the same reason, and for one more: a
+savestate is a pickle of the env chain, so rules that are a wrapper's
+parameters come back with a resumed world while rules an adapter imposed on a
+live player would not. ``env_kwargs.level`` names one of
+``crafter_gym.levels.LEVELS`` and nothing in this file reads it -- it goes
+through to the env with the rest of ``env_kwargs``, which also means the
+``resume`` slot header carries it and a block that opens an earlier level's
+world is told so.
+
 The observation IS the RGB frame (64x64 by default; ``env_kwargs.size``), so
 ``render`` returns it. Choose a ``size`` that is an integer fraction of the
 display height (384 -> x2 in a 1024x768 window): display.draw_frame scales
@@ -54,7 +63,9 @@ them; the frames totalled 22.5 MB.
 That night noise is drawn from ``world.random``, the same stream the creatures
 use, so a render outside the step loop would shift every later draw. Nothing
 here renders: ``CrafterEnv`` hands back the frame ``step`` already produced,
-which is also what ``restore`` shows for a restored anchor.
+which is also what ``restore`` shows for a restored anchor. The one render out
+of band is a level's, on the first frame of an episode, where the noise is not
+drawn at all (``CrafterEnv.redraw``).
 
 Savestates
 ----------
@@ -342,7 +353,7 @@ class CrafterAdapter(EnvAdapter):
         # Built directly rather than through gym.make: the menu's cursor is on
         # the wrapper, and gymnasium's OrderEnforcing would hide it.
         env = (crafter_gym.make_menu(**kwargs) if self._menu_mode
-               else crafter_gym.CrafterEnv(**kwargs))
+               else crafter_gym.make_plain(**kwargs))
         _check_internals(env.unwrapped.game)
         return env
 
