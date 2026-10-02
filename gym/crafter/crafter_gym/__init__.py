@@ -11,11 +11,13 @@ from __future__ import annotations
 import gymnasium as gym
 
 from .env import CrafterEnv, import_crafter
-from .levels import LEVELS, LevelWrapper, with_level
+from .levels import (LEVELS, LevelWrapper, level_of, reachable_achievements,
+                     with_level)
 from .menu import MenuWrapper
 
 __all__ = ["LEVELS", "CrafterEnv", "LevelWrapper", "MenuWrapper",
-           "import_crafter", "make_menu", "make_plain", "with_level"]
+           "import_crafter", "level_of", "make_menu", "make_plain",
+           "reachable_achievements", "with_level"]
 
 
 def make_plain(**kwargs) -> gym.Env:
