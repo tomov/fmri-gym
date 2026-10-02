@@ -45,11 +45,12 @@ another level's world: :func:`level_of` answers it.
 What is not here
 ----------------
 
-``tasks`` and ``stat_tasks`` are in the table because they are part of the
-table, but nothing in fmri-gym reads them yet: the task chain is cue text, a
-HUD row and a menu entry to skip a task, so it spans the adapter and the menu's
-action space rather than the game's rules. A block run from the L1-L3 configs
-is the level's game without its task cues.
+The ``tasks`` flag belongs to the table and is read from
+:mod:`crafter_gym.tasks`, which is a wrapper of its own because what the player
+is asked to do is not one of the rules: a level's rules say what the world
+does, and the chain says which of the things it affords to name next.
+``stat_tasks`` is the part of that chain which waits on a live homeostat, so
+nothing reads it while L1 is the level being piloted.
 """
 
 from __future__ import annotations
@@ -62,7 +63,7 @@ import numpy as np
 from .env import import_crafter
 
 __all__ = ["LEVELS", "LevelWrapper", "level_of", "reachable_achievements",
-           "with_level"]
+           "require_level", "with_level"]
 
 # The rig's own table (core.py:LEVELS), which the agent-side training env is
 # built from as well. In every level an episode ends on death only (the configs
@@ -98,7 +99,7 @@ LEVELS: dict[str, dict[str, Any]] = {
 _HOSTILE_ACHIEVEMENTS = ("defeat_skeleton", "defeat_zombie")
 
 
-def _require_level(level: str) -> dict[str, Any]:
+def require_level(level: str) -> dict[str, Any]:
     """This level's row of :data:`LEVELS`.
 
     :param level: a key of :data:`LEVELS`.
@@ -127,7 +128,7 @@ def reachable_achievements(level: str | None) -> tuple[str, ...]:
     :raises ValueError: if ``level`` is not one of :data:`LEVELS`.
     """
     names = tuple(import_crafter().constants.achievements)
-    if level is None or _require_level(level)["hostiles"]:
+    if level is None or require_level(level)["hostiles"]:
         return names
     return tuple(n for n in names if n not in _HOSTILE_ACHIEVEMENTS)
 
@@ -362,7 +363,7 @@ class LevelWrapper(gym.Wrapper):
     """
 
     def __init__(self, env: gym.Env, level: str) -> None:
-        _require_level(level)
+        require_level(level)
         super().__init__(env)
         self.level = level
 

@@ -89,10 +89,11 @@ player's world position, and a 64x64 grid of material/object ids -- so
 ``capture`` logs all four and ``block_extra`` ships the tables that decode
 them. In menu mode ``info`` also carries what the engine was given
 (``env_action``) and where the cursor stands, which ``capture`` adds to the
-same row, beside the button ``actions`` holds.
+same row, beside the button ``actions`` holds; on a level with tasks it carries
+the task that press was made under and what became of it.
 
-The score, and the cursor
--------------------------
+The score, the task, and the cursor
+-----------------------------------
 
 The env's HUD covers inventory and the four status bars but not the achievement
 count, so ``show_score`` puts it in the strip above the frame. It reports only
@@ -102,6 +103,24 @@ the block's cumulative reward, which is the same quantity written less legibly:
 crafter pays +1 per first unlock and (health - last_health)/10 per step, and
 the health terms telescope to at most -0.9 over an episode, so a return of 2.3
 means three achievements.
+
+The strip's third field is the task the chain is asking for, on the levels that
+name tasks (``crafter_gym.tasks``), and there the count beside it is the
+chain's: its closed entries out of its length, which is where the count and
+crafter's reward part ways, because the reward still pays every unlock. The
+chain itself is the env's, and so is the entry that puts a task off; what this
+file owns is those two fields, the two messages a completion holds the frame up
+to deliver, and the rule that a ``+1`` sounds when and only when the count goes
+up -- so the chain's one entry crafter does not score still earns one, and an
+unlock the chain never asked for no longer does.
+
+A completion is the one thing in a crafter block that cannot be said in the
+strip alone. The strip is read between presses and replaced by the next frame,
+while "that was the task, here is the next one" is a thing that happened once,
+so the session holds the frame it happened on and says it there
+(``EnvAdapter.notices``, ``tasks`` in the phase for how long). The frame is
+already recorded when the hold starts, and the hold steps nothing, so a block
+with a subject who reads slowly is the same block.
 
 ``menu`` mode draws the cursor over the player rather than in the strip,
 because that is where the eyes already are between presses, and only while the
@@ -177,6 +196,12 @@ _DIRECTIONS = {"left": (-1, 0), "right": (+1, 0), "up": (0, -1), "down": (0, +1)
 #: HUD text per cue -- the model's copy of what the subject just heard.
 _CUE_LINES = {"score": "+1", "hit": "HIT", "blocked": "NO EFFECT"}
 
+#: Seconds the two task messages are held over the frame that earned them,
+#: and the default for a phase's ``tasks`` (see ``_task_holds``). The rig's own
+#: timings: the point is announced first and briefly, then what to do next is
+#: left up long enough to read and remember.
+_TASK_HOLDS = {"done": 1.5, "next": 2.0}
+
 #: The outcome of a frame nobody pressed a button for: a reset, or a restore.
 _NO_OUTCOME = {"hit": False, "refused": False, "target": ""}
 
@@ -235,6 +260,43 @@ def _reachable(env: Any) -> tuple[str, ...]:
     import crafter_gym
 
     return crafter_gym.reachable_achievements(crafter_gym.level_of(env))
+
+
+def _task_holds(spec: dict, has_tasks: bool) -> dict[str, float]:
+    """How long each of the two completion messages is held, from the phase.
+
+    Validated here rather than in :mod:`fmri_gym.config`, which is where the
+    other crafter-only fields are checked too (``show_score``, ``cues``): the
+    config validator knows the fields every backend has, and a backend knows
+    its own.
+
+    :param spec: the phase dict.
+    :param has_tasks: whether the env this phase built names tasks at all.
+    :return: seconds per message, defaulting to the rig's own timings
+        (``frontend_pygame.py``: ``--task-done-s 1.5``, ``--task-hold-s 2.0``).
+    :raises ValueError: if ``tasks`` is not a mapping of the two keys to
+        non-negative numbers, or if it is set on a level that names no tasks,
+        which would otherwise read as a block that holds and does not.
+    """
+    holds = dict(_TASK_HOLDS)
+    asked = spec.get("tasks")
+    if asked is None:
+        return holds
+    if not has_tasks:
+        raise ValueError("crafter backend: this phase sets `tasks` but its level names "
+                         "none, so there is nothing to hold the frame for; the levels "
+                         "that do are the ones whose `tasks` flag is set in "
+                         "crafter_gym.levels.LEVELS")
+    if not isinstance(asked, dict) or set(asked) - set(holds):
+        raise ValueError(f"crafter backend: `tasks` is how long each completion "
+                         f"message is held, as {{{', '.join(holds)}}} in seconds, "
+                         f"not {asked!r}")
+    for key, value in asked.items():
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
+            raise ValueError(f"crafter backend: `tasks.{key}` is seconds to hold the "
+                             f"frame for, 0 to say nothing, not {value!r}")
+        holds[key] = float(value)
+    return holds
 
 
 # --- the three cues -------------------------------------------------------
@@ -364,8 +426,10 @@ class CrafterAdapter(EnvAdapter):
             "score": _score_cue(), "hit": _hit_cue(), "blocked": _blocked_cue(),
         } if self._cues else {}
         self._unlocked: set[str] = set()
+        self._points = 0
         self._cue = ""
         self._outcome: dict = _NO_OUTCOME
+        self._notices: list[tuple[list[str], float]] = []
         game = spec.get("game", _PLAIN)
         if game not in (_PLAIN, _MENU):
             raise ValueError(f"crafter backend: game must be {_PLAIN!r} or "
@@ -379,12 +443,35 @@ class CrafterAdapter(EnvAdapter):
                else crafter_gym.make_plain(**kwargs))
         _check_internals(env.unwrapped.game)
         self._achievements = _reachable(env)
+        self._holds = _task_holds(spec, crafter_gym.tracker_of(env) is not None)
         return env
 
     @property
     def _game(self) -> Any:
         """The ``crafter.Env`` itself, past the Gymnasium env and any wrapper."""
         return self.env.unwrapped.game
+
+    @property
+    def _menu(self) -> Any:
+        """The menu wrapper, or ``None`` in the sixteen-key game.
+
+        Found in the chain on every read rather than kept, because ``restore``
+        replaces the whole chain with an unpickled one and a kept reference
+        would then be to the env of a world that is no longer on screen.
+        """
+        import crafter_gym
+
+        return crafter_gym.menu_of(self.env)
+
+    @property
+    def _tracker(self) -> Any:
+        """The task chain, or ``None`` on a level that names no tasks.
+
+        Found per read, for the reason :attr:`_menu` is.
+        """
+        import crafter_gym
+
+        return crafter_gym.tracker_of(self.env)
 
     def reset(self, seed: int | None) -> tuple[Any, dict]:
         """Start an episode on a world determined by ``seed`` alone.
@@ -395,23 +482,39 @@ class CrafterAdapter(EnvAdapter):
         self._unlocked = set()
         self._cue = ""
         self._outcome = _NO_OUTCOME
-        return super().reset(seed)
+        self._notices = []
+        out = super().reset(seed)
+        # Read rather than zeroed, for the reason `restore` reads it: what the
+        # next `+1` is measured against is whatever the strip shows now.
+        self._points = self._fraction()[0]
+        return out
 
     def step(self, action: Any) -> tuple[Any, float, bool, bool, dict]:
         # In menu mode the press and the action part ways; the cue is about
         # what the engine is given, so ask the wrapper before it moves.
-        env_action = (self.env.env_action(action) if self._menu_mode
+        env_action = (self._menu.env_action(action) if self._menu_mode
                       else int(action))
         # Read what this press is about to meet, before the engine acts on it.
         self._outcome = self._predict(env_action)
         obs, reward, terminated, truncated, info = super().step(action)
-        scored = self._note_unlocks(info["achievements"])
+        self._note_unlocks(info["achievements"])
+        # A "+1" is the count above the frame going up, and nothing else. Where
+        # a chain names the tasks that count is the chain's (`crafter_gym.tasks`:
+        # "What the chain scores"), so an unlock the chain never names -- water
+        # drunk on a level with no thirst -- stops being paid for (Fan,
+        # 2026-10-06), while an entry that closes out of order is paid even
+        # though the task on screen did not change. Read as a count and not off
+        # `task_done`, which is the named task alone and so would miss that.
+        points = self._fraction()[0]
+        scored = points > self._points
+        self._points = points
         # One cue at a time, highest first: the killing blow that unlocks
         # defeat_zombie is a "+1", not a thud, and a refusal never outranks
         # something that actually happened.
         self._cue = ("score" if scored else
                      "hit" if self._outcome["hit"] else
                      "blocked" if self._outcome["refused"] else "")
+        self._notices = self._task_notices(info)
         return obs, reward, terminated, truncated, info
 
     def _predict(self, action: int) -> dict:
@@ -503,16 +606,68 @@ class CrafterAdapter(EnvAdapter):
             return {**out, "refused": refused}
         return out
 
-    def _note_unlocks(self, achievements: dict) -> bool:
-        """Track which achievements are unlocked, and the newest one.
+    def _note_unlocks(self, achievements: dict) -> None:
+        """Track which of crafter's achievements are unlocked.
+
+        Kept on every level, not only the ones scored by unlocks: it is the
+        strip's numerator where no chain names the tasks, and ``restore`` has to
+        be able to rebuild it from the world that came back.
 
         :param achievements: crafter's per-achievement counts for this frame.
-        :return: whether this frame unlocked at least one new achievement.
         """
-        unlocked = {name for name, n in achievements.items() if n > 0}
-        new = unlocked - self._unlocked
-        self._unlocked = unlocked
-        return bool(new)
+        self._unlocked = {name for name, n in achievements.items() if n > 0}
+
+    def _fraction(self) -> tuple[int, int]:
+        """The strip's score field: what has been earned, out of what is on offer.
+
+        One place for it, because a ``+1`` is defined as this numerator moving
+        (see ``step``) and the sound and the number must not be able to
+        disagree.
+
+        :return: ``(earned, offered)`` -- the chain's closed entries out of its
+            length where a chain names the tasks, else the achievements unlocked
+            out of the ones the level leaves reachable.
+        """
+        tracker = self._tracker
+        if tracker is None:
+            return len(self._unlocked), len(self._achievements)
+        return len(tracker.completed), len(tracker.base_chain)
+
+    def _task_notices(self, info: dict) -> list[tuple[list[str], float]]:
+        """The messages this step's frame has to be held up to deliver.
+
+        Two, in the order the rig shows them: the point just earned, then what
+        to do next. The first is shown only when the task named during the step
+        is the entry that closed (``task_done``), because that is what it says
+        in words; the pointer also moves when the subject puts a task off, and
+        the honest message for that is the second one alone. The second is shown
+        whenever the task changed, a skip included, since the only other place
+        the new task appears is one field of a strip the subject reads between
+        presses.
+
+        :param info: the step's info, as the task wrapper left it.
+        :return: ``(lines, seconds)`` per message, shortest-lived first; empty
+            on the levels that name no tasks, and on the frame a player died
+            on, which has an ending of its own to show.
+        """
+        import crafter_gym
+
+        if not info.get("task_moved"):
+            return []
+        stages = []
+        if info["task_done"]:
+            stages.append(([crafter_gym.TASK_DONE_TEXT], self._holds["done"]))
+        stages.append(([crafter_gym.next_task_text(self._tracker.task)],
+                       self._holds["next"]))
+        return [(lines, seconds) for lines, seconds in stages if seconds > 0]
+
+    def notices(self) -> list[tuple[list[str], float]]:
+        """The task messages for the frame just stepped, or nothing.
+
+        :return: what :meth:`_task_notices` found, which the session shows over
+            that frame before taking the next press.
+        """
+        return self._notices
 
     def sound(self) -> Sound | None:
         """The cue for the frame just stepped, or ``None``.
@@ -552,7 +707,7 @@ class CrafterAdapter(EnvAdapter):
         return 0 if info.get("sleeping") else None
 
     def hud(self, score: float, time_remaining: float) -> list[str]:
-        """Time left, then the achievement count.
+        """Time left, the task in hand, then the count of what has been earned.
 
         Crafter draws its own HUD -- four status bars and the inventory -- but
         never the achievement count, which is the score its paper reports and
@@ -561,11 +716,24 @@ class CrafterAdapter(EnvAdapter):
         already returns every step, so the model harness reads the identical
         values: this shows env state, it does not add any.
 
-        The denominator is what the level being played can unlock, which on the
-        two levels with nothing hostile in them is 20 rather than crafter's 22
-        (``crafter_gym.levels.reachable_achievements``). A count against 22
-        there would ask the subject for two achievements the world does not
-        contain, and would score the block against them afterwards.
+        The denominator is everything the player can be paid for, which is what
+        makes it a number they can reach. Where a chain names the tasks it is
+        the whole of it, so the fraction is the chain's closed entries out of
+        the chain's length (``crafter_gym.tasks``: "What the chain scores"),
+        which is also what settles the entry crafter has no achievement for: it
+        is in the chain, so it is in both halves without a correction. Where
+        nothing names tasks the fraction is crafter's own unlocks, out of the
+        ones the level leaves reachable rather than out of 22, since two of the
+        22 are a creature the peaceful levels keep out of the world
+        (``crafter_gym.levels.reachable_achievements``) and a count against 22
+        would score the block against achievements it does not contain.
+
+        The task is the middle field, between the two the subject reads as
+        corners, because it is the one they come back to: a count tells them
+        how the block is going and the task tells them what to do, which is the
+        question a player of a tech tree they cannot see keeps asking. It is
+        state like the rest of the strip -- the chain is in the env, and
+        ``info["task"]`` carries the same id a model would read.
 
         The cue field is the same bit of information the subject just heard,
         written down, so a policy reading these lines as text is told what a
@@ -577,7 +745,12 @@ class CrafterAdapter(EnvAdapter):
         :param time_remaining: seconds until the block ends.
         :return: the fields, laid out left to right above the frame.
         """
+        import crafter_gym
+
         lines = [f"{max(0, int(time_remaining))} s"]
+        tracker = self._tracker
+        if tracker is not None:
+            lines.append(crafter_gym.task_text(tracker.task))
         if self._cue_overlay and self._cue:
             cue = _CUE_LINES[self._cue]
             if self._cue == "hit" and self._outcome["target"]:
@@ -585,7 +758,8 @@ class CrafterAdapter(EnvAdapter):
             lines.append(cue)
         if not self._show_score:
             return [*lines, f"Score: {score:g}"]
-        return [*lines, f"{len(self._unlocked)} / {len(self._achievements)}"]
+        earned, offered = self._fraction()
+        return [*lines, f"{earned} / {offered}"]
 
     def overlay(self) -> tuple[list[str], float] | None:
         """The menu cursor, drawn over the player, while it is being used.
@@ -596,10 +770,11 @@ class CrafterAdapter(EnvAdapter):
 
         :return: ``(lines, y_frac)``, or ``None`` when the menu is off or idle.
         """
-        if not (self._menu_mode and self.env.showing):
+        menu = self._menu
+        if menu is None or not menu.showing:
             return None
         # Underscores are the logged id; the screen gets the readable form.
-        return (["> " + self.env.selected.replace("_", " ")], self.overlay_y)
+        return (["> " + menu.selected.replace("_", " ")], self.overlay_y)
 
     def outcome(self, terminated: bool, truncated: bool) -> tuple[str, str]:
         # The env already separates the two endings crafter reports as one
@@ -645,6 +820,17 @@ class CrafterAdapter(EnvAdapter):
             # what the frame shows.
             variables["menu_idx"] = info["menu_idx"]
             variables["menu_sel"] = info["menu_sel"]
+        if "task" in info:
+            # The task in effect DURING this frame rather than after it, so a
+            # row says what the press was made under; "" is a finished chain.
+            # `task_passed` is the one completion crafter's own achievement
+            # counters do not record, so without it the score cannot be
+            # rebuilt from the log, and `task_skip` is the subject declining a
+            # task, which is the other thing nothing else here would show.
+            variables["task"] = info["task"] or ""
+            variables["task_passed"] = info["task_passed"]
+            variables["task_done"] = info["task_done"]
+            variables["task_skip"] = info["task_skip"]
         blob = pickle.dumps(self.env, protocol=5) if want_blob else None
         return FrameState(blob=blob, variables=variables)
 
@@ -665,13 +851,17 @@ class CrafterAdapter(EnvAdapter):
         # follows the world rather than the config.
         self._achievements = _reachable(self.env)
 
-        self._unlocked = set()
-        for name, count in self._game._player.achievements.items():
-            if count > 0:
-                self._unlocked.add(name)
-        # The restored frame is one nobody pressed a button to reach.
+        self._note_unlocks(self._game._player.achievements)
+        # The chain came back in the blob with the world, so the count the next
+        # `+1` is measured against is read off the restored env: a rollback that
+        # reopens an entry lowers it, and the point is there to be earned again.
+        self._points = self._fraction()[0]
+        # The restored frame is one nobody pressed a button to reach, so
+        # there is nothing about it to sound, and nothing to hold it up for:
+        # the task it completed is a task the rollback has made current again.
         self._cue = ""
         self._outcome = _NO_OUTCOME
+        self._notices = []
 
     def block_extra(self) -> dict:
         """Block-level legends for the per-frame variables.
@@ -694,13 +884,33 @@ class CrafterAdapter(EnvAdapter):
             "achievement_names": np.array(names),
             # Aligned with the names above and with every frame's achievement
             # counts: False marks one the level kept out of the world, which is
-            # the denominator the subject was scored against (see `hud`) and
-            # the column an analysis has to leave out of a per-level total.
+            # the column an analysis has to leave out of a per-level total, and
+            # the denominator the subject was scored against on a level where
+            # no chain names the tasks (see `hud`).
             "achievements_reachable": np.array([n in self._achievements
                                                 for n in names]),
             "semantic_names": np.array(_semantic_names(self._game)),
         }
-        if self._menu_mode:
+        menu = self._menu
+        if menu is not None:
             # Decodes menu_idx, and is the order the subject cycles through.
-            extra["menu_names"] = np.array(self.env.menu_names)
+            extra["menu_names"] = np.array(menu.menu_names)
+        tracker = self._tracker
+        if tracker is not None:
+            import crafter_gym
+
+            # The chain as the block began, which is the order the tasks were
+            # asked for; a skip reorders the episode's own copy and shows up as
+            # the frame it happened on (`capture`), so the two together say
+            # what the subject was asked for and when.
+            chain = tracker.base_chain
+            extra["task_chain"] = np.array(chain)
+            # What the subject actually read, which is not the id for every
+            # entry, and whose line is the one a timing analysis locks to.
+            extra["task_labels"] = np.array([crafter_gym.task_text(t) for t in chain])
+            # Aligned with the chain: True marks an entry whose completion is in
+            # no achievement column, so an analysis rebuilding the strip's count
+            # from the log reads `task_passed` for it and the counters for the
+            # rest. The chain itself is the denominator (see `hud`).
+            extra["task_scorable"] = np.array([t in tracker.scorable for t in chain])
         return extra

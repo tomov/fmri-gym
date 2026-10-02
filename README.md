@@ -295,7 +295,7 @@ One thing the four configs do differ in besides the rules is that L1 rolls a dea
 
 A level is part of the game rather than of the session, so it lives in the env and not in the adapter or the rig: a model compared against a subject has to meet the same rules, and a savestate has to carry them. Since the crafter savestate is a pickle of the whole env chain, the rules pickle with it — they are instances of module-level classes, not closures over the live player — and a restored world plays on under its own rules, which is exactly what `resume` needs (below). `level` rides inside `env_kwargs`, so it is in the slot file's header too, and a block that points at another level's world is warned by name before it plays. The four levels are all `CrafterMenu-v0`, so **each names its own `resume` slot**; one shared name would hand L4's world to an L1 block.
 
-`docs/levels_check.py` measures all of this against the engine's own state and pixels — the rig's table, each rule and its negative control, the pickle round trip, and the cross-level warning. Not yet ported: the rig's task chain (`TASK: collect wood …`), its low-stat interrupts (`core.py:STAT_TASKS`) and the `skip task` menu entry, which are cue text, a HUD row and an extra action rather than game rules; `LEVELS` carries the `tasks` and `stat_tasks` flags and nothing reads them. Until then an L3 block and an L4 block differ in their `resume` slot and in nothing a subject can see.
+`docs/levels_check.py` measures all of this against the engine's own state and pixels — the rig's table, each rule and its negative control, the pickle round trip, and the cross-level warning. Three of the four levels also ask for one achievement at a time, which is the rig's task chain and the `tasks` field below. Not ported: the rig's low-stat interrupts (`core.py:STAT_TASKS`), which cut into that chain when a life stat runs low and therefore need the homeostat L2 turns back on; `LEVELS` carries the `stat_tasks` flag and nothing reads it.
 
 ## Design: the experiment loop never knows the engine
 
@@ -471,9 +471,10 @@ They assume `sub-01` and a 1024x768 window, and take the subject's next free ses
  "keys": {"": 0, "LEFT": 0, "RIGHT": 1}, // REQUIRED: key -> env action, the whole map;
                                 //   "" is the action sent with no key held (see below)
  "save_pixels": false,          // also store lossless pixels, where the backend can
- "show_score": false}           // crafter: draw the achievement count beside the frame
-                                //   (out of what the level can reach: 20, not 22, with
-                                //   nothing hostile in it to defeat)
+ "show_score": false}           // crafter: draw the score beside the frame -- the chain's
+                                //   closed entries where a level names tasks, else the
+                                //   achievements unlocked out of what the level can
+                                //   reach (20, not 22, with nothing hostile to defeat)
 ```
 
 ### Keys (the `keys` field)
@@ -702,6 +703,26 @@ That blob is what keeps the episode replayable, because its actions in order are
 The segments are also where the play a rollback cost is, once an episode has had more than one. `frames_back` is a distance in the episode's own frame numbering, from the frame the rollback happened on to the frame it went back to, and that is what the subject lost on the first rollback only: a repeated death restores the same world again, so from the second on `frames_back` keeps growing while what was lost is just the play since the rollback before it, which is the length of the segment this one ended. Measured in `docs/rewind_check.py` on a block that kept dying in the same spot: six rollbacks, `frames_back` 5, 10, 15, 20, 25, 30, and segment lengths 209, 5, 5, 5, 5, 5, 0 — the first segment the whole play up to the first death, each later one the five frames the next rollback undid, and the last empty because the block's clock ran out during the final rollback's hold.
 
 `docs/rewind_check.py` measures the feature end to end through `fmri_play.py`: the field and every way a bad one is refused, the ring's arithmetic, a block that really dies headless and comes back (the world on each line, the undone frames in the record, the hold and the line the held frame carries, the slot that is still handed on), `max_rewinds` running out and taking the world with it, the segmented replay against the world the episode ended in, and a rollout of the same phase where no rollback happens at all.
+
+### One task at a time (the `tasks` field)
+
+Crafter's tech tree is a lattice, and a subject who has five minutes of it needs a line. The rig names one achievement above the frame, says so when it is reached, and names the next (`crafter_rig/core.py`: `TASK_CHAIN`, `TASK_LABELS`; `frontend_pygame.py`: `--task-done-s` 1.5 s, `--task-hold-s` 2.0 s). Three of the four levels ask for that chain, and the one phase field is how long each of the two messages holds the frame:
+
+```jsonc
+"tasks": {"done": 1.5, "next": 2.0}   // seconds; 0 for either says nothing
+```
+
+The chain is a `gymnasium.Wrapper` over the level (`gym/crafter/crafter_gym/tasks.py`) for the reason the level is one: a model compared against a subject has to be asked for the same thing in the same order, so the task is in every frame's `info` (`task`, `task_done`, `task_moved`, `task_skip`, `task_passed`) and in the block log beside the press that was made under it, and it pickles into a savestate with everything else, so a resumed world carries on with the task the subject left and the order they left it in.
+
+**The pointer is derived, not advanced.** It is the first entry of this episode's order whose achievements the player has not unlocked, read off crafter's own counters each frame, so there is no second copy of the player's progress to keep in step: an entry reached early is simply closed when the pointer arrives at it, and a composite entry (`collect_place_plant`) stays open until both of its halves are. One entry is not an achievement at all — crafter has nothing called `build_stone_shelter` — so the chain tests that one itself, by flood-filling out from the player: sealed against anything that walks, with no line of sight out for an arrow, and small enough that nothing can spawn inside it beside them.
+
+**The chain is the whole of the score, where there is one.** The fraction above the frame is the chain's own, its closed entries out of its length, and the `+1` cue is defined as that number going up and nothing else (`fmri_gym/adapters/crafter.py:_fraction`). So `build_stone_shelter` is paid like any other entry although crafter has no achievement for it, and an achievement the chain never names is not paid at all: crafter scores `collect_drink` for drinking at a full stat (`crafter/objects.py:219` checks a collect's `require` and never its `receive`), and on L1 thirst is frozen at 9 and not even shown, so there is nothing there to be rewarded for (Fan, 2026-10-06). Which entries a level asks for is the level's and not the table's for the same reason (`tasks.py:chain_for`): a level that freezes the four life stats is not asked for `eat_plant`, the one entry that means nothing while the homeostat is off, so an L1 block reads `n / 11` and an L2 or L3 block `n / 12`. Crafter's own 22 counters and crafter's own reward are untouched and logged every frame, so this changes what the subject is scored on and nothing an analysis reads: `task_passed` marks the one entry no counter holds, and a level that names no tasks keeps the unlock count out of the achievements it leaves reachable.
+
+**A hold is paid out of the block's own clock, not added to it.** The loop draws the message, waits, and anchors the next frame to the end of the wait rather than trying to catch the time back up, so a block that holds plays a few presses fewer and ends when it was always going to end. Measured in `docs/tasks_check.py` with a policy in place of the subject: the same seed and the same presses as far as either block got, 128 frames with the two holds against 136 with both set to 0, 22.06 s of block against 22.12 s, and neither one ever behind its own clock. Those eight frames are what the holds cost at the time a press really took there, 160 ms against the silent block's 163 ms, and that measured rate is the one the comparison has to be made at: a real-time block gets whatever the engine and the display leave it, which on that machine is short of the 125 ms that 8 fps asks for. The run loop's whole part in this is one default-empty hook (`EnvAdapter.notices`), so a backend that holds no frames is untouched.
+
+The menu's eleventh entry, `skip_task`, puts the current task at the back of this episode's own order, for a subject stuck on one. It is an entry rather than a ninth button, so it costs a turn per press like every other menu gesture and hands the engine no action: eleven presses, eleven noops, and the chain asks for something else. Putting off the only task left does nothing.
+
+`docs/tasks_check.py` measures all of it: the chain against the rig's own literals when `CRAFTER_RIG` points at them, which of its entries each level asks for, what moves the pointer and what does not, what a `+1` is paid for and what it is not, the shelter test against nine built worlds and its negative controls, every way a bad `tasks` field is refused, every label packed into one HUD row at the shipped window size, and a real block played headless where the two messages reach the screen in order, hold for as long as they asked, and cost the block the frames above. Not ported: the rig's low-stat interrupts (`core.py:STAT_TASKS`), which need L2's homeostat.
 
 ## Playing a block with a model
 

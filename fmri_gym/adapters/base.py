@@ -199,6 +199,28 @@ class EnvAdapter:
     #: into the bottom rows of its frame leaves the played part above centre.
     overlay_y: float = 0.5
 
+    def notices(self) -> list[tuple[list[str], float]]:
+        """What the frame just stepped has to be held to say, if anything.
+
+        :meth:`hud` and :meth:`overlay` are drawn with the frame and replaced
+        by the next one, which is the whole of what a backend needs while the
+        subject keeps pressing. Something that happens once needs reading time
+        instead, and the frame it happened on is the frame it is about, so the
+        session shows each of these over that frame and waits: nothing is
+        asked of the subject, nothing is stepped, and the block's clock keeps
+        running. Then play resumes where it left off.
+
+        The default is empty, and a backend that returns nothing costs its
+        block nothing. One that speaks is spending block time per message, so
+        how long for belongs in the config rather than in the code that
+        returns them.
+
+        :return: one ``(lines, seconds)`` per message, in the order to show
+            them. The lines go where :meth:`overlay` puts its own
+            (:attr:`overlay_y`), since what they are about is in the picture.
+        """
+        return []
+
     def outcome(self, terminated: bool, truncated: bool) -> tuple[str, str]:
         """How the episode stands after its last step, as a name and a line for the subject.
 
