@@ -14,7 +14,7 @@ instead (``crafter_rig/core.py``: ``DEATH_RESTORE_LEVELS``,
 
 This is that, and the subject's own version of it: a game phase may say
 
-    "rewind": {"frames": 5, "on_death": true, "hold": 1.0}
+    "rewind": {"frames": 1, "on_death": true, "hold": 1.2}
     "rewind": {"seconds": 10.0, "stride": 2, "max_states": 32}
 
 and the block keeps the last few frames of play as savestates, so a death
@@ -36,11 +36,20 @@ a rollout of the same level sees nothing of it.
 rate is the config's, so ``seconds`` says what it means. A turn-based block
 steps on presses and waits as long as the subject thinks, so a second of its
 run clock is worth one press or none, and the window that matters there is
-``frames``: five frames is five of the subject's own moves, whatever they spent
+``frames``: one frame is one of the subject's own moves, whatever they spent
 deciding. Exactly one of the two is required, and a phase that gives the one
 that does not suit its pacing gets a window that drifts with how fast the
-subject plays. The rig's default is ``1.0`` s at ``cadence_hz=5.0``, which is
-five of its ticks, and the turn-based form of that is ``"frames": 5``.
+subject plays.
+
+**And the rig's window, read in presses, is one move.** Its default is
+``--death-restore-s`` 1.0 s at ``cadence_hz`` 5.0, which is five of its ticks.
+But it pushes a snapshot on every tick, and a tick steps the env whether or not
+a button is down (``core.py``: ``Rig.tick``, where ``ButtonMapper.resolve``
+answers ``noop`` for no buttons), so the second it goes back holds whichever
+presses happened to fall inside it rather than five of them. In presses, the
+only unit a turn-based block has, that second is one, and the turn-based form of
+it is ``"frames": 1``: what the affordance level ships, settled on a test
+session on 2026-10-02.
 
 **Memory, and what the ring holds.** A savestate is a blob the backend hands
 over (``capture(..., want_blob=True)``), and crafter's is a pickle of the env
@@ -113,7 +122,13 @@ class Policy:
         needs no field here: it is in the menu's own ``options``.
     :ivar hold: seconds the frame that triggered the rollback is left on screen
         first, so the subject sees what happened before the world moves
-        (the rig's ``--death-hold-s``).
+        (the rig's ``--death-hold-s``). A death's held frame also carries the
+        backend's own word for that ending, written over it
+        (:meth:`~fmri_gym.adapters.base.EnvAdapter.outcome`, at that backend's
+        :attr:`~fmri_gym.adapters.base.EnvAdapter.overlay_y`), because the
+        rollback is exactly the ending that never reaches the outcome screen
+        where the line is otherwise said. The menu's rollback is held in
+        silence: the entry the subject chose already said how far back it goes.
     :ivar stride: capture a state for the ring every this many frames.
     :ivar max_states: the ``seconds`` form's cap on ring depth, which the
         ``frames`` form computes instead.
