@@ -7,8 +7,11 @@ name = "fmri-gym"
 version = "0.1.0"
 description = "One fMRI experiment framework for (almost) any Gymnasium-compatible game."
 readme = "README.md"
-# stable-retro caps at <3.15; nle>=1.3 needs >=3.10.
-requires-python = ">=3.10,<3.15"
+# nle>=1.3 needs >=3.10. The ceiling is what the backends ship wheels for, and
+# uv/pip pick the newest interpreter a project allows: nle and box2d have no
+# cp314 wheels, so <3.14 keeps a fresh env off a Python that would have to
+# compile them. No .python-version needed -- this bound binds pip too.
+requires-python = ">=3.10,<3.14"
 # The core is engine-agnostic (session, display, keys, logging). Backends are
 # extras below ("install what you need"); adapters import their engine lazily,
 # so a missing extra only bites the curriculum that names it.
@@ -56,7 +59,10 @@ rushhour = ["rushhour-gym>=0.6.0"]
 # update procedure; STK_ENV_BIN overrides the binary it fetched.
 stk = ["supertuxkart-gym>=0.1.3"]
 # `gym` backend families beyond classic_control / toy_text (which ship with gymnasium):
-box2d = ["gymnasium[box2d]"]
+# `Box2D` is the module gymnasium's box2d envs import. gymnasium[box2d] would
+# get it from box2d-py, an sdist-only 2018 release that must compile (swig +
+# a C++ compiler) and fails to on many machines; `box2d` ships wheels.
+box2d = ["box2d>=2.3.10"]
 mujoco = ["gymnasium[mujoco]"]  # run with MUJOCO_GL=egl headless
 shimmy = ["shimmy"]  # old-`gym` envs via "legacy_gym": true
 tilematch = ["tile-match-gym"]  # display + logging only
