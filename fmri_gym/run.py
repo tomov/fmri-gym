@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Any
 
 import pygame
 
-from . import bids, pad, resume
+from . import bids, pad, resume, rewind
 from .adapters import get_adapter
 from .audio import Audio
 from .config import fold_cli_options
@@ -490,6 +490,7 @@ class Run:
         carry: resume.Carry | None = None,
         slot: str | None = None,
         provenance: dict | None = None,
+        policy: rewind.Policy | None = None,
     ) -> dict:
         """Run one episode, logging every frame.
 
@@ -516,25 +517,100 @@ class Run:
             clock is what ends this episode. ``None`` = nothing is carried.
         :param provenance: what the slot's file should record about where the
             world came from (run, block, backend, game).
+        :param policy: how far back a death or the menu's ``rewind`` option
+            puts the world (:mod:`fmri_gym.rewind`). ``None`` = a death ends
+            the episode, which is every block that does not ask.
         :return: the episode's ``episode_end`` record, as recorded:
             ``episode_id``, ``outcome`` (one of the adapter's,
             :meth:`~.adapters.base.EnvAdapter.outcome`: ``"won"``, ``"lost"``,
             ``"terminated"``, ``"truncated"``, or ``"playing"`` when the
             block's clock cut it off; or ``"quit"`` for ESC / window close,
             ``"reset"`` / ``"forfeit"`` for the subject's choice in the menu),
-            ``terminated``, ``truncated``, ``score`` and ``n_pacing_resets``.
+            ``terminated``, ``truncated``, ``score`` and ``n_pacing_resets``,
+            plus ``n_rewinds`` when the phase has a rollback policy.
         """
         terminated = truncated = False
         outcome = ""
         score = 0.0                     # the episode's cumulative reward
         n_pacing_resets = 0
         ep_frame = 0
+        # The last window of play, in case a death or the subject sends the
+        # world back through it. One ring per episode: a rollback goes back
+        # inside the episode it happens in, never into the one before.
+        ring = rewind.Ring(policy) if policy is not None else None
+        n_rewinds = 0
         key_to_action = (adapter.keymap.turn_actions()
                          if turn_based or latched else None)
 
         def redraw() -> float:
             """Present the frame again, for its HUD. Never steps, logs or triggers."""
             return self._show(adapter, False, score, block_end)[0]
+
+        def rewind_now(trigger: str, at_frame: int) -> bool:
+            """Put the world back a window, and go on playing from there.
+
+            :param trigger: what asked for it: ``"death"`` or ``"menu"``.
+            :param at_frame: the last frame played, which the record cuts at.
+            :return: whether it happened. ``False`` leaves the episode exactly
+                as it was, for an episode that has had its ``max_rewinds`` or
+                has no frame to go back to yet, and the caller carries on as
+                if the field were not there: a death ends the episode, and the
+                menu resumes.
+            """
+            nonlocal score, terminated, truncated, auto, next_t, n_rewinds
+            back = ring.target() if ring is not None else None
+            if back is None or (policy.max_rewinds is not None
+                                and n_rewinds >= policy.max_rewinds):
+                return False
+            # Stamped before the hold, so `seconds_back` is the window of play
+            # that was undone and not the pause over the frame that ended it.
+            now = self.clock.run_time()
+            # The frame that triggered it is left up first: a world that snaps
+            # back before the subject has seen what happened teaches them
+            # nothing, and the rig holds the death on screen too. ESC during
+            # the hold raises out, as it does on the outcome screen: that is
+            # the run's interrupt path, and the block keeps what it has written.
+            if policy.hold > 0:
+                self.audio.stop()       # the death's own sounds, over the held frame
+                # And it is told, in the backend's own words, because the one
+                # screen that would have said it is what the rollback takes
+                # away: an episode that ends shows its outcome message, an
+                # episode that goes back has no ending to show. The menu's
+                # rewind needs no line -- the entry the subject just chose
+                # said how far back it goes -- and a backend with nothing to
+                # say about this ending gets the held frame as it was.
+                message = (adapter.outcome(terminated, truncated)[1]
+                           if trigger == "death" else "")
+                if message:
+                    self._show(adapter, False, score, block_end, notice=[message])
+                _wait_for_duration(self.display, policy.hold)
+            adapter.restore(back.blob)
+            # The world this goes back to, as the `resume` line carries one:
+            # the frames between it and here were played and then undone, so
+            # the actions alone no longer describe the episode and a replay
+            # has to restore (see fmri_gym.replay.reconstruction_plan).
+            self.logger.log(type="rewind", episode_id=episode_id, trigger=trigger,
+                            run_time=now, from_ep_frame=at_frame,
+                            to_ep_frame=back.ep_frame,
+                            frames_back=at_frame - back.ep_frame,
+                            seconds_back=now - back.run_time,
+                            from_score=score, score=back.score,
+                            capped=ring.capped, state=back.blob)
+            score = back.score
+            # The ending is undone: the episode goes on, so the block's clock
+            # is what ends it and a slot it carries is still handed on.
+            terminated = False
+            # The restored world is not one anybody pressed a button into, so
+            # whatever the undone frame's info asked to be autoplayed does not
+            # apply to it.
+            auto = None
+            n_rewinds += 1
+            ring.reseed(back)
+            # The subject is looking at the frame that triggered this; show
+            # them the world they are now in before the loop waits for a press.
+            flip_t0, _, _ = self._show(adapter, False, score, block_end)
+            next_t = flip_t0 + dt
+            return True
 
         # A turn-based wait is unbounded -- it ends at a press -- and the HUD
         # is drawn only by _show, so without this the block clock a subject
@@ -593,7 +669,12 @@ class Run:
                 break
             if menu is not None and menu.pending:
                 choice = menu.run(self.display, self.clock.run_time, self.logger)
-                if choice != "resume":
+                if choice == "rewind":
+                    # Nothing to go back to yet (nobody has pressed a button in
+                    # this episode) is a resume: the subject asked for a few
+                    # frames back and there are none.
+                    rewind_now("menu", ep_frame - 1)
+                elif choice != "resume":
                     outcome = choice
                     break
                 flip_t0, _, _ = self._show(adapter, False, score, block_end)
@@ -616,7 +697,12 @@ class Run:
             # A savestate at each episode's first frame (the replay anchor), then
             # every stride; frames between are the anchor plus the logged actions.
             save_state = ep_frame % state_stride == 0
-            fs = adapter.capture(observation, info, want_blob=save_state)
+            # The ring keeps its own stride: a block's anchors are 25 frames
+            # apart in the crafter configs, so a window of a few frames would
+            # hold this frame and nothing else (see fmri_gym.rewind). A frame
+            # due for both pays for one capture.
+            want_ring = ring is not None and ring.due(ep_frame)
+            fs = adapter.capture(observation, info, want_blob=save_state or want_ring)
             # The frame trigger goes out on the flip that shows this frame.
             self.display.call_on_flip(self.triggers.frame)
             flip_t, frame, sound = self._show(adapter, play_sound, score, block_end)
@@ -654,15 +740,26 @@ class Run:
                 # The chunk this frame's sound was queued as (-1: none); when it
                 # reached the DAC is in the block_end record's audio onsets.
                 fields["audio_chunk"] = self.audio.last_chunk
-            self.logger.log_frame(fields, frame=frame, state=fs.blob)
+            self.logger.log_frame(fields, frame=frame, state=fs.blob if save_state else None)
             self.logger.log_audio(sound)
+            if want_ring:
+                ring.push(rewind.State(ep_frame=ep_frame, run_time=t_step,
+                                       score=score, blob=fs.blob))
+            # A death the subject comes back from: the world goes back a window
+            # and the episode goes on, so this ending is not one the game gets
+            # to charge for. Only `terminated`, which is the game ending it; a
+            # `truncated` is the env's own step cap, which is a clock, and
+            # rolling that back would truncate again a window later for ever.
+            if terminated and not truncated and policy is not None and policy.on_death:
+                rewind_now("death", ep_frame)
             ep_frame += 1
 
         ## Final outcome
         outcome, message = _final_outcome(adapter, outcome, terminated, truncated,
                                           resumes=slot is not None)
         end = {"episode_id": episode_id, "outcome": outcome, "terminated": bool(terminated),
-               "truncated": bool(truncated), "score": score, "n_pacing_resets": n_pacing_resets}
+               "truncated": bool(truncated), "score": score, "n_pacing_resets": n_pacing_resets,
+               **({"n_rewinds": n_rewinds} if policy is not None else {})}
         self.logger.log(type="episode_end", **end)
         # "playing" is the block's clock ending an episode the game had not
         # finished, so it is the only outcome whose world is still the
@@ -699,7 +796,8 @@ class Run:
         return end
 
     def _show(
-        self, adapter: EnvAdapter, play_sound: bool, score: float, block_end: float
+        self, adapter: EnvAdapter, play_sound: bool, score: float, block_end: float,
+        notice: list[str] | None = None
     ) -> tuple[float, Any, Any]:
         """Flip the adapter's frame with its HUD, then queue its sound against that flip.
 
@@ -708,12 +806,18 @@ class Run:
         :param play_sound: pass the sound to the speakers.
         :param score: the episode's running score, for the HUD.
         :param block_end: ``perf_counter`` the block ends at, for the HUD.
+        :param notice: lines of the session's own to draw over the frame
+            instead of the backend's :meth:`~.adapters.base.EnvAdapter.overlay`,
+            at the backend's :attr:`~.adapters.base.EnvAdapter.overlay_y`. For
+            the one thing the session has to say inside the picture: that the
+            death the subject is looking at is about to be taken back.
         :return: ``perf_counter`` of the flip, the rendered frame, and the
             sound queued this frame (``None`` if ``play_sound`` is ``False``).
         """
         frame = adapter.render()
         hud = adapter.hud(score, block_end - time.perf_counter())
-        flip_t = self.display.draw_frame(frame, hud, adapter.overlay())
+        overlay = (notice, adapter.overlay_y) if notice else adapter.overlay()
+        flip_t = self.display.draw_frame(frame, hud, overlay)
         sound = adapter.sound() if play_sound else None
         if play_sound:
             self.audio.play(sound, flip_t)
@@ -729,7 +833,7 @@ class Run:
             ``duration`` / ``n_episodes`` and ``advancing_outcomes``, ``fps``,
             ``seed``, ``state_stride``, ``turn_based``, ``latched_keys``,
             ``live_hud``,
-            ``keys``, ``outcome_duration``, …).
+            ``keys``, ``outcome_duration``, ``resume``, ``rewind``, …).
         :param index: phase index in the curriculum (for the manifest).
         :raises KeyboardInterrupt: if the subject quits mid-block.
         """
@@ -790,12 +894,23 @@ class Run:
             f"Loading {phase.get('text') or phase.get('game', 'game')} …")
         adapter = get_adapter(backend, phase)
         speed = {} if turn_based else self._speed(adapter, fps, index, phase["game"])
+        ## How far back a death or the menu sends the world, if this block lets
+        # it go back at all. Same savestate as a resume, so the same refusal: a
+        # backend without one would read as if the field had taken.
+        policy = rewind.policy_of(phase)
+        if policy is not None and not resume.supported(adapter):
+            raise ValueError(
+                f'game phase {index}: "rewind", but the {backend} adapter has no savestate to '
+                "go back to (EnvAdapter.restore); today crafter, retro, ale and vgdl do. Drop "
+                "the field to let a death end the episode")
+
         ## The world this block continues, if it continues one
         # Whether a backend can resume takes a built env to know, so it is
         # settled here rather than in validate_config: a block that asks to
         # carry its world on a backend with no savestate would quietly start
-        # fresh every time, and the config would read as if it had not. Before
-        # open_block, so a refusal leaves no half-written block behind.
+        # fresh every time, and the config would read as if it had not. Both
+        # refusals are before open_block, so one leaves no half-written block
+        # behind.
         slot = resume.slot_of(phase)
         carry = None
         if slot is not None:
@@ -845,8 +960,12 @@ class Run:
         onset = self.clock.run_time()
         block_start = time.perf_counter()
         block_end = block_start + cap
-        # The hold-a-key pause menu (reset / forfeit / resume), if the phase has one.
-        menu = Menu(phase["menu"], block_start) if "menu" in phase else None
+        # The hold-a-key pause menu (rewind / reset / forfeit / resume), if the
+        # phase has one. Its rewind option is labelled by the policy, whose
+        # units are the phase's (frames or seconds) and not the menu's.
+        menu = (Menu(phase["menu"], block_start,
+                     labels={"rewind": policy.label()} if policy else None)
+                if "menu" in phase else None)
         episodes: list[dict] = []       # each episode's episode_end record
         completed = 0
         outcome = ""
@@ -862,7 +981,7 @@ class Run:
                 dt=dt, state_stride=state_stride,
                 block_end=block_end, play_sound=play_sound, menu=menu,
                 outcome_duration=outcome_duration,
-                carry=carry, slot=slot, provenance=provenance)
+                carry=carry, slot=slot, provenance=provenance, policy=policy)
             episodes.append(end)
             outcome = end["outcome"]
             # Only the block's first episode continues a world: the ones after
@@ -894,6 +1013,11 @@ class Run:
             "outcomes": dict(Counter(e["outcome"] for e in episodes)),
             "n_pacing_resets": sum(e["n_pacing_resets"] for e in episodes),
             "total_reward": sum(e["score"] for e in episodes),
+            # How many times a death or the subject sent the world back a
+            # window (:mod:`fmri_gym.rewind`); absent when the block has no
+            # policy, which is every block that did not ask for one.
+            **({"n_rewinds": sum(e.get("n_rewinds", 0) for e in episodes)}
+               if policy is not None else {}),
             # The slot this block carried its world on, and the world it was
             # handed (:mod:`fmri_gym.resume`); absent when nothing carried.
             **({"resume": slot, "resumed_from": resumed_from} if slot else {}),
@@ -906,6 +1030,7 @@ class Run:
             **({"advancing_outcomes": advancing} if advancing is not None else {}),
             "data_dir": data_dir, **speed,
             **({"menu": menu.describe()} if menu else {}),
+            **({"rewind": policy.describe()} if policy is not None else {}),
         })
         if user_quit:
             raise KeyboardInterrupt

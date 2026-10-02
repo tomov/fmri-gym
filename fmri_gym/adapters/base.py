@@ -183,15 +183,21 @@ class EnvAdapter:
         It costs game pixels, so the default is ``None`` and a backend that
         returns lines should keep them short.
 
-        The float is where down the frame to centre them, as a fraction of its
-        height (0.5 = the middle). It is the backend's call because "where they
-        are already looking" is not always the middle: a game that draws its
-        own HUD into the bottom rows of its frame leaves the played part above
-        centre.
+        The float is :attr:`overlay_y`, or anywhere else down the frame this
+        particular line belongs.
 
         :return: ``(lines, y_frac)``, or ``None``.
         """
         return None
+
+    #: Where down the frame a line drawn *on* it goes, as a fraction of the
+    #: frame's height: what :meth:`overlay` returns beside its lines, and where
+    #: the session puts a line of its own when it has one to say inside the
+    #: picture (:mod:`fmri_gym.rewind`'s "You died" over the held frame). It is
+    #: the backend's call because "where the subject is already looking" is not
+    #: always the middle, which is the default: a game that draws its own HUD
+    #: into the bottom rows of its frame leaves the played part above centre.
+    overlay_y: float = 0.5
 
     def outcome(self, terminated: bool, truncated: bool) -> tuple[str, str]:
         """How the episode stands after its last step, as a name and a line for the subject.

@@ -1,4 +1,4 @@
-"""The in-game menu: hold a key to pause and choose reset / forfeit / resume.
+"""The in-game menu: hold a key to pause and choose rewind / reset / forfeit / resume.
 
 A subject can get stuck (a Baba Is You puzzle with the rules pushed into a
 corner) or want out of a level, and the button box has few buttons, so the
@@ -20,6 +20,12 @@ the episode over (a new ``reset`` of the env with the same seed: the very
 instance the subject gave up on), ``forfeit`` ends the block and moves on to
 the next phase, ``resume`` goes on where the game paused. Options are shown in
 the order listed.
+
+``rewind`` is the fifth option and the one not in the defaults: it puts the
+world back a few frames and plays on (:mod:`fmri_gym.rewind`), and how far back
+is a phase field rather than a menu one, so a menu that offers it without that
+field would pause the game and do nothing. A phase lists it explicitly or does
+not have it, and ``validate_config`` refuses the half of either.
 """
 
 from __future__ import annotations
@@ -37,10 +43,33 @@ if TYPE_CHECKING:
     from .display import Display
     from .logging import Logger
 
-OPTIONS = ("reset", "forfeit", "resume")
-_LABELS = {"reset": "Restart the level", "forfeit": "Give up this level", "resume": "Resume"}
-_DEFAULTS = {"hold": 5.0, "after": 15.0, "options": list(OPTIONS),
+#: What a menu offers unless the phase says otherwise.
+DEFAULT_OPTIONS = ("reset", "forfeit", "resume")
+#: Every option a phase may list. ``rewind`` is not a default: it does nothing
+#: without the phase field that says how far back to go (:mod:`fmri_gym.rewind`).
+OPTIONS = ("rewind", *DEFAULT_OPTIONS)
+_LABELS = {"rewind": "Go back a few frames", "reset": "Restart the level",
+           "forfeit": "Give up this level", "resume": "Resume"}
+_DEFAULTS = {"hold": 5.0, "after": 15.0, "options": list(DEFAULT_OPTIONS),
              "move": ["UP", "DOWN"], "confirm": "RETURN"}
+
+
+def options_of(phase: dict) -> list[str]:
+    """The options a game phase's pause menu offers.
+
+    For the cross-field checks in :func:`fmri_gym.config.validate_config`: an
+    option and the phase field behind it are written in two places and have to
+    agree.
+
+    :param phase: a game-phase config.
+    :return: the options in force, empty when the phase has no menu (or one
+        :func:`menu_problems` is about to refuse).
+    """
+    spec = phase.get("menu")
+    if not isinstance(spec, dict):
+        return []
+    options = spec.get("options", _DEFAULTS["options"])
+    return [o for o in options if isinstance(o, str)] if isinstance(options, list) else []
 
 
 def menu_problems(spec: object) -> list[str]:
@@ -78,11 +107,16 @@ class Menu:
     :param spec: the phase's ``"menu"`` dict (already validated).
     :param block_start: ``perf_counter`` at which the block began.
     :param held: returns the names of the keys held now (a test can fake it).
+    :param labels: what to call an option instead of its default label, for
+        the ones whose wording belongs to a phase field rather than to the
+        menu (``rewind``: how far back, in the units it was asked for).
     """
 
     def __init__(self, spec: dict, block_start: float,
-                 held: Callable[[], frozenset[str]] = held_key_names) -> None:
+                 held: Callable[[], frozenset[str]] = held_key_names,
+                 labels: dict[str, str] | None = None) -> None:
         cfg = {**_DEFAULTS, **spec}
+        self.labels = {**_LABELS, **(labels or {})}
         self.key = cfg["key"].upper()
         self.hold = float(cfg["hold"])
         self.after = float(cfg["after"])
@@ -159,7 +193,8 @@ class Menu:
 
     def _draw(self, display: Display, choice: int) -> None:
         """Render the option list with ``choice`` marked."""
-        rows = [f"{'>' if i == choice else ' '}  {_LABELS[o]}" for i, o in enumerate(self.options)]
+        rows = [f"{'>' if i == choice else ' '}  {self.labels[o]}"
+                for i, o in enumerate(self.options)]
         display.draw_text("Paused\n\n" + "\n".join(rows) + "\n\n"
                           f"({self.prev_key}/{self.next_key} to choose, {self.confirm_key} to select)",
                           align="left")
