@@ -115,6 +115,25 @@ def build(level: str | None, seed: int = 1, menu: bool = False) -> tuple:
     return env, game, game._player
 
 
+def level_wrapper(env: object) -> object:
+    """The level wrapper in this chain, wherever it sits in it.
+
+    Found rather than taken off the outside, because a level that names tasks
+    has the task chain above it and Gymnasium 1.3 forwards no attribute through
+    a wrapper. What a block reads is the level in the chain, which is this
+    wrapper's own ``level`` (``crafter_gym.levels.level_of``).
+
+    :param env: any env, wrapped or not.
+    :return: the :class:`~crafter_gym.levels.LevelWrapper`, or ``None`` if the
+        chain has none.
+    """
+    while hasattr(env, "env"):
+        if isinstance(env, crafter_gym.LevelWrapper):
+            return env
+        env = env.env
+    return None
+
+
 def unit_of(game: object) -> np.ndarray:
     """The pixel size of one tile, by the engine's own arithmetic.
 
@@ -311,7 +330,7 @@ def part2() -> None:
               f"{len(reach)} reachable, missing {', '.join(gone) or 'none'}")
         env, _, _ = build(level)
         check(f"{level}: the wrapper says the same of the env it wraps",
-              env.achievements == reach)
+              level_wrapper(env).achievements == reach)
         env.close()
 
     env, game, player = build("L1_affordance")
@@ -372,8 +391,8 @@ def part3() -> None:
           rule.player is bg._player and rule.inner.player is bg._player
           and rule.player is not player)
     check("and the wrapper still knows which level it is",
-          back.env.level == "L1_affordance"
-          and back.env.rules == LEVELS["L1_affordance"])
+          level_wrapper(back).level == "L1_affordance"
+          and level_wrapper(back).rules == LEVELS["L1_affordance"])
     # The point of a savestate: the restored world is where play continues, so
     # it has to produce the frames the original would have.
     here = [env.step(a) for a in (4, 4, 5, 17, 18, 0)]
