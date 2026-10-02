@@ -568,6 +568,17 @@ class Run:
             # the run's interrupt path, and the block keeps what it has written.
             if policy.hold > 0:
                 self.audio.stop()       # the death's own sounds, over the held frame
+                # And it is told, in the backend's own words, because the one
+                # screen that would have said it is what the rollback takes
+                # away: an episode that ends shows its outcome message, an
+                # episode that goes back has no ending to show. The menu's
+                # rewind needs no line -- the entry the subject just chose
+                # said how far back it goes -- and a backend with nothing to
+                # say about this ending gets the held frame as it was.
+                message = (adapter.outcome(terminated, truncated)[1]
+                           if trigger == "death" else "")
+                if message:
+                    self._show(adapter, False, score, block_end, notice=[message])
                 _wait_for_duration(self.display, policy.hold)
             adapter.restore(back.blob)
             # The world this goes back to, as the `resume` line carries one:
@@ -782,7 +793,8 @@ class Run:
         return end
 
     def _show(
-        self, adapter: EnvAdapter, play_sound: bool, score: float, block_end: float
+        self, adapter: EnvAdapter, play_sound: bool, score: float, block_end: float,
+        notice: list[str] | None = None
     ) -> tuple[float, Any, Any]:
         """Flip the adapter's frame with its HUD, then queue its sound against that flip.
 
@@ -791,12 +803,18 @@ class Run:
         :param play_sound: pass the sound to the speakers.
         :param score: the episode's running score, for the HUD.
         :param block_end: ``perf_counter`` the block ends at, for the HUD.
+        :param notice: lines of the session's own to draw over the frame
+            instead of the backend's :meth:`~.adapters.base.EnvAdapter.overlay`,
+            at the backend's :attr:`~.adapters.base.EnvAdapter.overlay_y`. For
+            the one thing the session has to say inside the picture: that the
+            death the subject is looking at is about to be taken back.
         :return: ``perf_counter`` of the flip, the rendered frame, and the
             sound queued this frame (``None`` if ``play_sound`` is ``False``).
         """
         frame = adapter.render()
         hud = adapter.hud(score, block_end - time.perf_counter())
-        flip_t = self.display.draw_frame(frame, hud, adapter.overlay())
+        overlay = (notice, adapter.overlay_y) if notice else adapter.overlay()
+        flip_t = self.display.draw_frame(frame, hud, overlay)
         sound = adapter.sound() if play_sound else None
         if play_sound:
             self.audio.play(sound, flip_t)

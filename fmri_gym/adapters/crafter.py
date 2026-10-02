@@ -339,6 +339,12 @@ def _blocked_cue(rate: int = _SAMPLE_RATE) -> Sound:
 class CrafterAdapter(EnvAdapter):
     name: str = "crafter"
 
+    #: 0.5 would be the middle of the frame; crafter draws its own HUD into the
+    #: bottom two of the nine tile rows, so the played part is the top seven and
+    #: the player stands at row 3.5 of 9. Anything written over the frame goes
+    #: there, which is where the rig puts its own lines too.
+    overlay_y: float = 3.5 / 9.0
+
     def _make(self, spec: dict) -> gym.Env:
         import crafter_gym
 
@@ -585,17 +591,15 @@ class CrafterAdapter(EnvAdapter):
         """The menu cursor, drawn over the player, while it is being used.
 
         The one thing on screen the subject is aiming with rather than reading,
-        so it goes where they are already looking instead of into the strip.
-        0.5 would be the middle of the frame; crafter draws its own HUD into the
-        bottom two of the nine tile rows, so the played part is the top seven
-        and the player stands at row 3.5 of 9.
+        so it goes where they are already looking (:attr:`overlay_y`) instead of
+        into the strip.
 
         :return: ``(lines, y_frac)``, or ``None`` when the menu is off or idle.
         """
         if not (self._menu_mode and self.env.showing):
             return None
         # Underscores are the logged id; the screen gets the readable form.
-        return (["> " + self.env.selected.replace("_", " ")], 3.5 / 9.0)
+        return (["> " + self.env.selected.replace("_", " ")], self.overlay_y)
 
     def outcome(self, terminated: bool, truncated: bool) -> tuple[str, str]:
         # The env already separates the two endings crafter reports as one

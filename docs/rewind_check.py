@@ -21,7 +21,10 @@ and with ``on_death`` it comes back, so the block logs a rollback every few
 frames until its clock stops it. What is checked there is the world (the blob on
 each ``rewind`` line is the world the frame it names logged), the record (the
 undone frames are still in it, and a death that was undone is a frame flag
-rather than an outcome), the clock (the hold really held), and the handoff: the
+rather than an outcome), the screen (the hold really held, with the backend's
+own word for a death written over the held frame, which is the one part of this
+the subject sees and the one part the record cannot hold: it is measured
+through the display's own ``draw_frame``), and the handoff: the
 episode's outcome stays ``playing``, so the thread of play survives a death and
 the slot is written. Part 4 is the other end of it -- ``max_rewinds`` spent, and
 the next death is a death: the episode ends, and the slot goes with it -- and on
@@ -43,7 +46,7 @@ which level 4 does not have (level 1 is the level that does). Everything else,
 ``resume`` included, is whatever ``configs/dbp_games/crafter__crafter_L4.json``
 says today.
 
-Last run 2026-10-01 on this branch: 3 blocks, 80 checks, 0 failures.
+Last run 2026-10-02 on this branch: 3 blocks, 83 checks, 0 failures.
 """
 
 import hashlib
@@ -127,30 +130,76 @@ def dying_curriculum(path: str, **field) -> str:
     return path
 
 
-def headless(*args: str) -> subprocess.CompletedProcess:
+def headless(*args: str, **extra: str) -> subprocess.CompletedProcess:
     """Run one of the repo's own commands with no window, no sound and no scanner.
 
     :param args: the script and its arguments, after the interpreter.
+    :param extra: environment the command needs beyond those.
     :return: the finished process.
     """
     env = {**os.environ, "SDL_VIDEODRIVER": "dummy", "SDL_AUDIODRIVER": "dummy",
-           "PYTHONPATH": ROOT + os.pathsep + os.environ.get("PYTHONPATH", "")}
+           "PYTHONPATH": ROOT + os.pathsep + os.environ.get("PYTHONPATH", ""),
+           **extra}
     return subprocess.run([sys.executable, *args], cwd=ROOT, env=env,
                           capture_output=True, text=True)
 
 
-def play(curriculum: str, data_root: str, run: int) -> tuple[str, str]:
+#: ``fmri_play.py``, with every line the display drew over a frame written down
+#: on the way out. A notice over a held frame is pixels and nothing else -- no
+#: log line says it, and there is no window here to look at -- and
+#: :meth:`fmri_gym.display.Display.draw_frame` is the one place a frame reaches
+#: the screen, so this is where that half of the feature can be measured. The
+#: run itself is untouched: the wrapper records what it was passed and calls the
+#: real thing.
+DRIVER = '''\
+import json
+import os
+import runpy
+import sys
+
+from fmri_gym import display
+
+drawn = []
+flip = display.Display.draw_frame
+
+
+def recording(self, rgb, hud=None, overlay=None):
+    if overlay is not None:
+        drawn.append(overlay)
+    return flip(self, rgb, hud, overlay)
+
+
+display.Display.draw_frame = recording
+sys.argv = [os.environ["FMRI_PLAY"], *sys.argv[1:]]
+try:
+    runpy.run_path(sys.argv[0], run_name="__main__")
+finally:
+    with open(os.environ["FMRI_OVERLAY_LOG"], "w") as f:
+        json.dump(drawn, f)
+'''
+
+
+def play(curriculum: str, data_root: str, run: int) -> tuple[str, str, list]:
     """Run one ``fmri_play.py`` block in its own process, headless.
 
-    :param curriculum: the config to play.
+    :param curriculum: the config to play, in the folder this writes its own
+        driver and overlay log beside.
     :param data_root: the BIDS root the runs share.
     :param run: the run number.
-    :return: the block's folder, and what the run said on stderr.
+    :return: the block's folder, what the run said on stderr, and every overlay
+        the display drew, in order (:data:`DRIVER`).
     :raises RuntimeError: if the process failed or wrote no block.
     """
-    proc = headless(os.path.join(ROOT, "fmri_play.py"), "--curriculum", curriculum,
+    work = os.path.dirname(curriculum)
+    driver = os.path.join(work, "play_recording.py")
+    with open(driver, "w") as f:
+        f.write(DRIVER)
+    overlays = os.path.join(work, f"overlays-run{run:03d}.json")
+    proc = headless(driver, "--curriculum", curriculum,
                     "--subject", "sub-01", "--ses", "1", "--run", str(run),
-                    "--data-root", data_root, "--dummy-trigger", "--no-audio")
+                    "--data-root", data_root, "--dummy-trigger", "--no-audio",
+                    FMRI_PLAY=os.path.join(ROOT, "fmri_play.py"),
+                    FMRI_OVERLAY_LOG=overlays)
     if proc.returncode != 0:
         raise RuntimeError(f"run {run} failed:\n{proc.stderr[-2000:]}")
     for line in proc.stderr.splitlines():
@@ -162,7 +211,9 @@ def play(curriculum: str, data_root: str, run: int) -> tuple[str, str]:
     blocks = [d for d in sorted(os.listdir(run_dir)) if d.startswith("block-")]
     if not blocks:
         raise RuntimeError(f"run {run} wrote no block")
-    return os.path.join(run_dir, blocks[0]), proc.stderr
+    with open(overlays) as f:
+        drawn = json.load(f)
+    return os.path.join(run_dir, blocks[0]), proc.stderr, drawn
 
 
 def lines_of(block: str, kind: str) -> list[dict]:
@@ -237,11 +288,16 @@ def part1() -> None:
           all(validate_config(c) == [] for c in levels.values()))
     policy = rewind.policy_of(phases["L1"])
     check("level 1 rolls a death back", policy is not None and policy.on_death)
-    # The rig's 1.0 s at cadence_hz 5.0 is five of its ticks, and the turn-based
-    # form of five ticks is five presses (core.py: --death-restore-s, --death-hold-s).
-    check("a window of the rig's five ticks, in the subject's own moves",
-          policy.frames == 5 and policy.seconds is None, f"{policy.describe()}")
+    # One move, which is the rig's own window read in presses rather than in
+    # ticks: --death-restore-s 1.0 at cadence_hz 5.0 is five ticks, but the rig
+    # pushes a snapshot on every tick and a tick steps the env whether or not a
+    # button is down (core.py:Rig.tick, ButtonMapper.resolve), so the second it
+    # goes back holds whichever presses fell inside it and not five of them.
+    check("a window of one of the subject's own moves",
+          policy.frames == 1 and policy.seconds is None, f"{policy.describe()}")
     check("and the rig's hold over the frame that killed them", policy.hold == 1.2)
+    check("so the menu entry it would be offered under says one move",
+          policy.label() == "Go back 1 move", policy.label())
     check("nothing caps how many rollbacks the level allows", policy.max_rewinds is None)
     check("the other three levels keep the true death",
           all(rewind.policy_of(phases[n]) is None for n in ("L2", "L3", "L4")))
@@ -374,7 +430,7 @@ def part3(curriculum: str, data_root: str) -> str:
     :return: the block's folder.
     """
     print("part 3: a death rolled back")
-    block, said = play(curriculum, data_root, 1)
+    block, said, drawn = play(curriculum, data_root, 1)
     frames = lines_of(block, "frame")
     rewinds = lines_of(block, "rewind")
     check("the block died and came back more than once", len(rewinds) > 1,
@@ -432,6 +488,19 @@ def part3(curriculum: str, data_root: str) -> str:
     check("the frame that triggered it was held before the world moved",
           len(held) >= len(rewinds) - 1 and all(h >= HOLD for h in held),
           f"{min(held):.2f} s at least, {HOLD} asked for")
+    # And what it says while it is up, which no line of the record holds: the
+    # backend's own message for this ending, where that backend puts a line on
+    # its frame. A rolled-back death never reaches the outcome screen, so
+    # without this the subject is shown a world that jumps and told nothing.
+    adapter = get_adapter("crafter", read_events(block)[0]["phase"])
+    try:
+        notice = [[adapter.outcome(True, False)[1]], adapter.overlay_y]
+    finally:
+        adapter.close()
+    check("with the backend's word for the death written over it, once each",
+          drawn == [notice] * len(rewinds),
+          f"{len(drawn)} lines drawn over {len(rewinds)} rollbacks: "
+          f"{notice[0][0]!r} at {notice[1]:.3f} of the frame height")
 
     end = lines_of(block, "episode_end")[-1]
     check("the episode never ended of the death", end["outcome"] == "playing",
@@ -472,7 +541,7 @@ def part4(data_root: str, work: str) -> None:
     resume_dir = os.path.join(data_root, "sub-01", "ses-001", "resume")
     was = resume.load(resume_dir, "crafter_L4").blob
     curriculum = dying_curriculum(os.path.join(work, "l4_capped.json"), max_rewinds=1)
-    block, said = play(curriculum, data_root, 2)
+    block, said, drawn = play(curriculum, data_root, 2)
     check("the block was handed the world part 3 left, rollbacks and all",
           all(e["resumed"] for e in lines_of(block, "episode_start"))
           and read_state(lines_of(block, "resume")[0]) == was,
@@ -485,6 +554,11 @@ def part4(data_root: str, work: str) -> None:
     check("so the next death ended the episode",
           end["outcome"] != "playing" and end["terminated"], f"outcome {end['outcome']}")
     check("the record still counts the one rollback", end["n_rewinds"] == 1)
+    # The other side of part 3's notice: a line over the held frame belongs to a
+    # death that is about to be taken back, and the one that ends the episode is
+    # told on the outcome screen the ending reaches.
+    check("only the rollback wrote its line over a frame", len(drawn) == 1,
+          f"{len(drawn)} lines drawn over two deaths")
     check("and the thread of play ended with the episode",
           resume.load(resume_dir, "crafter_L4") is None)
     check("the block that ended it is a block whose game ended it",
