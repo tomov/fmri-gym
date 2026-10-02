@@ -53,7 +53,8 @@ def reconstruct_episode(
         getattr(adapter, "warm_up", lambda: None)()
     adapter.reset(plan["seed"])
     for action in plan["actions"]:
-        adapter.step(action)
+        obs, _, _, _, info = adapter.step(action)
+        adapter.capture(obs, info, want_blob=False)
     return adapter, plan
 
 
