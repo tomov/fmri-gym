@@ -9,11 +9,11 @@ One system library, then everything else, from the repo root:
 ```bash
 sudo apt install libportaudio2                  # PortAudio; every backend needs it
 curl -LsSf https://astral.sh/uv/install.sh | sh # if you don't have uv
-uv sync --extra dbp                             # every game below, into .venv/
+uv sync --extra dbp --extra gui                 # every game below + the editor, into .venv/
 uv run fmri-play --help                         # check: prints usage
 ```
 
-That installs every game below into `.venv/`; `uv run fmri-play ...` then plays one. Without [uv](https://docs.astral.sh/uv/): `pip install -e ".[dbp]"` in a venv of your own, and `python fmri_play.py` in place of `fmri-play`.
+That installs every game below, plus the `fmri-edit` editor, into `.venv/`; `uv run fmri-play ...` then plays one. A game is an extra and nothing is installed by default: a bare `uv sync` gets the core alone, `--extra dbp` the DBP set, `--extra baba` (or any one backend) the core plus that game, `--extra all` every backend and the editor. Each sync makes `.venv/` match exactly the extras it names, so name the whole list every time -- one left out is one uv uninstalls. `baba_auto` (hence `all`) compiles a C++ engine at install: `sudo apt install build-essential`, or `xcode-select --install` on macOS. Without [uv](https://docs.astral.sh/uv/): `pip install -e ".[dbp,gui]"` in a venv of your own, and `python fmri_play.py` in place of `fmri-play`.
 
 COOM, Baba Is Auto and VGDL read their game files from a checkout of the game's own repo, a git submodule at `external/<backend>` pinned to a commit (README "External checkouts"). `git clone --recursive` fetches them; in a clone made without it, run `git submodule update --init` once. On an offline scanner PC, fetch them while online or copy `external/` over.
 

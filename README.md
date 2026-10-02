@@ -37,7 +37,7 @@ uv sync --extra dbp                          # .venv/ with the DBP backends, pin
 uv run fmri-play --subject sub-01 --dummy-trigger --curriculum configs/dbp_games/atari__pong.json --ses 1 --run 1
 ```
 
-`dbp` is the DBP games. Each backend is also its own extra (`ale`, `retro`, `vizdoom`, `minihack`, `rushhour`, …), and `--extra all` installs every backend.
+Nothing is installed by default: a bare `uv sync` gets the engine-agnostic core alone, and every game arrives as an extra. `dbp` is the DBP games; each backend is also its own extra (`ale`, `retro`, `vizdoom`, `minihack`, `rushhour`, …), so `--extra baba` is the core plus that one game. `gui` adds the `fmri-edit` editor, and `--extra all` installs every backend and the editor -- enough to run every game here without an import error. Extras combine (`--extra dbp --extra gui`), and each `uv sync` makes `.venv/` match exactly the extras it names -- one you leave out is one uv uninstalls, so repeat the whole list every time. `uv run` does not: it adds what the lockfile requires and leaves the rest, so the games survive every `uv run`; only the next bare `uv sync` strips them. `baba_auto` (hence `all`) compiles a C++ engine at install, so it needs a compiler: `build-essential` on Linux, `xcode-select --install` on macOS. No `.python-version` is needed to keep uv off a Python the backends have no wheels for: `requires-python` in `pyproject.toml` caps the interpreter at `<3.14`, which is also what pip reads.
 
 Without uv: pip into a venv of your own, and `python fmri_play.py` in place of `fmri-play`:
 
