@@ -459,6 +459,8 @@ They assume `sub-01` and a 1024x768 window, and take the subject's next free ses
                                 //   "" is the action sent with no key held (see below)
  "save_pixels": false,          // also store lossless pixels, where the backend can
  "show_score": false}           // crafter: draw the achievement count beside the frame
+                                //   (out of what the level can reach: 20, not 22, with
+                                //   nothing hostile in it to defeat)
 ```
 
 ### Keys (the `keys` field)

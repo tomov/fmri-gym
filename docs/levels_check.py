@@ -15,8 +15,12 @@ a dependency of this repo and nothing here can go looking for it. Part 2 is the
 rules, one level at a time, each measured where the engine keeps it: hostiles
 cleared and kept out through a night, the life stats frozen or not, health
 refused or taken, the four icons gone from the item panel and every other icon
-still at its own index, the death tint, the sleep button, and lava still
-lethal. Each has the engine's own behaviour next to it as a negative control,
+still at its own index, the death tint, the sleep button, lava still lethal,
+and the achievement count the strip divides by, which is a claim about the
+rules: the two defeats are unreachable because the creature is never in the
+world, and the other twenty survive a frozen homeostat, shown on the two whose
+reward is a stat that is already full.
+Each has the engine's own behaviour next to it as a negative control,
 because a rule that cannot be shown to change anything is not evidence of
 anything. Part 3 is what the levels are for in fMRI: the same seed gives the
 same terrain in all four, a level survives the pickle a savestate and a resume
@@ -32,7 +36,7 @@ The in-process envs of parts 2 and 3 are a quarter of crafter's world (see
 level per rule here; part 4's blocks are the configs' own world, at the frame
 size ``docs/resume_check.py`` plays at.
 
-Last run 2026-10-01 on this branch: 53 checks, 0 failures (48 without
+Last run 2026-10-02 on this branch: 65 checks, 0 failures (60 without
 ``CRAFTER_RIG``).
 """
 
@@ -73,6 +77,13 @@ AREA = (32, 32)
 #: Deep enough into crafter's night for a zombie to spawn: daylight falls below
 #: 0.5 between steps 148 and 272 of each 300-step day.
 NIGHT = 200
+#: The four move actions of ``crafter.constants.actions``, each with the step it
+#: takes, and the index of ``do``.
+MOVES = ((1, (-1, 0)), (2, (+1, 0)), (3, (0, -1)), (4, (0, +1)))
+DO = 5
+#: The two achievements no level without a hostile in it can unlock, in the
+#: order ``crafter.constants.achievements`` lists them.
+HOSTILE_ACHIEVEMENTS = ["defeat_skeleton", "defeat_zombie"]
 
 failures = []
 
@@ -121,6 +132,21 @@ def hostiles(game: object) -> list:
     """
     kinds = (crafter.objects.Zombie, crafter.objects.Skeleton, crafter.objects.Arrow)
     return [o for o in game._world.objects if isinstance(o, kinds)]
+
+
+def free_neighbour(game: object, player: object) -> tuple:
+    """A cell beside the player with nothing standing in it.
+
+    Every check that puts something within reach needs one: ``world.add``
+    refuses to share a cell, and so does the ``is_free`` of a move.
+
+    :param game: the ``crafter.Env``.
+    :param player: its ``Player``.
+    :return: ``(move action, facing, cell)`` for that neighbour.
+    """
+    pos = np.array(player.pos)
+    return next((a, d, tuple(pos + d)) for a, d in MOVES
+                if game._world[tuple(pos + d)][1] is None)
 
 
 def part1() -> None:
@@ -256,17 +282,63 @@ def part2() -> None:
         env.close()
 
     env, game, player = build("L1_affordance")
-    world = game._world
-    # Any free neighbour: `move` refuses an occupied cell, and lava is walkable.
-    action, target = next(
-        (a, tuple(np.array(player.pos) + d))
-        for a, d in ((1, (-1, 0)), (2, (1, 0)), (3, (0, -1)), (4, (0, 1)))
-        if world[tuple(np.array(player.pos) + d)][1] is None)
-    world[target] = "lava"
+    action, _, target = free_neighbour(game, player)
+    game._world[target] = "lava"
     _, _, terminated, truncated, info = env.step(action)
     check("L1: lava still ends the episode",
           terminated and not truncated and info["inventory"]["health"] == 0,
           f"health {info['inventory']['health']}, terminated {terminated}")
+    env.close()
+
+    # What the rules cost the scoreboard. The strip divides by the reachable
+    # count, so the count is a claim about the rules and is measured as one: the
+    # two defeats go because the creature is never in the world (the hostile
+    # checks above), and the rest stay because an unlock hangs off the action
+    # and not off the stat it feeds, which the two live checks below show at the
+    # only stat value where the difference is visible.
+    names = list(crafter.constants.achievements)
+    check("crafter still ships 22 achievements", len(names) == 22, str(len(names)))
+    check("stock crafter: every one of them is reachable",
+          list(crafter_gym.reachable_achievements(None)) == names)
+    for level in LEVELS:
+        reach = crafter_gym.reachable_achievements(level)
+        hostile = LEVELS[level]["hostiles"]
+        gone = sorted(set(names) - set(reach))
+        check(f"{level}: {len(names) if hostile else len(names) - 2} of the "
+              f"{len(names)} are reachable, in crafter's order",
+              gone == ([] if hostile else HOSTILE_ACHIEVEMENTS)
+              and list(reach) == [n for n in names if n not in gone],
+              f"{len(reach)} reachable, missing {', '.join(gone) or 'none'}")
+        env, _, _ = build(level)
+        check(f"{level}: the wrapper says the same of the env it wraps",
+              env.achievements == reach)
+        env.close()
+
+    env, game, player = build("L1_affordance")
+    _, facing, target = free_neighbour(game, player)
+    game._world[target] = "water"
+    # Water is not walkable, so a move would only turn the player; face it and
+    # drink in one step. `collect.water` requires nothing and leaves water.
+    player.facing = facing
+    env.step(DO)
+    check("L1: collect_drink unlocks on drinking with the stat already full",
+          player.achievements["collect_drink"] == 1
+          and player.inventory["drink"] == 9,
+          f"drink {player.inventory['drink']}")
+    env.close()
+
+    env, game, player = build("L1_affordance")
+    _, facing, target = free_neighbour(game, player)
+    cow = crafter.objects.Cow(game._world, np.array(target))
+    # A kill in one hit, which the player lands before the cow's own update can
+    # walk it out of the faced cell (`env.step` updates the player first).
+    cow.health = 1
+    game._world.add(cow)
+    player.facing = facing
+    env.step(DO)
+    check("L1: eat_cow unlocks on the kill with the stat already full",
+          player.achievements["eat_cow"] == 1 and player.inventory["food"] == 9,
+          f"food {player.inventory['food']}")
     env.close()
 
 

@@ -221,6 +221,22 @@ def _semantic_names(game: Any) -> list[str]:
     return [names.get(i, "?") for i in range(max(names) + 1)]
 
 
+def _reachable(env: Any) -> tuple[str, ...]:
+    """The achievements this env's level can unlock, in crafter's id order.
+
+    Asked of the env rather than of the phase's ``env_kwargs``, so that it
+    follows a restored world into the level that world was recorded on, which
+    is the level actually being played (``crafter_gym.levels.level_of``).
+
+    :param env: the env chain, as ``_make`` built it or ``restore`` unpickled it.
+    :return: the reachable names, a subsequence of
+        ``crafter.constants.achievements``.
+    """
+    import crafter_gym
+
+    return crafter_gym.reachable_achievements(crafter_gym.level_of(env))
+
+
 # --- the three cues -------------------------------------------------------
 #
 # Separated by TIMBRE, not pitch: `hit` is a noise burst, `score` a harmonic
@@ -329,7 +345,9 @@ class CrafterAdapter(EnvAdapter):
         # Through the env package rather than `import crafter`: the repo's own
         # gym/ directory shadows old gym for a process started at the repo
         # root, and `crafter_gym.import_crafter` is where that is dealt with.
-        crafter = crafter_gym.import_crafter()
+        # Called for that, not for the module: once it has run, the plain
+        # `import crafter` of `block_extra` works too.
+        crafter_gym.import_crafter()
 
         self._show_score = bool(spec.get("show_score", False))
         self._cues = bool(spec.get("cues", False))
@@ -339,7 +357,6 @@ class CrafterAdapter(EnvAdapter):
         self._cue_sounds = {
             "score": _score_cue(), "hit": _hit_cue(), "blocked": _blocked_cue(),
         } if self._cues else {}
-        self._n_achievements = len(crafter.constants.achievements)
         self._unlocked: set[str] = set()
         self._cue = ""
         self._outcome: dict = _NO_OUTCOME
@@ -355,6 +372,7 @@ class CrafterAdapter(EnvAdapter):
         env = (crafter_gym.make_menu(**kwargs) if self._menu_mode
                else crafter_gym.make_plain(**kwargs))
         _check_internals(env.unwrapped.game)
+        self._achievements = _reachable(env)
         return env
 
     @property
@@ -537,6 +555,12 @@ class CrafterAdapter(EnvAdapter):
         already returns every step, so the model harness reads the identical
         values: this shows env state, it does not add any.
 
+        The denominator is what the level being played can unlock, which on the
+        two levels with nothing hostile in them is 20 rather than crafter's 22
+        (``crafter_gym.levels.reachable_achievements``). A count against 22
+        there would ask the subject for two achievements the world does not
+        contain, and would score the block against them afterwards.
+
         The cue field is the same bit of information the subject just heard,
         written down, so a policy reading these lines as text is told what a
         human in the bore is told and no more. It has its own flag because the
@@ -555,7 +579,7 @@ class CrafterAdapter(EnvAdapter):
             lines.append(cue)
         if not self._show_score:
             return [*lines, f"Score: {score:g}"]
-        return [*lines, f"{len(self._unlocked)} / {self._n_achievements}"]
+        return [*lines, f"{len(self._unlocked)} / {len(self._achievements)}"]
 
     def overlay(self) -> tuple[list[str], float] | None:
         """The menu cursor, drawn over the player, while it is being used.
@@ -631,6 +655,11 @@ class CrafterAdapter(EnvAdapter):
         :param blob: bytes previously returned as :attr:`FrameState.blob`.
         """
         self.env = pickle.loads(blob)
+        # The level came back with the world, and it is the level now being
+        # played even if the phase asked for another one (`fmri_gym.resume`
+        # warns about that before the block opens), so the strip's denominator
+        # follows the world rather than the config.
+        self._achievements = _reachable(self.env)
 
         self._unlocked = set()
         for name, count in self._game._player.achievements.items():
@@ -644,19 +673,27 @@ class CrafterAdapter(EnvAdapter):
         """Block-level legends for the per-frame variables.
 
         :return: id-indexed name arrays for the action space, the inventory
-            slots, the achievements and the semantic grid.
+            slots, the achievements and the semantic grid, plus which of the
+            achievements the level played could unlock at all.
         """
         import crafter
         # constants.items / .achievements are what the player's dicts are built
         # from, so their order is the order `capture` logs the values in
         # (checked against a live env, 2026-09-15).
+        names = list(crafter.constants.achievements)
         extra = {
             # In menu mode this covers the two buttons that are not crafter
             # actions, since `actions` holds buttons; `env_action` indexes the
             # first 17 of the same list either way.
             "action_names": np.array(self.env.action_names),
             "inventory_names": np.array(list(crafter.constants.items)),
-            "achievement_names": np.array(list(crafter.constants.achievements)),
+            "achievement_names": np.array(names),
+            # Aligned with the names above and with every frame's achievement
+            # counts: False marks one the level kept out of the world, which is
+            # the denominator the subject was scored against (see `hud`) and
+            # the column an analysis has to leave out of a per-level total.
+            "achievements_reachable": np.array([n in self._achievements
+                                                for n in names]),
             "semantic_names": np.array(_semantic_names(self._game)),
         }
         if self._menu_mode:

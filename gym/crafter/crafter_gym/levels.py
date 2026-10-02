@@ -30,6 +30,18 @@ reproduce the chain -- and, because each rule reaches its predecessor through
 between a player and the rules installed on it unpickles without resolving
 back through the dict being restored.
 
+What a level can score
+----------------------
+
+Rules decide what there is to get. Two of crafter's 22 achievements are a
+creature L1 and L2 keep out of the world, so 20 is the ceiling on those two
+levels: :func:`reachable_achievements` is that set, and the count the subject
+is shown while playing is divided by it rather than by 22. Nothing else is lost
+to the rest of the table, for the reasons recorded with
+:data:`_HOSTILE_ACHIEVEMENTS`. Which level an env is actually in is a question
+for the chain and not for the config that built it, since a block can open
+another level's world: :func:`level_of` answers it.
+
 What is not here
 ----------------
 
@@ -49,7 +61,8 @@ import numpy as np
 
 from .env import import_crafter
 
-__all__ = ["LEVELS", "LevelWrapper", "with_level"]
+__all__ = ["LEVELS", "LevelWrapper", "level_of", "reachable_achievements",
+           "with_level"]
 
 # The rig's own table (core.py:LEVELS), which the agent-side training env is
 # built from as well. In every level an episode ends on death only (the configs
@@ -72,6 +85,51 @@ LEVELS: dict[str, dict[str, Any]] = {
     "L4_survival": dict(hostiles=True, homeostatic_death=True,
                         hidden_items=()),
 }
+
+#: The two of crafter's 22 achievements a level with nothing hostile in it can
+#: never unlock: both are a creature :class:`_NoHostiles` keeps out of the
+#: world. The other twenty survive the rest of the table, a frozen homeostat
+#: included, because an unlock hangs off the action and not off the stat it
+#: feeds: ``eat_cow`` is awarded on the kill however full the player is,
+#: ``collect_drink`` on drinking water with the stat already at 9 (the engine
+#: checks a collect's ``require``, never its ``receive``), and
+#: :class:`_InstantSleep` is in the table precisely so ``wake_up`` stays
+#: reachable with energy frozen. Measured in ``docs/levels_check.py``.
+_HOSTILE_ACHIEVEMENTS = ("defeat_skeleton", "defeat_zombie")
+
+
+def _require_level(level: str) -> dict[str, Any]:
+    """This level's row of :data:`LEVELS`.
+
+    :param level: a key of :data:`LEVELS`.
+    :return: the row itself, not a copy.
+    :raises ValueError: if ``level`` is not one of them.
+    """
+    try:
+        return LEVELS[level]
+    except KeyError:
+        raise ValueError(f"unknown crafter level {level!r}; the paradigm's "
+                         f"levels are {', '.join(LEVELS)}") from None
+
+
+def reachable_achievements(level: str | None) -> tuple[str, ...]:
+    """The achievements this level can unlock, in crafter's own id order.
+
+    Crafter scores a run by how many of its achievements were unlocked, and
+    the count is only a score against the number there are to get. On a level
+    with no hostiles that number is not 22 (see :data:`_HOSTILE_ACHIEVEMENTS`),
+    and a subject shown a denominator they cannot reach is being told the run
+    failed at something it never contained.
+
+    :param level: a key of :data:`LEVELS`, or ``None`` for stock crafter.
+    :return: the reachable names, a subsequence of
+        ``crafter.constants.achievements``.
+    :raises ValueError: if ``level`` is not one of :data:`LEVELS`.
+    """
+    names = tuple(import_crafter().constants.achievements)
+    if level is None or _require_level(level)["hostiles"]:
+        return names
+    return tuple(n for n in names if n not in _HOSTILE_ACHIEVEMENTS)
 
 
 class _PlayerRule:
@@ -304,9 +362,7 @@ class LevelWrapper(gym.Wrapper):
     """
 
     def __init__(self, env: gym.Env, level: str) -> None:
-        if level not in LEVELS:
-            raise ValueError(f"unknown crafter level {level!r}; the paradigm's "
-                             f"levels are {', '.join(LEVELS)}")
+        _require_level(level)
         super().__init__(env)
         self.level = level
 
@@ -314,6 +370,11 @@ class LevelWrapper(gym.Wrapper):
     def rules(self) -> dict[str, Any]:
         """This level's row of :data:`LEVELS`, copied."""
         return dict(LEVELS[self.level])
+
+    @property
+    def achievements(self) -> tuple[str, ...]:
+        """What this level can unlock (:func:`reachable_achievements`)."""
+        return reachable_achievements(self.level)
 
     @property
     def action_names(self) -> list[str]:
@@ -371,6 +432,24 @@ class LevelWrapper(gym.Wrapper):
         else:
             player.__dict__.pop("_update_life_stats", None)
             player.__dict__.pop("update", None)
+
+
+def level_of(env: gym.Env) -> str | None:
+    """The level imposed on this env chain, or ``None`` for stock crafter.
+
+    Reads the chain rather than the ``level`` that was asked for, because the
+    two part ways: a block that opens another level's ``resume`` slot plays the
+    world in the slot, rules and all, and says so (``fmri_gym.resume``). The
+    env is the authority on which game is being played.
+
+    :param env: any env, wrapped or not.
+    :return: the :class:`LevelWrapper`'s level, or ``None`` if there is none.
+    """
+    while isinstance(env, gym.Wrapper):
+        if isinstance(env, LevelWrapper):
+            return env.level
+        env = env.env
+    return None
 
 
 def with_level(env: gym.Env, level: str | None) -> gym.Env:
