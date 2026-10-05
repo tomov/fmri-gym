@@ -64,4 +64,8 @@ class RushHourAdapter(EnvAdapter):
         self, obs: Any, info: dict, want_blob: bool = True
     ) -> FrameState:
         info = info if isinstance(info, dict) else {}
-        return FrameState(blob=None, variables=dict(info))
+        variables = {}
+        for k, v in info.items():
+            if k not in ("t_ms", "trial_ms"):
+                variables[k] = v
+        return FrameState(blob=None, variables=variables)
