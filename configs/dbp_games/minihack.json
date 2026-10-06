@@ -3,7 +3,7 @@
   "_source": "https://github.com/facebookresearch/minihack",
   "_status": "verified",
   "_verified": "pip install minihack (needs setuptools<81 for pkg_resources; downgrades gymnasium to 1.2). Runs via the 'minihack' backend: pixel observation displayed, Discrete(8) compass (arrows=N/E/S/W), blstats/glyphs/message logged. No savestate (seed+replay).",
-  "_keys_note": "Discrete(8) compass action space: 0=N,1=E,2=S,3=W,4=NE,5=SE,6=SW,7=NW. Arrows map to the cardinals; NetHack's y/u/b/n map to the diagonals. turn_based:true is required -- noop is action 0 (=move N), so a real-time loop would auto-walk north. Keep the message Controls text in sync with 'keys' by hand.",
+  "_keys_note": "Discrete(8) compass action space: 0=N,1=E,2=S,3=W,4=NE,5=SE,6=SW,7=NW. Arrows map to the cardinals; Y/A/B/X to the diagonals NW/NE/SW/SE. turn_based:true is required -- noop is action 0 (=move N), so a real-time loop would auto-walk north. Keep the message Controls text in sync with 'keys' by hand.",
   "curriculum": [
     {
       "type": "message",
@@ -16,8 +16,8 @@
         "",
         "Controls:",
         "   ARROWS       move  N / S / W / E",
-        "   Y / U        move diagonally  NW / NE",
-        "   B / N        move diagonally  SW / SE",
+        "   Y / A        move diagonally  NW / NE",
+        "   B / X        move diagonally  SW / SE",
         "",
         "(press SPACE to start)"
       ]
@@ -35,8 +35,8 @@
       "max_duration": 120.0,
       "fps": 15,
       "turn_based": true,
-      "keys": {"UP": 0, "DOWN": 2, "LEFT": 3, "RIGHT": 1, "Y": 7, "U": 4, "B": 6, "N": 5},
-      "_note": "Many env ids (MiniHack-Room-*, MiniHack-MazeWalk-*, MiniHack-River-*, ...). Diagonals via y/u/b/n; extra commands per scenario (see minihack__corridor / minihack__eat).",
+      "keys": {"UP": 0, "DOWN": 2, "LEFT": 3, "RIGHT": 1, "Y": 7, "A": 4, "B": 6, "X": 5},
+      "_note": "Many env ids (MiniHack-Room-*, MiniHack-MazeWalk-*, MiniHack-River-*, ...). Diagonals via Y/A/B/X; extra commands per scenario (see minihack__corridor / minihack__eat).",
       "type": "game"
     },
     {

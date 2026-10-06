@@ -19,8 +19,9 @@ import copy
 import json
 from typing import Any
 
-from .keys import KEY_NAMES
+from .keys import is_key, keycode, typed_keys
 from .menu import menu_problems
+from .rig import CONTROLS
 from .triggers import TriggerError, TriggerSettings
 
 #: The phases of a run; the ``check_*`` ones make a rig check (:mod:`fmri_gym.checks`).
@@ -103,7 +104,8 @@ def new_config() -> dict:
             {"type": "message", "text": "Get ready\n\n(press SPACE to start)"},
             {"type": "fixation", "duration": 2.0},
             {"type": "game", "backend": "ale", "game": "ALE/Pong-v5", "mode": "duration",
-             "duration": 60.0, "fps": 30, "keys": {"UP": 2, "DOWN": 3}},
+             "duration": 60.0, "fps": 30,
+             "keys": {"": 0, "A": 1, "UP": 2, "DOWN": 3, "UP+A": 4, "DOWN+A": 5}},
             {"type": "fixation", "duration": 2.0},
         ],
     }
@@ -140,32 +142,40 @@ def validate_config(config: dict) -> list[str]:
     for i, phase in enumerate(config["curriculum"]):
         problems.extend(f"phase {i}: {p}" for p in _phase_problems(phase))
     problems.extend(trigger_problems(config.get("triggers")))
+    try:
+        typed_keys()
+    except ValueError as exc:  # this machine's rig file, which every game is read through
+        problems.append(str(exc))
     problems.extend(trigger_key_clashes(config))
     return problems
 
 
 def trigger_key_clashes(config: dict) -> list[str]:
-    """Phases whose ``keys`` bind the key the scanner types at every volume.
+    """The key the scanner types at every volume, where a game would hear it.
 
-    A button box in a digit mode sends its trigger as a digit too (Current
-    Designs: ``5``). With ``sync.mode`` ``wait`` on that key, a game bound to
-    it would act at every volume. Only a phase's own ``keys`` are checked: a
-    backend's default map is known once its env is built.
+    A button box in a digit or letter mode sends its trigger as a key too
+    (Current Designs: ``5``, ``t``). With ``sync.mode`` ``wait`` on that key, a
+    game hears it at every volume when it stands for a rig key on this machine
+    (the keyboard's, or the rig file's ``keys``).
 
     :param config: a config of the right shape.
-    :return: one problem per clashing binding.
+    :return: at most one problem.
     """
     try:
         sync = TriggerSettings.from_dict(config.get("triggers")).sync
     except (TypeError, ValueError, TriggerError):
         return []  # trigger_problems says why
-    name = sync.key.upper()
-    if sync.mode != "wait" or not (len(name) == 1 and name.isalnum()):
-        return []  # "=" is no game key: nothing can clash
-    return [f"phase {i}: keys: {combo} uses {sync.key!r}, the key the scanner types at every "
-            f"volume (triggers.sync.key): bind another key"
-            for i, phase in enumerate(config["curriculum"])
-            for combo in phase.get("keys", {}) if name in combo.upper().split("+")]
+    if sync.mode != "wait" or not is_key(sync.key):
+        return []
+    try:
+        rig_key = typed_keys().get(keycode(sync.key))
+    except ValueError:
+        return []  # validate_config says why
+    if rig_key is None or not any(p["type"] == "game" for p in config["curriculum"]):
+        return []
+    return [f"triggers.sync.key: {sync.key!r}, the key the scanner types at every volume, "
+            f"stands for the rig key {rig_key} on this machine, so a game would hear it: "
+            "map that key to no rig key in the rig file, or wait for another"]
 
 
 def _phase_problems(phase: dict) -> list[str]:
@@ -202,24 +212,28 @@ def _phase_problems(phase: dict) -> list[str]:
 
 
 def _keys_problems(phase: dict) -> list[str]:
-    """``keys`` is required, and each name in it must be a key that can be pressed.
+    """``keys`` is required, and names rig keys only.
 
-    There is no default map: which key does what differs between sites (a
-    keyboard here, a gamepad that types keys there), so the file states it in
-    full. A name outside :data:`~fmri_gym.keys.KEY_NAMES` can never be pressed,
-    and the binding would be dead without a word; ``""`` is the no-key action.
-    Whether the values fit the env's action space is checked when the env is
-    built (:mod:`fmri_gym.adapters.keymap`).
+    The rig keys (:data:`~fmri_gym.rig.CONTROLS`) are what a game hears, on
+    every rig, so a binding to any other name could never be pressed; nor could
+    a combo in a ``turn_based`` phase, which steps on single presses. ``""`` is
+    the no-key action. Whether the values fit the env's action space is checked
+    when the env is built (:mod:`fmri_gym.adapters.keymap`).
     """
     keys = phase.get("keys")
     if not isinstance(keys, dict) or not keys:
-        return ['keys: missing; map each key to the env action it sends, e.g. {"": 0, "LEFT": 3, '
-                '"RIGHT": 2, "UP+SPACE": 5} ("" is no key held; names as in fmri_gym/keys.py; '
-                "there is no default map)"]
-    unknown = sorted({k for combo in keys if combo for k in combo.split("+")} - KEY_NAMES)
+        return ['keys: missing; map each rig key to the env action it sends, e.g. {"": 0, '
+                '"LEFT": 3, "RIGHT": 2, "UP+A": 5} ("" is no key held; the rig keys are '
+                f'{", ".join(CONTROLS)}; there is no default map)']
+    unknown = [combo for combo in keys
+               if combo and not set(combo.split("+")) <= set(CONTROLS)]
     if unknown:
-        return [f"keys: {unknown} are not key names; use those in fmri_gym/keys.py (UP, SPACE, "
-                "RETURN, LSHIFT, A-Z, 0-9, F1-F12, KP0-KP9, ...)"]
+        return [f"keys: {', '.join(unknown)}: not rig keys; a game hears only "
+                f"{', '.join(CONTROLS)}, joined with + for a combo (\"UP+A\")"]
+    combos = [combo for combo in keys if "+" in combo]
+    if phase.get("turn_based", False) and combos:
+        return [f"keys: {', '.join(combos)}: a turn_based phase steps on one key press, so a "
+                "combo is never played; give the action a rig key of its own"]
     return []
 
 

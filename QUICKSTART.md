@@ -48,10 +48,12 @@ uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/<game>.json --s
 | Flag / key         | What it does                                                    |
 | ------------------ | --------------------------------------------------------------- |
 | `--subject sub-01` | Subject id used in the output folder name                       |
-| `--monitor 1`      | Which screen to open on, when there are several (0 = the first) |
+| `--rig scanner3T`  | Which rig plays it, when this machine has several (see below)   |
 | **SPACE**          | Advance past the experimenter screen                            |
 | `=`                | Scanner trigger (anchors the session clock)                     |
 | **ESC**            | Quit early; data is still saved                                 |
+
+**A rig file first.** How a run is played -- window size, fullscreen, which monitor, the controller, audio, where the data goes -- is the rig's, not the command's: one file per rig, `~/.config/fmri-gym/rigs/<name>.json`. With no rig file, `fmri-play` does not start; make one with the rig's long rig check (one per rig), which opens a form for it: `uv run fmri-play --curriculum configs/rig-check-long.json --subject sub-rig --ses 1 --run 1 --rig <name>` (or only the form: `uv run python -m fmri_gym.checks rig --rig <name>`). A machine with one rig needs no `--rig` after that (README "Rigs").
 
 
 The config editor is a command of its own, `fmri-edit` (needs the `gui` extra: `uv sync --extra dbp --extra gui`). It opens on a run, on a session script (`--session ses1.sh`, one line per run) or on a new run, and its **Play** starts what it shows. To play a session without it: `sh ses1.sh`.
@@ -60,7 +62,7 @@ Each config is a short curriculum: message → fixation → game (~300 s, auto-r
 
 Runtime: experimenter screen (**SPACE**) → "Waiting for scanner..." → trigger `=` → curriculum.
 
-stable-retro games play their native audio, and ViZDoom and COOM do when their config sets `env_kwargs.audio_buffer_enabled`. Add `--no-audio` to mute every game, or set `"audio": false` on a game phase to mute that block; logged audio is unchanged. Sound plays through the system's default output, a constant delay after its frame's flip (printed at start-up).
+stable-retro games play their native audio, and ViZDoom and COOM do when their config sets `env_kwargs.audio_buffer_enabled`. Set `"audio": false` in the rig file to mute every game, or set `"audio": false` on a game phase to mute that block; logged audio is unchanged. Sound plays through the system's default output, a constant delay after its frame's flip (printed at start-up).
 
 ## 3. Run every game
 
@@ -83,7 +85,7 @@ uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/vizdoom__take_c
 uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/vizdoom__take_cover_defend_line.json --ses 1 --run 1     # those last two back to back, 150 s each
 ```
 
-Controls: arrows move/turn, Z/X strafe, SPACE shoots — but each scenario only has the buttons its `.cfg` declares, so the arrows *strafe* in Basic and Take Cover (no turning), there is no SPACE in Health Gathering / My Way Home / Take Cover (no weapon), and Deathmatch adds N/M to switch weapons and S to run. Each config's controls message lists exactly what that scenario accepts.
+Controls: the arrows move/turn and the buttons shoot or strafe — but each scenario only has the buttons its `.cfg` declares, so the arrows *strafe* in Basic and Take Cover (no turning), and there is no shooting in Health Gathering / My Way Home / Take Cover (no weapon). Each config's controls message lists exactly what that scenario accepts.
 
 ### COOM
 
@@ -101,7 +103,7 @@ uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__parkour.j
 uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__raise_the_roof.json --ses 1 --run 1   # press wall switches before the ceiling crushes you
 ```
 
-Controls: UP moves forward, LEFT/RIGHT turn, and the scenario's one extra button is SPACE (pitfall, chainsaw, run_and_gun, parkour), LSHIFT (health_gathering, hide_and_seek, arms_dealer, floor_is_lava) or E (raise_the_roof). The nine configs enable native audio; OpenAL is required. MIDI background music needs a working MIDI renderer. See README for audio setup and the current episode-end playback limitation.
+Controls: UP moves forward, LEFT/RIGHT turn, and the scenario's one extra button is A (on a keyboard, the A key). The nine configs enable native audio; OpenAL is required. MIDI background music needs a working MIDI renderer. See README for audio setup and the current episode-end playback limitation.
 
 ### Crafter
 
@@ -167,7 +169,7 @@ uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/aigamestore__ga
 uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/aigamestore__game10.json --ses 1 --run 1
 ```
 
-Controls: arrows + SPACE / Z / ENTER (game-dependent). Needs Playwright + Chrome (§1).
+Controls: arrows + A / B and other rig keys (game-dependent; each config's controls message lists them). Needs Playwright + Chrome (§1).
 
 ### MiniHack
 
@@ -189,11 +191,11 @@ Controls: arrow keys (N/E/S/W). Needs `setuptools<81` (already a core dependency
 uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/stk__hacienda.json --ses 1 --run 1
 ```
 
-Needs a real GL display (does **not** work under `SDL_VIDEODRIVER=dummy`); the game itself comes with `supertuxkart-gym`, which fetches it on first use (no checkout, no build). See the README section "Running SuperTuxKart". Controls: arrows steer/accelerate/brake, SPACE fire, V skid, N nitro, BACKSPACE rescue.
+Needs a real GL display (does **not** work under `SDL_VIDEODRIVER=dummy`); the game itself comes with `supertuxkart-gym`, which fetches it on first use (no checkout, no build). See the README section "Running SuperTuxKart". Controls: arrows steer/accelerate/brake, X fire, B skid, A nitro, Y rescue.
 
 ## Tips
 
-- Useful flags: `--size 1280x1024`, `--fullscreen`, `--no-vsync`.
+- The window, the controller, the audio and the data folder are the rig's, in its rig file (README "Rigs"): `"screen": {"size": "1280x1024", "fullscreen": true, "monitor": 1, "vsync": true}`, `"pad"`, `"audio"`, `"data_root"`.
 - Before a MEG/EEG session, check that flips lock to the refresh on the presentation machine: `python -m fmri_gym.display --fullscreen`.
 - Once per rig, measure the flip-to-photon offset with a photodiode on the screen: `python -m fmri_gym.photodiode --fullscreen` (see README "Timing").
 - Archived / unsupported configs live under `configs/dbp_games/archive/` and `configs/dbp_games/unsupported/` — see the README for the wider game list.

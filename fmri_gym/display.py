@@ -476,7 +476,7 @@ def check_monitor(monitor: int) -> None:
     monitors = list_monitors()
     if not 0 <= monitor < len(monitors):
         labels = "; ".join(monitor_label(i, m) for i, m in enumerate(monitors))
-        raise ValueError(f"--monitor {monitor}: this machine has {len(monitors)}: {labels}")
+        raise ValueError(f"monitor {monitor}: this machine has {len(monitors)}: {labels}")
 
 
 def quit_like_esc(_signum: int, _frame: object) -> None:

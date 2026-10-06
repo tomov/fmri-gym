@@ -1,137 +1,93 @@
 """Shared keyboard helpers for the display loop and adapters.
 
-Maps pygame keycodes to the upper-case NAMES a phase's ``keys`` are written in
-("LEFT", "SPACE", "Z", "F1", "KP_ENTER", ...). One definition so every caller
-agrees, and so a config can be checked against it before the window opens.
+What a game hears is the **rig keys** (:data:`fmri_gym.rig.CONTROLS`): a typed
+key that stands for one (the keyboard's :data:`fmri_gym.rig.TYPED_KEYS`, and the
+rig file's own) is reported as that rig key, and the controller
+(:mod:`fmri_gym.pad`, registered here) presses them by name. Any other key is
+no game key.
 
-A key need not come from a keyboard: :mod:`fmri_gym.pad` registers a gamepad's
-buttons here, so a site whose response device is a controller presses the same
-NAMES as one whose device types. It also feeds events in: read the queue with
-:func:`get_events`, never ``pygame.event.get()``, and a pad press arrives as
-the key it stands for.
+Typed keys are named as pygame names them (:func:`pygame.key.name`: ``"1"``,
+``"space"``, ``"left shift"``, ``"[1]"`` for keypad 1), in any case, and are
+compared by keycode: two spellings of one key (``"[1]"``, ``"keypad 1"``) are the
+same key, and a name pygame does not know is refused (:func:`keycode`).
+
+The pad also feeds events in: read the queue with :func:`get_events`, never
+``pygame.event.get()``, and a pad press arrives as its rig key.
 """
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Callable
+from typing import Any
 
 import pygame
 
-# pygame constants: single letters are lowercase (K_a), everything else is
-# uppercase (K_UP, K_SPACE, K_RETURN, K_0). Getting this wrong makes a key
-# undetectable.
-_PYGAME_KEY_NAMES: dict[int, str] = {
-    pygame.K_UP: "UP",
-    pygame.K_DOWN: "DOWN",
-    pygame.K_LEFT: "LEFT",
-    pygame.K_RIGHT: "RIGHT",
-    pygame.K_SPACE: "SPACE",
-    pygame.K_RETURN: "RETURN",
-    pygame.K_BACKSPACE: "BACKSPACE",
-    pygame.K_TAB: "TAB",
-    pygame.K_LSHIFT: "LSHIFT",
-    pygame.K_RSHIFT: "RSHIFT",
-    pygame.K_LCTRL: "LCTRL",
-    pygame.K_RCTRL: "RCTRL",
-    pygame.K_LALT: "LALT",
-    pygame.K_RALT: "RALT",
-    pygame.K_COMMA: "COMMA",
-    pygame.K_PERIOD: "PERIOD",
-    pygame.K_SLASH: "SLASH",
-    pygame.K_SEMICOLON: "SEMICOLON",
-    pygame.K_QUOTE: "QUOTE",
-    pygame.K_MINUS: "MINUS",
-    pygame.K_EQUALS: "EQUALS",
-    pygame.K_BACKQUOTE: "BACKQUOTE",
-    pygame.K_LEFTBRACKET: "LEFTBRACKET",
-    pygame.K_RIGHTBRACKET: "RIGHTBRACKET",
-    pygame.K_BACKSLASH: "BACKSLASH",
-    pygame.K_INSERT: "INSERT",
-    pygame.K_DELETE: "DELETE",
-    pygame.K_HOME: "HOME",
-    pygame.K_END: "END",
-    pygame.K_PAGEUP: "PAGEUP",
-    pygame.K_PAGEDOWN: "PAGEDOWN",
-    pygame.K_F1: "F1",
-    pygame.K_F2: "F2",
-    pygame.K_F3: "F3",
-    pygame.K_F4: "F4",
-    pygame.K_F5: "F5",
-    pygame.K_F6: "F6",
-    pygame.K_F7: "F7",
-    pygame.K_F8: "F8",
-    pygame.K_F9: "F9",
-    pygame.K_F10: "F10",
-    pygame.K_F11: "F11",
-    pygame.K_F12: "F12",
-    pygame.K_KP0: "KP0",
-    pygame.K_KP1: "KP1",
-    pygame.K_KP2: "KP2",
-    pygame.K_KP3: "KP3",
-    pygame.K_KP4: "KP4",
-    pygame.K_KP5: "KP5",
-    pygame.K_KP6: "KP6",
-    pygame.K_KP7: "KP7",
-    pygame.K_KP8: "KP8",
-    pygame.K_KP9: "KP9",
-    pygame.K_KP_ENTER: "KP_ENTER",
-    pygame.K_KP_PLUS: "KP_PLUS",
-    pygame.K_KP_MINUS: "KP_MINUS",
-    pygame.K_KP_MULTIPLY: "KP_MULTIPLY",
-    pygame.K_KP_DIVIDE: "KP_DIVIDE",
-    pygame.K_KP_PERIOD: "KP_PERIOD",
-    pygame.K_a: "A",
-    pygame.K_b: "B",
-    pygame.K_c: "C",
-    pygame.K_d: "D",
-    pygame.K_e: "E",
-    pygame.K_f: "F",
-    pygame.K_g: "G",
-    pygame.K_h: "H",
-    pygame.K_i: "I",
-    pygame.K_j: "J",
-    pygame.K_k: "K",
-    pygame.K_l: "L",
-    pygame.K_m: "M",
-    pygame.K_n: "N",
-    pygame.K_o: "O",
-    pygame.K_p: "P",
-    pygame.K_q: "Q",
-    pygame.K_r: "R",
-    pygame.K_s: "S",
-    pygame.K_t: "T",
-    pygame.K_u: "U",
-    pygame.K_v: "V",
-    pygame.K_w: "W",
-    pygame.K_x: "X",
-    pygame.K_y: "Y",
-    pygame.K_z: "Z",
-    pygame.K_0: "0",
-    pygame.K_1: "1",
-    pygame.K_2: "2",
-    pygame.K_3: "3",
-    pygame.K_4: "4",
-    pygame.K_5: "5",
-    pygame.K_6: "6",
-    pygame.K_7: "7",
-    pygame.K_8: "8",
-    pygame.K_9: "9",
-}
-#: Every name a phase's ``keys`` may use.
-KEY_NAMES: frozenset[str] = frozenset(_PYGAME_KEY_NAMES.values())
-#: The keycode to press for a NAME -- the map above, read the other way.
-KEYCODE_BY_NAME: dict[str, int] = {name: code for code, name in _PYGAME_KEY_NAMES.items()}
+from . import rig
 
 #: Devices other than the keyboard that can hold a key down (:mod:`fmri_gym.pad`
 #: registers the gamepad here). Kept as a list of callables so this module stays
 #: the one place that answers "what is held", whatever is plugged in.
 _held_sources: list[Callable[[], frozenset[str]]] = []
+#: Keycode -> rig key, read from the rig file on first use (:func:`typed_keys`).
+_typed: dict[int, str] | None = None
+
+
+def keycode(name: str) -> int:
+    """The keycode of a typed key, named as pygame names it, in any case.
+
+    :raises ValueError: a name pygame does not know.
+    """
+    # SDL reads names from a static table; pygame warns before pygame.init() all
+    # the same, and a config is checked before the window opens.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        try:
+            return pygame.key.key_code(name)
+        except ValueError:
+            raise ValueError(f"{name!r} is not a key name (pygame's names: \"1\", \"space\", "
+                             "\"left shift\", \"[1]\" for keypad 1, ...)") from None
+
+
+def is_key(name: str) -> bool:
+    """Whether ``name`` is a typed key's name (:func:`keycode` takes it)."""
+    try:
+        keycode(name)
+    except ValueError:
+        return False
+    return True
+
+
+def typed_keys() -> dict[int, str]:
+    """Keycode -> the rig key it stands for, on this machine.
+
+    :raises ValueError: a rig file whose ``keys`` or ``controls`` are wrong.
+    """
+    global _typed
+    if _typed is None:
+        site = rig.read() or {}
+        problems = rig.key_problems(site, is_key)
+        own = site.get("keys", {}) if not problems else {}
+        codes = [keycode(name) for name in own]
+        problems += [f'"keys": {name!r} is a key named twice' for name, code in zip(own, codes)
+                     if codes.count(code) > 1]
+        if problems:
+            raise ValueError(f"{rig.current()}: " + "; ".join(problems))
+        _typed = {**{keycode(n): r for n, r in rig.TYPED_KEYS.items()},
+                  **dict(zip(codes, own.values()))}
+    return _typed
+
+
+def reread_rig() -> None:
+    """Forget the rig file's keys, so the next read takes the file as it is now."""
+    global _typed
+    _typed = None
 
 
 def register_held_source(source: Callable[[], frozenset[str]]) -> None:
     """Add a device whose held keys count as held, alongside the keyboard's.
 
-    :param source: called each frame; returns the NAMES it is holding down.
+    :param source: called each frame; returns the rig keys it is holding down.
     """
     _held_sources.append(source)
 
@@ -168,24 +124,31 @@ def get_events(*types: int) -> list[pygame.event.Event]:
 
 
 def held_key_names() -> frozenset[str]:
-    """Return the currently held keys as NAMES (``"LEFT"``, ``"SPACE"``, ...).
+    """Return the rig keys held now (``"LEFT"``, ``"A"``, ...), from every device.
 
-    :return: frozenset of the pressed keys' names.
+    :return: frozenset of the held rig keys.
     """
     pressed = pygame.key.get_pressed()
-    names = {name for code, name in _PYGAME_KEY_NAMES.items() if pressed[code]}
+    names = {name for code, name in typed_keys().items() if pressed[code]}
     for source in _held_sources:
         names |= source()
     return frozenset(names)
 
 
-def key_name(keycode: int) -> str | None:
-    """Map a pygame keycode to its NAME, or ``None`` if it is not a game key.
+def key_name(code: int) -> str:
+    """The name pygame gives a keycode (``"space"``, ``"1"``); what a game hears is
+    :func:`event_name`."""
+    return pygame.key.name(code)
 
-    Used for turn-based games, which step on discrete KEYDOWN events rather than
-    polling held keys.
 
-    :param keycode: a ``pygame.K_*`` constant.
-    :return: the key NAME, or ``None``.
+def event_name(event: Any) -> str | None:
+    """The rig key of a ``KEYDOWN`` / ``KEYUP``, or ``None`` if it is not a game key.
+
+    A controller press (``pad=True``) carries its rig key as ``name``; a typed
+    key is read through :func:`typed_keys`.
+
+    :param event: a pygame key event.
     """
-    return _PYGAME_KEY_NAMES.get(keycode)
+    if getattr(event, "pad", False):
+        return event.name
+    return typed_keys().get(event.key)

@@ -15,9 +15,9 @@
         "the exit on the right.",
         "",
         "Controls:",
-        "   LEFT / RIGHT  or  3 / 4   previous / next car",
-        "   UP    or  1 or ,          slide it left, or up if vertical",
-        "   DOWN  or  2 or .          slide it right, or down if vertical",
+        "   LEFT / RIGHT   previous / next car",
+        "   UP             slide it left, or up if vertical",
+        "   DOWN           slide it right, or down if vertical",
         "",
         "White triangles mark the moves a car can make.",
         "",
@@ -40,14 +40,8 @@
       "keys": {
         "LEFT": 4,
         "RIGHT": 5,
-        "3": 4,
-        "4": 5,
         "UP": 6,
-        "DOWN": 7,
-        "1": 6,
-        "2": 7,
-        "COMMA": 6,
-        "PERIOD": 7
+        "DOWN": 7
       },
       "mode": "duration",
       "duration": 300.0,

@@ -19,10 +19,12 @@ Its curriculum holds check phases where a game run holds games:
   run waits for the scanner. Only the configured port is written to: another
   may be wired to a response box or an eye tracker, and a write that succeeds
   says nothing of where it went.
-* ``check_controls`` -- the response device. Every key of ``keys`` is first
-  checked automatically -- a key the games can read, and one that comes back
-  through the event queue as itself -- and the input devices plugged in are
-  listed; then each key is asked for on screen and pressed on the real device.
+* ``check_controls`` -- the response device. The keys asked for are the phase's
+  ``keys`` when it has them, else this rig's rig keys (the rig file's
+  ``controls``, :mod:`fmri_gym.rig`), read as games read them. Every key that
+  is typed is first checked automatically -- one that comes back through the
+  event queue as itself -- and the input devices plugged in are listed; then
+  each key is asked for on screen and pressed on the real device.
 * ``check_photodiode`` -- the flip-to-photon offset, and on the same flashes
   the audio test: a tone burst on every other flash, timed at the DAC, and at
   a microphone at the ear with ``"mic": true``.
@@ -34,9 +36,11 @@ failed test ends nothing, neither the check nor the session.
 
 **The rig file** says what software cannot see: the site and rig, the PI, the
 monitor or projector, the photodiode, the sound path to the ear, the trigger
-hardware. One per machine (``rig.json``, not in git), filled in by a form
-(:func:`fmri_gym.gui_qt.fill_rig`) when it is missing or invalid; a check that
-says nothing of where it ran could not be pooled, so without it none starts.
+hardware. One per rig (:mod:`fmri_gym.rig`: ``~/.config/fmri-gym/rigs/<name>.json``,
+which also holds the rig's screen, keys and data root), filled in by a form
+(:func:`fmri_gym.gui_qt.fill_rig`) when it is missing or invalid -- a rig check is
+how a rig gets its file (:func:`open_rig`); a check that says nothing of where it
+ran could not be pooled, so without it none starts.
 The rig-check configs ship with ``"triggers": null``, no setup being anyone's
 default: the first check asks for one and saves it.
 
@@ -48,7 +52,7 @@ numbers, charts, this rig's previous checks; one offline file),
 holds every check filed there, read from their manifests, so checks filed by
 an earlier version still line up::
 
-    python -m fmri_gym.checks rig                      # fill in / update rig.json
+    python -m fmri_gym.checks rig --rig <name>         # fill in / update a rig file
     python -m fmri_gym.checks report <run folder>...   # re-file checks already run
     python -m fmri_gym.checks pool data/ /mnt/siteB/data/ --out rigchecks.tsv
 """
@@ -77,8 +81,9 @@ import pygame
 from gymnasium import spaces
 
 from . import pad
+from . import rig as rig_file
 from .display import Display, is_locked
-from .keys import _PYGAME_KEY_NAMES, get_events, key_name
+from .keys import event_name, get_events, is_key, key_name, keycode, reread_rig, typed_keys
 from .photodiode import (CORNERS, AudioRecorder, _clicker, _light_verdict, _log_clicks,
                          _readout, _sound_verdict, run_flashes)
 from .run import _wait_for_duration
@@ -95,8 +100,6 @@ LOADS = ("none", "cpu")
 _VERDICT_S = 1.5
 #: Seconds the list of every test's verdict stays up at the end.
 _SUMMARY_S = 5.0
-#: The rig file, per machine; ``RIG`` in the environment points elsewhere.
-RIG_FILE = os.environ.get("RIG", "rig.json")
 _PASS = {"status": "pass", "why": None}
 
 
@@ -111,10 +114,9 @@ def has_checks(config: dict) -> bool:
 
 
 def prepare(config: dict, path: str) -> dict[str, Any]:
-    """Before the window: the rig file, the trigger settings, and a line the run can open.
+    """Before the window: the trigger settings, and a line the run can open.
 
-    The rig file is required (its form opens when it is missing, see
-    :func:`ensure_rig`). A rig check as downloaded has
+    The rig file is already open (:func:`open_rig`). A rig check as downloaded has
     ``"triggers": null``: no setup is anyone's default, so the first run asks
     for one -- a preset, or one's own -- and saves it in the config
     (:func:`_ask_triggers`). A trigger line that does not open
@@ -126,16 +128,14 @@ def prepare(config: dict, path: str) -> dict[str, Any]:
         it has none, and replaced when its line does not open.
     :param path: the config's file, where a chosen section is saved.
     :raises ValueError: when the config has no trigger settings and none is chosen.
-    :return: ``rig`` and ``trigger_error`` (``None`` when the line opened), for
-        the manifest.
+    :return: ``trigger_error`` (``None`` when the line opened), for the manifest.
     """
-    rig = ensure_rig(RIG_FILE)
     if "triggers" in config and config["triggers"] is None:
         _ask_triggers(config, path)
     section = config.get("triggers") or {}
     try:
         Triggers.from_config(section).close()
-        return {"rig": rig, "trigger_error": None}
+        return {"trigger_error": None}
     except (TriggerError, OSError) as exc:
         error = f"{type(exc).__name__}: {exc}"
     sync = dict(section.get("sync", {}))
@@ -144,7 +144,7 @@ def prepare(config: dict, path: str) -> dict[str, Any]:
     config["triggers"] = {**section, "backend": "null", "sync": sync}
     print(f"rig check: the trigger line did not open ({error}); the triggers check fails, "
           "the other checks run without codes", file=sys.stderr)
-    return {"rig": rig, "trigger_error": error}
+    return {"trigger_error": error}
 
 
 def _ask_triggers(config: dict, path: str) -> None:
@@ -360,29 +360,33 @@ def input_devices() -> list[str]:
     return names
 
 
-def _round_trip(name: str) -> bool:
-    """A synthetic press of ``name`` comes back through the event queue as ``name``."""
-    code = {v: k for k, v in _PYGAME_KEY_NAMES.items()}.get(name)
-    if code is None:
-        return False
+def _round_trip(code: int) -> bool:
+    """A synthetic press of keycode ``code`` comes back through the event queue as itself."""
     pygame.event.clear(pygame.KEYDOWN)
     pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=code, mod=0, unicode="",
                                          scancode=0))
-    return any(key_name(e.key) == name for e in pygame.event.get(pygame.KEYDOWN))
+    return any(e.key == code for e in pygame.event.get(pygame.KEYDOWN))
 
 
 def _check_controls(run: Run, phase: dict, summary: dict, arrays: dict, tests: dict,
                     index: int) -> None:
-    keys: dict[str, str] = phase["keys"]
+    as_rig = "keys" not in phase  # this rig's rig keys, read as the games read them
+    # typed keys under the name pygame gives them, which is how _key_events reads them back
+    keys: dict[str, str] = ({key_name(keycode(k)): v for k, v in phase["keys"].items()}
+                            if not as_rig
+                            else {c: c for c in rig_file.controls(rig_file.read())})
+    # the keycode a key comes from, when one does (the controller types none)
+    typed = ({v: k for k, v in typed_keys().items()} if as_rig
+             else {k: keycode(k) for k in keys})
     summary["devices"] = input_devices()
     summary["pad"] = _check_pad(run, phase)
-    summary["automatic"] = {name: _round_trip(name) for name in keys}
+    summary["automatic"] = {name: _round_trip(typed[name]) for name in keys if name in typed}
     ignore = run.triggers.sync.key if run.triggers.sync.mode == "wait" else None
     results: dict[str, dict] = {}
     try:
         for name, label in keys.items():
             results[name] = _prompt(run, name, label, keys, results,
-                                    phase.get("timeout_s", 10.0), ignore)
+                                    phase.get("timeout_s", 10.0), ignore, as_rig)
     except _Skipped:
         pass
     summary["prompted"] = results
@@ -425,9 +429,8 @@ def _check_pad(run: Run, phase: dict) -> dict[str, Any]:
                 "why": "", "note": 'skipped ("pad": false)'}
     rig = {}
     try:
-        with open(RIG_FILE) as fh:
-            rig = {k: json.load(fh)[k] for k in ("site", "rig")}
-    except (OSError, ValueError, KeyError):
+        rig = {k: (rig_file.read() or {})[k] for k in ("site", "rig")}
+    except (ValueError, KeyError):
         pass
     _title(run, f"measuring {device}")
     try:
@@ -464,9 +467,10 @@ def _key_problem(name: str, result: dict | None) -> str:
 
 
 def _prompt(run: Run, name: str, label: str, keys: dict, done: dict, timeout: float,
-            ignore: str | None) -> dict[str, Any]:
+            ignore: str | None, as_rig: bool) -> dict[str, Any]:
     """Ask for ``name`` on screen; wait for it, noting any other key that comes instead.
 
+    :param as_rig: read the keys as rig keys (:func:`~fmri_gym.keys.event_name`).
     :raises _Skipped: on ESC.
     """
     marks = "   ".join(f"{k}{' ok' if done.get(k, {}).get('pressed') else ''}" for k in keys)
@@ -477,7 +481,7 @@ def _prompt(run: Run, name: str, label: str, keys: dict, done: dict, timeout: fl
     start = time.perf_counter()
     strays: list[str] = []
     while time.perf_counter() - start < timeout:
-        events = _key_events(ignore)
+        events = _key_events(ignore, as_rig)
         for i, (down, got) in enumerate(events):
             if not down:
                 continue
@@ -486,15 +490,17 @@ def _prompt(run: Run, name: str, label: str, keys: dict, done: dict, timeout: fl
                 continue
             pressed = time.perf_counter()
             return {"pressed": True, "latency_s": pressed - start,
-                    "held_s": _held(name, pressed, events[i + 1:]), "strays": strays}
+                    "held_s": _held(name, pressed, events[i + 1:], as_rig),
+                    "strays": strays}
         run.display.idle(time.perf_counter() + 0.002, poll=0.001)
     return {"pressed": False, "strays": strays}
 
 
-def _key_events(ignore: str | None) -> list[tuple[bool, str]]:
+def _key_events(ignore: str | None, as_rig: bool) -> list[tuple[bool, str]]:
     """Key presses and releases since the last call, in order: ``(down, name)``; the
     scanner's key left out.
 
+    :param as_rig: name them as games hear them (their rig keys), not as typed.
     :raises _Skipped: on ESC or window close.
     """
     out = []
@@ -503,11 +509,12 @@ def _key_events(ignore: str | None) -> list[tuple[bool, str]]:
             raise _Skipped
         if ignore and getattr(e, "unicode", None) == ignore:
             continue
-        out.append((e.type == pygame.KEYDOWN, key_name(e.key) or f"keycode {e.key}"))
+        name = event_name(e) if as_rig else key_name(e.key)
+        out.append((e.type == pygame.KEYDOWN, name or f"keycode {e.key}"))
     return out
 
 
-def _held(name: str, pressed: float, pending: list[tuple[bool, str]],
+def _held(name: str, pressed: float, pending: list[tuple[bool, str]], as_rig: bool,
           limit: float = 2.0) -> float:
     """Seconds until ``name`` is released (``nan`` if not within ``limit``).
 
@@ -516,7 +523,7 @@ def _held(name: str, pressed: float, pending: list[tuple[bool, str]],
     while time.perf_counter() - pressed < limit:
         if (False, name) in pending:
             return time.perf_counter() - pressed
-        pending = _key_events(None)
+        pending = _key_events(None, as_rig)
         time.sleep(0.001)
     return float("nan")
 
@@ -529,7 +536,7 @@ def _check_photodiode(run: Run, phase: dict, summary: dict, arrays: dict, tests:
     readout = phase.get("readout", "soundcard")
     clicks = phase.get("audio", True) and run.audio.enabled
     if phase.get("audio", True) and not run.audio.enabled:
-        tests["audio"] = {"status": "not run", "why": "the audio output is off (--no-audio)"}
+        tests["audio"] = {"status": "not run", "why": "the audio output is off (the rig's \"audio\": false)"}
     summary.update(display=run.display.describe(), readout=readout, mic=phase.get("mic", False),
                    n=phase.get("n", 10), on_ms=phase.get("on_ms", 50.0),
                    gap_ms=[phase.get("gap_min_ms", 150.0), phase.get("gap_max_ms", 250.0)],
@@ -744,12 +751,13 @@ def _positive(v: Any) -> bool:
 
 
 def _controls_problems(keys: Any) -> list[str]:
+    if keys is None:
+        return []  # this rig's rig keys
     if not isinstance(keys, dict) or not keys:
         return ["keys: expected the keys to test, as {key: what it stands for} "
-                '(e.g. {"1": "LEFT"}); the Controls tab adds a device\'s']
-    known = set(_PYGAME_KEY_NAMES.values())
-    return [f"keys: {k!r} is not a key the games can read (one key, a name such as "
-            "1, A, LEFT or SPACE)" for k in keys if k not in known]
+                '(e.g. {"1": "LEFT"}), or none to test this rig\'s rig keys']
+    return [f"keys: {k!r} is not a key name (one key, as pygame names it: \"1\", \"b\", "
+            "\"left\", \"space\", ...)" for k in keys if not is_key(k)]
 
 
 def _photodiode_problems(phase: dict) -> list[str]:
@@ -1218,15 +1226,24 @@ NAMES = tuple(c[0] for c in COLUMNS)
 # ---------------------------------------------------------------------------
 
 
+#: What the rig file holds besides :data:`RIG_FIELDS` (:mod:`fmri_gym.rig`): what a run
+#: takes from it, and the participant's keys.
+_RIG_KEYS = (*rig_file.SETTINGS, "keys", "controls")
+
+
 def rig_problems(rig: dict) -> list[str]:
-    """What keeps ``rig`` from being a rig file: every field of :data:`RIG_FIELDS`, no other.
+    """What keeps ``rig`` from being a rig file: every field of :data:`RIG_FIELDS`, and
+    optionally the settings and keys of :mod:`fmri_gym.rig`, no other.
 
     :return: one line per problem; empty when it is valid.
     """
     problems = [f"missing {k!r} ({what})" for k, what in RIG_FIELDS.items() if k not in rig]
-    problems += [f"unknown key {k!r}" for k in rig if k not in RIG_FIELDS]
-    problems += [f"{k!r} must be a string" for k, v in rig.items() if not isinstance(v, str)]
-    problems += [f"{k!r} is empty" for k, v in rig.items() if k != "notes" and v == ""]
+    problems += [f"unknown key {k!r}" for k in rig if k not in RIG_FIELDS and k not in _RIG_KEYS]
+    fields = {k: v for k, v in rig.items() if k in RIG_FIELDS}
+    problems += [f"{k!r} must be a string" for k, v in fields.items() if not isinstance(v, str)]
+    problems += [f"{k!r} is empty" for k, v in fields.items() if k != "notes" and v == ""]
+    problems += rig_file.setting_problems(rig)
+    problems += rig_file.key_problems(rig, is_key)
     for k in ("site", "rig"):
         if isinstance(rig.get(k), str) and rig[k] and not _LABEL.fullmatch(rig[k]):
             problems.append(f"{k!r} must be letters, digits, _ or -, got {rig[k]!r}")
@@ -1237,48 +1254,70 @@ def rig_problems(rig: dict) -> list[str]:
     return problems
 
 
-def load_rig(path: str) -> dict[str, str]:
-    """The rig file, checked (:func:`rig_problems`).
+def open_rig(name: str | None, create: bool = False) -> dict[str, Any]:
+    """The rig a run plays on (:func:`fmri_gym.rig.choose`), checked, and picked for
+    this process (:func:`fmri_gym.rig.use`).
 
-    :raises FileNotFoundError: if there is none, with how to make one.
-    :raises ValueError: naming each field that is missing, unknown or invalid.
+    A rig check (``create``) is how a rig gets its file: when it is missing or
+    invalid -- a machine with no rig yet, or a ``name`` it has no file for -- the
+    form to fill it in opens first (:func:`fmri_gym.gui_qt.fill_rig`; the ``gui``
+    extra and a screen). Any other run refuses to start.
+
+    :param name: ``--rig``; ``None`` for this machine's only rig.
+    :param create: open the form on a missing or invalid file.
+    :raises ValueError: when there is still no valid rig file, saying how to make one.
     """
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"rig check: no rig file {path!r}. Run python -m "
-                                f"fmri_gym.checks rig --rig {path} to fill it in: the check "
-                                "will not start without it, since its results could not be "
-                                "pooled")
-    with open(path) as f:
-        rig = json.load(f)
+    try:
+        target: str | None = rig_file.choose(name)
+    except ValueError:
+        if not create or (name is None and rig_file.names()):
+            raise  # several rigs and no --rig: which one is the user's to say
+        target = name
+    try:
+        return _checked_rig(target)
+    except ValueError as error:
+        if not (create and can_show_form()):
+            raise
+        print(f"{error}\nrig check: opening the rig form", file=sys.stderr)
+        saved = _fill_rig(target)
+        if saved is None:
+            raise
+    return _checked_rig(saved["rig"])
+
+
+def _checked_rig(name: str | None) -> dict[str, Any]:
+    """:raises ValueError: when the rig ``name`` has no file, or one :func:`rig_problems` refuses."""
+    if name not in rig_file.names():
+        raise ValueError(f"no rig file {rig_file.path(name) if name else rig_file.folder()} yet")
+    rig = rig_file.use(name)
     problems = rig_problems(rig)
+    if rig.get("rig") not in (name, None, ""):
+        problems.append(f'"rig" is {rig["rig"]!r}: a rig file is named after its rig, '
+                        f"{rig['rig']}.json")
     if problems:
-        raise ValueError(f"rig check: {path}: " + "; ".join(problems))
+        raise ValueError(f"{rig_file.path(name)}: " + "; ".join(problems) + ". Fix it by hand, "
+                         f"or in the form: python -m fmri_gym.checks rig --rig {name}")
     return rig
 
 
-def ensure_rig(path: str) -> dict[str, str]:
-    """The rig file; when it is missing or invalid, the form to fill it in, then it.
+def _fill_rig(name: str | None) -> dict | None:
+    """The rig form on the rig ``name`` (empty if it has no file); on Save, written to the
+    file of the rig it names.
 
-    The form (:func:`fmri_gym.gui_qt.fill_rig`) needs the ``gui`` extra and a screen;
-    without them, or when the form is cancelled, the rig file's own error is raised.
-
-    :raises FileNotFoundError: if there is still no rig file.
-    :raises ValueError: if it is still invalid.
+    :return: the rig written, or ``None`` if the form was cancelled.
     """
+    from .gui_qt import fill_rig
     try:
-        return load_rig(path)
-    except (FileNotFoundError, ValueError) as error:
-        if not can_show_form():
-            raise
-        from .gui_qt import fill_rig
-        values = {}
-        if os.path.exists(path):
-            with open(path) as f:
-                values = json.load(f)
-        print(f"{error}\nrig check: opening the rig form", file=sys.stderr)
-        if fill_rig(path, values) is None:
-            raise
-    return load_rig(path)
+        values = rig_file.load(name) if name in rig_file.names() else {"rig": name or ""}
+    except ValueError:
+        values = {"rig": name}
+    saved = fill_rig(values)
+    reread_rig()
+    kept = {k: values[k] for k in _RIG_KEYS if k in values}
+    if saved is not None and kept.keys() - saved.keys():  # a form without them keeps them
+        saved = {**saved, **kept}
+        _write_json(str(rig_file.path(saved["rig"])), saved)
+    return saved
 
 
 def can_show_form() -> bool:
@@ -1567,8 +1606,9 @@ def _md_offsets(p: dict, keys: tuple[tuple[str, str], ...]) -> list[str]:
 def main() -> None:
     p = argparse.ArgumentParser(description="The rig file, and pooling rig checks.")
     sub = p.add_subparsers(dest="command", required=True)
-    r = sub.add_parser("rig", help="fill in or update the rig file, in a form")
-    r.add_argument("--rig", default=os.environ.get("RIG", "rig.json"))
+    r = sub.add_parser("rig", help="fill in or update a rig file, in a form")
+    r.add_argument("--rig", help="the rig, by name; default: this machine's only one, or a "
+                                 "new one when it has none")
     f = sub.add_parser("report", help="re-file checks already run: their reports and the "
                                       "data root's rigchecks.tsv, with this version")
     f.add_argument("folders", nargs="+", help="rig-check run folders")
@@ -1600,20 +1640,18 @@ def main() -> None:
         sys.stdout.write(text)
 
 
-def _edit_rig(path: str) -> None:
-    """Open the form on the rig file (empty if there is none), and save it."""
+def _edit_rig(name: str | None) -> None:
+    """Open the form on a rig file (empty if there is none), and save it."""
     if not can_show_form():
         raise RuntimeError("rig check: the rig form needs PySide6 (pip install "
                            "'fmri-gym[gui]') and a screen; or edit the file by hand")
-    from .gui_qt import fill_rig
-    values = {}
-    if os.path.exists(path):
-        with open(path) as f:
-            values = json.load(f)
-    if fill_rig(path, values) is None:
+    if name is None and rig_file.names():
+        name = rig_file.choose(None)
+    saved = _fill_rig(name)
+    if saved is None:
         print("rig check: cancelled, the rig file is unchanged", file=sys.stderr)
         return
-    print(f"saved: {path}")
+    print(f"saved: {rig_file.path(saved['rig'])}")
 
 
 # ---------------------------------------------------------------------------

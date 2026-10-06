@@ -4,18 +4,19 @@ Some sites' response device is a game controller on an fMRI interface (a
 Current Designs 932, say) that reports HID *joystick* buttons rather than
 keystrokes. Nothing a phase's ``keys`` names is ever pressed there, so the game
 does not move and the run records no responses, with nothing on screen to say
-why. This module presses the key each control stands for, so the run sees a
-keyboard either way and a curriculum's ``keys`` stay the one place input is
-mapped. :func:`pump` moves the events across; it registers with
-:func:`fmri_gym.keys.get_events`, which runs it before every read of the queue.
+why. This module presses each control as the rig key it is
+(:data:`fmri_gym.rig.CONTROLS`: UP DOWN LEFT RIGHT A B X Y LT RT), the names a
+curriculum's ``keys`` are written in. :func:`pump` moves the events across; it
+registers with :func:`fmri_gym.keys.get_events`, which runs it before every read
+of the queue.
 
-The map is fixed on purpose -- every site with this controller expects the same
-keys, so one curriculum plays at all of them. What is *not* fixed is the stick,
+The map is fixed on purpose -- the rig keys are this controller's own buttons,
+so one curriculum plays at every site. What is *not* fixed is the stick,
 which rests off centre, travels further one way than the other, and moves its
 centre between sessions; that is measured per rig by ``fmri-pad-calibrate``
 (below) into ``~/.config/fmri-gym/pad.json``, and checked in ``fmri-pad-scope``.
 
-It turns itself on when a pad is plugged in, and ``--no-pad`` leaves it off.
+It turns itself on when a pad is plugged in, and a rig file's ``"pad": false`` leaves it off.
 """
 
 from __future__ import annotations
@@ -35,12 +36,12 @@ from pathlib import Path
 
 import pygame
 
-from .keys import KEYCODE_BY_NAME, register_event_source, register_held_source
+from .keys import is_key, keycode, register_event_source, register_held_source
 
-#: Which key each control presses. SDL numbers buttons from 0, one less than
-#: the HID report does: on the Current Designs pad that is y=0, b=1, x=2, LT=3,
+#: Which rig key each button is. SDL numbers buttons from 0, one less than the
+#: HID report does: on the Current Designs pad that is y=0, b=1, x=2, LT=3,
 #: a=4, RT=5.
-BUTTON_KEYS: dict[int, str] = {0: "W", 1: "D", 2: "A", 3: "Q", 4: "S", 5: "E"}
+BUTTON_KEYS: dict[int, str] = {0: "Y", 1: "B", 2: "X", 3: "LT", 4: "A", 5: "RT"}
 #: Which key a stick axis presses. Axis 0 is horizontal, 1 vertical; SDL reads
 #: up and left as negative.
 AXIS_KEYS: dict[tuple[int, str], str] = {
@@ -98,7 +99,7 @@ _settled: set[int] = set()              # axes whose centre has been taken
 _joysticks: list = []
 _unmapped: set[int] = set()
 _warmed = False
-_status = "off (--no-pad)"
+_status = "off (the rig's \"pad\": false)"
 
 
 def config_path() -> Path:
@@ -111,14 +112,14 @@ def config_path() -> Path:
 
 
 def init(enabled: bool = True) -> str:
-    """Open whatever pad is plugged in, unless ``--no-pad`` said not to.
+    """Open whatever pad is plugged in, unless the rig file said not to.
 
     :param enabled: ``False`` to leave the pad off for this run.
     :return: a one-line status for the run's stderr banner.
     """
     global _status, _enabled
     if not enabled:
-        _status = "off (--no-pad)"
+        _status = "off (the rig's \"pad\": false)"
         return _status
     _enabled = True
     _load_calibration()
@@ -252,18 +253,19 @@ def _settle(now: float) -> None:
 
 
 def _press(name: str, down: bool) -> None:
-    """Hold or release ``name``, and post the keypress it stands for."""
+    """Hold or release the rig key ``name``, and post it as a keypress."""
     if down:
         _held.add(name)
     else:
         _held.discard(name)
     # `unicode` is what a "press <char> to go on" screen reads; `pad` marks the
-    # event as ours for anything that wants to tell the two apart.
+    # event as ours, and `name` is the rig key (LT and RT have no keycode).
     char = name.lower() if len(name) == 1 else ""
     pygame.event.post(pygame.event.Event(
         pygame.KEYDOWN if down else pygame.KEYUP,
-        key=KEYCODE_BY_NAME[name], mod=0, unicode=char if down else "",
-        scancode=0, pad=True))
+        key=keycode(name) if is_key(name) else pygame.K_UNKNOWN, mod=0,
+        unicode=char if down else "",
+        scancode=0, pad=True, name=name))
 
 
 def _away(a: float, b: float) -> float:
@@ -368,7 +370,7 @@ def pump() -> None:
             _press(BUTTON_KEYS[event.button], event.type == pygame.JOYBUTTONDOWN)
         elif event.type == pygame.JOYBUTTONDOWN and event.button not in _unmapped:
             _unmapped.add(event.button)
-            print(f"pad: button {event.button} pressed, but no key is mapped to it "
+            print(f"pad: button {event.button} pressed, but no rig key is mapped to it "
                   "(fmri_gym/pad.py: BUTTON_KEYS)", file=sys.stderr)
     if moved:
         _resolve()
@@ -1270,7 +1272,7 @@ def scope_main() -> None:
 
 
 def main() -> None:
-    """``python -m fmri_gym.pad``: name each control and the key it presses."""
+    """``python -m fmri_gym.pad``: name each control and the rig key it presses."""
     pygame.init()
     pygame.display.set_mode((320, 64))
     print(init(), file=sys.stderr)

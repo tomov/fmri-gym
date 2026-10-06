@@ -16,8 +16,8 @@
         "",
         "Controls:",
         "   LEFT / RIGHT        move",
-        "   UP or SPACE         jump",
-        "   Z                   interact",
+        "   UP or A             jump",
+        "   B                   interact",
         "",
         "(press SPACE to start)"
       ]
@@ -25,7 +25,7 @@
     {"type": "fixation", "duration": 1.0},
     {
       "type": "game", "backend": "aigamestore", "game": "game6/level1",
-      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "SPACE": 3, "Z": 4},
+      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "A": 3, "B": 4},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 300.0, "fps": 10
     },
     {"type": "fixation", "duration": 2.0}

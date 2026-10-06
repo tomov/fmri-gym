@@ -16,8 +16,8 @@
         "",
         "Controls:",
         "   LEFT / RIGHT   highlight a tube",
-        "   SPACE          select / pour",
-        "   Z              undo",
+        "   A              select / pour",
+        "   B              undo",
         "",
         "(press SPACE to start)"
       ]
@@ -25,47 +25,47 @@
     {"type": "fixation", "duration": 1.0},
     {
       "type": "game", "backend": "aigamestore", "game": "game1/level1",
-      "keys": {"LEFT": 0, "RIGHT": 1, "SPACE": 2, "Z": 3},
+      "keys": {"LEFT": 0, "RIGHT": 1, "A": 2, "B": 3},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game1/level2",
-      "keys": {"LEFT": 0, "RIGHT": 1, "SPACE": 2, "Z": 3},
+      "keys": {"LEFT": 0, "RIGHT": 1, "A": 2, "B": 3},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game1/level3",
-      "keys": {"LEFT": 0, "RIGHT": 1, "SPACE": 2, "Z": 3},
+      "keys": {"LEFT": 0, "RIGHT": 1, "A": 2, "B": 3},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game1/level4",
-      "keys": {"LEFT": 0, "RIGHT": 1, "SPACE": 2, "Z": 3},
+      "keys": {"LEFT": 0, "RIGHT": 1, "A": 2, "B": 3},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game1/level5",
-      "keys": {"LEFT": 0, "RIGHT": 1, "SPACE": 2, "Z": 3},
+      "keys": {"LEFT": 0, "RIGHT": 1, "A": 2, "B": 3},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game1/level6",
-      "keys": {"LEFT": 0, "RIGHT": 1, "SPACE": 2, "Z": 3},
+      "keys": {"LEFT": 0, "RIGHT": 1, "A": 2, "B": 3},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game1/level7",
-      "keys": {"LEFT": 0, "RIGHT": 1, "SPACE": 2, "Z": 3},
+      "keys": {"LEFT": 0, "RIGHT": 1, "A": 2, "B": 3},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game1/level8",
-      "keys": {"LEFT": 0, "RIGHT": 1, "SPACE": 2, "Z": 3},
+      "keys": {"LEFT": 0, "RIGHT": 1, "A": 2, "B": 3},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game1/level9",
-      "keys": {"LEFT": 0, "RIGHT": 1, "SPACE": 2, "Z": 3},
+      "keys": {"LEFT": 0, "RIGHT": 1, "A": 2, "B": 3},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {"type": "fixation", "duration": 2.0}

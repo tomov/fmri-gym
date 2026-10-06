@@ -32,7 +32,7 @@ from .adapters import get_adapter
 from .audio import Audio
 from .config import fold_cli_options
 from .display import Display, check_monitor
-from .keys import get_events, held_key_names, key_name
+from .keys import event_name, get_events, held_key_names
 from .menu import Menu
 from .logging import Logger
 from .triggers import Triggers
@@ -148,7 +148,7 @@ def _poll_keys_until(
                 continue
             if event.key == pygame.K_ESCAPE:
                 return None, True
-            name = key_name(event.key)
+            name = event_name(event)
             if name is None:
                 continue
             down = event.type == pygame.KEYDOWN

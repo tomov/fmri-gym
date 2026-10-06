@@ -28,7 +28,7 @@
       "keys": {"UP": 1, "RIGHT": 2, "DOWN": 3, "LEFT": 4},
       "menu": {"key": "X", "hold": 3.0, "after": 0.0,
                "options": ["reset", "forfeit", "resume"],
-               "move": ["UP", "DOWN"], "confirm": "SPACE"},
+               "move": ["UP", "DOWN"], "confirm": "A"},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 300.0, "fps": 15, "turn_based": true
     },
     {"type": "fixation", "duration": 2.0}

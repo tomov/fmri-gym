@@ -16,10 +16,10 @@
         "",
         "Controls:",
         "   ARROWS   move",
-        "   Z        shoot",
-        "   SPACE    sprint",
-        "   SHIFT    take cover",
-        "   1–5      switch weapons",
+        "   A        shoot",
+        "   B        sprint",
+        "   X        take cover",
+        "   Y / LT / RT / A+B / A+X   switch to weapon 1 / 2 / 3 / 4 / 5",
         "",
         "(press SPACE to start)"
       ]
@@ -27,27 +27,27 @@
     {"type": "fixation", "duration": 1.0},
     {
       "type": "game", "backend": "aigamestore", "game": "game7/level1",
-      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "Z": 4, "SPACE": 5, "LSHIFT": 6, "1": 7, "2": 8, "3": 9, "4": 10, "5": 11},
+      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "A": 4, "B": 5, "X": 6, "Y": 7, "LT": 8, "RT": 9, "A+B": 10, "A+X": 11},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game7/level2",
-      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "Z": 4, "SPACE": 5, "LSHIFT": 6, "1": 7, "2": 8, "3": 9, "4": 10, "5": 11},
+      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "A": 4, "B": 5, "X": 6, "Y": 7, "LT": 8, "RT": 9, "A+B": 10, "A+X": 11},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game7/level3",
-      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "Z": 4, "SPACE": 5, "LSHIFT": 6, "1": 7, "2": 8, "3": 9, "4": 10, "5": 11},
+      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "A": 4, "B": 5, "X": 6, "Y": 7, "LT": 8, "RT": 9, "A+B": 10, "A+X": 11},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game7/level4",
-      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "Z": 4, "SPACE": 5, "LSHIFT": 6, "1": 7, "2": 8, "3": 9, "4": 10, "5": 11},
+      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "A": 4, "B": 5, "X": 6, "Y": 7, "LT": 8, "RT": 9, "A+B": 10, "A+X": 11},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game7/level5",
-      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "Z": 4, "SPACE": 5, "LSHIFT": 6, "1": 7, "2": 8, "3": 9, "4": 10, "5": 11},
+      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "A": 4, "B": 5, "X": 6, "Y": 7, "LT": 8, "RT": 9, "A+B": 10, "A+X": 11},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {"type": "fixation", "duration": 2.0}

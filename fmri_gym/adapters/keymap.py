@@ -1,9 +1,9 @@
 """Keymap: a phase's ``keys`` -> the action ``step`` gets, one class per action space.
 
-``keys`` maps a key NAME (:mod:`fmri_gym.keys`), or several joined with ``"+"``,
-to the action to send, written as the env takes it. The empty name ``""`` is the
-action for no key held. There is no default map and nothing is merged in: which
-key does what differs from site to site, so the file states all of it.
+``keys`` maps a rig key (:data:`fmri_gym.rig.CONTROLS`, the controller's
+buttons), or several joined with ``"+"``, to the action to send, written as the
+env takes it. The empty name ``""`` is the action for no key held. There is no
+default map and nothing is merged in: the file states all of it.
 
 :func:`make_keymap` picks the class from the env's action space:
 

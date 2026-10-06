@@ -40,13 +40,7 @@
     },
     {
       "type": "check_controls",
-      "timeout_s": 10.0,
-      "keys": {
-        "1": "LEFT",
-        "2": "DOWN",
-        "3": "UP",
-        "4": "RIGHT"
-      }
+      "timeout_s": 10.0
     },
     {
       "type": "check_photodiode",

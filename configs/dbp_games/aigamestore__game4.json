@@ -15,7 +15,7 @@
         "dodge zappers and missiles, grab coins.",
         "",
         "Controls:",
-        "   SPACE or UP   thrust / fly",
+        "   A or UP       thrust / fly",
         "",
         "(press SPACE to start)"
       ]
@@ -23,7 +23,7 @@
     {"type": "fixation", "duration": 1.0},
     {
       "type": "game", "backend": "aigamestore", "game": "game4",
-      "keys": {"SPACE": 0, "UP": 1},
+      "keys": {"A": 0, "UP": 1},
       "mode": "episode", "n_episodes": 1, "max_duration": 300.0, "fps": 10
     },
     {"type": "fixation", "duration": 2.0}

@@ -16,8 +16,8 @@
         "",
         "Controls:",
         "   ARROWS   hold to aim / pull",
-        "   SPACE    start aim / launch",
-        "   Z        bird special ability",
+        "   A        start aim / launch",
+        "   B        bird special ability",
         "",
         "(press SPACE to start)"
       ]
@@ -25,47 +25,47 @@
     {"type": "fixation", "duration": 1.0},
     {
       "type": "game", "backend": "aigamestore", "game": "game2/level1",
-      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
+      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "A": 4, "B": 5},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game2/level2",
-      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
+      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "A": 4, "B": 5},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game2/level3",
-      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
+      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "A": 4, "B": 5},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game2/level4",
-      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
+      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "A": 4, "B": 5},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game2/level5",
-      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
+      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "A": 4, "B": 5},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game2/level6",
-      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
+      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "A": 4, "B": 5},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game2/level7",
-      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
+      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "A": 4, "B": 5},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game2/level8",
-      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
+      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "A": 4, "B": 5},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {
       "type": "game", "backend": "aigamestore", "game": "game2/level9",
-      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
+      "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "A": 4, "B": 5},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 120.0, "fps": 10
     },
     {"type": "fixation", "duration": 2.0}

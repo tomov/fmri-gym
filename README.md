@@ -81,7 +81,7 @@ uv run fmri-edit                                    # start from a new run
 
 Drop `--dummy-trigger` for a real session (then press SPACE, then wait for the `=` scanner trigger). For VGDL setup see [Running VGDL games](#running-vgdl-games).
 
-stable-retro games play their native audio; ViZDoom and COOM do when their config sets `env_kwargs.audio_buffer_enabled`. Use `--no-audio` or a game phase's `"audio": false` to mute playback; logged audio is unchanged. Each frame's sound starts a constant delay after the flip that shows it, measured from the system's default output at start-up and logged. A game with sound must run at its engine's own frame rate (ViZDoom: `fps * frame_skip == 35`; Genesis cores: 59.92), or the block stops and names the fps that fits.
+stable-retro games play their native audio; ViZDoom and COOM do when their config sets `env_kwargs.audio_buffer_enabled`. Use the rig file's `"audio": false` (every run on that rig) or a game phase's `"audio": false` to mute playback; logged audio is unchanged. Each frame's sound starts a constant delay after the flip that shows it, measured from the system's default output at start-up and logged. A game with sound must run at its engine's own frame rate (ViZDoom: `fps * frame_skip == 35`; Genesis cores: 59.92), or the block stops and names the fps that fits.
 
 Note: **MuJoCo and Box2D use continuous (`Box`) action spaces** — their configs write list actions that push the first dims to their limits (`"LEFT": [-1.0, 0.0, ...]`), so they render and log fine but aren't really human-playable without a per-game control scheme. Everything else in these families is keyboard-playable.
 
@@ -122,15 +122,32 @@ Each config carries `_game` / `_note` (per-game setup reminders). Games use `mod
 
 > **Not covered** — configs live under `configs/dbp_games/unsupported/`, each with a `_status`/`_note` explaining why: games with no real-time pixel interface — `2048` (upstream reset bug), `pathery`/`wordle` (text/placement), `tile-match-gym` (display-only, `Discrete(84)` swaps → no keyboard play), `mastermind` (needs Python ≥3.13), and `craftium` (needs the Luanti engine built).
 
-Runtime flow: experimenter screen (**SPACE**) → "Waiting for scanner..." → scanner **trigger `=`** (anchors the session clock) → curriculum phases → done. `ESC` quits early but still saves. Flags: `--size 1280x1024`, `--fullscreen`, `--monitor 1` (which screen, when there are several), `--no-vsync` (see [Timing](#timing-what-is-stamped-when)). The editor opens on its Launch tab, fullscreen ticked and the monitor picked there.
+Runtime flow: experimenter screen (**SPACE**) → "Waiting for scanner..." → scanner **trigger `=`** (anchors the session clock) → curriculum phases → done. `ESC` quits early but still saves.
 
-**A response device that is not a keyboard.** Some button boxes and gamepads (a Current Designs interface with a controller on it, say) report HID *joystick* buttons rather than keystrokes: nothing a phase's `keys` names is ever pressed, the game does not move, and the run records no responses with nothing on screen to say why. A plugged-in controller is therefore read directly, and its controls press the keys a phase's `keys` can already map:
+**Rigs: how a run is played.** A run config says what is played, and plays the same on every rig. How it is played is the rig's: a **rig** is one setup -- a monitor, a scanner, a response device, a trigger line -- and a site can have several. Each has its own **rig file**, outside the checkout, `~/.config/fmri-gym/rigs/<name>.json` (`$XDG_CONFIG_HOME` moves it), which every run played on that rig reads:
 
-| control | y | b | x | a | LT | RT | stick |
-|---|---|---|---|---|---|---|---|
-| presses | `W` | `D` | `A` | `S` | `Q` | `E` | `UP` / `DOWN` / `LEFT` / `RIGHT` |
+| key | what it says | when left out |
+|---|---|---|
+| `site`, `rig`, `pi`, `modality`, `monitor`, `photodiode`, `audio_path`, `trigger_hardware`, `notes` | what the rig is, filed with every run and rig check; `rig` is the file's name | required |
+| `"screen"` | the window: `{"size": "1024x768", "fullscreen": true, "monitor": 1, "vsync": true}`; `monitor` by index, 0 the first, and fullscreen takes the monitor's resolution (see [Timing](#timing-what-is-stamped-when)) | 1024x768 windowed on monitor 0, vsync on |
+| `"pad"` | read a plugged-in game controller | `true` |
+| `"audio"` | play game audio; `false` mutes every block | `true` |
+| `"data_root"` | where the BIDS tree goes | `data` |
+| `"keys"`, `"controls"` | the participant's device (below) | the keyboard's keys; all ten rig keys |
 
-The map is fixed (`fmri_gym/pad.py`), so every site with this controller expects the same keys and one curriculum plays at all of them; a curriculum keeps saying which *key* does what, and nothing else in the run can tell a pad from a keyboard. Press a button no key is mapped to and its number is printed on stderr; run `python -m fmri_gym.pad` to press each control and see the key it sends. `--no-pad` ignores the controller.
+`fmri-play --rig <name>` picks the rig. A machine with one rig file needs no `--rig`; with none, or with several and no `--rig`, `fmri-play` does not start and says how to pick or make one. Each rig gets one long rig check, which makes its file: its form asks for each field the first time (`fmri-play --curriculum configs/rig-check-long.json --subject sub-rig --ses 1 --run 1 --rig <name>`; `python -m fmri_gym.checks rig --rig <name>` opens the form alone, or edits it later). In the editor, the Launch tab picks the rig and its **Edit rig...** opens the same form. Every run's manifest keeps the rig file it was played with.
+
+**Rig keys: what a participant presses.** Games are played with the buttons of the Current Designs controller, the **rig keys**: `UP` `DOWN` `LEFT` `RIGHT` (the stick) and `A` `B` `X` `Y` `LT` `RT`. Every game phase maps these to its actions (see [Keys](#keys-the-keys-field)), so one curriculum plays on every rig. Each device reaches them its own way:
+
+| device | how it presses the rig keys |
+|---|---|
+| the Current Designs controller | by name: its stick and its y, b, x, a, LT and RT buttons are `UP`/`DOWN`/`LEFT`/`RIGHT`, `Y`, `B`, `X`, `A`, `LT`, `RT` |
+| a keyboard | the arrows, the letter keys `A` `B` `X` `Y`, and `LSHIFT` / `RSHIFT` for `LT` / `RT` |
+| a device that types keys (a button box) | through the **rig file** (see *Rigs* above): its `"keys"` says which typed key is which rig key, e.g. `{"1": "LEFT", "2": "DOWN", "3": "UP", "4": "RIGHT", "5": "A"}` |
+
+Besides `"keys"` the rig file can list the rig keys the participant's device has, `"controls"` (all ten when left out), which the rig check asks for one by one. A typed key is named as pygame names it (`pygame.key.name`: `"1"`, `"space"`, `"left shift"`, `"[1]"` for keypad 1), in any case; a name pygame does not know is refused. A typed key that stands for no rig key is no game key.
+
+**The controller is read directly.** Its interface reports HID *joystick* buttons rather than keystrokes, so it would type nothing; a plugged-in controller is therefore read by `fmri_gym/pad.py`, which presses the rig keys itself. Press a button no rig key is mapped to and its number is printed on stderr; run `python -m fmri_gym.pad` to press each control and see the rig key it sends. The rig file's `"pad": false` ignores the controller.
 
 **Calibrate the stick once per rig.** A stick neither rests at 0 nor reaches 1 both ways -- one pad measured -0.03 at rest and travelled about twice as far right as left -- so a single symmetric threshold asks for twice the movement one way as the other. `fmri-pad-calibrate` measures this machine's pad (roll the stick around its edge, hands off, then ~60 cued presses) and writes `~/.config/fmri-gym/pad.json`, which every run then reads: each axis' rest and its two extremes, so a reading becomes a fraction of the travel *available in that direction*, plus the thresholds fitted from how hard the stick was actually pushed. It lives outside the checkout because it describes the hardware here, not the task; `FMRI_GYM_PAD_CONFIG` points elsewhere, and the raw samples are saved beside it. Without one the raw readings are used as-is and the run's banner says `UNCALIBRATED`. It cues one control at a time in a fixed order, announced before each run of trials, so a press aimed at the wrong button never has to be measured. `fmri-pad-scope` opens on its own when it finishes -- push each control and watch the thresholds it just wrote act on it -- and can be run any time after; its arrow keys move `axis_on`/`axis_off` live and `S` saves them back into the calibration.
 
@@ -208,7 +225,7 @@ uv run fmri-play --subject sub-01 --curriculum configs/dbp_games/coom__pitfall.j
 
 The env reads `<repo>/COOM/env/scenarios/<scenario>/conf.cfg` and `<task>.wad` (`env_kwargs.task`, default `"default"`; `run_and_gun` also ships `blue`, `red`, `hard`, ...). Without the checkout the run stops at start-up.
 
-Every scenario always exposes exactly 4 buttons (`TURN_LEFT`, `TURN_RIGHT`, `MOVE_FORWARD`, plus one of `JUMP`/`ATTACK`/`SPEED`/`USE`), driven through COOM's own 12-action table (turn x move x execute), so a phase's `keys` are indices into it -- 8 = turn left, 4 = turn right, 2 = forward, 1 = the 4th button, sums for combos, `"": 0` for no key; each `coom__*.json` spells its map out. COOM blocks log the raw ViZDoom `game_variables` (health, ammo, position, ...) as an analysis variable; there's no in-memory savestate, so reconstruction is via seed + action replay like most backends. The nine COOM curricula enable audio via `env_kwargs.audio_buffer_enabled`. On Ubuntu, install OpenAL with `sudo apt install libopenal1`. Keep `fps: 35` for one Doom tic of 44.1 kHz stereo PCM per step. `--no-audio` mutes playback but preserves recorded PCM; terminal frames are marked `audio_valid=false`. `audio_efx: false` disables reverb to avoid an older OpenAL crash. MIDI music requires a working engine MIDI renderer; check the startup console for errors. Queued sounds can be cut at episode end. Logged `audio_onset` estimates DAC timing, not physical speaker latency.
+Every scenario always exposes exactly 4 buttons (`TURN_LEFT`, `TURN_RIGHT`, `MOVE_FORWARD`, plus one of `JUMP`/`ATTACK`/`SPEED`/`USE`), driven through COOM's own 12-action table (turn x move x execute), so a phase's `keys` are indices into it -- 8 = turn left, 4 = turn right, 2 = forward, 1 = the 4th button, sums for combos, `"": 0` for no key; each `coom__*.json` spells its map out. COOM blocks log the raw ViZDoom `game_variables` (health, ammo, position, ...) as an analysis variable; there's no in-memory savestate, so reconstruction is via seed + action replay like most backends. The nine COOM curricula enable audio via `env_kwargs.audio_buffer_enabled`. On Ubuntu, install OpenAL with `sudo apt install libopenal1`. Keep `fps: 35` for one Doom tic of 44.1 kHz stereo PCM per step. The rig file's `"audio": false` mutes playback but preserves recorded PCM; terminal frames are marked `audio_valid=false`. `audio_efx: false` disables reverb to avoid an older OpenAL crash. MIDI music requires a working engine MIDI renderer; check the startup console for errors. Queued sounds can be cut at episode end. Logged `audio_onset` estimates DAC timing, not physical speaker latency.
 
 ## Running AI GameStore games
 
@@ -297,6 +314,7 @@ fmri_gym/
   logging.py        # manifest.json + one crash-safe JSONL/HDF5 log per game block
   replay.py         # replay an episode from a block's log; its frame fields as arrays
   menu.py           # the hold-a-key pause menu (reset / forfeit / resume), opt-in per game phase
+  rig.py            # the rig files (one per rig: screen, pad, audio, data root, keys) and the rig keys
   triggers.py       # run-start sync (wait/send/none) + MEG/EEG trigger codes over lsl/serial/parallel
   photodiode.py     # `python -m fmri_gym.photodiode`: flash a patch to measure the flip-to-photon offset
   checks.py         # the rig check: its phases, the rig file, report.html/.md, rigchecks.tsv, `pool`
@@ -362,9 +380,9 @@ One config is one run. A whole scanning session is a plain shell script with one
 # fmri-gym session: one line per run, in order.
 set -e
 SES=${1:-$(uv run fmri-ses --subject sub-01)}
-uv run fmri-play --curriculum configs/pong.json --subject sub-01 --ses "$SES" --run 1 --size 1024x768
+uv run fmri-play --curriculum configs/pong.json --subject sub-01 --ses "$SES" --run 1
 ./scripts/localizer.sh "$SES"
-# uv run fmri-play --curriculum configs/mario.json --subject sub-01 --ses "$SES" --run 1 --size 1024x768
+# uv run fmri-play --curriculum configs/mario.json --subject sub-01 --ses "$SES" --run 1
 ```
 
 **The numbers come from the script, not from the disk.** The `SES=` line picks the session once, so every run lands in it: the script's own argument if it was given one (`sh ses1.sh 003` resumes session 3), else the subject's next free session. Each run states its `--run`, which is its place among the lines that play that task -- so it is the same run number however the session went, and skipping a line renumbers nothing after it. Both flags are required of `fmri-play`: it never picks a number itself.
@@ -427,7 +445,7 @@ They assume `sub-01` and a 1024x768 window, and take the subject's next free ses
  "state": "Level1",             // retro: named savestate/level (optional)
  "scenario": null,              // retro: scenario name (optional)
  "level": 0,                    // vgdl: level index; also uses "game","block_size"
- "keys": {"": 0, "LEFT": 0, "RIGHT": 1}, // REQUIRED: key -> env action, the whole map;
+ "keys": {"": 0, "LEFT": 0, "RIGHT": 1}, // REQUIRED: rig key -> env action, the whole map;
                                 //   "" is the action sent with no key held (see below)
  "save_pixels": false,          // also store lossless pixels, where the backend can
  "show_score": false}           // crafter: draw the achievement count beside the frame
@@ -435,12 +453,13 @@ They assume `sub-01` and a 1024x768 window, and take the subject's next free ses
 
 ### Keys (the `keys` field)
 
-Every game phase states its whole keyboard map. **There is no default**: which key does what differs between sites (a keyboard at the desk, a gamepad that types keys in the scanner), so the file says it, and a phase without `keys` is refused before the window opens. `keys` is a dict of `"<key(s)>": <action>`:
+Every game phase states its whole map from the **rig keys** -- `UP` `DOWN` `LEFT` `RIGHT` `A` `B` `X` `Y` `LT` `RT`, the controller's buttons (see *Rig keys* under [Quick start](#quick-start)) -- to its actions. **There is no default**: the file says it, and a phase without `keys` is refused before the window opens. `keys` is a dict of `"<key(s)>": <action>`:
 
-- The key is a name from `fmri_gym/keys.py` (`UP`, `DOWN`, `LEFT`, `RIGHT`, `SPACE`, `RETURN`, `LSHIFT`, `A`–`Z`, `0`–`9`, `F1`–`F12`, `KP0`–`KP9`, …); a name not in that table is refused, since it could never be pressed. Join keys with `+` for a combo (`"UP+SPACE"`).
+- The key is a rig key; join them with `+` for a combo (`"UP+A"`). Every action the phase uses must be reachable this way: a game with more actions than buttons puts the rest on combos (`"LT+A"`).
+- Any other name (`SPACE`, `Z`, …) is refused, since no device presses it; so is a combo in a `turn_based` phase, which steps on single presses.
 - The action is what the env's `step` takes, as JSON, and the rule is the env's action space (`fmri_gym/adapters/keymap.py`, one class per space):
-  - **`MultiBinary`** (retro, vizdoom, stk, aigamestore): the value is the **index of the button** the key holds down; every held key sets its bit, so keys combine as on a controller, and nothing held is every button up. An index outside the space is refused when the env is built, and so is a `""` entry (nothing held already means no button).
-  - **`Discrete`** (ale, coom, vgdl, crafter, minihack, baba, rushhour, gym) or **`Box`** (gym): the value is the action itself, an index or a list (`"LEFT": [-1.0, 0.0]`). The most specific combo whose keys are all held wins (`"UP+SPACE"` over `"UP"`), and the **`""`** entry is what a frame with no key held sends. `""` is required unless the phase is `turn_based`, where nothing is sent between presses: these spaces have no action that means "do nothing" everywhere (FrozenLake's 0 is LEFT, MiniHack's is "move N"). A value outside the space is refused when the env is built.
+  - **`MultiBinary`** (retro, vizdoom, stk, aigamestore): the value is the **index of the button** the rig key holds down; every held key sets its bit, so keys combine as on a controller, and nothing held is every button up. An index outside the space is refused when the env is built, and so is a `""` entry (nothing held already means no button).
+  - **`Discrete`** (ale, coom, vgdl, crafter, minihack, baba, rushhour, gym) or **`Box`** (gym): the value is the action itself, an index or a list (`"LEFT": [-1.0, 0.0]`). The most specific combo whose keys are all held wins (`"UP+A"` over `"UP"`), and the **`""`** entry is what a frame with no key held sends. `""` is required unless the phase is `turn_based`, where nothing is sent between presses: these spaces have no action that means "do nothing" everywhere (FrozenLake's 0 is LEFT, MiniHack's is "move N"). A value outside the space is refused when the env is built.
   - Any other action space is refused when the env is built.
 
 Each adapter's module docstring says what its indices mean, and each config's `_keys_note` spells out the map it uses. For an Atari game, read its meanings:
@@ -451,12 +470,12 @@ gym.make("ALE/Pong-v5").unwrapped.get_action_meanings()
 # ['NOOP', 'FIRE', 'RIGHT', 'LEFT', 'RIGHTFIRE', 'LEFTFIRE']  -> RIGHT=2, LEFT=3
 ```
 
-**Example — Pong on up/down arrows** (its paddle is `RIGHT`=2 / `LEFT`=3):
+**Example — Pong on up/down, serving with A** (its paddle is `RIGHT`=2 / `LEFT`=3):
 
 ```jsonc
 {"type": "game", "backend": "ale", "game": "ALE/Pong-v5",
  "mode": "duration", "duration": 30.0,
- "keys": {"": 0, "UP": 2, "DOWN": 3, "SPACE": 1, "UP+SPACE": 4, "DOWN+SPACE": 5}}
+ "keys": {"": 0, "UP": 2, "DOWN": 3, "A": 1, "UP+A": 4, "DOWN+A": 5}}
 ```
 
 The editor's Controls tab edits the table and, with *Check with the engine*, builds the env to confirm the keys fit its action space (and shows the engine's own rate for `fps`).
@@ -468,10 +487,10 @@ A subject can get stuck (a Baba Is You puzzle with its rules pushed into a corne
 ```jsonc
 "menu": {"key": "X", "hold": 5.0, "after": 15.0,
          "options": ["reset", "forfeit", "resume"],
-         "move": ["UP", "DOWN"], "confirm": "SPACE"}
+         "move": ["UP", "DOWN"], "confirm": "A"}
 ```
 
-Holding `key` for `hold` seconds -- even if that key does something in the game -- pauses the game and shows the options; `move` steps through them and `confirm` picks one. `reset` starts the episode over -- a new `reset()` of the env with the same seed, so the very same level instance -- `forfeit` ends the block and moves on to the next phase, `resume` continues. The menu is unavailable for the first `after` seconds of the block (0 = always), and a hold plus a two-key choice is hard to do by accident -- the point is that this is possible but never done lightly. Only `key` is required; the rest default to the values shown, and `options` may list any subset, in the order to show them. The manifest's phase entry records the settings and every pop-up (`menu.events`: when, and what was chosen); a reset or forfeited episode's `episode_outcome` is `reset` / `forfeit` (the env's own `terminated` / `truncated` flags are never touched), and a reset one does not count towards `n_episodes`. `configs/dbp_games/baba__make_win.json` uses it.
+Holding `key` for `hold` seconds -- even if that key does something in the game -- pauses the game and shows the options; `move` steps through them and `confirm` picks one. `reset` starts the episode over -- a new `reset()` of the env with the same seed, so the very same level instance -- `forfeit` ends the block and moves on to the next phase, `resume` continues. The menu is unavailable for the first `after` seconds of the block (0 = always), and a hold plus a two-key choice is hard to do by accident -- the point is that this is possible but never done lightly. The keys are rig keys. Only `key` is required; the rest default to the values shown, and `options` may list any subset, in the order to show them. The manifest's phase entry records the settings and every pop-up (`menu.events`: when, and what was chosen); a reset or forfeited episode's `episode_outcome` is `reset` / `forfeit` (the env's own `terminated` / `truncated` flags are never touched), and a reset one does not count towards `n_episodes`. `configs/dbp_games/baba__make_win.json` uses it.
 
 ## Triggers: fMRI vs MEG/EEG
 
@@ -510,7 +529,7 @@ What is sent: `task_start` when the clock anchors, `episode_start` at each reset
 Frames are shown with a vsync-locked flip and each frame's onset is logged as `flip_time`; message/fixation onsets in the manifest are flip times too. Key presses and releases are logged as they arrive (`key_time`, `key_name`, `key_down`), independent of the frame grid. The manifest records the display actually obtained (`vsync`, measured at start-up; `refresh_rate`).
 
 - A frame is shown at the next refresh after its step, so an `fps` that divides the refresh rate (30 or 60 on a 60 Hz screen) shows every frame for the same number of refreshes; otherwise frames alternate between one and two and each onset can be up to one refresh late. `flip_time` records what happened either way. Some cores' own rate is 59.92: close enough to 60 Hz that one frame in ~800 is shown twice.
-- Check that the rig locks to the refresh before a session: `python -m fmri_gym.display --fullscreen` (verdict LOCKED / NOT locked; if not, use fullscreen and disable the desktop compositor). `--no-vsync` turns the request off. Pass the session's `--monitor` here and to the photodiode: refresh, vsync and the photon offset belong to the monitor.
+- Check that the rig locks to the refresh before a session: `python -m fmri_gym.display --fullscreen` (verdict LOCKED / NOT locked; if not, use fullscreen and disable the desktop compositor). `--no-vsync` turns the request off. Pass the rig's monitor (its `"screen"` `"monitor"`) here and to the photodiode as `--monitor`: refresh, vsync and the photon offset belong to the monitor.
 - Once per rig, measure the constant flip-to-photon offset with a photodiode on the screen, then subtract it from `flip_time` and the frame triggers:
 
   ```bash
@@ -520,7 +539,7 @@ Frames are shown with a vsync-locked flip and each frame's onset is logged as `f
   ```
 
   The first flashes a patch with the frame trigger on each white flip; match the triggers to the diode edges in your recording with `fmri_gym.photodiode.match_edges(trigger_times, edge_times)`. The second records the diode on the sound-card input and prints the offsets itself (`--list-audio-devices` to pick the input). `--audio-click` also plays a tone burst on each white flip through the session's audio output and reports when it reaches the DAC; with `--mic`, when a microphone on input channel 1 hears it.
-- **The rig check** runs all of these as one run: `configs/rig-check.json`, whose curriculum holds check phases instead of games, played by `fmri-play` with the window, trigger line and audio output a session opens. So the editor edits it like any config -- its **Triggers** tab sets the line it tests (make it the session's), its **Controls** tab the buttons it asks for (Use a device layout to fill them in) -- and it can stand first in any session: add `configs/rig-check.json` as its first run. A failed test does not stop the check or the session: it is listed, with why, on screen, on the console and in the report. On its own, the session `configs/rig-check.sh` plays the long check (filed under `sub-rig`, as MEG-BIDS files empty-room recordings under `sub-emptyroom`; its first line, the quick check, is skipped: un-skip it to play that one): open it in the editor, `fmri-edit --session configs/rig-check.sh`, and press Play, or run `sh configs/rig-check.sh`.
+- **The rig check** runs all of these as one run: `configs/rig-check.json`, whose curriculum holds check phases instead of games, played by `fmri-play` with the window, trigger line and audio output a session opens. So the editor edits it like any config -- its **Triggers** tab sets the line it tests (make it the session's), the buttons it asks for are this rig's rig keys, from the rig file -- and it can stand first in any session: add `configs/rig-check.json` as its first run. No session does by default; each rig gets the long check (`configs/rig-check-long.json`) once, which also makes its rig file. A failed test does not stop the check or the session: it is listed, with why, on screen, on the console and in the report. On its own, the session `configs/rig-check.sh` plays the long check (filed under `sub-rig`, as MEG-BIDS files empty-room recordings under `sub-emptyroom`; its first line, the quick check, is skipped: un-skip it to play that one): open it in the editor, `fmri-edit --session configs/rig-check.sh`, and press Play, or run `sh configs/rig-check.sh`.
 
   | phase | test | fails when |
   |---|---|---|
@@ -535,7 +554,7 @@ Frames are shown with a vsync-locked flip and each frame's onset is logged as `f
 
   Every check runs whichever fails, and each test gets its verdict. The screen says what each check is doing -- which code goes out on which line, which flash (and whether it carries a click), which rate under which load -- and then its verdict. A session's runs must share one triggers section: the editor's Check says so when they differ (each run keeps its own, so a change on the Triggers tab applies to the selected run only). `configs/rig-check.json` is the **quick** check, before every session: under a minute, most of it pressing the buttons -- enough to show today's rig is the one that was measured. `configs/rig-check-long.json` **measures** the rig, once per rig and after any hardware, driver or OS change (about 25 min; the frame test alone plays 60, 30, 20 and 50 fps for a minute each, idle and under CPU load): offsets to a fraction of a ms, their drift in ms/min (a sound card's clock runs apart from the PC's), missed refreshes and pulses, the TR on this PC's clock. With `sync.mode` `wait`, the check waits for the scanner like any run: start a sequence, or the trigger box's test mode.
 
-  Each machine needs a **rig file**, `rig.json` (not in git): site, rig, PI's initials, modality, and what software cannot see -- monitor or projector, photodiode, sound path to the ear, trigger hardware. When it is missing or invalid, the check opens a form to fill it in (the `gui` extra; Save stays disabled until every field is valid) before the window; cancelled, or with no screen, it stops. `python -m fmri_gym.checks rig` reopens the form when the hardware changes; `RIG=<path>` points elsewhere.
+  Each rig needs a **rig file**, `~/.config/fmri-gym/rigs/<name>.json` (see *Rigs* under [Quick start](#quick-start)): site, rig, PI's initials, modality, and what software cannot see -- monitor or projector, photodiode, sound path to the ear, trigger hardware -- with what every run on the rig uses (screen, pad, audio, data root). When it is missing or invalid -- a machine with no rig yet, or a `--rig` it has no file for -- the check opens a form to fill it in (the `gui` extra; Save stays disabled until every field is valid) before the window; cancelled, or with no screen, it stops. `python -m fmri_gym.checks rig --rig <name>` reopens the form when the hardware changes. The controls check asks for each rig key the file's `"controls"` lists, pressed on the participant's device.
 
   The check's run folder holds, beside the run's own `manifest.json` (with the rig, each check's numbers and each test's verdict) and one `block-NN_check_<name>.npz` per check:
 
@@ -561,7 +580,7 @@ data/sub-01/ses-001/beh/sub-01_ses-001_task-pong_run-002_02/     ... re-acquired
 data/sub-01/ses-001/beh/sub-01_ses-001_task-crafter_run-001/
 ```
 
-The task is the config's file name (letters and digits); `--subject` must be `sub-<letters/digits>`. `--ses` and `--run` are **required**: the numbers come from the session design (the script's `SES=` line and each run's place in it), never from what is on disk, so they survive a session that was interrupted, resumed or re-acquired. `--data-root` moves the tree (default `data`).
+The task is the config's file name (letters and digits); `--subject` must be `sub-<letters/digits>`. `--ses` and `--run` are **required**: the numbers come from the session design (the script's `SES=` line and each run's place in it), never from what is on disk, so they survive a session that was interrupted, resumed or re-acquired. The rig file's `"data_root"` moves the tree (default `data`).
 
 Data is never overwritten. A run whose folder is already there writes to `..._02`, then `_03`; the attempt that stopped stays where it is. That suffix names the folder only — the run's label, which the manifest records with the `attempt` number and which keys the seeds, stays canonical, so every attempt at a run plays the same episodes.
 

@@ -17,7 +17,7 @@
         "",
         "Controls:",
         "   ARROWS   move",
-        "   SPACE    wait a turn",
+        "   A        wait a turn",
         "   hold X   pause menu (restart / give up / resume)",
         "",
         "(press SPACE to start)"
@@ -25,8 +25,8 @@
     },
     {"type": "fixation", "duration": 1.0},
     {
-      "type": "game", "backend": "baba_auto", "game": "novice_locksmith", "keys": {"SPACE": 0, "UP": 1, "DOWN": 2, "LEFT": 3, "RIGHT": 4},
-      "menu": {"key": "X", "hold": 3.0, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["UP", "DOWN"], "confirm": "SPACE"},
+      "type": "game", "backend": "baba_auto", "game": "novice_locksmith", "keys": {"A": 0, "UP": 1, "DOWN": 2, "LEFT": 3, "RIGHT": 4},
+      "menu": {"key": "X", "hold": 3.0, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["UP", "DOWN"], "confirm": "A"},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 300.0, "fps": 15, "turn_based": true
     },
     {"type": "fixation", "duration": 2.0}

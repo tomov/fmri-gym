@@ -8,7 +8,8 @@ Please read this before writing code.
 fmri_play.py                     CLI   parse the flags of one run, then play it (Run.from_config)
 fmri_gym/run.py                  CORE  one run's experiment loop: trigger, phases, timing
 fmri_gym/display.py              CORE  one pygame window: frames, text, fixation
-fmri_gym/keys.py                 CORE  pygame keycode to key NAME ("LEFT", "SPACE")
+fmri_gym/keys.py                 CORE  typed keys (pygame's names) to rig keys; what is held
+fmri_gym/rig.py                  CORE  the rig keys, and the rig files (one per rig: what every run on it uses)
 fmri_gym/logging.py              CORE  manifest.json + one crash-safe JSONL/HDF5 log per game block
 fmri_gym/replay.py                     replay an episode from a block's log; frame fields as arrays
 fmri_gym/menu.py                 CORE  hold-a-key pause menu: reset / forfeit / resume (opt-in per phase)
@@ -33,7 +34,7 @@ An adapter is lightweight glue that takes a `gymnasium.Env` and makes it fMRI-fr
 - build the env (`_make`): a `gymnasium.Env`, always. Prefer a ready-made pip package (`ale-py`, `stable-retro`, `minihack`, `rushhour-gym`, ...). If the game's own env speaks another API (old `gym`, a bare engine, a `with_img=` of its own), a thin Gymnasium env under `gym/` puts the contract in front of it (`gym/baba/`, `gym/crafter/`, `gym/vgdl/`, `gym/coom/`, `gym/baba_auto/`), and that is where any new one goes; the adapter never normalizes `reset`/`step` itself. Two rules for that env:
   - **Only the wrapper lives here.** The game's own code is a pip package, or a checkout in `external/<backend>` at the commit the README pins ("External checkouts"). The env reads that path by default and takes `repo=` for another; the pin is the README's.
   - **It is a plain RL env.** It follows the Gymnasium API and knows nothing about fMRI, scanners, phases, blocks, subjects or how it will be used; someone training an agent on it should find nothing odd. That vocabulary belongs to the adapter and the core.
-- say in the module docstring what the env's action indices mean, so a config can write its `keys` (there is no default keyboard map: the config states all of it)
+- say in the module docstring what the env's action indices mean, so a config can write its `keys` (there is no default map: the config states all of it, from the rig keys)
 - produce an RGB frame for the screen (`render`)
 - if the engine makes sound, hand over this step's PCM (`sound`; the contract is in `EnvAdapter.sound`, and `retro.py` is a two-line example)
 - if the engine has a clock of its own, say how many steps per second are real speed (`native_fps`), read from the engine where it tells; the run reports the block's speed against it
@@ -98,8 +99,8 @@ and confirm the block's folder holds an `events.jsonl` whose `frame` lines (`act
 
 ## Things that are easy to get wrong
 
-- **Key names are pygame names, upper-cased, without `K_`** (`"LEFT"`, `"SPACE"`, `"Z"`). Add unlisted keys to `_PYGAME_KEY_NAMES` in `keys.py` rather than mapping keycodes yourself; `validate_config` refuses a config that names a key outside that table.
-- **Every game phase writes its whole `keys` map; there is no default.** A `MultiBinary` env takes button indices (held keys combine), anything else takes the action itself and a real-time phase also needs the `""` entry, the action for no key held. One class per action space in `adapters/keymap.py`. Don't add a per-backend default or a merge step: the map depends on the site's input device, not on the engine.
+- **A game's `keys` are written in rig keys** (`fmri_gym/rig.py`: `UP DOWN LEFT RIGHT A B X Y LT RT`, the controller's buttons), combined with `+` when a game has more actions than buttons (not in a `turn_based` phase, which steps on single presses). Any other name is refused. Which typed key is which rig key is the machine's business (`keys.typed_keys`, the rig file, typed keys named as `pygame.key.name` names them), never a config's.
+- **Every game phase writes its whole `keys` map; there is no default.** A `MultiBinary` env takes button indices (held keys combine), anything else takes the action itself and a real-time phase also needs the `""` entry, the action for no key held. One class per action space in `adapters/keymap.py`. Don't add a per-backend default or a merge step.
 - **Copy observations you keep.** Several envs reuse their observation buffers, so `capture` must `.copy()` anything it stores (see `minihack.py`).
 - **`render()` is not always free of side effects.** An engine that draws from the same RNG its dynamics use spends a draw on every render, so one extra call shifts everything after it and the run silently stops matching its own log. Return the frame `step` already produced rather than rendering again — crafter's night noise is the live example, and it is why `gym/crafter` caches the observation and hands that back.
 - **Reproducibility is the product.** A block must be replayable from `episode_seeds` + `actions`. If the env has no savestate, leave `blob=None` and make sure `reset(seed=...)` really determines the episode. **Test it rather than assume it**: replay a recorded block in a *second process* and compare the frames bit for bit, because the usual culprit is hash order, which is fixed for the life of one interpreter and would let a replay inside the recording process pass. Crafter passes every surface check (a seed argument, a seeded `RandomState`, deterministic worldgen) and still diverges, because one creature list is built from a Python `set` and the despawn pick therefore follows object `id()`, which moves with `PYTHONHASHSEED`. Sorting that list is the whole fix, and it lives in a fork the env package pins (`gym/crafter/pyproject.toml`: `crafter @ git+https://github.com/chengfanbrain/crafter.git@deterministic`), not in the adapter: when the bug is in the engine, fix the engine and pin the build, or the rig starts owning game behaviour.

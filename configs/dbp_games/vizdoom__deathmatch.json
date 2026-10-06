@@ -17,10 +17,10 @@
         "Controls:",
         "   UP / DOWN      move forward / back",
         "   LEFT / RIGHT   turn left / right",
-        "   Z / X          move left / right",
-        "   SPACE          shoot",
-        "   N / M          previous / next weapon",
-        "   S              run",
+        "   A / X          move left / right",
+        "   B              shoot",
+        "   Y / LT         previous / next weapon",
+        "   RT             run",
         "",
         "(press SPACE to start)"
       ]
@@ -29,7 +29,7 @@
     {
       "type": "game", "backend": "vizdoom", "game": "VizdoomDeathmatch-v1",
       "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
-      "keys": {"UP": 6, "DOWN": 5, "LEFT": 8, "RIGHT": 7, "Z": 4, "X": 3, "SPACE": 0, "N": 16, "M": 15, "S": 1},
+      "keys": {"UP": 6, "DOWN": 5, "LEFT": 8, "RIGHT": 7, "A": 4, "X": 3, "B": 0, "Y": 16, "LT": 15, "RT": 1},
       "mode": "duration", "duration": 300.0, "fps": 35
     },
     {"type": "fixation", "duration": 2.0}

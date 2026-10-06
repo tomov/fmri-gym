@@ -44,6 +44,7 @@ from typing import Any, Sequence
 
 from . import bids
 from . import config as cfg
+from . import rig
 from .triggers import (SYNC_MODES, TRIGGER_BACKENDS, TriggerSettings)
 
 #: Suggestions for a game phase's ``backend`` (free text is accepted too; the
@@ -78,12 +79,10 @@ class Field:
 
 
 #: What the Launch tab starts at, and so what a run's command carries unless the
-#: tab (or an opened session script) says otherwise. Fullscreen, as a session in
-#: the scanner needs; untick it to pilot at the desk.
+#: tab (or an opened session script) says otherwise. The window, the controller,
+#: the audio and the data root are the rig's (:mod:`fmri_gym.rig`), not a launch's.
 DEFAULT_LAUNCH: dict[str, Any] = {
-    "subject": "sub-test", "ses": None, "data_root": "data", "size": "1024x768",
-    "monitor": 0, "fullscreen": True, "no_vsync": False, "no_audio": False,
-    "dummy_trigger": False,
+    "subject": "sub-test", "ses": None, "rig": None, "dummy_trigger": False,
 }
 
 #: Keys are the argparse names of ``fmri_play.py``'s flags; labels are the flags.
@@ -96,18 +95,10 @@ LAUNCH_FIELDS = [
                                      "it then too. A number here is what the script takes when "
                                      "it is run without one -- `sh ses1.sh 003` overrides it, "
                                      "which is how a stopped session is resumed."),
-    Field("data_root", "--data-root", tip="Where the BIDS tree goes. Blank = data."),
-    Field("size", "--size", "combo", (),
-          tip="The window's size as <w>x<h>, when not fullscreen: common sizes that fit the "
-              "monitor, or type another. Fullscreen always takes the monitor's resolution."),
-    Field("fullscreen", "--fullscreen", "bool", default=False,
-          tip="Fill the screen. Windowed is handier for piloting at the desk."),
-    Field("no_vsync", "--no-vsync", "bool", default=False,
-          tip="Do not lock flips to the monitor refresh. Only if the display self-test "
-              "(python -m fmri_gym.display) reports it cannot lock."),
-    Field("no_audio", "--no-audio", "bool", default=False,
-          tip="Mute game audio in every block; the manifest's curriculum then shows "
-              "\"audio\": false."),
+    Field("rig", "--rig", "combo", (),
+          tip="The rig it is played on: its file says the window, the controller, the audio "
+              "and where the data goes. Blank = this machine's only rig. Edit rig... changes "
+              "it, or makes a new one."),
     Field("dummy_trigger", "--dummy-trigger", "bool", default=False,
           tip="Skip the experimenter and scanner waits. A test run, not a session -- though its "
               "data is saved like any run's and takes the next run number."),
@@ -417,55 +408,24 @@ def window_sizes(width: int, height: int) -> list[str]:
     return [*fits, f"{width}x{height}"] if f"{width}x{height}" not in fits else fits
 
 
-#: Response devices that type keys, and the game key each button stands for. Every input is
-#: a key press, so a device is a translation of a phase's keyboard map; the Controls tab adds
-#: its keys to a phase's ``keys``, and a controls check lists its buttons to test. A device's scanner trigger (Current
-#: Designs: 5 in digit mode, t in letter mode) is left out: it arrives at every volume.
-DEVICE_LAYOUTS: dict[str, dict[str, str]] = {
-    # The keyboard needs no translation: every game plays with its own map, always.
-    "Keyboard (the game's own keys)": {},
-    "Button box (1 2 3 4 5)": {"1": "LEFT", "2": "DOWN", "3": "UP", "4": "RIGHT", "5": "SPACE"},
-    "Current Designs fORP, HID KEY 12345 (1 2 3 4)": {"1": "LEFT", "2": "DOWN", "3": "UP",
-                                                      "4": "RIGHT"},
-    "Current Designs fORP, HID KEY BYGRT (b y g r)": {"B": "LEFT", "Y": "DOWN", "G": "UP",
-                                                      "R": "RIGHT"},
-}
-
-
-def combo_name(combo: str) -> str:
-    """``"space+Left"`` -> ``"LEFT+SPACE"``: the one spelling of a key combo."""
-    return "+".join(sorted(key.strip().upper() for key in combo.split("+")))
-
-
-def translate_keys(game_map: dict[str, Any], layout: dict[str, str]) -> dict[str, Any]:
-    """The device's bindings: each combo of the game's map whose keys all have a button.
-
-    :param game_map: combo -> action, as the phase plays on the keyboard now.
-    :param layout: device key -> the game key it stands for (a :data:`DEVICE_LAYOUTS` value).
-    :return: device combo -> the same action (``LEFT+SPACE`` -> ``1+5`` on a button box).
-    """
-    button = {game_key: device_key for device_key, game_key in layout.items()}
-    out = {}
-    for combo, action in game_map.items():
-        keys = combo_name(combo).split("+")
-        if all(key in button for key in keys):
-            out[combo_name("+".join(button[key] for key in keys))] = action
-    return out
-
-
 def launch_values(form: dict) -> dict:
     """The Launch form as the flag values ``fmri_play`` reads, every flag present.
 
     :param form: what :func:`field_values` returned for :data:`LAUNCH_FIELDS`.
-    :raises ValueError: if the subject is blank, or the size is not ``<w>x<h>``.
+    :raises ValueError: if the subject is blank.
     """
     if "subject" not in form:
         raise ValueError("--subject: required")
-    if not re.fullmatch(r"[1-9]\d*x[1-9]\d*", form.get("size", "")):
-        raise ValueError(f"--size: expected <width>x<height> such as 1024x768, got "
-                         f"{form.get('size', '')!r}")
     off = {f.key: False for f in LAUNCH_FIELDS if f.kind == "bool"}
-    return {"ses": None, "data_root": "data", **off, **form}
+    return {"ses": None, "rig": None, **off, **form}
+
+
+def data_root(launch: dict) -> str:
+    """Where the launch's rig puts the data (:func:`fmri_gym.rig.choose` picks the rig).
+
+    :raises ValueError: when there is no such rig, saying how to make one.
+    """
+    return rig.settings(rig.load(rig.choose(launch["rig"])))["data_root"]
 
 
 def trigger_mismatches(steps: list[dict], configs: dict[str, dict]) -> list[str]:
@@ -615,9 +575,8 @@ HEADER = ["#!/bin/sh", "# fmri-gym session: one line per run, in order.", "set -
 PLAY = "uv run fmri-play"
 #: What a script's first line asks for the session number when it is given none.
 SES_TOOL = "uv run fmri-ses"
-DATA_ROOT = "data"
 #: The launch flags a session carries on every run's line (argparse names of ``fmri_play``).
-SWITCHES = ("fullscreen", "no_vsync", "no_audio", "dummy_trigger")
+SWITCHES = ("dummy_trigger",)
 #: Where a run's line takes its ``--ses``: the session the script picked once, in
 #: its first line. Written as typed, not quoted -- the shell has to expand it.
 SES_VAR = '"$SES"'
@@ -646,9 +605,9 @@ def write_session(steps: list[dict], launch: dict) -> str:
     fails or is quit.
 
     :param steps: ``{"config" | "command", "skip"}`` dicts, in order.
-    :param launch: subject, ses (``None``: the next free one), data_root, size,
-        monitor and the :data:`SWITCHES`; written on every run's line (the
-        data root and monitor only when not the default).
+    :param launch: subject, ses (``None``: the next free one), rig (``None``:
+        the machine's only one) and the :data:`SWITCHES`; written on every run's
+        line.
     :return: the script.
     """
     lines = [*HEADER, _ses_line(launch)]
@@ -720,20 +679,21 @@ def play_command(config_path: str, launch: dict, ses: str, run: int) -> list[str
     :param run: the ``--run`` value (see :func:`run_number`).
     :return: the command, word by word.
     """
-    root = [] if launch["data_root"] == DATA_ROOT else ["--data-root", launch["data_root"]]
-    monitor = ["--monitor", str(launch["monitor"])] if launch["monitor"] else []
     switches = [f"--{key.replace('_', '-')}" for key in SWITCHES if launch[key]]
-    return [*PLAY.split(), "--curriculum", config_path, "--subject", launch["subject"], *root,
-            "--ses", ses, "--run", str(run),
-            "--size", launch["size"], *monitor, *switches]
+    return [*PLAY.split(), "--curriculum", config_path, "--subject", launch["subject"],
+            "--ses", ses, "--run", str(run), *_rig_flag(launch), *switches]
+
+
+def _rig_flag(launch: dict) -> list[str]:
+    return ["--rig", launch["rig"]] if launch["rig"] else []
 
 
 def _ses_line(launch: dict) -> str:
     """``SES=``: the script's own argument, else the number pinned here or the next free one."""
     if launch["ses"] is not None:
         return f"SES=${{1:-{launch['ses']:03d}}}"
-    root = [] if launch["data_root"] == DATA_ROOT else ["--data-root", launch["data_root"]]
-    return f"SES=${{1:-$({_shell([*SES_TOOL.split(), '--subject', launch['subject'], *root])})}}"
+    ses_tool = [*SES_TOOL.split(), "--subject", launch["subject"], *_rig_flag(launch)]
+    return f"SES=${{1:-$({_shell(ses_tool)})}}"
 
 
 def _play_line(config_path: str, launch: dict, run: int) -> str:
@@ -759,11 +719,10 @@ def _parse_play_line(line: str) -> tuple[str, dict, int] | None:
     if not line.startswith(PLAY + " "):
         return None
     parser = _Parser(add_help=False, allow_abbrev=False)
-    for flag in ("--curriculum", "--subject", "--size", "--ses"):
+    for flag in ("--curriculum", "--subject", "--ses"):
         parser.add_argument(flag, required=True)
     parser.add_argument("--run", type=int, required=True)
-    parser.add_argument("--data-root", default=DATA_ROOT)
-    parser.add_argument("--monitor", type=int, default=0)
+    parser.add_argument("--rig")
     for key in SWITCHES:
         parser.add_argument(f"--{key.replace('_', '-')}", action="store_true")
     try:
@@ -806,7 +765,7 @@ def main() -> None:
     The editor opens on a run config, a session script, or a new run. Play
     saves what is shown and this process turns into the command that plays it:
     one ``fmri-play`` for a run, the script itself for a session of several.
-    Nothing about a launch is a flag here -- subject, window, the test switches
+    Nothing about a launch is a flag here -- subject, rig, the test switch
     are the Launch tab's, and a session writes them on every line of its script.
     """
     p = argparse.ArgumentParser(description="Design fmri-gym runs and sessions, then play one.")

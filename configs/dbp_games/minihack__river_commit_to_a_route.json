@@ -21,7 +21,7 @@
     {
       "type": "game", "backend": "minihack", "game": "minihack_levels:MiniHack-River-CommitToARoute-v0", "seed": 3,
       "keys": {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3},
-      "menu": {"key": "X", "hold": 1.5, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["UP", "DOWN"], "confirm": "SPACE"},
+      "menu": {"key": "X", "hold": 1.5, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["UP", "DOWN"], "confirm": "A"},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 900, "fps": 15, "turn_based": true
     }
   ]

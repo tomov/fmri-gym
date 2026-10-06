@@ -18,7 +18,7 @@
         "Controls:",
         "   UP             move forward",
         "   LEFT / RIGHT   turn left / right",
-        "   Z / X          move left / right",
+        "   A / X          move left / right",
         "",
         "(press SPACE to start)"
       ]
@@ -27,7 +27,7 @@
     {
       "type": "game", "backend": "vizdoom", "game": "VizdoomMyWayHome-v1",
       "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
-      "keys": {"UP": 2, "LEFT": 0, "RIGHT": 1, "Z": 3, "X": 4},
+      "keys": {"UP": 2, "LEFT": 0, "RIGHT": 1, "A": 3, "X": 4},
       "mode": "duration", "duration": 300.0, "fps": 35
     },
     {"type": "fixation", "duration": 2.0}

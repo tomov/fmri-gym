@@ -4,7 +4,7 @@
   "curriculum": [
     {"type": "message", "text": "stable-retro: Anguna-GbAdvance", "duration": 2.0},
     {"type": "fixation", "duration": 1.0},
-    {"backend": "retro", "game": "Anguna-GbAdvance", "keys": {"Z": 8, "X": 0, "Q": 10, "W": 11, "UP": 4, "DOWN": 5, "LEFT": 6, "RIGHT": 7, "RETURN": 3, "TAB": 2}, "fps": 60, "state_stride": 15, "type": "game", "mode": "duration", "duration": 300.0},
+    {"backend": "retro", "game": "Anguna-GbAdvance", "keys": {"A": 8, "X": 0, "B": 10, "Y": 11, "UP": 4, "DOWN": 5, "LEFT": 6, "RIGHT": 7, "LT": 3, "RT": 2}, "fps": 60, "state_stride": 15, "type": "game", "mode": "duration", "duration": 300.0},
     {"type": "fixation", "duration": 2.0}
   ]
 }

@@ -36,6 +36,8 @@ import re
 import sys
 from typing import Callable, NamedTuple
 
+from . import rig
+
 _LABEL = re.compile(r"[A-Za-z0-9]+")
 
 
@@ -96,7 +98,7 @@ def run_output(root: str, subject: str, config_path: str,
     Nothing is ever overwritten: the folder of a run that already has data
     goes to the next free attempt beside it, and the caller is told which.
 
-    :param root: the BIDS tree's root (``--data-root``).
+    :param root: the BIDS tree's root (the rig's ``data_root``).
     :param subject: ``sub-<label>``.
     :param config_path: the run's config file; its name is the task label.
     :param session: the BIDS session number (``--ses``), from 1.
@@ -175,7 +177,8 @@ def main() -> None:
     p = argparse.ArgumentParser(
         description="Print a subject's next free BIDS session number (001, 002, ...).")
     p.add_argument("--subject", required=True, help="BIDS subject: sub-<letters/digits>")
-    p.add_argument("--data-root", default="data",
-                   help="where the BIDS tree is: <root>/sub-XX/ses-NNN/ (default: data)")
+    p.add_argument("--rig", help="the rig whose data root holds the BIDS tree, "
+                   "<root>/sub-XX/ses-NNN/ (default: this machine's only rig)")
     args = p.parse_args()
-    print(f"{next_session(args.data_root, subject_label(args.subject)):03d}")
+    root = rig.settings(rig.use(args.rig))["data_root"]
+    print(f"{next_session(root, subject_label(args.subject)):03d}")

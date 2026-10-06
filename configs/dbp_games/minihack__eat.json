@@ -1,7 +1,7 @@
 {
   "_game": "MiniHack: MiniHack-Eat-v0",
-  "_note": "pip install minihack (needs setuptools<81). Eating floor food is a TWO-step NetHack action: press E, then NetHack asks 'eat it? [ynq]' and you answer Y (yes). That confirm keystroke is why eating seems to 'freeze' after E -- you must then press Y. (NetHack draws the prompt on the tty message line, which is NOT part of the pixel observation, so it can't be shown on screen; the E-then-Y recipe in the instructions is what the player follows.) In NetHack y/n ARE the NW/SE movement keys, so the diagonal keys double as the yes/no answers (Y=act 7='y', N=act 5='n').",
-  "_keys_note": "Discrete(85) full command set; we expose movement + eat. Compass 0-7 (0=N,1=E,2=S,3=W,4=NE,5=SE,6=SW,7=NW); 29=EAT. Arrows map to the cardinals, y/u/b/n to the diagonals, E to eat. Y (act 7) sends keystroke 'y'='yes' and N (act 5) sends 'n'='no' at a [ynq] prompt. turn_based:true is required -- noop is action 0 (=move N). Keep the message Controls text in sync with 'keys' by hand.",
+  "_note": "pip install minihack (needs setuptools<81). Eating floor food is a TWO-step NetHack action: press LT (eat), then NetHack asks 'eat it? [ynq]' and you answer Y (yes). That confirm keystroke is why eating seems to 'freeze' after LT -- you must then press Y. (NetHack draws the prompt on the tty message line, which is NOT part of the pixel observation, so it can't be shown on screen; the LT-then-Y recipe in the instructions is what the player follows.) In NetHack y/n ARE the NW/SE movement keys, so the diagonal keys double as the yes/no answers (Y=act 7='y', X=act 5='n').",
+  "_keys_note": "Discrete(85) full command set; we expose movement + eat. Compass 0-7 (0=N,1=E,2=S,3=W,4=NE,5=SE,6=SW,7=NW); 29=EAT. Arrows map to the cardinals, Y/A/B/X to the diagonals NW/NE/SW/SE, LT to eat. Y (act 7) sends keystroke 'y'='yes' and X (act 5) sends 'n'='no' at a [ynq] prompt. turn_based:true is required -- noop is action 0 (=move N). Keep the message Controls text in sync with 'keys' by hand.",
   "_keys_reference": "https://github.com/facebookresearch/minihack",
   "_curriculum_note": "Blocking: the block is this task played until completed (mode 'episode', n_episodes 1, advancing_outcomes ['won']); a death or the env's own step limit restarts the same level, and max_duration 300 s is the cap. ESC is the experimenter's way out.",
   "curriculum": [
@@ -12,13 +12,13 @@
         "MiniHack: Eat",
         "",
         "You're hungry. Walk onto the food, then eat it in",
-        "two steps:  press  E  to eat, then  Y  to confirm.",
+        "two steps:  press  LT  to eat, then  Y  to confirm.",
         "",
         "Controls:",
         "   ARROWS       move  N / S / W / E",
-        "   Y / U        move diagonally  NW / NE     (Y = 'yes')",
-        "   B / N        move diagonally  SW / SE     (N = 'no')",
-        "   E  then  Y   eat the food you're standing on",
+        "   Y / A        move diagonally  NW / NE     (Y = 'yes')",
+        "   B / X        move diagonally  SW / SE     (X = 'no')",
+        "   LT  then  Y   eat the food you're standing on",
         "",
         "(press SPACE to start)"
       ]
@@ -26,7 +26,7 @@
     {"type": "fixation", "duration": 1.0},
     {
       "type": "game", "backend": "minihack", "game": "MiniHack-Eat-v0",
-      "keys": {"UP": 0, "DOWN": 2, "LEFT": 3, "RIGHT": 1, "Y": 7, "U": 4, "B": 6, "N": 5, "E": 29},
+      "keys": {"UP": 0, "DOWN": 2, "LEFT": 3, "RIGHT": 1, "Y": 7, "A": 4, "B": 6, "X": 5, "LT": 29},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 300.0, "fps": 15, "turn_based": true
     },
     {"type": "fixation", "duration": 2.0}

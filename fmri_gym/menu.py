@@ -13,9 +13,10 @@ Phase field::
 
     "menu": {"key": "X", "hold": 5.0, "after": 15.0,
              "options": ["reset", "forfeit", "resume"],
-             "move": ["UP", "DOWN"], "confirm": "RETURN"}
+             "move": ["UP", "DOWN"], "confirm": "A"}
 
-``key`` is required; the rest default to the values shown. ``reset`` starts
+``key`` is required; the rest default to the values shown. Keys are rig keys
+(:data:`fmri_gym.rig.CONTROLS`), so the menu works on every device. ``reset`` starts
 the episode over (a new ``reset`` of the env with the same seed: the very
 instance the subject gave up on), ``forfeit`` ends the block and moves on to
 the next phase, ``resume`` goes on where the game paused. Options are shown in
@@ -30,7 +31,8 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from .keys import get_events, held_key_names, key_name
+from .keys import event_name, get_events, held_key_names
+from .rig import CONTROLS
 
 if TYPE_CHECKING:
     from .display import Display
@@ -39,7 +41,7 @@ if TYPE_CHECKING:
 OPTIONS = ("reset", "forfeit", "resume")
 _LABELS = {"reset": "Restart the level", "forfeit": "Give up this level", "resume": "Resume"}
 _DEFAULTS = {"hold": 5.0, "after": 15.0, "options": list(OPTIONS),
-             "move": ["UP", "DOWN"], "confirm": "RETURN"}
+             "move": ["UP", "DOWN"], "confirm": "A"}
 
 
 def menu_problems(spec: object) -> list[str]:
@@ -53,6 +55,8 @@ def menu_problems(spec: object) -> list[str]:
     out = []
     if not isinstance(spec.get("key"), str):
         out.append("menu.key: the key to hold is required, e.g. \"X\"")
+    elif spec["key"] not in CONTROLS:
+        out.append(f"menu.key: {spec['key']!r} is not a rig key ({', '.join(CONTROLS)})")
     for field in ("hold", "after"):
         value = spec.get(field, _DEFAULTS[field])
         if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
@@ -61,10 +65,11 @@ def menu_problems(spec: object) -> list[str]:
     if not isinstance(options, list) or not options or set(options) - set(OPTIONS):
         out.append(f"menu.options: expected a non-empty list from {list(OPTIONS)}, got {options!r}")
     move = spec.get("move", _DEFAULTS["move"])
-    if not (isinstance(move, list) and len(move) == 2 and all(isinstance(k, str) for k in move)):
-        out.append(f"menu.move: expected two key names [previous, next], got {move!r}")
-    if not isinstance(spec.get("confirm", _DEFAULTS["confirm"]), str):
-        out.append(f"menu.confirm: expected a key name, got {spec.get('confirm')!r}")
+    if not (isinstance(move, list) and len(move) == 2 and all(k in CONTROLS for k in move)):
+        out.append(f"menu.move: expected two rig keys [previous, next], got {move!r}")
+    if spec.get("confirm", _DEFAULTS["confirm"]) not in CONTROLS:
+        out.append(f"menu.confirm: expected a rig key ({', '.join(CONTROLS)}), "
+                   f"got {spec.get('confirm')!r}")
     unknown = set(spec) - {"key"} - set(_DEFAULTS)
     if unknown:
         out.append(f"menu: unknown fields {sorted(unknown)}")
@@ -82,13 +87,13 @@ class Menu:
     def __init__(self, spec: dict, block_start: float,
                  held: Callable[[], frozenset[str]] = held_key_names) -> None:
         cfg = {**_DEFAULTS, **spec}
-        self.key = cfg["key"].upper()
+        self.key = cfg["key"]
         self.hold = float(cfg["hold"])
         self.after = float(cfg["after"])
         self.available_from = block_start + self.after
         self.options = list(cfg["options"])
-        self.prev_key, self.next_key = (k.upper() for k in cfg["move"])
-        self.confirm_key = cfg["confirm"].upper()
+        self.prev_key, self.next_key = cfg["move"]
+        self.confirm_key = cfg["confirm"]
         self._held = held
         self._held_since: float | None = None
         self.pending = False        # the hold completed; the pop-up is due
@@ -138,7 +143,7 @@ class Menu:
                     continue
                 if event.key == pygame.K_ESCAPE:
                     return "quit"
-                name = key_name(event.key)
+                name = event_name(event)
                 if name is None:
                     continue
                 logger.log(type="input_event", run_time=run_time(), name=name,

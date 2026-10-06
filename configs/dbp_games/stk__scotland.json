@@ -20,17 +20,17 @@
         "   UP             accelerate",
         "   DOWN           brake / reverse",
         "   LEFT / RIGHT   steer",
-        "   SPACE          fire item",
-        "   V              skid",
-        "   N              nitro (boost)",
-        "   BACKSPACE      rescue",
+        "   X              fire item",
+        "   B              skid",
+        "   A              nitro (boost)",
+        "   Y              rescue",
         "",
         "(press SPACE to start)"
       ]
     },
     {"type": "fixation", "duration": 1.0},
     {
-      "type": "game", "backend": "stk", "game": "supertuxkart", "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "N": 4, "V": 5, "SPACE": 6, "BACKSPACE": 7},
+      "type": "game", "backend": "stk", "game": "supertuxkart", "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "A": 4, "B": 5, "X": 6, "Y": 7},
       "track": "scotland", "laps": 3, "num_karts": 4, "difficulty": 1,
       "screensize": "640x360", "frame_skip": 2, "seed": 1,
       "mode": "duration", "duration": 300.0, "fps": 60

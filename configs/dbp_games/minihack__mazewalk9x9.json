@@ -1,7 +1,7 @@
 {
   "_game": "MiniHack: MiniHack-MazeWalk-9x9-v0",
   "_note": "pip install minihack (needs setuptools<81).",
-  "_keys_note": "Discrete(8) compass action space: 0=N,1=E,2=S,3=W,4=NE,5=SE,6=SW,7=NW. Arrows map to the cardinals; NetHack's y/u/b/n map to the diagonals. turn_based:true is required -- noop is action 0 (=move N), so a real-time loop would auto-walk north. Keep the message Controls text in sync with 'keys' by hand.",
+  "_keys_note": "Discrete(8) compass action space: 0=N,1=E,2=S,3=W,4=NE,5=SE,6=SW,7=NW. Arrows map to the cardinals; Y/A/B/X to the diagonals NW/NE/SW/SE. turn_based:true is required -- noop is action 0 (=move N), so a real-time loop would auto-walk north. Keep the message Controls text in sync with 'keys' by hand.",
   "_keys_reference": "https://github.com/facebookresearch/minihack",
   "_curriculum_note": "Blocking: the block is this task played until completed (mode 'episode', n_episodes 1, advancing_outcomes ['won']); a death or the env's own step limit restarts the same level, and max_duration 300 s is the cap. ESC is the experimenter's way out.",
   "curriculum": [
@@ -16,8 +16,8 @@
         "",
         "Controls:",
         "   ARROWS       move  N / S / W / E",
-        "   Y / U        move diagonally  NW / NE",
-        "   B / N        move diagonally  SW / SE",
+        "   Y / A        move diagonally  NW / NE",
+        "   B / X        move diagonally  SW / SE",
         "",
         "(press SPACE to start)"
       ]
@@ -25,7 +25,7 @@
     {"type": "fixation", "duration": 1.0},
     {
       "type": "game", "backend": "minihack", "game": "MiniHack-MazeWalk-9x9-v0",
-      "keys": {"UP": 0, "DOWN": 2, "LEFT": 3, "RIGHT": 1, "Y": 7, "U": 4, "B": 6, "N": 5},
+      "keys": {"UP": 0, "DOWN": 2, "LEFT": 3, "RIGHT": 1, "Y": 7, "A": 4, "B": 6, "X": 5},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 300.0, "fps": 15, "turn_based": true
     },
     {"type": "fixation", "duration": 2.0}
