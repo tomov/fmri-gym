@@ -521,12 +521,13 @@ class Run:
 
         ## Reset environment and show initial state
         observation, info = adapter.reset(seed)
-        self.logger.log(type="episode_start", episode_id=episode_id, seed=seed)
         self.display.call_on_flip(self.triggers.episode_start)
         # Paced from the flip, so a slow reset does not become a burst of
         # catch-up frames. The reset frame's sound is not played: it is not a
         # step's, and it would start the episode's sound off its flips.
         flip_t0, _, _ = self._show(adapter, False, score, block_end)
+        self.logger.log(type="episode_start", episode_id=episode_id, seed=seed,
+                         flip_time=self.clock.from_perf(flip_t0))
         next_t = flip_t0 + dt
 
         ## Loop over frames within episode
