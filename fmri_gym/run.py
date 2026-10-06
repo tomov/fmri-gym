@@ -32,7 +32,7 @@ from .adapters import get_adapter
 from .audio import Audio
 from .config import fold_cli_options
 from .display import Display, check_monitor
-from .keys import held_key_names, key_name
+from .keys import get_events, held_key_names, key_name
 from .menu import Menu
 from .logging import Logger
 from .triggers import Triggers
@@ -91,8 +91,7 @@ def _check_quit() -> bool:
 
     :return: ``True`` if the window was closed or ESC was pressed.
     """
-    pad.pump()          # a pad press arrives as the key it stands for
-    for event in pygame.event.get():
+    for event in get_events():
         if event.type == pygame.QUIT:
             return True
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -142,8 +141,7 @@ def _poll_keys_until(
     while True:
         if menu is not None and menu.armed():
             return None, False
-        pad.pump()          # a pad press arrives as the key it stands for
-        for event in pygame.event.get():
+        for event in get_events():
             if event.type == pygame.QUIT:
                 return None, True
             if event.type not in (pygame.KEYDOWN, pygame.KEYUP):
@@ -185,8 +183,7 @@ def _wait_for_char(display: Display, char: str, dummy_trigger: bool = False) -> 
         time.sleep(0.05)
         return
     while True:
-        pad.pump()          # a pad press arrives as the key it stands for
-        for event in pygame.event.get():
+        for event in get_events():
             if event.type == pygame.QUIT:
                 raise KeyboardInterrupt
             if event.type == pygame.KEYDOWN:
@@ -442,8 +439,7 @@ class Run:
                 self.display.draw_text(
                     f"{q}\n\nDisagree      Agree\n{scale}\n\n"
                     "(LEFT/RIGHT to rate, ENTER to confirm)")
-                pad.pump()          # a pad press arrives as the key it stands for
-                for event in pygame.event.get():
+                for event in get_events():
                     if event.type == pygame.QUIT:
                         raise KeyboardInterrupt
                     if event.type == pygame.KEYDOWN:

@@ -6,8 +6,8 @@ keystrokes. Nothing a phase's ``keys`` names is ever pressed there, so the game
 does not move and the run records no responses, with nothing on screen to say
 why. This module presses the key each control stands for, so the run sees a
 keyboard either way and a curriculum's ``keys`` stay the one place input is
-mapped. :func:`pump` moves the events across and must run before each
-``pygame.event.get()`` that wants to see them.
+mapped. :func:`pump` moves the events across; it registers with
+:func:`fmri_gym.keys.get_events`, which runs it before every read of the queue.
 
 The map is fixed on purpose -- every site with this controller expects the same
 keys, so one curriculum plays at all of them. What is *not* fixed is the stick,
@@ -35,7 +35,7 @@ from pathlib import Path
 
 import pygame
 
-from .keys import KEYCODE_BY_NAME, register_held_source
+from .keys import KEYCODE_BY_NAME, register_event_source, register_held_source
 
 #: Which key each control presses. SDL numbers buttons from 0, one less than
 #: the HID report does: on the Current Designs pad that is y=0, b=1, x=2, LT=3,
@@ -123,6 +123,7 @@ def init(enabled: bool = True) -> str:
     _enabled = True
     _load_calibration()
     register_held_source(held)
+    register_event_source(pump)
     if not _open():
         _status = "no controller plugged in; the keyboard answers"
         return _status
@@ -350,7 +351,7 @@ def _resolve() -> None:
 
 
 def pump() -> None:
-    """Move the pad's events into the keyboard ones, before a ``pygame.event.get()``.
+    """Move the pad's events into the keyboard ones (run by ``keys.get_events``).
 
     Takes only the joystick events off the queue, so whatever else is waiting
     there is still the caller's to read.

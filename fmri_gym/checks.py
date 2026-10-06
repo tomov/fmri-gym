@@ -78,7 +78,7 @@ from gymnasium import spaces
 
 from . import pad
 from .display import Display, is_locked
-from .keys import _PYGAME_KEY_NAMES, key_name
+from .keys import _PYGAME_KEY_NAMES, get_events, key_name
 from .photodiode import (CORNERS, AudioRecorder, _clicker, _light_verdict, _log_clicks,
                          _readout, _sound_verdict, run_flashes)
 from .run import _wait_for_duration
@@ -498,8 +498,7 @@ def _key_events(ignore: str | None) -> list[tuple[bool, str]]:
     :raises _Skipped: on ESC or window close.
     """
     out = []
-    pad.pump()          # so the controls check tests the pad a session will play on
-    for e in pygame.event.get((pygame.QUIT, pygame.KEYDOWN, pygame.KEYUP)):
+    for e in get_events(pygame.QUIT, pygame.KEYDOWN, pygame.KEYUP):
         if e.type == pygame.QUIT or (e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE):
             raise _Skipped
         if ignore and getattr(e, "unicode", None) == ignore:

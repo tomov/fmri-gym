@@ -30,8 +30,7 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from . import pad
-from .keys import held_key_names, key_name
+from .keys import get_events, held_key_names, key_name
 
 if TYPE_CHECKING:
     from .display import Display
@@ -132,8 +131,7 @@ class Menu:
         choice = 0
         while True:
             self._draw(display, choice)
-            pad.pump()          # a pad press arrives as the key it stands for
-            for event in pygame.event.get():
+            for event in get_events():
                 if event.type == pygame.QUIT:
                     return "quit"
                 if event.type not in (pygame.KEYDOWN, pygame.KEYUP):

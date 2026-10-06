@@ -6,7 +6,9 @@ agrees, and so a config can be checked against it before the window opens.
 
 A key need not come from a keyboard: :mod:`fmri_gym.pad` registers a gamepad's
 buttons here, so a site whose response device is a controller presses the same
-NAMES as one whose device types.
+NAMES as one whose device types. It also feeds events in: read the queue with
+:func:`get_events`, never ``pygame.event.get()``, and a pad press arrives as
+the key it stands for.
 """
 
 from __future__ import annotations
@@ -132,6 +134,37 @@ def register_held_source(source: Callable[[], frozenset[str]]) -> None:
     :param source: called each frame; returns the NAMES it is holding down.
     """
     _held_sources.append(source)
+
+
+#: Devices whose input reaches the event queue only once something moves it
+#: there (:mod:`fmri_gym.pad` registers its ``pump``). :func:`get_events` runs
+#: them first, so no loop has to remember to.
+_event_sources: list[Callable[[], None]] = []
+
+
+def register_event_source(source: Callable[[], None]) -> None:
+    """Add a device that posts its input to the event queue when called.
+
+    :param source: called before every :func:`get_events`; posts the keypresses
+        it has waiting.
+    """
+    if source not in _event_sources:
+        _event_sources.append(source)
+
+
+def get_events(*types: int) -> list[pygame.event.Event]:
+    """Take events off the queue, the registered devices' included.
+
+    Use this, not ``pygame.event.get()``, so a pad press is on the queue before
+    it is read. Returns a list, not a generator: the devices must be pumped now,
+    not at the caller's first iteration.
+
+    :param types: only take these event types (all of them when none given).
+    :return: the events, in order.
+    """
+    for source in _event_sources:
+        source()
+    return pygame.event.get(types) if types else pygame.event.get()
 
 
 def held_key_names() -> frozenset[str]:
