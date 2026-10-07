@@ -49,8 +49,10 @@ The ``tasks`` flag belongs to the table and is read from
 :mod:`crafter_gym.tasks`, which is a wrapper of its own because what the player
 is asked to do is not one of the rules: a level's rules say what the world
 does, and the chain says which of the things it affords to name next.
-``stat_tasks`` is the part of that chain which waits on a live homeostat, so
-nothing reads it while L1 is the level being piloted.
+``stat_tasks`` is the part of that chain which waits on a live homeostat, and is
+read from the same place (:func:`crafter_gym.tasks.chain_for`): it is a row of
+this table because whether the homeostat runs is a rule, and what is asked for
+when it runs low is not.
 """
 
 from __future__ import annotations

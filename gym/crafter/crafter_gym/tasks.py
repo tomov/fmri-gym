@@ -52,8 +52,10 @@ What the chain scores
 The chain is the whole of the score: :attr:`TaskWrapper.completed` against
 :attr:`TaskWrapper.base_chain` is the fraction above the frame, and a ``+1``
 sounds when and only when that numerator moves. Crafter's own 22 achievement
-counters are untouched and still logged every frame, but the ten of them the
-chain never names (eleven on L1) stop being a point the subject is paid.
+counters are untouched and still logged every frame, but the ones the chain
+never names stop being a point the subject is paid: ten of the 22 on a level
+that asks for :data:`TASK_CHAIN` alone, eleven on L1, and seven on a level
+whose interrupts name three more (below).
 
 That is a rule about which achievements mean anything on the level being
 played (Fan, 2026-10-06). Crafter awards an unlock for the act and never for its
@@ -64,10 +66,11 @@ inventory cell that ``update`` clamps straight back to full
 (``objects.py:127``). On L1, where :class:`~crafter_gym.levels._FrozenLifeStats`
 pins all four stats and :class:`~crafter_gym.levels._HiddenItems` hides them,
 that is a point for an act with no consequence the subject can even see. Four
-achievements hang on a live homeostat this way -- ``collect_drink``,
-``eat_cow``, ``wake_up`` and ``eat_plant`` -- and only ``eat_plant`` is a chain
-entry, so the first three need nothing but the rule above and the fourth is
-what :func:`chain_for` is for.
+achievements hang on a live homeostat this way: ``collect_drink``, ``eat_cow``,
+``wake_up`` and ``eat_plant``. None of the four is in the chain of a level that
+freezes the stats, so none of them is paid there, and all four are in the chain
+of a level whose stats run, the first three as the interrupts below. Deciding
+that per level is :func:`chain_for`'s whole job.
 
 ``build_stone_shelter`` is the chain's one entry crafter has no achievement
 for, so nothing in a block's log accounts for it on its own:
@@ -77,14 +80,60 @@ the chain to the achievement columns. It needs no correction to the
 denominator any more, because the denominator is the chain and the entry is in
 it.
 
+The low-stat interrupts
+-----------------------
+
+The base chain is playable thirsty, so on its own it lets a subject ignore the
+homeostat that L2 exists to ask about. A level that says so in its row
+(``stat_tasks``) therefore carries three entries more, one per stat
+(:data:`STAT_TASKS`), and each becomes askable the first time that stat is seen
+at or below :data:`STAT_TASK_LOW` in an episode. Until then the pointer steps
+over it, and on the step it arms it is moved up the episode's own order to just
+ahead of the chain the subject was working through, which is what makes it an
+interrupt rather than a thirteenth task. Closing it hands the pointer straight
+back to the entry it cut in front of.
+
+Fan settled three things about them (2026-10-07), and the derived pointer gives
+all three out of the order :attr:`TaskWrapper.chain` already keeps for skips,
+plus one per-episode set of the entries that have armed:
+
+- **Eight of nine, not the rig's six.** Awake, a stat loses a point every 21
+  (drink), 26 (food) or 31 (energy) ticks (``objects.py:_update_life_stats``),
+  so from a full start a threshold of 8 puts the three crossings at ticks 21,
+  26 and 31 against 63, 78 and 93 for the rig's 6. In a turn-based block a tick
+  is a press, so this is the difference between an errand that arrives while
+  the subject is still on the early chain and one that arrives a third of the
+  way through the block, and at 8 the stat is one point down rather than
+  two ticks from the crisis the rig's comment was worried about.
+- **Drink, then eat, then sleep, one at a time.** An interrupt is asked for
+  behind one already being asked for, never over the top of it, so the next
+  appears when the one before it is finished or put off; and the ones waiting
+  are in that fixed order whatever order their stats ran low in
+  (:data:`_STAT_ORDER`), which can differ from it in a world a block resumed
+  with more than one stat already down. Both are where the entry is inserted
+  (:meth:`TaskWrapper._arm`), where the rig needed a queue walk for the first of
+  them.
+- **One reminder per stat per episode.** Arming is a one-way latch, so a stat
+  that recovers and runs low a second time asks nothing and one hovering at the
+  threshold cannot ask twice, and an entry closed before its stat ever ran low
+  is simply never asked for: a subject who drank in the first twenty presses is
+  paid for it like any other entry of the chain and then left alone. Putting one
+  off is the subject's own doing and is a skip like any other, back once the
+  rest of the chain is done.
+
+Nothing new is logged for them. The crossing is in the inventory columns every
+frame already carries, the entries are in the chain the block writes, and the
+score is the chain's as it is for everything else: what changes on a
+``stat_tasks`` level is that the denominator is 15 rather than 12.
+
 What is not here
 ----------------
 
-The homeostat interrupts (``core.py:STAT_TASKS``): on the levels that have a
-homeostat, a stat falling low inserts a drink/eat/sleep task at the pointer, so
-that the level's own subject matter cannot be ignored. They are the part of the
-chain that depends on the stats being live, which is L2's question and not
-L1's, and ``LEVELS`` carries the ``stat_tasks`` flag they will read.
+Nothing of the rig's task system now, but two things about it are deliberately
+not the rig's: :data:`STAT_TASK_LOW` is 8 and not 6, and an interrupt is a
+chain entry from the first frame rather than a row spliced into the chain when
+it fires, so the fraction above the frame does not grow a denominator
+mid-block.
 """
 
 from __future__ import annotations
@@ -98,9 +147,9 @@ from .env import import_crafter
 from .levels import require_level
 from .menu import menu_of
 
-__all__ = ["SKIP_ENTRY", "TASK_CHAIN", "TASK_DONE_TEXT", "TASK_GOALS", "TASK_LABELS",
-           "TASK_PREDICATES", "TaskWrapper", "chain_for", "has_tasks",
-           "next_task_text", "task_text", "tracker_of", "with_tasks"]
+__all__ = ["SKIP_ENTRY", "STAT_TASKS", "STAT_TASK_LOW", "TASK_CHAIN", "TASK_DONE_TEXT",
+           "TASK_GOALS", "TASK_LABELS", "TASK_PREDICATES", "TaskWrapper", "chain_for",
+           "has_tasks", "next_task_text", "task_text", "tracker_of", "with_tasks"]
 
 #: The order the tasks are named in, and the whole of what a task level asks
 #: for before :func:`chain_for` drops what the level's own rules make empty. It
@@ -131,15 +180,48 @@ TASK_CHAIN = (
     "eat_plant",
 )
 
-#: Chain entries whose completion is only worth a point while the homeostat
-#: runs: each is scored for putting food, drink or energy back, and a level
-#: that freezes the four life stats pays it for nothing. Only ``eat_plant`` is
-#: one; the other three achievements of that kind (``collect_drink``,
-#: ``eat_cow``, ``wake_up``) are not in :data:`TASK_CHAIN` at all and are now
-#: unpaid on every level, which is the whole of the ``+1``-follows-the-chain
-#: rule. Keyed off the level's own ``frozen_stats`` rule rather than off its
-#: name, so a later level that freezes the stats inherits this for free.
+#: Entries of :data:`TASK_CHAIN` whose completion is only worth a point while
+#: the homeostat runs: each is scored for putting food, drink or energy back,
+#: and a level that freezes the four life stats pays it for nothing. Only
+#: ``eat_plant`` is one. The other three achievements of that kind are the
+#: interrupts (:data:`STAT_TASKS`), which such a level does not carry at all.
+#: Keyed off the level's own ``frozen_stats`` rule rather than off its name, so
+#: a later level that freezes the stats inherits this for free.
 _FROZEN_STAT_ENTRIES = ("eat_plant",)
+
+#: The low-stat interrupts a ``stat_tasks`` level adds to its chain: the stat
+#: to watch, and the entry to ask for when it falls. In the order they are
+#: asked for, which is this order and not the order the stats happen to cross
+#: (Fan, 2026-10-07): drink, then eat, then sleep. Each entry is one of
+#: crafter's own achievements, so it closes and scores the way the rest of the
+#: chain does, and it is labelled by what to do rather than by the achievement
+#: that completes it (:data:`TASK_LABELS`).
+STAT_TASKS: tuple[tuple[str, str], ...] = (
+    ("drink", "collect_drink"),
+    ("food", "eat_cow"),
+    ("energy", "wake_up"),
+)
+
+#: The stat each interrupt entry watches, which is also the test for whether an
+#: entry is an interrupt at all: the pointer reaches these only once they are
+#: armed, where it walks the base entries in chain order.
+_STAT_OF: dict[str, str] = {entry: stat for stat, entry in STAT_TASKS}
+
+#: Where an interrupt goes in the queue of interrupts waiting to be asked for,
+#: which is :data:`STAT_TASKS`' own order and not the order the stats ran low in
+#: (Fan, 2026-10-07). It matters only in a world that was resumed with more than
+#: one stat already down: from a full start the stats cross in this order by
+#: themselves, 21 ticks for drink against 26 and 31.
+_STAT_ORDER: dict[str, int] = {entry: i for i, (_, entry) in enumerate(STAT_TASKS)}
+
+#: A stat at or below this, of a full 9, arms its interrupt. Eight and not the
+#: rig's six (Fan, 2026-10-07): awake, a stat loses a point every 21 (drink),
+#: 26 (food) or 31 (energy) ticks (``objects.py:_update_life_stats``), so from
+#: a full start 8 puts the three crossings 21, 26 and 31 presses into a
+#: turn-based block against 63, 78 and 93 at 6. A subject meets the homeostat
+#: while they are still on the early chain, and meets it one point down rather
+#: than near the crisis the rig's threshold was chosen to keep clear of.
+STAT_TASK_LOW = 8
 
 #: Entries that need more than one achievement: id -> the achievements that
 #: must ALL unlock to close it. An id that is not in here is itself the single
@@ -381,10 +463,12 @@ class TaskWrapper(gym.Wrapper):
     def __init__(self, env: gym.Env, chain: tuple[str, ...] = TASK_CHAIN) -> None:
         super().__init__(env)
         self.base_chain = tuple(chain)
-        #: This episode's own order; a skip moves an entry to the back of it.
+        #: This episode's own order: a skip moves an entry to the back of it, a
+        #: stat going low moves its interrupt up to the front of what is left.
         self.chain: list[str] = list(self.base_chain)
         self._unlocked: set[str] = set()
         self._passed: set[str] = set()
+        self._armed: set[str] = set()
         menu = menu_of(env)
         if menu is not None:
             menu.set_extra((SKIP_ENTRY,))
@@ -400,15 +484,32 @@ class TaskWrapper(gym.Wrapper):
 
     @property
     def task(self) -> str | None:
-        """The task in effect: the first entry of :attr:`chain` still open.
+        """The first entry of this episode's order that is open and askable.
 
-        ``None`` once every entry is closed, which is the chain finished and
-        the rest of the episode free play.
+        Still derived and never stored, and still one walk of :attr:`chain`,
+        which is where the order lives: a skip moved an entry to the back of it
+        and a crossing moved an interrupt to the front of what was left
+        (:meth:`_arm`). The one thing an entry can be besides open or closed is
+        unreachable: an interrupt whose stat has not gone low this episode is
+        not askable, so the pointer steps over it and a chain of nothing but
+        those reads as finished.
+
+        ``None`` once every askable entry is closed, which is the chain finished
+        and the rest of the episode free play.
         """
         for entry in self.chain:
-            if self._entry_open(entry):
+            if (entry not in _STAT_OF or entry in self._armed) and self._entry_open(entry):
                 return entry
         return None
+
+    @property
+    def armed(self) -> frozenset[str]:
+        """The interrupts whose stat has gone low this episode, so are askable.
+
+        Membership only: which of them is asked for first is :attr:`chain`'s to
+        say, the way it is for every other entry.
+        """
+        return frozenset(self._armed)
 
     @property
     def passed(self) -> frozenset[str]:
@@ -463,14 +564,22 @@ class TaskWrapper(gym.Wrapper):
         self.chain = list(self.base_chain)
         self._unlocked = set()
         self._passed = set()
+        # A new world starts the homeostat full (``data.yaml``: food, drink and
+        # energy all `initial: 9`), so nothing is armed yet and the first
+        # crossing is the first thing `_arm_stats` can see.
+        self._armed = set()
         return obs, self._with_tasks(info, self.task)
 
     def step(self, action: Any) -> tuple[Any, float, bool, bool, dict]:
         """Apply the press, then see what it did to the chain.
 
         In cause order: the task in effect can complete, by an unlock or by its
-        world test, and only then can a skip requeue it, so a press that
-        completes a task is never read as a request to put it off. A death
+        world test; a stat that has just run low can cut an interrupt in ahead
+        of it; and only then can a skip requeue it, and only if neither of those
+        moved the pointer. So a press that completes the task, or is answered
+        with an errand, is never also read as a request to put the task off:
+        it is off the screen either way, and an errand hands it straight back
+        to be put off on a later press if the subject still wants to. A death
         outranks all of it: the episode is over, and what the player needs told
         is that rather than which task they were on.
 
@@ -485,6 +594,10 @@ class TaskWrapper(gym.Wrapper):
         self._unlocked = self._unlocked_in(info)
         if terminated:
             return obs, reward, terminated, truncated, self._with_tasks(info, task)
+        # After the unlocks and before the pointer is read again: a stat that
+        # just went low can take the pointer on this very step, and what the
+        # press was made under is `task`, read above.
+        self._arm_stats(info)
         passed = self._pass_predicate(task)
         # A completion is this entry closing, which is the one thing the banner
         # claims and the one thing that moves the count. An unlock the chain
@@ -498,6 +611,75 @@ class TaskWrapper(gym.Wrapper):
         return obs, reward, terminated, truncated, self._with_tasks(
             info, task, passed=passed, done=done, moved=moved_to != task,
             skipped=skipped)
+
+    def _arm_stats(self, info: dict) -> None:
+        """Arm the interrupt of every stat seen at or below :data:`STAT_TASK_LOW`.
+
+        A one-way latch, which is the whole of "one reminder per stat per
+        episode": arming happens on the step an interrupt goes from unarmed to
+        armed and never again, so a stat that recovers and dips a second time
+        asks nothing, and one hovering at the threshold cannot ask twice.
+        Reading the stat as it stands rather than watching for the step it
+        crossed on is the same thing for a stat that only decays, and it is the
+        right thing for a world restored mid-episode, where the crossing
+        happened in a block that is already over.
+
+        Only the entries this level carries can arm, so a level with no
+        interrupts in its chain never grows one, and a stat crafter does not
+        report is read as full rather than as low. Which of several goes first
+        is :meth:`_arm`'s to say and not this walk's.
+
+        :param info: an ``info`` dict from the env below.
+        """
+        inventory = info.get("inventory")
+        if inventory is None:
+            return
+        for stat, entry in STAT_TASKS:
+            if (entry in self.chain and entry not in self._armed
+                    and inventory.get(stat, 9) <= STAT_TASK_LOW):
+                self._arm(entry)
+
+    def _arm(self, entry: str) -> None:
+        """Make one interrupt askable, and move it up to where it interrupts.
+
+        Both halves of Fan's second rule (2026-10-07) are this one move. The
+        entry being asked for right now is read first and left exactly where it
+        is, so nothing is ever replaced on screen before it is finished or put
+        off. Everything else waiting goes just ahead of the first base entry
+        still open, in :data:`_STAT_ORDER`, so the queue is drink then food then
+        sleep however the stats themselves ran low. With the base chain finished
+        there is nothing to interrupt and the queue goes on the end.
+
+        An interrupt the subject put off is not in that queue: a skip left it
+        behind the open chain, which is where "back once the rest is done" lives,
+        and only a position before the first open base entry counts as waiting.
+        One whose entry closed before its stat ever ran low moves nothing at all,
+        since there is nothing left to ask for.
+
+        :param entry: an entry of :data:`STAT_TASKS`, not yet armed.
+        """
+        held = self.task
+        self._armed.add(entry)
+        if not self._entry_open(entry):
+            return
+        waiting = [e for e in self.chain[:self._first_base_open()]
+                   if e in self._armed and e != held and self._entry_open(e)]
+        if entry not in waiting:
+            waiting.append(entry)
+        waiting.sort(key=_STAT_ORDER.__getitem__)
+        for queued in waiting:
+            self.chain.remove(queued)
+        at = self._first_base_open()
+        self.chain[at:at] = waiting
+
+    def _first_base_open(self) -> int:
+        """Where the chain the subject was working through starts.
+
+        :return: the index in :attr:`chain` of the first entry that is open and
+            is not an interrupt, or the length of the chain if there is none.
+        """
+        return next((i for i, e in enumerate(self.chain)
+                     if e not in _STAT_OF and self._entry_open(e)), len(self.chain))
 
     def _pass_predicate(self, task: str | None) -> str:
         """Test a predicate entry that is the pointer, and close it if it passes.
@@ -515,9 +697,10 @@ class TaskWrapper(gym.Wrapper):
     def _requeue(self, task: str) -> str | None:
         """Put a task off: move it to the back of this episode's chain.
 
-        The entries it moves past are closed ones, so the chain's order is the
-        only thing this changes; whether it changes the pointer is the caller's
-        question, and it does not when the task put off is the last one open.
+        The entries it moves past are the ones the pointer had already stepped
+        over, closed or not yet armed, so the chain's order is the only thing
+        this changes; whether it changes the pointer is the caller's question,
+        and it does not when the task put off is the last one askable.
 
         :param task: the task in effect.
         :return: the pointer after the move, which is ``task`` itself if
@@ -565,17 +748,29 @@ def chain_for(level: str | None) -> tuple[str, ...]:
     against a subject has to be asked for the same things, and the chain
     pickles into the savestate with the rest of the env.
 
+    Both of the rules it reads are about the homeostat, from the two ends of
+    it. A level that freezes the stats drops the entries that only mean
+    something while they run (:data:`_FROZEN_STAT_ENTRIES`), and a level that
+    says ``stat_tasks`` adds the three it can ask for when they run low
+    (:data:`STAT_TASKS`), which is why the two branches are exclusive in
+    practice as well as in code. The interrupts go on the end, where they are
+    out of the order the base chain is walked in and in the order they are
+    asked for.
+
     :param level: a key of :data:`~crafter_gym.levels.LEVELS`, or ``None``.
-    :return: the entries to ask for, in :data:`TASK_CHAIN`'s order. Empty on a
-        level that names no tasks, which is what :func:`with_tasks` reads as
-        "do not wrap".
+    :return: the entries to ask for, in :data:`TASK_CHAIN`'s order, the
+        interrupts after it. Empty on a level that names no tasks, which is what
+        :func:`with_tasks` reads as "do not wrap".
     :raises ValueError: if ``level`` is not one of the levels.
     """
     if not has_tasks(level):
         return ()
-    if not require_level(level).get("frozen_stats"):
-        return TASK_CHAIN
-    return tuple(e for e in TASK_CHAIN if e not in _FROZEN_STAT_ENTRIES)
+    config = require_level(level)
+    if config.get("frozen_stats"):
+        return tuple(e for e in TASK_CHAIN if e not in _FROZEN_STAT_ENTRIES)
+    if config.get("stat_tasks"):
+        return TASK_CHAIN + tuple(entry for _, entry in STAT_TASKS)
+    return TASK_CHAIN
 
 
 def has_tasks(level: str | None) -> bool:
