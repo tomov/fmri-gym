@@ -1,0 +1,39 @@
+{
+  "_game": "ViZDoom: Freedoom Phase 1, E2M6 'Hidden Sector' (full Doom-style map; COOM engine) -- skill 2",
+  "_note": "pip install vizdoom. Freedoom (https://freedoom.github.io/) is a free replacement for Doom's game data; its WADs ship inside the vizdoom package, which registers every map as VizdoomFreedoom1E<e>M<m>-S<skill>-v0 (and VizdoomFreedoom2MAP<nn>-S<skill>-v0 for Phase 2; VizdoomDoom* for the original WADs, which are not free), so any of them runs with this config by changing 'game'. The map ends when the player reaches the exit, with reward 1; the scenario's own episode_timeout is 60 minutes. freedoom1.cfg turns the automap buffer on, which puts a second panel next to the screen in render() and logs it every frame, so env_kwargs.automap_buffer_enabled turns it off.",
+  "_keys_note": "The env's action is MultiBinary over the scenario's buttons (env_kwargs.max_buttons_pressed 0), so 'keys' values are button indices in the scenario's available_buttons order -- freedoom1.cfg: 0=ATTACK, 1=SPEED, 2=STRAFE, 3=USE, 4=MOVE_RIGHT, 5=MOVE_LEFT, 6=MOVE_BACKWARD, 7=MOVE_FORWARD, 8=TURN_RIGHT, 9=TURN_LEFT, 10=SELECT_WEAPON1, 11=SELECT_WEAPON2, 12=SELECT_WEAPON3, 13=SELECT_WEAPON4, 14=SELECT_WEAPON5, 15=SELECT_WEAPON6, 16=SELECT_WEAPON7, 17=SELECT_NEXT_WEAPON, 18=SELECT_PREV_WEAPON. Held keys combine (turn while shooting). The controls the subject sees are a plain 'message' phase; keep its text in sync with 'keys' by hand.",
+  "_keys_reference": "https://github.com/Farama-Foundation/ViZDoom/blob/main/scenarios/freedoom1.cfg",
+  "_audio_note": "env_kwargs.audio_buffer_enabled turns Doom's sound on: it arrives in obs['audio'], is played through the session's speakers, and is logged per frame. Doom makes 1/35 s of sound per step, so fps * env_kwargs.frame_skip must be 35: the session stops the block otherwise, because sound could not follow the frames.",
+  "curriculum": [
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Freedoom: Hidden Sector",
+        "",
+        "Find your way to the exit of the level. Doors and",
+        "switches open when you press E in front of them.",
+        "Watch out for monsters.",
+        "",
+        "Controls:",
+        "   UP / DOWN      move forward / back",
+        "   LEFT / RIGHT   turn left / right",
+        "   Z / X          move left / right",
+        "   SPACE          shoot",
+        "   E              open doors, press switches",
+        "   N / M          previous / next weapon",
+        "   S              run",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {"type": "fixation", "duration": 1.0},
+    {
+      "type": "game", "backend": "vizdoom", "game": "VizdoomFreedoom1E2M6-S2-v0",
+      "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true, "automap_buffer_enabled": false},
+      "keys": {"UP": 7, "DOWN": 6, "LEFT": 9, "RIGHT": 8, "Z": 5, "X": 4, "SPACE": 0, "E": 3, "N": 18, "M": 17, "S": 1},
+      "mode": "duration", "duration": 300.0, "fps": 35
+    },
+    {"type": "fixation", "duration": 2.0}
+  ]
+}
