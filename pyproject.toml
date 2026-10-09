@@ -50,7 +50,7 @@ vizdoom = ["vizdoom"]
 # COOM scenarios as a gym env, from gym/coom (see tool.uv.sources). Needs the
 # external/coom checkout too; the COOM package itself is not installed.
 coom = ["coom-gym"]
-rushhour = ["rushhour-gym>=0.6.0"]
+rushhour = ["rushhour-gym>=0.7.0"]
 # SuperTuxKart, game included. The wheel is pure Python; it fetches the
 # game and a trimmed asset pack (254 MiB) from the matching GitHub release on
 # first use, into ~/.cache/supertuxkart-gym. Linux x86_64 only for now, and it

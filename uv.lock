@@ -657,7 +657,7 @@ requires-dist = [
     { name = "pyparallel", marker = "extra == 'triggers'" },
     { name = "pyserial", marker = "extra == 'triggers'" },
     { name = "pyside6-essentials", marker = "extra == 'gui'", specifier = ">=6.6" },
-    { name = "rushhour-gym", marker = "extra == 'rushhour'", specifier = ">=0.6.0" },
+    { name = "rushhour-gym", marker = "extra == 'rushhour'", specifier = ">=0.7.0" },
     { name = "setuptools", specifier = "<81" },
     { name = "shimmy", marker = "extra == 'shimmy'" },
     { name = "sounddevice" },
@@ -1632,7 +1632,7 @@ wheels = [
 
 [[package]]
 name = "rushhour-gym"
-version = "0.6.0"
+version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gymnasium" },
@@ -1640,9 +1640,9 @@ dependencies = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/55/ea/0bcf66061d3299df422bc48be9b41ff4de6cd9ea195c5ad669e50081f92d/rushhour_gym-0.6.0.tar.gz", hash = "sha256:bf8875aa515d73f6a71d9d32c16281392d4b84fbf4d79ba14de2caebb925c19a", size = 39813, upload-time = "2026-09-13T08:18:19.805Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ff/49/95c19f05cf0884a1ec677492b975cb7bfdba101c9e7f62cb3207064a96ff/rushhour_gym-0.7.0.tar.gz", hash = "sha256:377e4a1d33a0150459848b960bbf1ebbb7b2fa63d0fd29940bdfdfc9d962b00d", size = 40742, upload-time = "2026-10-09T09:17:29.288Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/16/a2/a57cfa58cbb3fc887b0b5a7ab590843b78471b6d58b912ef499101894f21/rushhour_gym-0.6.0-py3-none-any.whl", hash = "sha256:ea86e3c9471d1a70cbc3965fbf7275b2d6c3745b6f68bd050baf532f7a256d83", size = 33728, upload-time = "2026-09-13T08:18:18.602Z" },
+    { url = "https://files.pythonhosted.org/packages/30/a8/f0202ef91ca298dcaa4b65f63d9a6cec1c5bba07fff81aa351a2851c036f/rushhour_gym-0.7.0-py3-none-any.whl", hash = "sha256:bbcffc61f6374c5e5b18b21426bc5133f6060a620ba7f2089e85cd9e13d622ef", size = 34286, upload-time = "2026-10-09T09:17:27.949Z" },
 ]
 
 [[package]]

@@ -5,14 +5,17 @@ Slide cars out of a 6x6 grid to free the red car. The rules run in a Go engine
 fetches the engine binary of its matching release on first use.
 
 The env this adapter drives is ``RushHourHuman-v0``: the experiment program's
-own interface -- the eight meta-actions of its button scheme (choose a car,
+own interface -- the twelve meta-actions of its button scheme (choose a car,
 slide it), its picture (``rgb_array``: board, white outline and legal-slide
 arrows on the chosen car, status line) and the columns of its results file in
 ``info``. All of that lives in the package; this adapter is the ``info``
-fields to log. A phase's ``keys`` index the eight meta-actions: 0..3 choose the
-car up/down/left/right, 4/5 choose the previous/next car, 6/7 slide it back
-(left/up) / forward (right/down). ``rushhour_gym.human.DEFAULT_KEYS`` is the
-program's own keyboard layout, to copy from.
+fields to log. A phase's ``keys`` index the twelve meta-actions (rushhour-gym
+0.7.0 or later): 0..3 choose the car up/down/left/right, 4/5 choose the
+previous/next car, 6/7 slide it back (left/up) / forward (right/down) along its
+own axis, 8..11 slide it left/right/up/down -- only along its own axis; a
+direction across it moves nothing and is logged as ``event`` ``wrong_axis``.
+``rushhour_gym.human.DEFAULT_KEYS`` is the program's own keyboard layout, to
+copy from.
 
 One game block is one puzzle: the phase's ``puzzle`` (``"p07"``; the library
 is numbered easiest first) or ``puzzle_indices`` / ``min_moves_range`` picks
