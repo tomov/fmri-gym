@@ -1,0 +1,36 @@
+{
+  "_game": "ARC-AGI-3 tr87: a turn-based symbol-matching puzzle in several levels (arcprize.org)",
+  "_note": "uv sync --extra arc3 (arc3-gym, gym/arc3/, Python >= 3.12), then once with the network on: uv run python -m arc3_gym tr87 (puts the game's files in external/arc3; playing needs no network).",
+  "_keys_note": "tr87 offers ACTION1-4, so the indices are 0=ACTION1 (up), 1=ACTION2 (down), 2=ACTION3 (left), 3=ACTION4 (right). Other games index their own simple actions in ascending order (see fmri_gym/adapters/arc3.py). Keep the message Controls text in sync with 'keys' by hand.",
+  "_menu_note": "A level can be a dead end (the game can end before it is solved), so after 15 s of play holding X for 5 s pauses the game and offers Restart / Give up / Resume (UP/DOWN to choose, SPACE to select). See fmri_gym/menu.py.",
+  "_curriculum_note": "Blocking: the block is the whole game played until won (mode 'episode', n_episodes 1, advancing_outcomes ['won']); a GAME_OVER restarts it from level 1.",
+  "curriculum": [
+    {
+      "type": "message",
+      "align": "left",
+      "text": [
+        "Puzzle game",
+        "",
+        "Work out what the game wants, level by level.",
+        "Each move counts: the game can end before the puzzle is solved.",
+        "",
+        "Controls:",
+        "   UP/DOWN   change the symbol",
+        "   LEFT/RIGHT   move the highlight",
+        "   hold X   pause menu (restart / give up / resume)",
+        "",
+        "(press SPACE to start)"
+      ]
+    },
+    {"type": "fixation", "duration": 1.0},
+    {
+      "type": "game", "backend": "arc3", "game": "tr87",
+      "keys": {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3},
+      "menu": {"key": "X", "hold": 5.0, "after": 15.0,
+               "options": ["reset", "forfeit", "resume"],
+               "move": ["UP", "DOWN"], "confirm": "SPACE"},
+      "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 600.0, "fps": 15, "turn_based": true
+    },
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

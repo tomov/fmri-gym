@@ -28,3 +28,4 @@ gym/rush-hour-src/
 # Compiled extension modules and setuptools build dirs (gym/baba_auto builds pyBaba into its package)
 *.so
 build/
+external/arc3/
