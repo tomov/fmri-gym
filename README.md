@@ -108,7 +108,7 @@ Each is a minimal `message → fixation → game (300 s) → fixation` curriculu
 | `box2d__` | 3 | lunarlander, bipedalwalker, carracing (needs box2d-py) |
 | `mujoco__` | 10 | ant, halfcheetah, hopper, humanoid, … (`MUJOCO_GL=egl`) |
 | `text__` | 5 | frozenlake, frozenlake8x8, cliffwalking, taxi, blackjack (turn-based) |
-| `crafter__` | 1 | crafter |
+| `crafter__` | 4 | crafter_L1 … crafter_L4: the paradigm's four rule levels of the one game (see [The four levels](#the-four-levels-crafter)) |
 | `craftium__` | 1 | choptree (Luanti voxel; other ids: Room/Speleo/OpenWorld/…) |
 | `vizdoom__` | 10 | basic, deadly_corridor, defend_center, defend_line, health_gathering_supreme, my_way_home, predict_position, take_cover, deathmatch (Doom; COOM's engine; other `Vizdoom*-v1` scenarios work too), plus `take_cover_defend_line` running two of them back to back in one session |
 | `coom__` | 9 | pitfall, chainsaw, hide_and_seek, health_gathering, arms_dealer, parkour, raise_the_roof, run_and_gun, floor_is_lava (needs the COOM repo checkout) |
@@ -278,6 +278,23 @@ No checkout and no build: the wheel is pure Python and fetches the game with a t
 
 The binary can be overridden with `STK_ENV_BIN`, and `STK_ENV_OFFLINE=1` forbids the download outright. It needs a real OpenGL display (the frame is the game's rendering). `fps` must equal the game's physics rate over `frame_skip` (120 / 2 = 60 in the config); the config's `_note`s list the keys, the phase fields and the logged columns, and the package's own README on [PyPI](https://pypi.org/project/supertuxkart-gym/) ("Frames", "Reproducibility") the details and measured cost.
 
+## The four levels (`crafter`)
+
+The crafter paradigm does not play one game, it plays four, and they differ by rules rather than by worlds. The table is the rig's own ([`crafter-for-brain-scan`](https://github.com/chengfanbrain/crafter-for-brain-scan) v0.33, `core.py:LEVELS`), ported field for field into `crafter_gym.levels.LEVELS` and imposed by a `gymnasium.Wrapper`:
+
+| config | `env_kwargs.level` | what it is |
+| --- | --- | --- |
+| `crafter__crafter_L1.json` | `L1_affordance` | nothing hostile, the four life stats frozen at 9 and hidden from the panel, no homeostatic death: what is left is what the world affords. Lava still kills. |
+| `crafter__crafter_L2.json` | `L2_homeostasis` | the homeostat back on and visible, still nothing hostile. |
+| `crafter__crafter_L3.json` | `L3_predation` | zombies and skeletons too. |
+| `crafter__crafter_L4.json` | `L4_survival` | stock crafter. |
+
+Every other field of the four game phases is identical — the same eight buttons, `turn_based`, 300 s, size 384, `state_stride` 25 — so only the rules change, and each config's `_level_note` says which rules those are. Two of them are shared by all four and are not in the rig's table: health cannot regenerate from 0 (stock crafter can add a point on the tick a death set it there, which makes an episode's end unreliable), and the view is tinted red while the player is dead, which is the engine's own commented-out tint and the one death signal that survives a hidden health icon. ⚠️ So `L4_survival` is not quite the stock game, and a `crafter_L4` slot file written before 2026-10-01 has no level in its header: it will report one field of drift on the next block, and should be deleted.
+
+A level is part of the game rather than of the session, so it lives in the env and not in the adapter or the rig: a model compared against a subject has to meet the same rules, and a savestate has to carry them. Since the crafter savestate is a pickle of the whole env chain, the rules pickle with it — they are instances of module-level classes, not closures over the live player — and a restored world plays on under its own rules, which is exactly what `resume` needs (below). `level` rides inside `env_kwargs`, so it is in the slot file's header too, and a block that points at another level's world is warned by name before it plays. The four levels are all `CrafterMenu-v0`, so **each names its own `resume` slot**; one shared name would hand L4's world to an L1 block.
+
+`docs/levels_check.py` measures all of this against the engine's own state and pixels — the rig's table, each rule and its negative control, the pickle round trip, and the cross-level warning. Not yet ported: the rig's task chain (`TASK: collect wood …`), its low-stat interrupts (`core.py:STAT_TASKS`) and the `skip task` menu entry, which are cue text, a HUD row and an extra action rather than game rules; `LEVELS` carries the `tasks` and `stat_tasks` flags and nothing reads them. Until then an L3 block and an L4 block differ in their `resume` slot and in nothing a subject can see.
+
 ## Design: the experiment loop never knows the engine
 
 A game reaches the scanner through up to three layers, each its own directory:
@@ -437,10 +454,13 @@ They assume `sub-01` and a 1024x768 window, and take the subject's next free ses
  "state": "Level1",             // retro: named savestate/level (optional)
  "scenario": null,              // retro: scenario name (optional)
  "level": 0,                    // vgdl: level index; also uses "game","block_size"
+                                //   (crafter's rule level is env_kwargs.level, not this)
  "keys": {"": 0, "LEFT": 0, "RIGHT": 1}, // REQUIRED: key -> env action, the whole map;
                                 //   "" is the action sent with no key held (see below)
  "save_pixels": false,          // also store lossless pixels, where the backend can
  "show_score": false}           // crafter: draw the achievement count beside the frame
+                                //   (out of what the level can reach: 20, not 22, with
+                                //   nothing hostile in it to defeat)
 ```
 
 ### Keys (the `keys` field)
@@ -628,7 +648,7 @@ adapter, plan = reconstruct_episode(block, episode_id=0)
 
 > ⚠️ **Storage note & `state_stride`.** Per-frame savestates are cheap for ALE (~0.4 KB/frame) but large for retro consoles: a Genesis state is ~1 MB/frame. Set **`"state_stride": K`** on a game phase to snapshot a full savestate only every K frames (always including each episode's first frame, the replay anchor); frames between anchors stay reconstructable by restoring the last anchor and replaying the logged actions (retro/ALE/VGDL are deterministic). Analysis variables (RAM, `info_*`) are always logged every frame regardless of stride. The rendered frames have their own **`"frame_stride"`**; ⚠️ **`"save_pixels": true`** (ale) additionally logs the indexed screen as a variable (`palette[screen_index] == RGB`), which `frames.h5` makes unnecessary. Prints a loud warning when enabled.
 
-> ⚠️ **Crafter replays only on a fork.** Every tenth step stock crafter rebalances creatures per chunk by iterating a Python *set* of objects, so which animal is despawned follows object `id()` and two runs of the same seed and the same action list diverge: terrain is identical, creatures are not. Measured 2026-09-28 on stock 1.8.3, replaying one episode's 225 actions in a second process that differed only in `PYTHONHASHSEED`: the two left each other at step 30, and the episode ended a step apart. Ordering that list by position is the whole fix, and it lives in [`chengfanbrain/crafter@deterministic`](https://github.com/chengfanbrain/crafter/tree/deterministic), which `gym/crafter/pyproject.toml` pins as a direct reference resolved to a commit in `uv.lock` (nothing to clone into `external/`). The same measurement on that build: a 750-frame block of 5 episodes replayed from `episode_seeds` + `actions` into every logged pixel and the whole logged symbolic state, 750 frames of 750, and all 32 savestate anchors restored and then played their episode out identically, which is what a model rollout from a subject's own state needs. The block's `frames.h5` keeps the displayed frames regardless, and those pixels are the record that does not depend on whoever opens the block later having the fork installed. What that block cost at size 384 and 2.5 fps, measured with per-frame zlib: a median frame is 7.4 KB, but crafter mixes per-pixel noise into the view at night, so its 107 night frames ran to 212 KB and the pixels came to 22.5 MB; the 32 anchors pickle to 2.3 MB each, nearly all of it the observation space's constant bounds and the cached frame, and compress to 1.8 MB. That night noise is drawn from the RNG the creatures use, so a `render()` outside the step loop would shift every later draw; nothing renders out of band, because `CrafterEnv` hands back the frame `step` already produced.
+> ⚠️ **Crafter replays only on a fork.** Every tenth step stock crafter rebalances creatures per chunk by iterating a Python *set* of objects, so which animal is despawned follows object `id()` and two runs of the same seed and the same action list diverge: terrain is identical, creatures are not. Measured 2026-09-28 on stock 1.8.3, replaying one episode's 225 actions in a second process that differed only in `PYTHONHASHSEED`: the two left each other at step 30, and the episode ended a step apart. Ordering that list by position is the whole fix, and it lives in [`chengfanbrain/crafter@deterministic`](https://github.com/chengfanbrain/crafter/tree/deterministic), which `gym/crafter/pyproject.toml` pins as a direct reference resolved to a commit in `uv.lock` (nothing to clone into `external/`). The same measurement on that build: a 750-frame block of 5 episodes replayed from `episode_seeds` + `actions` into every logged pixel and the whole logged symbolic state, 750 frames of 750, and all 32 savestate anchors restored and then played their episode out identically, which is what a model rollout from a subject's own state needs. The block's `frames.h5` keeps the displayed frames regardless, and those pixels are the record that does not depend on whoever opens the block later having the fork installed. What that block cost at size 384 and 2.5 fps, measured with per-frame zlib: a median frame is 7.4 KB, but crafter mixes per-pixel noise into the view at night, so its 107 night frames ran to 212 KB and the pixels came to 22.5 MB; the 32 anchors pickle to 2.3 MB each, nearly all of it the observation space's constant bounds and the cached frame, and compress to 1.8 MB. That night noise is drawn from the RNG the creatures use, so a `render()` outside the step loop would shift every later draw, and `CrafterEnv` hands back the frame `step` already produced rather than drawing its own. The one render out of band is a level's, on the first frame of an episode: `reset()` imposes the rules and then redraws, so that a hidden item panel or a death tint is on the frame the subject is first shown. That one is free, because the noise is drawn only while daylight is below 0.5 and a reset is step 0, where it is 0.797 — the RNG is not touched at all. Measured: the same seed and action list replays frame for frame with a level on (`docs/levels_check.py`).
 
 ### Resuming a world (the `resume` field)
 
