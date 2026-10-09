@@ -19,38 +19,57 @@ Without it that part says it was skipped, because the rig is not a dependency of
 this repo. What it checks either way is what the port cannot inherit: which
 entries crafter scores by itself and which one the chain therefore has to score,
 and which entries the level being played can pay for at all, since a level that
-freezes the four life stats is not asked for the one that puts food back. Part 2
-is the chain as state, measured
+freezes the four life stats is not asked for the one that puts food back, a
+level that lets them run carries three more for when they do, and a level where
+something hostile spawns carries two more again. That last group is also checked
+against the rig and against crafter: each sighting has to name a class
+``crafter.objects`` really has, no level may carry an interrupt its own row did
+not ask for, and the chain's tail has to come out in ``_INTERRUPT_ORDER``.
+Part 2 is the chain as state, measured
 through ``info``: a frame that changes nothing says nothing, an unlock earned
 before the chain asks for it moves no pointer and is stepped over when the
 pointer arrives, a composite entry waits for both halves, a skip puts the task at
 the back of this episode's own order, a death outranks all of it, and the whole
 wrapper leaves the world it wraps untouched -- same map, same inventory, same
-achievements, same random state. Part 3 is the one entry crafter has no
+achievements, same random state. Part 3 is those three entries, driven by putting
+a life stat where the engine's own decay would have taken it: a full stat asks
+nothing, the stat reaching the threshold cuts its entry in ahead of the one being
+worked on and nothing else, two more never land over the top of it, they are
+asked for drink then food then sleep whatever order the stats fell in, the last
+of them hands the pointer back, a stat that runs low twice is asked about once, an
+entry closed before its stat ever fell is paid for and then never mentioned,
+putting one off is a skip like any other, a skip pressed on the very press one
+cuts in is answered with the errand instead, the count above the frame is the
+whole chain from the first frame, and a world restored with a stat already down
+asks about it on the next block's first frame. It ends on the one that is not set
+up at all: a world played from full on nothing but noops, where the first
+interrupt has to arrive on the press the threshold says it does.
+Part 4 is the one entry crafter has no
 achievement for, against nine built worlds: what seals a room and what only looks
 like it does, that the test is read-only, and that being sealed before the chain
-asks does not pre-complete it. Part 4 is the adapter: the field that sets the two
+asks does not pre-complete it. Part 5 is the adapter: the field that sets the two
 holds and every way a bad one is refused, the strip's three fields with the task
 between them and the count that is the chain's own, which the shelter moves like
 any other entry while an unlock the chain never names moves neither it nor the
-cue, every label packed into one row at the shipped window size, the two messages
-a completion produces, and the fields a frame and a block record. Part 5 plays a real block through ``fmri_play.py`` with
+cue, a level whose stats run offered three entries more in the same count and
+naming one when it cuts in, every label packed into one row at the shipped window
+size, the two messages a completion produces, and the fields a frame and a block
+record. Part 6 plays a real block through ``fmri_play.py`` with
 a policy in place of the subject, where the half of this nothing else can see is
 measured: the messages reached the screen in order, each hold really held, and the
 block's clock paid for them -- the same play, ending earlier, rather than a stall.
 
-Part 5 measures wall-clock on the machine it runs on, and its two blocks are
+Part 6 measures wall-clock on the machine it runs on, and its two blocks are
 played one after the other, so it wants that machine otherwise idle: a block
 that is competing for a core plays slower, and what a hold cost is read from
 the difference between the two. The rest of the file is state and pixels and
 does not care.
 
-Not covered here: the homeostat's own task interrupts, which are not ported
-(:mod:`crafter_gym.tasks`, "What is not here"), and the shipped 300-second
-turn-based block, which has a person at the keyboard. Part 5 plays the same phase
-in real time at a smaller frame and a faster clock.
+Not covered here: the shipped 300-second turn-based block, which has a person at
+the keyboard. Part 6 plays the same phase in real time at a smaller frame and a
+faster clock.
 
-Last run 2026-10-07 on this branch: 2 blocks, 86 checks, 0 failures (80 without
+Last run 2026-10-07 on this branch: 2 blocks, 113 checks, 0 failures (105 without
 ``CRAFTER_RIG``).
 """
 
@@ -66,7 +85,7 @@ import tempfile
 
 import numpy as np
 
-# Before fmri_gym.display is imported: part 4 opens a real window to measure what
+# Before fmri_gym.display is imported: part 5 opens a real window to measure what
 # the strip packs into, and there is no screen here.
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
@@ -92,12 +111,15 @@ CONFIGS = os.path.join(ROOT, "configs", "dbp_games")
 #: the whole of what it asks for: no hostiles and a frozen homeostat, so nothing
 #: but the player moves the chain.
 LEVEL = "L1_affordance"
+#: The level part 3 plays: the first one whose row asks for the low-stat
+#: interrupts, which is the homeostat coming back on.
+STAT_LEVEL = "L2_homeostasis"
 #: Small enough to reset a few dozen worlds, still a whole multiple of the
 #: engine's 9x9 view.
 SIZE = [128, 128]
 #: A quarter of crafter's world, for the reason ``docs/levels_check.py`` uses it.
 AREA = (32, 32)
-#: How far around the player part 3 flattens the ground before building: wider
+#: How far around the player part 4 flattens the ground before building: wider
 #: than the widest wall it builds, so what is being measured is the wall.
 CLEARING = 14
 #: The shipped window (``fmri_play.py --size``). The HUD font is a fixed 24 px
@@ -105,7 +127,7 @@ CLEARING = 14
 #: the frame it is packed against is the shipped ``env_kwargs.size``.
 WINDOW = (1024, 768)
 FRAME = 384
-#: Part 5's block: a real-time clock fast enough that a few tasks are reached in
+#: Part 6's block: a real-time clock fast enough that a few tasks are reached in
 #: twenty seconds, and holds short enough that three of them fit in it.
 FPS = 8
 DURATION = 20.0
@@ -173,6 +195,21 @@ def grant(game: object, *names: str) -> None:
     """
     for name in names:
         game._player.achievements[name] += 1
+
+
+def dip(game: object, stat: str, to: int = tasks.STAT_TASK_LOW) -> None:
+    """Put one life stat where the engine's own decay would have taken it.
+
+    The chain reads the stat out of ``info["inventory"]``
+    (``TaskWrapper._arm_stats``), so this is the whole of a crossing as far as it
+    can tell, and it costs none of the 21 to 31 presses the engine would take to
+    get there.
+
+    :param game: the ``crafter.Env``.
+    :param stat: ``drink``, ``food`` or ``energy``.
+    :param to: the value to leave it at; the threshold by default.
+    """
+    game._player.inventory[stat] = to
 
 
 def close_through(stepper: object, game: object, tracker: object, entry: str) -> dict:
@@ -366,6 +403,25 @@ def part1() -> None:
                   and tasks.next_task_text(t) == theirs["next_task_text"](t)
                   for t in asked),
               f"{len(asked)} entries, {tasks.task_text(None)!r} at the end")
+        stat = rig_objects(path, ("STAT_TASKS", "STAT_TASK_LOW"))
+        # The rig's entry is a tuple of goals because it splices a chain row in;
+        # here an interrupt is a chain entry like any other, and a composite one
+        # would be in TASK_GOALS. Same stats, same entries, same order.
+        check("the interrupts watch the same stats, and ask for the same thing in "
+              "the same order",
+              tuple((s, (e,)) for s, e in tasks.STAT_TASKS) == stat["STAT_TASKS"],
+              " -> ".join(f"{s} {e}" for s, e in tasks.STAT_TASKS))
+        check("and the one number that is deliberately not the rig's is the threshold",
+              (tasks.STAT_TASK_LOW, stat["STAT_TASK_LOW"]) == (8, 6),
+              f"8 of 9 here against the rig's {stat['STAT_TASK_LOW']} (Fan, 2026-10-07)")
+        sighting = rig_objects(path, ("HOSTILE_TASKS",))
+        # Same shape of deviation as the stats above, for the same reason: the
+        # rig splices a chain row in, so its entry is a tuple of goals.
+        check("the sightings watch the same creatures, and ask for the same "
+              "thing in the same order",
+              tuple((c, (e,)) for c, e in tasks.HOSTILE_TASKS)
+              == sighting["HOSTILE_TASKS"],
+              " -> ".join(f"{c} {e}" for c, e in tasks.HOSTILE_TASKS))
         frontend = os.path.join(os.path.dirname(path), "frontend_pygame.py")
         rig_holds = {"done": rig_default(frontend, "--task-done-s"),
                      "next": rig_default(frontend, "--task-hold-s")}
@@ -410,10 +466,66 @@ def part1() -> None:
                                           if e != "eat_plant") for n in frozen),
           f"{' '.join(frozen)}: {len(tasks.TASK_CHAIN) - 1} entries")
     check("and every level whose stats run asks for the whole chain",
-          all(tasks.chain_for(n) == tasks.TASK_CHAIN
+          all(tasks.chain_for(n)[:len(tasks.TASK_CHAIN)] == tasks.TASK_CHAIN
               for n in levels if n not in frozen),
           f"{' '.join(n for n in levels if n not in frozen)}: "
           f"{len(tasks.TASK_CHAIN)} entries")
+    # The same rule from the other end (Fan, 2026-10-07): an entry that needs a
+    # trigger is carried by the levels that can pull it. Two families of them
+    # now, built the same way -- a stat that can run low, and a creature that
+    # can be seen (Fan, msgs 1138/1140) -- so each is read off its own flag.
+    stats = tuple(e for _, e in tasks.STAT_TASKS)
+    sightings = tuple(e for _, e in tasks.HOSTILE_TASKS)
+    interrupts = sightings + stats
+    on_stat = [n for n in levels if crafter_gym.LEVELS[n].get("stat_tasks")]
+    on_sight = [n for n in levels if crafter_gym.LEVELS[n].get("hostile_tasks")]
+    check("the levels that interrupt with a low stat are the ones the table says",
+          on_stat == [n for n, r in crafter_gym.LEVELS.items() if r.get("stat_tasks")]
+          and not set(on_stat) & set(frozen), " ".join(on_stat))
+    check("the ones that interrupt on a sighting are the table's too, and each has "
+          "something hostile to sight",
+          on_sight == [n for n, r in crafter_gym.LEVELS.items()
+                       if r.get("hostile_tasks")]
+          and all(crafter_gym.LEVELS[n]["hostiles"] for n in on_sight),
+          " ".join(on_sight))
+    check("each level asks for exactly the families it opted into, after the chain",
+          all(tasks.chain_for(n) == tasks.TASK_CHAIN
+              + (sightings if n in on_sight else ())
+              + (stats if n in on_stat else ())
+              for n in levels if n not in frozen),
+          ", ".join(f"{n} {len(tasks.chain_for(n))}" for n in levels))
+    check("and no level carries an interrupt it did not opt into",
+          not any(set(tasks.chain_for(n)) & set(sightings)
+                  for n in crafter_gym.LEVELS if n not in on_sight)
+          and not any(set(tasks.chain_for(n)) & set(stats)
+                      for n in crafter_gym.LEVELS if n not in on_stat),
+          f"{', '.join(sightings)} are {' '.join(on_sight)}'s alone, "
+          f"{', '.join(stats)} {' and '.join(on_stat)}'s")
+    check("every interrupt is an achievement crafter scores itself, and is worded "
+          "by what to do",
+          all(e in crafter.constants.achievements and e in tasks.TASK_LABELS
+              for e in interrupts),
+          ", ".join(tasks.TASK_LABELS[e] for e in interrupts))
+    check("and watches a stat crafter reports, out of the nine the threshold is of",
+          all(crafter.constants.items[s]["max"] == 9
+              and crafter.constants.items[s]["initial"] == 9
+              for s, _ in tasks.STAT_TASKS)
+          and 0 < tasks.STAT_TASK_LOW < 9,
+          f"{tasks.STAT_TASK_LOW} of 9, each stat full at a reset")
+    # The sighting's own version of that: the class has to be one crafter has,
+    # or the entry can never arm at all.
+    check("and each sighting names a creature class of crafter's own",
+          all(isinstance(getattr(crafter.objects, c, None), type)
+              and issubclass(getattr(crafter.objects, c), crafter.objects.Object)
+              for c, _ in tasks.HOSTILE_TASKS),
+          ", ".join(f"{c} -> {tasks.TASK_LABELS[e]}" for c, e in tasks.HOSTILE_TASKS))
+    check("the tail of the chain is in the order the ones waiting are asked in",
+          all(sorted(tasks.chain_for(n)[len(tasks.TASK_CHAIN):],
+                     key=tasks._INTERRUPT_ORDER.__getitem__)
+              == list(tasks.chain_for(n)[len(tasks.TASK_CHAIN):])
+              for n in levels)
+          and list(tasks._INTERRUPT_ORDER) == list(interrupts),
+          " then ".join(interrupts))
     check("so the chain an episode is played with is the level's, not the table's",
           tracker.base_chain == tasks.chain_for(LEVEL),
           f"{LEVEL} plays {len(tracker.base_chain)} of {len(tasks.TASK_CHAIN)}")
@@ -552,8 +664,183 @@ def part2() -> None:
 
 
 def part3() -> None:
+    """The interrupts: when one cuts in, in what order, and how often."""
+    print("part 3: a stat running low")
+    chain = tasks.chain_for(STAT_LEVEL)
+    base = tasks.TASK_CHAIN
+    env, game, tracker, info = build(level=STAT_LEVEL)
+    check("an episode opens on the base chain, with no interrupt armed",
+          (tracker.task, tracker.armed, len(tracker.base_chain))
+          == (base[0], frozenset(), len(chain)),
+          f"{len(chain)} entries, {tracker.task!r} asked for")
+    info = env.step(0)[4]
+    check("a full stat arms nothing, and the entry it would ask for is stepped over",
+          (tracker.armed, info["task"], info["task_moved"])
+          == (frozenset(), base[0], False),
+          f"drink {info['inventory']['drink']} of 9")
+    # The engine's own decay would take 21 presses to do this; what the chain
+    # reads is the stat, so putting it there is the whole of the crossing.
+    dip(game, "drink")
+    info = env.step(0)[4]
+    check("the stat falling to the threshold cuts the interrupt in at once",
+          (tracker.armed, tracker.task, info["task"], info["task_moved"],
+           info["task_done"]) == (frozenset({"collect_drink"}), "collect_drink",
+                                  base[0], True, False),
+          f'{info["task"]!r} -> {tracker.task!r}, nothing completed')
+    check("ahead of the entry it interrupted and nothing else, so it is an "
+          "interrupt and not a reordering",
+          tracker.chain == ["collect_drink", *chain[:len(base)]] + [
+              e for _, e in tasks.STAT_TASKS if e != "collect_drink"],
+          f"{tracker.chain[:3]} ...")
+    # Low in the wrong order on purpose: energy before food, and both while
+    # drink is the one on screen. The order asked for is the fixed one either
+    # way, and what is on screen is never replaced (Fan, 2026-10-07).
+    dip(game, "energy")
+    env.step(0)
+    dip(game, "food")
+    info = env.step(0)[4]
+    check("a second and a third never land over the top of the first",
+          (tracker.armed, tracker.task, info["task_moved"])
+          == (frozenset({"collect_drink", "eat_cow", "wake_up"}), "collect_drink",
+              False),
+          "energy and food ran low after drink took the pointer")
+    order = []
+    for entry in ("collect_drink", "eat_cow", "wake_up"):
+        grant(game, entry)
+        info = env.step(0)[4]
+        order.append((info["task"], info["task_done"], tracker.task))
+    check("and they are asked for one at a time, drink then food then sleep "
+          "whatever order the stats fell in",
+          [a for a, _, _ in order] == ["collect_drink", "eat_cow", "wake_up"]
+          and all(done for _, done, _ in order),
+          "energy ran low first and is asked for last")
+    check("the last of them hands the pointer back to the entry it cut in front of",
+          order[-1][2] == base[0], f"{order[-1][2]!r}, where the subject was")
+    dip(game, "drink", 1)
+    info = env.step(0)[4]
+    check("and a stat that runs low again is not asked about twice",
+          (tracker.task, info["task_moved"]) == (base[0], False),
+          f"drink {info['inventory']['drink']} of 9, collect_drink closed")
+    env.close()
+
+    env, game, tracker, _ = build(level=STAT_LEVEL)
+    grant(game, "collect_drink")
+    env.step(0)
+    was = tracker.completed
+    dip(game, "drink")
+    info = env.step(0)[4]
+    check("an interrupt whose entry closed before its stat ever ran low is paid "
+          "for and then left alone",
+          "collect_drink" in was and tracker.armed == frozenset({"collect_drink"})
+          and (tracker.task, info["task_moved"]) == (base[0], False)
+          and tracker.chain == list(chain),
+          f"{len(was)} of {len(chain)} earned without being asked, order untouched")
+    env.close()
+
+    env, game, tracker, _ = build(level=STAT_LEVEL)
+    dip(game, "drink")
+    env.step(0)
+    info = skip(env, tracker)
+    check("putting an interrupt off is a skip like any other: back of the order, "
+          "pointer back to the chain",
+          (info["task"], info["task_skip"], info["task_moved"], tracker.task,
+           tracker.chain[-1]) == ("collect_drink", True, True, base[0],
+                                  "collect_drink"),
+          "and still armed, so it comes around once the chain is done")
+    dip(game, "food")
+    info = env.step(0)[4]
+    check("and the next one to run low does not drag it back with it",
+          (tracker.task, tracker.chain[-1], info["task_moved"])
+          == ("eat_cow", "collect_drink", True),
+          "a skip is the subject's own word on the order")
+    env.close()
+
+    # A skip pressed on the very press a stat crosses. The pointer moves either
+    # way, so the errand is the answer to it and the task is left where it was,
+    # as a press that completes a task is not also read as putting it off.
+    env, game, tracker, _ = build(level=STAT_LEVEL)
+    menu = crafter_gym.menu_of(env)
+    while menu.selected != tasks.SKIP_ENTRY:
+        env.step(menu.cycle)
+    dip(game, "drink")
+    info = env.step(menu.confirm)[4]
+    check("a skip and a crossing on the same press: the errand is the answer, "
+          "and the task is still there to be put off",
+          (info["task"], info["task_skip"], info["task_moved"], tracker.task,
+           tracker.chain[1]) == (base[0], False, True, "collect_drink", base[0]),
+          "so the order is untouched and the task comes back when the errand closes")
+    env.close()
+
+    # The denominator is the level's chain and does not move (Fan, 2026-10-07):
+    # the strip reads `base_chain`, which arming and skipping never touch.
+    env, game, tracker, _ = build(level=STAT_LEVEL)
+    offered = [len(tracker.base_chain)]
+    dip(game, "drink")
+    env.step(0)
+    offered.append(len(tracker.base_chain))
+    check("the count above the frame is out of the whole chain from the first "
+          "frame, interrupts included",
+          offered == [len(chain), len(chain)] and len(chain) == len(base) + 3
+          and not tracker.completed,
+          f"{len(base)} + 3 entries, nothing earned by being asked")
+    blob = pickle.dumps(env, protocol=5)
+    back = pickle.loads(blob)
+    restored = crafter_gym.tracker_of(back)
+    check("an armed interrupt survives the pickle a savestate is made of",
+          restored.armed == tracker.armed and restored.chain == tracker.chain
+          and restored.task == tracker.task,
+          f"{restored.task!r} still asked for after a restore")
+    env.close()
+    back.close()
+
+    # A world that comes back with a stat already low: the crossing happened in a
+    # block that is over, so what arms the interrupt is the stat as it stands.
+    env, game, tracker, _ = build(level=STAT_LEVEL, seed=4)
+    dip(game, "food")
+    state = pickle.dumps(env, protocol=5)
+    env.close()
+    back = pickle.loads(state)
+    restored = crafter_gym.tracker_of(back)
+    info = back.step(0)[4]
+    check("and a world restored with a stat already low asks about it on the "
+          "first frame of the next block",
+          (restored.armed, restored.task, info["task_moved"])
+          == (frozenset({"eat_cow"}), "eat_cow", True),
+          f"food {info['inventory']['food']} of 9 when the block opened")
+    back.close()
+
+    # The other half of `chain_for`: a level that carries no interrupt cannot
+    # grow one, whatever its stats say.
+    env, game, tracker, _ = build()
+    for stat, _ in tasks.STAT_TASKS:
+        dip(game, stat, 0)
+    info = env.step(0)[4]
+    check("a level that is not asked for the interrupts never arms one",
+          (tracker.armed, tracker.task, info["task_moved"])
+          == (frozenset(), tasks.chain_for(LEVEL)[0], False),
+          f"{LEVEL} with all three stats at 0")
+    env.close()
+
+    # Nothing set up at all: the engine's own decay, on a world played from full
+    # with noops. What the threshold is chosen against is this number of presses
+    # (STAT_TASK_LOW), so it is measured rather than asserted in a comment.
+    env, game, tracker, _ = build(level=STAT_LEVEL, seed=7)
+    arrived, stat = 0, 9
+    for press in range(1, 31):
+        info = env.step(0)[4]
+        if tracker.armed:
+            arrived, stat = press, info["inventory"]["drink"]
+            break
+    check("and a world just played, with nothing set, is asked to drink on the "
+          "press the threshold says",
+          (arrived, stat, tracker.task) == (21, tasks.STAT_TASK_LOW, "collect_drink"),
+          f"press {arrived}, drink {stat} of 9")
+    env.close()
+
+
+def part4() -> None:
     """The one entry the chain scores itself: nine worlds, and a read-only test."""
-    print("part 3: what counts as a shelter")
+    print("part 4: what counts as a shelter")
     predicate = tasks.TASK_PREDICATES["build_stone_shelter"]
     cases = []
     env, game, _, _ = build(menu=False)
@@ -688,9 +975,9 @@ def strip_rows(screen: object, strip: list[str]) -> tuple[int, int]:
     return len(seen[-1]), max(screen.hud_font.size(line)[0] for line in strip)
 
 
-def part4() -> None:
+def part5() -> None:
     """The adapter: the field, the strip, the two messages, and the record."""
-    print("part 4: what the subject is shown")
+    print("part 5: what the subject is shown")
     phase = spec()
     check("the shipped level-1 config validates and asks for the two holds",
           validate_config(load_config(os.path.join(CONFIGS, "crafter__crafter_L1.json")))
@@ -764,19 +1051,52 @@ def part4() -> None:
           " | ".join(adapter.hud(2.0, 12.4)))
     adapter.close()
 
+    # The interrupts need nothing of the adapter's own: the strip reads the
+    # chain's length and the pointer, so a level that carries three more entries
+    # is three wider from its first frame and names one when it cuts in.
+    adapter, game, tracker, _ = adapter_on(level=2)
+    offered = adapter.hud(0.0, 12.4)[-1]
+    dip(game, "drink")
+    info = adapter.step(0)[4]
+    check("a block whose stats run is offered the three interrupts in the same "
+          "count, and names one the moment it cuts in",
+          (offered, adapter.hud(0.0, 12.4))
+          == (f"0 / {len(tasks.TASK_CHAIN) + 3}",
+              ["12 s", "TASK: drink water", f"0 / {len(tasks.TASK_CHAIN) + 3}"]),
+          " | ".join(adapter.hud(0.0, 12.4)))
+    check("and the frame says it like any other move: what comes next, with "
+          "nothing claimed as earned",
+          (info["task_moved"], info["task_done"], adapter._cue,
+           adapter.notices()) == (True, False, "", [(["Next task: drink water"], 2.0)]),
+          "no completion and no point for a stat running down")
+    grant(game, "collect_drink")
+    info = adapter.step(0)[4]
+    check("and closing it is a point and a completion like any other entry",
+          (info["task"], info["task_done"], adapter._cue,
+           adapter.hud(0.0, 12.4)[-1])
+          == ("collect_drink", True, "score", f"1 / {len(tasks.TASK_CHAIN) + 3}"),
+          " | ".join(adapter.hud(0.0, 12.4)))
+    adapter.close()
+
     # The one thing a label is measured against: the strip holds the clock and
     # the count too, and a label that wraps pushes the frame down mid-block.
+    # Against the widest count any level offers, and every entry any level can
+    # ask for, interrupts included.
     screen = display.Display(size=WINDOW, vsync=False)
+    widest_count = max(len(tasks.chain_for(n)) for n in crafter_gym.LEVELS
+                       if tasks.has_tasks(n))
     try:
         widest, rows = (0, ""), 0
-        for entry in (*tasks.TASK_CHAIN, None):
-            strip = ["300 s", tasks.task_text(entry), f"{total} / {total}"]
+        for entry in (*tasks.TASK_CHAIN, *(e for _, e in tasks.STAT_TASKS), None):
+            strip = ["300 s", tasks.task_text(entry),
+                     f"{widest_count} / {widest_count}"]
             packed, pixels = strip_rows(screen, strip)
             rows = max(rows, packed)
             widest = max(widest, (pixels, tasks.task_text(entry)))
-        check("every label the chain can show fits one row of the shipped window",
+        check("every label any level can show fits one row of the shipped window",
               rows == 1, f"{widest[1]!r} is {widest[0]} px of "
-                         f"{FRAME} at {WINDOW[0]}x{WINDOW[1]}")
+                         f"{FRAME} at {WINDOW[0]}x{WINDOW[1]}, beside "
+                         f"{widest_count} / {widest_count}")
     finally:
         screen.close()
 
@@ -1013,12 +1333,12 @@ def phase_entry(block: str) -> dict:
     return [p for p in manifest["phases"] if p["type"] == "game"][0]
 
 
-def part5(work: str) -> None:
+def part6(work: str) -> None:
     """A block that really holds: the screen, the record, and what it costs.
 
     :param work: the folder to write the configs, drivers and data under.
     """
-    print("part 5: a block with a player in it")
+    print("part 6: a block with a player in it")
     block, drawn = play(block_config(os.path.join(work, "l1_held.json")),
                         os.path.join(work, "data_held"))
     frames = lines_of(block, "frame")
@@ -1110,14 +1430,15 @@ def part5(work: str) -> None:
 
 
 def main() -> None:
-    """Run all five parts and exit non-zero on any failure."""
+    """Run all six parts and exit non-zero on any failure."""
     work = tempfile.mkdtemp(prefix="tasks-check-")
     try:
         part1()
         part2()
         part3()
         part4()
-        part5(work)
+        part5()
+        part6(work)
     finally:
         shutil.rmtree(work, ignore_errors=True)
     print(f"\n{len(failures)} failures: {failures}" if failures else "\nall checks passed")
