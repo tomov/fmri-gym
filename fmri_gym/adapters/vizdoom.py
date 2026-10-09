@@ -5,8 +5,8 @@ but COOM itself pins gymnasium 0.28 which conflicts with the other backends
 (minihack/nle need 1.2). ViZDoom -- the same Doom engine COOM uses -- ships
 Gymnasium environments that work with our gymnasium and cover the same
 action-shooter category (DefendCenter, DeadlyCorridor, HealthGathering,
-TakeCover, MyWayHome, Deathmatch, and full Doom E1M1..). So this backend uses
-ViZDoom directly.
+TakeCover, MyWayHome, Deathmatch, and the full Doom and Freedoom maps). So this
+backend uses ViZDoom directly.
 
 The env's observation is a dict {"screen": (H,W,3) uint8, "gamevariables": ...};
 `env.render()` (rgb_array) returns the screen for display, and we log
