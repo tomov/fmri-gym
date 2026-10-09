@@ -20,8 +20,9 @@ import json
 from typing import Any
 
 from .keys import KEY_NAMES
-from .menu import menu_problems
+from .menu import menu_problems, options_of
 from .resume import slot_problems
+from .rewind import rewind_problems
 from .triggers import TriggerError, TriggerSettings
 
 #: The phases of a run; the ``check_*`` ones make a rig check (:mod:`fmri_gym.checks`).
@@ -200,6 +201,10 @@ def _phase_problems(phase: dict) -> list[str]:
     if "menu" in phase:
         out.extend(menu_problems(phase["menu"]))
     out.extend(slot_problems(phase))
+    # Cross-field: a rollback is a phase field and the menu entry that asks for
+    # one is a menu field, so either half alone is a config that reads as if it
+    # had taken (see fmri_gym.rewind).
+    out.extend(rewind_problems(phase, options_of(phase)))
     return out
 
 
