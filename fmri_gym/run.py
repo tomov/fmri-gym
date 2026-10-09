@@ -742,6 +742,28 @@ class Run:
             if want_ring:
                 ring.push(rewind.State(ep_frame=ep_frame, run_time=t_step,
                                        score=score, blob=fs.blob))
+            # Anything the backend has to hold this frame up to say (a task
+            # completed, say). The frame is already recorded, and each notice
+            # redraws that same frame rather than stepping a new one, so the
+            # record of what was played does not depend on how long the subject
+            # was given to read: a notice is one event with a duration, and the
+            # frame trigger for this frame has already gone out. No sound is
+            # queued and nothing already queued is stopped, so a cue that fired
+            # on the frame rings out over the first notice rather than being
+            # cut off by it.
+            notices = adapter.notices()
+            for lines, seconds in notices:
+                flip_t = self._show(adapter, False, score, block_end, notice=lines)[0]
+                self.logger.log(type="notice", episode_id=episode_id, ep_frame=ep_frame,
+                                lines=list(lines), duration=seconds,
+                                flip_time=self.clock.from_perf(flip_t))
+                _wait_for_duration(self.display, seconds)
+            if notices:
+                # A deliberate pause rather than a stall, so the next tick
+                # starts from the end of it: the frames it was "behind" by were
+                # never due, and repaying them as a burst is the one thing the
+                # pacing rules below are there to prevent.
+                next_t = time.perf_counter() + dt
             # A death the subject comes back from: the world goes back a window
             # and the episode goes on, so this ending is not one the game gets
             # to charge for. Only `terminated`, which is the game ending it; a
@@ -803,11 +825,13 @@ class Run:
         :param play_sound: pass the sound to the speakers.
         :param score: the episode's running score, for the HUD.
         :param block_end: ``perf_counter`` the block ends at, for the HUD.
-        :param notice: lines of the session's own to draw over the frame
-            instead of the backend's :meth:`~.adapters.base.EnvAdapter.overlay`,
-            at the backend's :attr:`~.adapters.base.EnvAdapter.overlay_y`. For
-            the one thing the session has to say inside the picture: that the
-            death the subject is looking at is about to be taken back.
+        :param notice: lines to draw over the frame instead of the backend's
+            :meth:`~.adapters.base.EnvAdapter.overlay`, at the backend's
+            :attr:`~.adapters.base.EnvAdapter.overlay_y`. For what is said
+            inside the picture while the frame is held up rather than played
+            on: that the death the subject is looking at is about to be taken
+            back, or a backend's own
+            :meth:`~.adapters.base.EnvAdapter.notices`.
         :return: ``perf_counter`` of the flip, the rendered frame, and the
             sound queued this frame (``None`` if ``play_sound`` is ``False``).
         """

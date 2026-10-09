@@ -11,9 +11,10 @@ the same cursor, and a replay has to reproduce it (see the repo's Rule 1).
 
 The action space is ``Discrete(n + 2)``: crafter's own ``n`` actions in their
 own order, then ``cycle`` and ``confirm``. ``info`` gains ``env_action`` (what
-the engine was actually given), ``menu_idx`` (where the cursor ended up) and
-``menu_sel`` (the name it is on), so a log keeps both what was pressed and what
-it did.
+the engine was actually given), ``menu_idx`` (where the cursor ended up),
+``menu_sel`` (the name it is on) and ``menu_extra`` (the pseudo-entry this
+press fired, when it fired one: see :meth:`MenuWrapper.set_extra`), so a log
+keeps both what was pressed and what it did.
 
 ``cycle`` spends a turn: the engine is stepped with ``noop``. Otherwise a look
 through the menu would be free and the player could reach any of the ten for
@@ -54,6 +55,39 @@ class MenuWrapper(gym.Wrapper):
         self.action_space = spaces.Discrete(n + 2)
         self.menu_idx = 0
         self.showing = False
+        self.extra: tuple[str, ...] = ()
+
+    def set_extra(self, names: tuple[str, ...]) -> None:
+        """Put pseudo-entries in the menu, after the actions.
+
+        An entry crafter has no action for: the cursor reaches it by cycling
+        like any other and confirming it steps the engine with ``noop``, while
+        ``info["menu_extra"]`` names it, so the layer that owns the entry acts
+        on it without the game having gained a rule. The one there is asks for
+        the current task to be put off (:data:`crafter_gym.tasks.SKIP_ENTRY`).
+
+        A method rather than a constructor argument because that layer sits
+        *above* this wrapper and installs its entry on the way up, which is
+        also how the rig does it (``crafter_rig/core.py``:
+        ``ButtonMapper.set_extra``). The action space does not change: a
+        pseudo-entry is reached through ``cycle`` and ``confirm``, which are
+        already in it.
+
+        :param names: entry names, in the order ``cycle`` reaches them, after
+            the actions. Replaces any set before.
+        :raises ValueError: if a name is empty or is one of crafter's own
+            action names, which would make two menu rows read alike.
+        """
+        for name in names:
+            if not name:
+                raise ValueError("a menu entry needs a name")
+            if name in self.env.action_names:
+                raise ValueError(f"menu entry {name!r} is already a crafter action; "
+                                 f"a pseudo-entry needs a name of its own")
+        self.extra = tuple(names)
+        # The cursor is the subject's hand position (see reset), so keep it
+        # where it is; it only has to stay on the list it indexes.
+        self.menu_idx %= len(self.menu) + len(self.extra)
 
     @property
     def action_names(self) -> list[str]:
@@ -62,13 +96,22 @@ class MenuWrapper(gym.Wrapper):
 
     @property
     def menu_names(self) -> list[str]:
-        """The menu's action names, in the order ``cycle`` steps through them."""
-        return [self.env.action_names[i] for i in self.menu]
+        """The menu's entries, in the order ``cycle`` steps through them.
+
+        Crafter's buttonless actions first, then any pseudo-entry
+        (:meth:`set_extra`).
+        """
+        return [self.env.action_names[i] for i in self.menu] + list(self.extra)
 
     @property
     def selected(self) -> str:
-        """The action name the cursor is on."""
-        return self.env.action_names[self.menu[self.menu_idx]]
+        """The entry the cursor is on."""
+        return self.menu_names[self.menu_idx]
+
+    @property
+    def on_extra(self) -> bool:
+        """Whether the cursor is on a pseudo-entry rather than an action."""
+        return self.menu_idx >= len(self.menu)
 
     def reset(self, **kwargs: Any) -> tuple[Any, dict]:
         """Reset the game, leaving the cursor where the last episode left it.
@@ -95,13 +138,14 @@ class MenuWrapper(gym.Wrapper):
 
         :param action: an index into :attr:`action_space`.
         :return: a crafter action id. ``cycle`` is ``noop``: a look costs a
-            turn, or the player could reach any menu action for one press.
+            turn, or the player could reach any menu action for one press. So
+            is ``confirm`` on a pseudo-entry, which crafter has no action for.
         """
         action = int(action)
         if action == self.cycle:
             return 0
         if action == self.confirm:
-            return self.menu[self.menu_idx]
+            return 0 if self.on_extra else self.menu[self.menu_idx]
         return action
 
     def step(self, action: Any) -> tuple[Any, float, bool, bool, dict]:
@@ -109,25 +153,48 @@ class MenuWrapper(gym.Wrapper):
 
         :param action: an index into :attr:`action_space`.
         :return: ``(obs, reward, terminated, truncated, info)``; ``info``
-            carries ``env_action``, ``menu_idx`` and ``menu_sel``.
+            carries ``env_action``, ``menu_idx``, ``menu_sel`` and
+            ``menu_extra``.
         """
         action = int(action)
         self.showing = action in (self.cycle, self.confirm)
         env_action = self.env_action(action)
+        fired = self.selected if action == self.confirm and self.on_extra else ""
         if action == self.cycle:
-            self.menu_idx = (self.menu_idx + 1) % len(self.menu)
+            self.menu_idx = (self.menu_idx + 1) % len(self.menu_names)
         obs, reward, terminated, truncated, info = self.env.step(env_action)
-        return obs, reward, terminated, truncated, self._with_menu(info, env_action)
+        return obs, reward, terminated, truncated, self._with_menu(info, env_action, fired)
 
-    def _with_menu(self, info: dict, env_action: int) -> dict:
+    def _with_menu(self, info: dict, env_action: int, fired: str = "") -> dict:
         """Add the menu fields to an ``info`` dict.
 
         :param info: the wrapped env's info.
         :param env_action: what the engine was given.
-        :return: the same dict, with the three fields set.
+        :param fired: the pseudo-entry this press fired, or ``""``.
+        :return: the same dict, with the four fields set.
         """
         info = dict(info)
         info["env_action"] = env_action
         info["menu_idx"] = self.menu_idx
         info["menu_sel"] = self.selected
+        info["menu_extra"] = fired
         return info
+
+
+def menu_of(env: gym.Env) -> MenuWrapper | None:
+    """The menu in this env chain, or ``None`` if the env is not behind one.
+
+    Asked rather than assumed for the reason
+    :func:`~crafter_gym.levels.level_of` is: the chain is built per phase, so
+    what is in it is the env's own answer. Whatever draws the cursor needs it,
+    since Gymnasium 1.3 forwards no attribute through a wrapper and the menu is
+    not the outermost one.
+
+    :param env: any env, wrapped or not.
+    :return: the :class:`MenuWrapper`, or ``None``.
+    """
+    while isinstance(env, gym.Wrapper):
+        if isinstance(env, MenuWrapper):
+            return env
+        env = env.env
+    return None
