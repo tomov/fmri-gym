@@ -19,9 +19,13 @@ Without it that part says it was skipped, because the rig is not a dependency of
 this repo. What it checks either way is what the port cannot inherit: which
 entries crafter scores by itself and which one the chain therefore has to score,
 and which entries the level being played can pay for at all, since a level that
-freezes the four life stats is not asked for the one that puts food back and a
-level that lets them run carries three more for when they do. Part 2
-is the chain as state, measured
+freezes the four life stats is not asked for the one that puts food back, a
+level that lets them run carries three more for when they do, and a level where
+something hostile spawns carries two more again. That last group is also checked
+against the rig and against crafter: each sighting has to name a class
+``crafter.objects`` really has, no level may carry an interrupt its own row did
+not ask for, and the chain's tail has to come out in ``_INTERRUPT_ORDER``.
+Part 2 is the chain as state, measured
 through ``info``: a frame that changes nothing says nothing, an unlock earned
 before the chain asks for it moves no pointer and is stepped over when the
 pointer arrives, a composite entry waits for both halves, a skip puts the task at
@@ -37,9 +41,10 @@ entry closed before its stat ever fell is paid for and then never mentioned,
 putting one off is a skip like any other, a skip pressed on the very press one
 cuts in is answered with the errand instead, the count above the frame is the
 whole chain from the first frame, and a world restored with a stat already down
-asks about it on the next block's first frame. It ends on the one that is not set up at
-all: a world played from full on nothing but noops, where the first interrupt has
-to arrive on the press the threshold says it does. Part 4 is the one entry crafter has no
+asks about it on the next block's first frame. It ends on the one that is not set
+up at all: a world played from full on nothing but noops, where the first
+interrupt has to arrive on the press the threshold says it does.
+Part 4 is the one entry crafter has no
 achievement for, against nine built worlds: what seals a room and what only looks
 like it does, that the test is read-only, and that being sealed before the chain
 asks does not pre-complete it. Part 5 is the adapter: the field that sets the two
@@ -48,8 +53,8 @@ between them and the count that is the chain's own, which the shelter moves like
 any other entry while an unlock the chain never names moves neither it nor the
 cue, a level whose stats run offered three entries more in the same count and
 naming one when it cuts in, every label packed into one row at the shipped window
-size, the two messages
-a completion produces, and the fields a frame and a block record. Part 6 plays a real block through ``fmri_play.py`` with
+size, the two messages a completion produces, and the fields a frame and a block
+record. Part 6 plays a real block through ``fmri_play.py`` with
 a policy in place of the subject, where the half of this nothing else can see is
 measured: the messages reached the screen in order, each hold really held, and the
 block's clock paid for them -- the same play, ending earlier, rather than a stall.
@@ -409,6 +414,14 @@ def part1() -> None:
         check("and the one number that is deliberately not the rig's is the threshold",
               (tasks.STAT_TASK_LOW, stat["STAT_TASK_LOW"]) == (8, 6),
               f"8 of 9 here against the rig's {stat['STAT_TASK_LOW']} (Fan, 2026-10-07)")
+        sighting = rig_objects(path, ("HOSTILE_TASKS",))
+        # Same shape of deviation as the stats above, for the same reason: the
+        # rig splices a chain row in, so its entry is a tuple of goals.
+        check("the sightings watch the same creatures, and ask for the same "
+              "thing in the same order",
+              tuple((c, (e,)) for c, e in tasks.HOSTILE_TASKS)
+              == sighting["HOSTILE_TASKS"],
+              " -> ".join(f"{c} {e}" for c, e in tasks.HOSTILE_TASKS))
         frontend = os.path.join(os.path.dirname(path), "frontend_pygame.py")
         rig_holds = {"done": rig_default(frontend, "--task-done-s"),
                      "next": rig_default(frontend, "--task-hold-s")}
@@ -457,20 +470,37 @@ def part1() -> None:
               for n in levels if n not in frozen),
           f"{' '.join(n for n in levels if n not in frozen)}: "
           f"{len(tasks.TASK_CHAIN)} entries")
-    # The same rule from the other end (Fan, 2026-10-07): the three entries that
-    # need a stat to have run low are carried by the level that can let it.
-    interrupts = tuple(e for _, e in tasks.STAT_TASKS)
-    opted = [n for n in levels if crafter_gym.LEVELS[n].get("stat_tasks")]
+    # The same rule from the other end (Fan, 2026-10-07): an entry that needs a
+    # trigger is carried by the levels that can pull it. Two families of them
+    # now, built the same way -- a stat that can run low, and a creature that
+    # can be seen (Fan, msgs 1138/1140) -- so each is read off its own flag.
+    stats = tuple(e for _, e in tasks.STAT_TASKS)
+    sightings = tuple(e for _, e in tasks.HOSTILE_TASKS)
+    interrupts = sightings + stats
+    on_stat = [n for n in levels if crafter_gym.LEVELS[n].get("stat_tasks")]
+    on_sight = [n for n in levels if crafter_gym.LEVELS[n].get("hostile_tasks")]
     check("the levels that interrupt with a low stat are the ones the table says",
-          opted == [n for n, r in crafter_gym.LEVELS.items() if r.get("stat_tasks")]
-          and not set(opted) & set(frozen), " ".join(opted))
-    check("each of them asks for the three interrupts as well, after the chain",
-          all(tasks.chain_for(n) == tasks.TASK_CHAIN + interrupts for n in opted),
-          f"{' '.join(opted)}: {len(tasks.TASK_CHAIN) + len(interrupts)} entries")
-    check("and no other level carries one at all",
-          not any(set(tasks.chain_for(n)) & set(interrupts)
-                  for n in crafter_gym.LEVELS if n not in opted),
-          f"{', '.join(interrupts)} are {' and '.join(opted)}'s alone")
+          on_stat == [n for n, r in crafter_gym.LEVELS.items() if r.get("stat_tasks")]
+          and not set(on_stat) & set(frozen), " ".join(on_stat))
+    check("the ones that interrupt on a sighting are the table's too, and each has "
+          "something hostile to sight",
+          on_sight == [n for n, r in crafter_gym.LEVELS.items()
+                       if r.get("hostile_tasks")]
+          and all(crafter_gym.LEVELS[n]["hostiles"] for n in on_sight),
+          " ".join(on_sight))
+    check("each level asks for exactly the families it opted into, after the chain",
+          all(tasks.chain_for(n) == tasks.TASK_CHAIN
+              + (sightings if n in on_sight else ())
+              + (stats if n in on_stat else ())
+              for n in levels if n not in frozen),
+          ", ".join(f"{n} {len(tasks.chain_for(n))}" for n in levels))
+    check("and no level carries an interrupt it did not opt into",
+          not any(set(tasks.chain_for(n)) & set(sightings)
+                  for n in crafter_gym.LEVELS if n not in on_sight)
+          and not any(set(tasks.chain_for(n)) & set(stats)
+                      for n in crafter_gym.LEVELS if n not in on_stat),
+          f"{', '.join(sightings)} are {' '.join(on_sight)}'s alone, "
+          f"{', '.join(stats)} {' and '.join(on_stat)}'s")
     check("every interrupt is an achievement crafter scores itself, and is worded "
           "by what to do",
           all(e in crafter.constants.achievements and e in tasks.TASK_LABELS
@@ -482,6 +512,20 @@ def part1() -> None:
               for s, _ in tasks.STAT_TASKS)
           and 0 < tasks.STAT_TASK_LOW < 9,
           f"{tasks.STAT_TASK_LOW} of 9, each stat full at a reset")
+    # The sighting's own version of that: the class has to be one crafter has,
+    # or the entry can never arm at all.
+    check("and each sighting names a creature class of crafter's own",
+          all(isinstance(getattr(crafter.objects, c, None), type)
+              and issubclass(getattr(crafter.objects, c), crafter.objects.Object)
+              for c, _ in tasks.HOSTILE_TASKS),
+          ", ".join(f"{c} -> {tasks.TASK_LABELS[e]}" for c, e in tasks.HOSTILE_TASKS))
+    check("the tail of the chain is in the order the ones waiting are asked in",
+          all(sorted(tasks.chain_for(n)[len(tasks.TASK_CHAIN):],
+                     key=tasks._INTERRUPT_ORDER.__getitem__)
+              == list(tasks.chain_for(n)[len(tasks.TASK_CHAIN):])
+              for n in levels)
+          and list(tasks._INTERRUPT_ORDER) == list(interrupts),
+          " then ".join(interrupts))
     check("so the chain an episode is played with is the level's, not the table's",
           tracker.base_chain == tasks.chain_for(LEVEL),
           f"{LEVEL} plays {len(tracker.base_chain)} of {len(tasks.TASK_CHAIN)}")

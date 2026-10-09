@@ -109,7 +109,7 @@ plus one per-episode set of the entries that have armed:
   behind one already being asked for, never over the top of it, so the next
   appears when the one before it is finished or put off; and the ones waiting
   are in that fixed order whatever order their stats ran low in
-  (:data:`_STAT_ORDER`), which can differ from it in a world a block resumed
+  (:data:`_INTERRUPT_ORDER`), which can differ from it in a world a block resumed
   with more than one stat already down. Both are where the entry is inserted
   (:meth:`TaskWrapper._arm`), where the rig needed a queue walk for the first of
   them.
@@ -125,6 +125,38 @@ Nothing new is logged for them. The crossing is in the inventory columns every
 frame already carries, the entries are in the chain the block writes, and the
 score is the chain's as it is for everything else: what changes on a
 ``stat_tasks`` level is that the denominator is 15 rather than 12.
+
+The sighting interrupts
+-----------------------
+
+The same machinery, triggered by something outside the player rather than
+inside them. A level that says so in its row (``hostile_tasks``) carries two
+entries more, one per hostile class (:data:`HOSTILE_TASKS`), and each becomes
+askable the first time one of that class is inside the window the player is
+being shown. Everything after that is the low-stat interrupts' behaviour
+exactly: a one-way latch, a move up to just ahead of the open base chain, an
+order of its own among the ones waiting, and no new log column, because the
+creature is in ``semantic`` and the entry is in the chain.
+
+Three things follow from it that are worth saying plainly, because none of them
+is a bug to be fixed later (Fan chose this shape on 2026-10-07 knowing them):
+
+- **A sighting and not a hit.** The entry arms when the creature comes into
+  view, so the strip reads "defeat a zombie" before the first blow lands rather
+  than after it. The level asks the subject to answer what is in front of them,
+  which is the ask Fan described; arming on damage would instead ask them to
+  avenge a hit they have already taken.
+- **It still never takes the screen.** :meth:`TaskWrapper._arm`'s rule is the
+  same for every interrupt, so a zombie can be swinging while the strip is
+  still asking for water. The sightings sort ahead of the stats among the ones
+  *waiting* (:data:`_INTERRUPT_ORDER`), which is as far as the priority goes.
+- **The denominator is 17, and 17 is not always reachable.** The entries are in
+  the chain from the first frame, like every other interrupt, so an episode
+  where no skeleton is ever seen carries a point that cannot be earned and tops
+  out at 16/17. Growing the denominator mid-block instead is the one thing this
+  module has refused all along, so the unearnable point is the deliberate cost.
+  Skeletons spawn on ``path`` and so only underground (``env.py``), which is why
+  this is the common case and not the corner one.
 
 What is not here
 ----------------
@@ -147,9 +179,10 @@ from .env import import_crafter
 from .levels import require_level
 from .menu import menu_of
 
-__all__ = ["SKIP_ENTRY", "STAT_TASKS", "STAT_TASK_LOW", "TASK_CHAIN", "TASK_DONE_TEXT",
-           "TASK_GOALS", "TASK_LABELS", "TASK_PREDICATES", "TaskWrapper", "chain_for",
-           "has_tasks", "next_task_text", "task_text", "tracker_of", "with_tasks"]
+__all__ = ["HOSTILE_TASKS", "SKIP_ENTRY", "STAT_TASKS", "STAT_TASK_LOW", "TASK_CHAIN",
+           "TASK_DONE_TEXT", "TASK_GOALS", "TASK_LABELS", "TASK_PREDICATES",
+           "TaskWrapper", "chain_for", "has_tasks", "next_task_text", "task_text",
+           "tracker_of", "with_tasks"]
 
 #: The order the tasks are named in, and the whole of what a task level asks
 #: for before :func:`chain_for` drops what the level's own rules make empty. It
@@ -189,6 +222,25 @@ TASK_CHAIN = (
 #: a later level that freezes the stats inherits this for free.
 _FROZEN_STAT_ENTRIES = ("eat_plant",)
 
+#: The sighting interrupts a ``hostile_tasks`` level adds to its chain: the
+#: creature class to watch for, and the entry to ask for once one of them has
+#: been in the window the player is shown. In the order they are asked for,
+#: which is the order they are dangerous in: a zombie is already beside you by
+#: the time it matters, an archer can be answered from across the room. Both
+#: entries are achievements crafter scores itself, so each closes the way the
+#: rest of the chain does, and each is worded as the rig's own tutorial words
+#: it (``lessons.py``: "Defeat a zombie.").
+#:
+#: Why a sighting and not a hit: the task has to be on screen BEFORE the blow,
+#: or the level asks the subject to avenge something rather than to answer it
+#: (Fan, msg 1128: task 是 kill zombie，被 zombie 攻击，kill zombie). It is also
+#: the one trigger that is about what the subject can act on rather than about
+#: what has already happened to them.
+HOSTILE_TASKS: tuple[tuple[str, str], ...] = (
+    ("Zombie", "defeat_zombie"),
+    ("Skeleton", "defeat_skeleton"),
+)
+
 #: The low-stat interrupts a ``stat_tasks`` level adds to its chain: the stat
 #: to watch, and the entry to ask for when it falls. In the order they are
 #: asked for, which is this order and not the order the stats happen to cross
@@ -202,17 +254,23 @@ STAT_TASKS: tuple[tuple[str, str], ...] = (
     ("energy", "wake_up"),
 )
 
-#: The stat each interrupt entry watches, which is also the test for whether an
-#: entry is an interrupt at all: the pointer reaches these only once they are
-#: armed, where it walks the base entries in chain order.
-_STAT_OF: dict[str, str] = {entry: stat for stat, entry in STAT_TASKS}
-
-#: Where an interrupt goes in the queue of interrupts waiting to be asked for,
-#: which is :data:`STAT_TASKS`' own order and not the order the stats ran low in
-#: (Fan, 2026-10-07). It matters only in a world that was resumed with more than
-#: one stat already down: from a full start the stats cross in this order by
-#: themselves, 21 ticks for drink against 26 and 31.
-_STAT_ORDER: dict[str, int] = {entry: i for i, (_, entry) in enumerate(STAT_TASKS)}
+#: Every interrupt entry, mapped to where it goes in the queue of the ones
+#: waiting to be asked for. Membership is also the test for whether an entry is
+#: an interrupt at all: the pointer reaches these only once they are armed,
+#: where it walks the base entries in chain order.
+#:
+#: The order is the sightings and then the stats, each group in its own data's
+#: order, and it is not the order they armed in. Which it can differ from in
+#: two places: a world a block resumed with more than one stat already down
+#: (from a full start the stats cross 21, 26 and 31 ticks in, in this order by
+#: themselves), and a night that puts a zombie in the window while an errand is
+#: already waiting. A hostile goes first there because it is a demand that
+#: moves and hits where a stat one point down is an errand; what it does NOT do
+#: is take the screen off a task being asked for right now, which is
+#: :meth:`TaskWrapper._arm`'s rule for every interrupt alike.
+_INTERRUPT_ORDER: dict[str, int] = {
+    entry: i for i, entry in enumerate(
+        [entry for _, entry in HOSTILE_TASKS] + [entry for _, entry in STAT_TASKS])}
 
 #: A stat at or below this, of a full 9, arms its interrupt. Eight and not the
 #: rig's six (Fan, 2026-10-07): awake, a stat loses a point every 21 (drink),
@@ -243,6 +301,8 @@ TASK_LABELS: dict[str, str] = {
     "collect_drink": "drink water",
     "eat_cow": "eat a cow",
     "wake_up": "sleep",
+    "defeat_zombie": "defeat a zombie",
+    "defeat_skeleton": "defeat a skeleton",
 }
 
 #: The pseudo-entry a task level adds to the menu
@@ -384,6 +444,42 @@ def _shelter_around(game: Any) -> bool:
     return _arrow_safe(world, start, seen, static)
 
 
+def _on_screen(game: Any, kind: type) -> bool:
+    """Whether a creature of ``kind`` is inside the window the player is shown.
+
+    The window is the renderer's own: ``LocalView`` draws an object only while
+    ``0 <= obj.pos - player.pos + offset < grid`` (``engine.py``), on a grid of
+    the configured view with the inventory rows taken off the bottom. The grid
+    is recomputed here from ``_view`` rather than read off the installed
+    ``_local_view``, because what is installed is a wrapper and not the
+    ``LocalView`` -- :class:`~crafter_gym.levels._DeathTint` is on every level,
+    the rig has its own equivalent -- and because recomputing is what makes a
+    different ``view=`` move this test with it. Stock ``view=(9, 9)`` and the 16
+    items leave a 9x7 window: four cells either side, three above and below.
+
+    The world and not ``info``: ``semantic`` is the whole 64x64 map stamped with
+    every object on it and has no notion of what is on screen, and the screen is
+    the thing being asked about. Read-only for the reason
+    :data:`TASK_PREDICATES` gives -- a walk that touched ``world.random`` would
+    move every later draw and break the replay.
+
+    :param game: the ``crafter.Env`` whose world and player to read.
+    :param kind: the creature class to look for.
+    :return: whether at least one of them is on screen.
+    """
+    view = np.asarray(game._view)
+    rows = int(np.ceil(len(import_crafter().constants.items) / view[0]))
+    grid = np.array([view[0], view[1] - rows])
+    centre = np.asarray(game._player.pos)
+    for obj in game._world.objects:
+        if not isinstance(obj, kind):
+            continue
+        pos = np.asarray(obj.pos) - centre + grid // 2
+        if bool((pos >= 0).all() and (pos < grid).all()):
+            return True
+    return False
+
+
 #: Entries closed by a test on the live world instead of by an achievement
 #: unlock. Tested only while the entry is the pointer, so sealing yourself in
 #: before being asked does not pre-complete the task: the test is positional
@@ -488,17 +584,19 @@ class TaskWrapper(gym.Wrapper):
 
         Still derived and never stored, and still one walk of :attr:`chain`,
         which is where the order lives: a skip moved an entry to the back of it
-        and a crossing moved an interrupt to the front of what was left
-        (:meth:`_arm`). The one thing an entry can be besides open or closed is
-        unreachable: an interrupt whose stat has not gone low this episode is
-        not askable, so the pointer steps over it and a chain of nothing but
-        those reads as finished.
+        and a crossing or a sighting moved an interrupt to the front of what
+        was left (:meth:`_arm`). The one thing an entry can be besides open or
+        closed is unreachable: an interrupt whose stat has not gone low and
+        whose creature has not been seen this episode is not askable, so the
+        pointer steps over it and a chain of nothing but those reads as
+        finished.
 
         ``None`` once every askable entry is closed, which is the chain finished
         and the rest of the episode free play.
         """
         for entry in self.chain:
-            if (entry not in _STAT_OF or entry in self._armed) and self._entry_open(entry):
+            if ((entry not in _INTERRUPT_ORDER or entry in self._armed)
+                    and self._entry_open(entry)):
                 return entry
         return None
 
@@ -565,19 +663,23 @@ class TaskWrapper(gym.Wrapper):
         self._unlocked = set()
         self._passed = set()
         # A new world starts the homeostat full (``data.yaml``: food, drink and
-        # energy all `initial: 9`), so nothing is armed yet and the first
-        # crossing is the first thing `_arm_stats` can see.
+        # energy all `initial: 9`), so no stat is armed yet and the first
+        # crossing is the first thing `_arm_stats` can see. A sighting has no
+        # such guarantee -- a zombie can be standing in frame 1 -- so it is
+        # looked for here as well as on every step.
         self._armed = set()
+        self._arm_hostiles()
         return obs, self._with_tasks(info, self.task)
 
     def step(self, action: Any) -> tuple[Any, float, bool, bool, dict]:
         """Apply the press, then see what it did to the chain.
 
         In cause order: the task in effect can complete, by an unlock or by its
-        world test; a stat that has just run low can cut an interrupt in ahead
-        of it; and only then can a skip requeue it, and only if neither of those
-        moved the pointer. So a press that completes the task, or is answered
-        with an errand, is never also read as a request to put the task off:
+        world test; a stat that has just run low or a hostile that has just come
+        into frame can cut an interrupt in ahead of it; and only then can a skip
+        requeue it, and only if neither of those moved the pointer. So a press
+        that completes the task, or is answered with an errand, is never also
+        read as a request to put the task off:
         it is off the screen either way, and an errand hands it straight back
         to be put off on a later press if the subject still wants to. A death
         outranks all of it: the episode is over, and what the player needs told
@@ -595,8 +697,12 @@ class TaskWrapper(gym.Wrapper):
         if terminated:
             return obs, reward, terminated, truncated, self._with_tasks(info, task)
         # After the unlocks and before the pointer is read again: a stat that
-        # just went low can take the pointer on this very step, and what the
-        # press was made under is `task`, read above.
+        # just went low, or a creature that just came into frame, can take the
+        # pointer on this very step, and what the press was made under is
+        # `task`, read above. Sightings go first so that on a step where both
+        # arm the creature is the one asked for, which is the same precedence
+        # `_INTERRUPT_ORDER` gives the ones already waiting.
+        self._arm_hostiles()
         self._arm_stats(info)
         passed = self._pass_predicate(task)
         # A completion is this entry closing, which is the one thing the banner
@@ -639,6 +745,26 @@ class TaskWrapper(gym.Wrapper):
                     and inventory.get(stat, 9) <= STAT_TASK_LOW):
                 self._arm(entry)
 
+    def _arm_hostiles(self) -> None:
+        """Arm the interrupt of every hostile class currently on screen.
+
+        The sighting half of the latch, and the same latch as the stats': a
+        class arms on the first frame one of it is in the window the player is
+        shown and never again, so a zombie that wanders off and comes back asks
+        nothing and two of them ask once. Only the entries this level carries
+        can arm, so a level with no sightings in its chain never grows one even
+        with the creature in front of it.
+
+        Which of several goes first is :meth:`_arm`'s to say and not this
+        walk's, and what "on screen" means is :func:`_on_screen`'s.
+        """
+        objects = import_crafter().objects
+        game = self.env.unwrapped.game
+        for name, entry in HOSTILE_TASKS:
+            if (entry in self.chain and entry not in self._armed
+                    and _on_screen(game, getattr(objects, name))):
+                self._arm(entry)
+
     def _arm(self, entry: str) -> None:
         """Make one interrupt askable, and move it up to where it interrupts.
 
@@ -646,17 +772,20 @@ class TaskWrapper(gym.Wrapper):
         entry being asked for right now is read first and left exactly where it
         is, so nothing is ever replaced on screen before it is finished or put
         off. Everything else waiting goes just ahead of the first base entry
-        still open, in :data:`_STAT_ORDER`, so the queue is drink then food then
-        sleep however the stats themselves ran low. With the base chain finished
-        there is nothing to interrupt and the queue goes on the end.
+        still open, in :data:`_INTERRUPT_ORDER`, so the queue is the creature
+        then drink then food then sleep however the sightings and the stats
+        themselves came. With the base chain finished there is nothing to
+        interrupt and the queue goes on the end.
 
         An interrupt the subject put off is not in that queue: a skip left it
         behind the open chain, which is where "back once the rest is done" lives,
         and only a position before the first open base entry counts as waiting.
-        One whose entry closed before its stat ever ran low moves nothing at all,
-        since there is nothing left to ask for.
+        One whose entry closed before its stat ever ran low, or before its
+        creature was ever seen, moves nothing at all, since there is nothing
+        left to ask for.
 
-        :param entry: an entry of :data:`STAT_TASKS`, not yet armed.
+        :param entry: an interrupt entry (:data:`_INTERRUPT_ORDER`), not yet
+            armed.
         """
         held = self.task
         self._armed.add(entry)
@@ -666,7 +795,7 @@ class TaskWrapper(gym.Wrapper):
                    if e in self._armed and e != held and self._entry_open(e)]
         if entry not in waiting:
             waiting.append(entry)
-        waiting.sort(key=_STAT_ORDER.__getitem__)
+        waiting.sort(key=_INTERRUPT_ORDER.__getitem__)
         for queued in waiting:
             self.chain.remove(queued)
         at = self._first_base_open()
@@ -679,7 +808,8 @@ class TaskWrapper(gym.Wrapper):
             is not an interrupt, or the length of the chain if there is none.
         """
         return next((i for i, e in enumerate(self.chain)
-                     if e not in _STAT_OF and self._entry_open(e)), len(self.chain))
+                     if e not in _INTERRUPT_ORDER and self._entry_open(e)),
+                    len(self.chain))
 
     def _pass_predicate(self, task: str | None) -> str:
         """Test a predicate entry that is the pointer, and close it if it passes.
@@ -748,14 +878,21 @@ def chain_for(level: str | None) -> tuple[str, ...]:
     against a subject has to be asked for the same things, and the chain
     pickles into the savestate with the rest of the env.
 
-    Both of the rules it reads are about the homeostat, from the two ends of
-    it. A level that freezes the stats drops the entries that only mean
+    Two of the three rules it reads are about the homeostat, from the two ends
+    of it. A level that freezes the stats drops the entries that only mean
     something while they run (:data:`_FROZEN_STAT_ENTRIES`), and a level that
     says ``stat_tasks`` adds the three it can ask for when they run low
-    (:data:`STAT_TASKS`), which is why the two branches are exclusive in
-    practice as well as in code. The interrupts go on the end, where they are
-    out of the order the base chain is walked in and in the order they are
-    asked for.
+    (:data:`STAT_TASKS`), which is why those two branches are exclusive in
+    practice as well as in code: a frozen stat never runs low. The third is
+    about what the level puts in the world rather than in the player: a level
+    that says ``hostile_tasks`` adds the two it can ask for once the creature
+    is on screen (:data:`HOSTILE_TASKS`), which a level with ``hostiles``
+    false has no way to ever show.
+
+    All of them go on the end, where they are out of the order the base chain is
+    walked in, and they are sorted there into :data:`_INTERRUPT_ORDER` so that
+    the tail of the chain and the queue of the ones waiting are the same order
+    by construction and not by coincidence.
 
     :param level: a key of :data:`~crafter_gym.levels.LEVELS`, or ``None``.
     :return: the entries to ask for, in :data:`TASK_CHAIN`'s order, the
@@ -768,9 +905,12 @@ def chain_for(level: str | None) -> tuple[str, ...]:
     config = require_level(level)
     if config.get("frozen_stats"):
         return tuple(e for e in TASK_CHAIN if e not in _FROZEN_STAT_ENTRIES)
+    interrupts: list[str] = []
+    if config.get("hostile_tasks"):
+        interrupts += [entry for _, entry in HOSTILE_TASKS]
     if config.get("stat_tasks"):
-        return TASK_CHAIN + tuple(entry for _, entry in STAT_TASKS)
-    return TASK_CHAIN
+        interrupts += [entry for _, entry in STAT_TASKS]
+    return TASK_CHAIN + tuple(sorted(interrupts, key=_INTERRUPT_ORDER.__getitem__))
 
 
 def has_tasks(level: str | None) -> bool:

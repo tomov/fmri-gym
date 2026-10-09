@@ -49,10 +49,12 @@ The ``tasks`` flag belongs to the table and is read from
 :mod:`crafter_gym.tasks`, which is a wrapper of its own because what the player
 is asked to do is not one of the rules: a level's rules say what the world
 does, and the chain says which of the things it affords to name next.
-``stat_tasks`` is the part of that chain which waits on a live homeostat, and is
-read from the same place (:func:`crafter_gym.tasks.chain_for`): it is a row of
-this table because whether the homeostat runs is a rule, and what is asked for
-when it runs low is not.
+``stat_tasks`` is the part of that chain which waits on a live homeostat, and
+``hostile_tasks`` the part which waits on something hostile being on screen;
+both are read from the same place (:func:`crafter_gym.tasks.chain_for`). They
+are rows of this table because whether the homeostat runs and whether anything
+hostile spawns are rules, and what is asked for when a stat runs low or a
+zombie walks into frame is not.
 """
 
 from __future__ import annotations
@@ -84,7 +86,8 @@ LEVELS: dict[str, dict[str, Any]] = {
     "L2_homeostasis": dict(hostiles=False, homeostatic_death=True,
                            hidden_items=(), tasks=True, stat_tasks=True),
     "L3_predation": dict(hostiles=True, homeostatic_death=True,
-                         hidden_items=(), tasks=True, stat_tasks=True),
+                         hidden_items=(), tasks=True, stat_tasks=True,
+                         hostile_tasks=True),
     "L4_survival": dict(hostiles=True, homeostatic_death=True,
                         hidden_items=()),
 }
