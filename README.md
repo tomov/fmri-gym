@@ -179,6 +179,10 @@ Three backends read their game files from a checkout of the game's own repo: `vg
 
 The env reads `external/<backend>` by default; a phase's `"repo"` field names another checkout for that block. To bump a pin, check the new commit out in the submodule, commit the submodule and this table together (for `baba_auto`, also `uv sync --reinstall-package baba-auto-gym`: the compiled engine is tied to the checkout it was built from).
 
+## ARC-AGI-3 games
+
+The `arc3` backend plays [ARC-AGI-3](https://arcprize.org/arc-agi/3) games (turn-based grid puzzles in several levels) through `arc3-gym` (`gym/arc3/`), which runs the `arc-agi` toolkit offline. It needs Python 3.12 or later, so `uv sync --extra arc3` skips it on older interpreters. The game files are downloaded once, with the network on, into `external/arc3` (gitignored): `uv run python -m arc3_gym ls20`. Playing then makes no network call and needs no API key. A game that offers a click (`ACTION6`) is refused at start-up, since the scanner has no pointer; `ls20`, `tr87`, `tu93` (ACTION1-4) and `g50t`, `re86`, `wa30` (ACTION1-5) are the keyboard-only ones at the time of writing.
+
 ## Running VGDL games
 
 The `vgdl` backend drives the VGDL games from a gymnasium-ported fork: **[tomov/language_and_experience @ dbp](https://github.com/tomov/language_and_experience/tree/dbp)**. Because it runs under gymnasium + numpy 2, no separate env is needed — the same `fmri-gym` env works.

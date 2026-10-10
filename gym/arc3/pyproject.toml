@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arc3-gym"
+version = "0.1.0"
+description = "ARC-AGI-3 games (the arc-agi toolkit, offline) as a Gymnasium env."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["gymnasium", "numpy", "arc-agi"]
+
+[tool.setuptools]
+packages = ["arc3_gym"]

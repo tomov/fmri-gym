@@ -51,6 +51,9 @@ def get_adapter(backend: str, spec: dict) -> EnvAdapter:
     if backend == "baba_auto":
         from .baba_auto import BabaAutoAdapter
         return BabaAutoAdapter(spec)
+    if backend == "arc3":
+        from .arc3 import Arc3Adapter
+        return Arc3Adapter(spec)
     if backend == "vizdoom":
         from .vizdoom import VizDoomAdapter
         return VizDoomAdapter(spec)

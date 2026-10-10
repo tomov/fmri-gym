@@ -46,6 +46,9 @@ minihack = ["minihack", "nle>=1.3", "minihack-levels"]
 nethack = ["nle>=1.3"]
 # The ten browser games as a gym env, from gym/aigamestore (see tool.uv.sources).
 aigamestore = ["aigamestore-gym"]
+# ARC-AGI-3 games, run offline by the arc-agi toolkit (Python >= 3.12), from gym/arc3 (see
+# tool.uv.sources). The games' files are fetched once (README "ARC-AGI-3 games").
+arc3 = ["arc3-gym; python_version >= '3.12'"]
 vizdoom = ["vizdoom"]
 # COOM scenarios as a gym env, from gym/coom (see tool.uv.sources). Needs the
 # external/coom checkout too; the COOM package itself is not installed.
@@ -79,7 +82,7 @@ dbp = [
     "fmri-gym[vizdoom,coom,aigamestore,crafter,rushhour,baba,minihack,stk]",
 ]
 all = [
-    "fmri-gym[dbp,ale,retro,nethack,vgdl,baba_auto,box2d,mujoco,shimmy,tilematch,triggers,gui]",
+    "fmri-gym[dbp,ale,retro,nethack,vgdl,baba_auto,arc3,box2d,mujoco,shimmy,tilematch,triggers,gui]",
 ]
 
 [project.scripts]
@@ -115,6 +118,7 @@ baba-gym = { path = "gym/baba", editable = true }
 baba-auto-gym = { path = "gym/baba_auto", editable = true }
 crafter-gym = { path = "gym/crafter", editable = true }
 vgdl-gym = { path = "gym/vgdl", editable = true }
+arc3-gym = { path = "gym/arc3", editable = true }
 
 [tool.ruff]
 line-length = 100
