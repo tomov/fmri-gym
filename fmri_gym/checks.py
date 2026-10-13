@@ -81,6 +81,7 @@ from .display import Display, is_locked
 from .keys import _PYGAME_KEY_NAMES, get_events, key_name
 from .photodiode import (CORNERS, AudioRecorder, _clicker, _light_verdict, _log_clicks,
                          _readout, _sound_verdict, run_flashes)
+from .replay import frame_arrays
 from .run import _wait_for_duration
 from .triggers import LIFECYCLE_EVENTS, Codes, TriggerError, Triggers
 
@@ -623,15 +624,23 @@ def _play_pattern(run: Run, fps: float, load: str, phase: dict, index: int) -> d
     rate = f"{fps:g}".replace(".", "p")
     env_id = _register_pattern(f"Frames{rate}fps{'' if load == 'none' else load.upper()}")
     caption = f"Rig check: frames at {fps:g} fps" + ("" if load == "none" else f", {load} load")
+    # keys: the pattern takes no input; its one action is what a frame with no key sends.
     game = {"type": "game", "backend": "gym", "game": env_id, "mode": "duration",
             "duration": phase.get("seconds", 2.0), "fps": fps, "audio": False,
-            "env_kwargs": {"caption": caption}}
+            "keys": {"": 0}, "env_kwargs": {"caption": caption}}
     # The run's own game loop, not a copy: its pacing and triggers are what is measured.
     run._game(game, index)
     entry = run.logger.manifest["phases"][-1]
-    with np.load(os.path.join(run.outdir, entry["data_file"]), allow_pickle=True) as d:
-        flips, codes = d["flip_time"], (d["trigger"] if "trigger" in d else None)
+    flips, codes = _block_flips(os.path.join(run.outdir, entry["data_dir"]))
     return _judge_frames(run, fps, load, phase, flips, codes, entry)
+
+
+def _block_flips(block: str) -> tuple[np.ndarray, np.ndarray | None]:
+    """A logged block's flip times, and its frame trigger codes (0: none) if it sent any."""
+    frames = frame_arrays(block)
+    codes = frames.get("trigger")
+    return (np.asarray(frames.get("flip_time", []), dtype=float),
+            None if codes is None else np.array([c or 0 for c in codes], dtype=int))
 
 
 def _judge_frames(run: Run, fps: float, load: str, phase: dict, flips: np.ndarray,
@@ -656,7 +665,7 @@ def _judge_frames(run: Run, fps: float, load: str, phase: dict, flips: np.ndarra
          "locked": period is not None,
          "divides_refresh": (bool(abs(dt / period - round(dt / period)) < 1e-3)
                              if period else None),
-         "data_file": entry["data_file"], "triggers": _frame_marks(run, codes, dt, phase)}
+         "data_dir": entry["data_dir"], "triggers": _frame_marks(run, codes, dt, phase)}
     name = f"{fps:g} fps" + ("" if load == "none" else f" under {load} load")
     allowed = {"lost": 0, "late": 0, "pacing_resets": 0}
     what = {"lost": "frames lost", "late": "frames a refresh late",
@@ -1908,6 +1917,18 @@ def _html_display(m: dict, folder: str) -> str:
     return "".join(out)
 
 
+def _html_section(section: Callable[[dict, str], str], m: dict, folder: str,
+                  verdict: dict | None) -> str:
+    """A check's section; for a check that broke part-way and left its summary
+    half-written (see :func:`run_check`), a note that it stopped, and why."""
+    try:
+        return section(m, folder)
+    except (KeyError, IndexError, TypeError):
+        why = (verdict or {}).get("why")
+        return (f'<p class="note">This check stopped before it finished'
+                f'{": " + _e(why) if why else ""}.</p>')
+
+
 def _html_frames(m: dict, folder: str) -> str:
     f = m["rig_check"]["frames"]
     out = [f'<p class="note">A test pattern played as a game through the session\'s own game '
@@ -1919,9 +1940,9 @@ def _html_frames(m: dict, folder: str) -> str:
                    'alone; late frames cannot be told from jitter.</p>')
     rows = []
     for b in f["blocks"]:
-        z = np.load(os.path.join(folder, b["data_file"]), allow_pickle=True) \
-            if os.path.exists(os.path.join(folder, b["data_file"])) else None
-        line = sparkline(np.diff(z["flip_time"]) * 1000) if z is not None else ""
+        block = os.path.join(folder, b["data_dir"])
+        line = (sparkline(np.diff(_block_flips(block)[0]) * 1000) if os.path.isdir(block)
+                else "")
         t = b["triggers"]
         marks = "off" if t is None else (f"{t['marked']}/{t['expected']}"
                                          + ("" if t["ok"] else f" — {_e(t['why'])}"))
@@ -2086,7 +2107,8 @@ def render_html(m: dict, folder: str, history: list[dict[str, str]]) -> str:
         body.append(f'<h2>{_e(title)} {_status(tests.get(test, {}).get("status", "not run"))}'
                     + (f' {_status(tests["audio"]["status"])}' if key == "photodiode"
                        and "audio" in tests else "") + "</h2>")
-        body.append('<div class="card">' + (section(m, folder) if key in m["rig_check"]
+        body.append('<div class="card">' + (_html_section(section, m, folder, tests.get(test))
+                                            if key in m["rig_check"]
                                             else '<p class="note">Not run.</p>') + "</div>")
     body.append(f'<h2>This rig over time</h2><div class="card">{_html_history(m, history)}</div>')
     body.append('<h2>Rig</h2><div class="card">' + _html_table(["", ""], [
