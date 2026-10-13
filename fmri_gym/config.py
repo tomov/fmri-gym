@@ -21,6 +21,7 @@ from typing import Any
 
 from .keys import KEY_NAMES
 from .menu import menu_problems
+from .resume import slot_problems
 from .triggers import TriggerError, TriggerSettings
 
 #: The phases of a run; the ``check_*`` ones make a rig check (:mod:`fmri_gym.checks`).
@@ -198,6 +199,7 @@ def _phase_problems(phase: dict) -> list[str]:
         out.append(f"outcome_duration: expected seconds >= 0, got {phase['outcome_duration']!r}")
     if "menu" in phase:
         out.extend(menu_problems(phase["menu"]))
+    out.extend(slot_problems(phase))
     return out
 
 

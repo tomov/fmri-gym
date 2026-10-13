@@ -4,6 +4,7 @@
     data/sub-01/ses-001/beh/sub-01_ses-001_task-pong_run-002/      the same task again
     data/sub-01/ses-001/beh/sub-01_ses-001_task-pong_run-002_02/   ... re-acquired
     data/sub-01/ses-001/beh/sub-01_ses-001_task-crafter_run-001/
+    data/sub-01/ses-001/resume/crafter_L4.state                    the world run-001 left off in
 
 **The numbers come from the session design, not from the disk.** ``--ses`` and
 ``--run`` are required: a run's number is which line of the session script it
@@ -152,6 +153,22 @@ def phase_seed(label: str, index: int) -> int:
     """
     digest = hashlib.sha256(f"{label}|phase-{index}".encode()).digest()
     return int.from_bytes(digest[:4], "big") >> 1
+
+
+def resume_dir(root: str, subject: str, session: int) -> str:
+    """Where this session keeps the worlds its blocks hand on (:mod:`fmri_gym.resume`).
+
+    A session, not a run: the runs of a session are separate ``fmri-play``
+    commands, and a game the subject is living in has to survive between them.
+    Beside ``beh/`` rather than in it, because the run folders under ``beh/``
+    are the data and this is a copy of a savestate they already hold.
+
+    :param root: the BIDS tree's root (``--data-root``).
+    :param subject: ``sub-<label>``.
+    :param session: the BIDS session number, from 1.
+    :return: the folder's path; it is created when a block first writes to it.
+    """
+    return os.path.join(root, subject_label(subject), f"ses-{session:03d}", "resume")
 
 
 def _beh(root: str, subject: str, session: int) -> str:

@@ -143,12 +143,16 @@ class Logger:
                  game=game, phase=phase, base_seed=base_seed)
         return name
 
-    def log(self, **record: Any) -> None:
+    def log(self, state: bytes | None = None, **record: Any) -> None:
         """Append one line to the open block's ``events.jsonl``.
 
+        :param state: an opaque savestate to store on the line as ``state``:
+            zlib'd, then base64 (both done by the writer process, off the
+            caller's loop), the way :meth:`log_frame` stores a frame's.
         :param record: the line's fields; give it a ``type``.
         """
-        self._queue.put({"op": "line", "block": self._block, "line": record})
+        self._queue.put({"op": "line", "block": self._block, "line": record,
+                         "state": state})
 
     def log_frame(self, fields: dict, frame: Any = None, state: bytes | None = None) -> None:
         """Append one ``frame`` line, and the rendered frame when the stride says so.
@@ -368,6 +372,20 @@ def read_events(block: str) -> list[dict]:
             except json.JSONDecodeError:
                 break
     return events
+
+
+def read_state(line: dict) -> bytes | None:
+    """The savestate on one record line, as ``restore()`` wants it.
+
+    The inverse of what the writer does to a ``state`` (see :meth:`Logger.log`
+    and :meth:`Logger.log_frame`). Here so that reading one back is not a
+    matter of knowing that it is zlib'd and then base64.
+
+    :param line: a record from :func:`read_events`.
+    :return: the blob, or ``None`` if that line carries no savestate.
+    """
+    state = line.get("state")
+    return zlib.decompress(base64.b64decode(state)) if state is not None else None
 
 
 def read_frames(block: str) -> tuple[np.ndarray, np.ndarray]:
