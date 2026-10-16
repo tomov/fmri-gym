@@ -1,26 +1,15 @@
 """Protocol 1: cross-process determinism.
 
-The reproducibility rule in ``AGENTS.md``, made executable: *"replay a
-recorded block in a second process and compare the frames bit for bit"* --
-not a same-interpreter comparison, which would never catch a hash-order bug
-(``PYTHONHASHSEED`` is fixed for the life of one interpreter and only
-randomizes between processes).
+The reproducibility rule in ``AGENTS.md``, made executable: replay a
+recorded block in a second process and diff the frames bit for bit --
+not a same-interpreter comparison, which can't catch a hash-order bug
+(``PYTHONHASHSEED`` only varies between processes).
 
-:func:`check_cross_process` samples one fixed action sequence from the
-phase's own keymap, then replays it in three independent ``python``
-subprocesses (``PYTHONHASHSEED`` left unset, so each gets its own random hash
-seed, the default):
-
-- twice with the *same* seed (``seed_a``) -- these two MUST come back
-  bit-identical (frame hashes, rewards, ``terminated``/``truncated``,
-  ``capture().variables``). Anything else is a real bug: the trajectory and
-  the interpreter are identical except for a hash seed nothing in the game
-  should depend on.
-- once with a *different* seed (``seed_b``) -- expected to diverge if the
-  game reads its seed at all; coming back identical is not automatically a
-  bug (the game may have no seed-dependent randomness, or this trajectory
-  never reached the branch that uses it), but is worth a human look before
-  being called "fine".
+:func:`check_cross_process` samples one fixed action sequence, then replays
+it in three subprocesses: two with the same seed (MUST be bit-identical --
+anything else is a real bug) and one with a different seed (expected to
+diverge if the game reads its seed at all; identical isn't automatically a
+bug, but is worth a look).
 """
 from __future__ import annotations
 
@@ -115,9 +104,8 @@ def _run_trajectory(phase: dict, seed: int, actions: list) -> dict:
 
 def diff_traces(a: dict, b: dict) -> dict:
     """Where two :func:`_run_trajectory` traces first disagree, and whether they're identical."""
-    # frame_hashes: [reset, after step 0, after step 1, ...] (len = n_steps+1).
-    # rewards/variables: [after step 0, after step 1, ...] (len = n_steps), so
-    # index i there lines up with frame_hashes[i + 1], not frame_hashes[i].
+    # frame_hashes has one extra entry (the reset) vs rewards/variables, so
+    # index i there lines up with frame_hashes[i + 1].
     n = min(len(a["frame_hashes"]), len(b["frame_hashes"]))
     nr = min(len(a["rewards"]), len(b["rewards"]))
     nv = min(len(a["variables"]), len(b["variables"]))
@@ -171,11 +159,9 @@ def check_cross_process(
     :param seed_b: the "different seed" run's env seed.
     :param tmpdir: scratch dir for inter-process trace files (default: a fresh
         one, removed afterwards).
-    :return: ``{"ok", "same_seed_cross_process", "diff_seed_cross_process",
-        "episode_ended_early", ...}`` -- ``ok`` is False (with ``"error"``) if
-        the subprocesses themselves failed to run, not if they merely
-        disagreed (that is ``same_seed_cross_process["identical"]`` being
-        False, which is the actual failure signal for a PR check).
+    :return: ``{"ok", "same_seed_cross_process", "diff_seed_cross_process", ...}``;
+        ``ok`` is False only if a subprocess itself failed to run -- the real
+        pass/fail signal is ``same_seed_cross_process["identical"]``.
     """
     own_tmpdir = tmpdir is None
     tmpdir = tmpdir or tempfile.mkdtemp(prefix="fmri_gym_determinism_")
@@ -194,10 +180,8 @@ def check_cross_process(
         with open(actions_path, "w") as f:
             json.dump(actions, f, default=lambda o: __import__("numpy").asarray(o).tolist())
 
-        # No PYTHONHASHSEED pin: each subprocess gets Python's own fresh random
-        # hash seed (the default), so a same-seed divergence between them is
-        # the hash-order class of bug AGENTS.md calls out, not an artifact of
-        # one shared hash ordering throughout.
+        # Leave PYTHONHASHSEED unset: each subprocess gets its own random hash
+        # seed, so a same-seed divergence is a real hash-order bug.
         env = {k: v for k, v in os.environ.items() if k != "PYTHONHASHSEED"}
 
         _spawn(config_path, seed_a, actions_path, out_a1, env)
@@ -230,11 +214,8 @@ def check_cross_process(
 
 
 def _cli_run_one() -> None:
-    """Internal subcommand: run one trajectory, write its trace to a JSON file.
-
-    Invoked by :func:`_spawn` as ``python -m tools.determinism.cross_process
-    _run_one <config> <seed> <actions.json> <out.json>`` -- this is the thing
-    that actually runs in the fresh subprocess.
+    """Run one trajectory, write its trace to a JSON file -- what actually
+    runs in each subprocess :func:`_spawn` launches.
     """
     ap = argparse.ArgumentParser()
     ap.add_argument("config")
