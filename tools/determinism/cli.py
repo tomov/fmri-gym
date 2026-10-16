@@ -15,16 +15,27 @@ from __future__ import annotations
 
 import glob
 import os
+import platform
 import subprocess
 import sys
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# SuperTuxKart's actual blocker differs by platform: darwin/arm64 has no
+# prebuilt stk_gym binary at all; Linux x86_64 does (pyproject.toml: "Linux
+# x86_64 only for now"), but still needs a real GL display, which a bare CI
+# runner doesn't have. Picked at import time so the reason shown is accurate
+# for wherever this actually runs, not hardcoded to one machine.
+if platform.system() == "Darwin":
+    _STK_REASON = ("stk_gym.binary.BinaryNotFound: no darwin/arm64 prebuilt binary "
+                   "in the gym-v0.1.3 release")
+else:
+    _STK_REASON = "needs a real GL display (no Xvfb/EGL set up in this environment)"
+
 # Configs this machine genuinely cannot run, name -> why. Add an entry only
 # for a real environment/hardware gap (never to silence an actual failure).
 _KNOWN_UNTESTABLE = {
-    f"stk__{name}": "stk_gym.binary.BinaryNotFound: no darwin/arm64 prebuilt binary "
-                     "in the gym-v0.1.3 release"
+    f"stk__{name}": _STK_REASON
     for name in ("cornfield_crossing", "hacienda", "lighthouse", "scotland", "snowmountain")
 }
 
