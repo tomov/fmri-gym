@@ -1,28 +1,19 @@
 """Protocol 2 & 3: replay fidelity against the REAL production pipeline.
 
-Protocol 1 (:mod:`tools.determinism.cross_process`) only tests the adapter
-directly. That is not the same claim as "a recorded block replays correctly"
--- the real path is ``fmri_gym.logging.Logger`` writing ``events.jsonl`` /
-``frames.h5`` during a run, and ``fmri_gym.replay.reconstruct_episode`` reading
-them back later, on a long-lived engine instance that has already played
-prior episodes. ``reconstruct_episode`` has a ``warm_up()`` hook for exactly
-this reason (some engines behave differently on their second ``reset()``) --
-a change there is what this protocol is built to catch a regression in.
+Protocol 1 only tests the adapter directly, not whether a recorded block
+replays correctly through the real path: ``fmri_gym.logging.Logger`` writes
+``events.jsonl``/``frames.h5`` during a run, and
+``fmri_gym.replay.reconstruct_episode`` reads them back later, on a
+long-lived engine that's already played prior episodes -- the precondition
+``reconstruct_episode``'s ``warm_up()`` hook exists for.
 
-This module does what an isolated single-episode replay test cannot: write a
-REAL, multi-episode block through the real :class:`~fmri_gym.logging.Logger`
-(the same ``open_block``/``log_frame``/``close_block`` calls
-``fmri_gym/run.py`` makes, on one long-lived adapter instance playing every
-episode back to back), then call the real
-:func:`fmri_gym.replay.reconstruct_episode` for each episode and diff its
-frames against what ``frames.h5`` actually recorded.
+:func:`check_episode_reconstruction` (Protocol 2) writes a real multi-episode
+block through the real :class:`~fmri_gym.logging.Logger`, then diffs
+``reconstruct_episode``'s replayed frames against what was actually recorded.
 
-Protocol 3 (:func:`check_savestate_restore`) is the other half of
-"reproducibility is the product": for a backend with an in-memory savestate
-(``capture().blob is not None``), capture mid-episode, replay the prefix from
-scratch into a second adapter, ``.restore()``, and check the tail matches the
-ORIGINAL recorded tail (not just another live run) -- the shape restore is
-actually used in, ``fmri_gym/run.py``'s crash-recovery path.
+:func:`check_savestate_restore` (Protocol 3): for a backend with an
+in-memory savestate, capture mid-episode, restore into a fresh adapter, and
+check the tail matches the ORIGINAL recorded tail, not just another live run.
 """
 from __future__ import annotations
 
@@ -72,16 +63,10 @@ def sample_actions(phase: dict, steps: int, action_seed: int) -> list:
 
 
 class _Recorder:
-    """Wraps a real :class:`~fmri_gym.adapters.base.EnvAdapter`, recording what
-    :func:`fmri_gym.replay.reconstruct_episode` actually sees as it replays.
-
-    Forwards everything except ``step``/``capture``, which it also records
-    through -- in the SAME order ``reconstruct_episode`` calls them (``step``
-    then ``capture``), matching real ``fmri_gym/run.py`` (``step`` then
-    ``capture`` then ``render`` for display): a frame is appended on
-    ``capture``, right after the real call, so an engine whose ``render()``
-    has side effects (AGENTS.md's warning) sees the same call order recorded
-    runs do.
+    """Wraps a real adapter, recording what ``reconstruct_episode`` sees as it
+    replays: forwards everything except ``step``/``capture``, which it also
+    records through, in the same order (``step`` then ``capture``) real
+    ``fmri_gym/run.py`` uses.
     """
 
     def __init__(self, inner: Any) -> None:
@@ -122,27 +107,21 @@ def record_real_block(
 ) -> dict:
     """Play a real multi-episode block through the real ``Logger``, on one adapter.
 
-    One long-lived adapter plays every episode back to back -- the same shape
-    ``fmri_gym/run.py`` uses, and the precondition the VizDoom episode-2+ bug
-    needed (a fresh engine's first episode behaves differently from every one
-    after it; a block always has that transition once it has >1 episode).
+    One long-lived adapter plays every episode back to back, matching
+    ``fmri_gym/run.py`` and the precondition the VizDoom episode-2+ bug needed.
 
     :param config_path: a ``configs/dbp_games/*.json`` file.
     :param episode_steps: step budget per episode, e.g. ``(6, 40)`` = a short
-        throwaway episode 0, then a longer episode 1 to actually check
-        reconstruction on (the common real shape: short first episodes,
-        VizDoom's own scenarios end in seconds).
-    :param state_stride: how often ``capture(want_blob=True)`` is asked for,
-        ``ep_frame == 0`` always included (the real convention, see
-        ``docs/SAVESTATES.md``).
-    :param action_seed: seed for sampling each episode's action sequence
-        (varies by episode: ``action_seed + episode_id``).
+        throwaway episode 0, then a longer episode 1 to check reconstruction on.
+    :param state_stride: how often ``capture(want_blob=True)`` is asked for
+        (``ep_frame == 0`` always included, see ``docs/SAVESTATES.md``).
+    :param action_seed: seed for sampling each episode's actions
+        (``action_seed + episode_id``).
     :param base_seed: episode ``i``'s env seed is ``base_seed + i``, matching
-        ``fmri_gym/run.py``'s ``base_seed + completed``.
+        ``fmri_gym/run.py``.
     :param outdir: where to write the block (default: a fresh temp dir).
-    :return: ``{"block_dir", "actions": [per-episode action lists],
-        "outdir", "own_outdir"}``. Caller owns cleanup of ``outdir`` when
-        ``own_outdir`` is True.
+    :return: ``{"block_dir", "actions", "outdir", "own_outdir"}``; caller owns
+        cleanup of ``outdir`` when ``own_outdir`` is True.
     """
     from fmri_gym.adapters import get_adapter
     from fmri_gym.logging import Logger
@@ -156,10 +135,8 @@ def record_real_block(
     rec_phase = {**phase, "frame_stride": 1}
     backend = rec_phase.get("backend", "gym")
 
-    # Sampled BEFORE the recording adapter is built, and never while it is
-    # still open: sample_actions builds and closes its own throwaway adapter,
-    # and some backends (AI GameStore's Playwright sync API) cannot have two
-    # instances alive in the same process even briefly.
+    # Sampled before the recording adapter is built: some backends (AI
+    # GameStore's Playwright sync API) can't have two instances open at once.
     actions_per_episode = [sample_actions(rec_phase, steps, action_seed + i)
                            for i, steps in enumerate(episode_steps)]
 
@@ -330,9 +307,7 @@ def check_savestate_restore(
             adapter2.restore(blob)
             tail_frames = [np.array(adapter2.render())]
             tail_rewards: list[float] = []
-            # ep_frame == k required actions[0..k] inclusive (k+1 actions) --
-            # the blob already reflects actions[k], so the next NEW action to
-            # apply is actions[k + 1], not actions[k] again.
+            # The blob already reflects actions[k]; the next new one is k + 1.
             for action in actions[k + 1:]:
                 obs, reward, terminated, truncated, info = adapter2.step(action)
                 tail_rewards.append(float(reward))
@@ -356,9 +331,8 @@ def check_savestate_restore(
         report["n_frames_compared"] = n
         report["n_mismatched"] = n_mismatched
         report["first_mismatch"] = first_mismatch
-        # original_tail_rewards[0] is the reward AT the restore frame itself
-        # (already baked into the blob, not reproduced by a post-restore
-        # step); align it against tail_rewards, which starts one frame later.
+        # original_tail_rewards[0] is the restore frame's own reward (already
+        # in the blob); tail_rewards starts one frame later.
         report["rewards_match"] = (
             original_tail_rewards[1:1 + len(tail_rewards)] == tail_rewards)
         report["identical"] = (n_mismatched == 0 and report["rewards_match"]
@@ -377,13 +351,7 @@ def check_savestate_restore(
 
 
 def main() -> None:
-    """``python -m tools.determinism.replay <reconstruction|restore> <config>``.
-
-    Each subcommand runs in its own process, called this way by ``cli.py``
-    rather than imported directly: some backends (AI GameStore's Playwright
-    sync API) error out if a second instance is built in the same process,
-    and both checks here build more than one adapter.
-    """
+    """``python -m tools.determinism.replay <reconstruction|restore> <config>``."""
     ap = argparse.ArgumentParser()
     ap.add_argument("subcommand", choices=["reconstruction", "restore"])
     ap.add_argument("config")

@@ -14,6 +14,7 @@ you touch ``fmri_gym/replay.py``, ``fmri_gym/logging.py``, or a backend's
 from __future__ import annotations
 
 import glob
+import importlib.util
 import os
 import platform
 import subprocess
@@ -21,23 +22,28 @@ import sys
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# SuperTuxKart's actual blocker differs by platform: darwin/arm64 has no
-# prebuilt stk_gym binary at all; Linux x86_64 does (pyproject.toml: "Linux
-# x86_64 only for now"), but still needs a real GL display, which a bare CI
-# runner doesn't have. Picked at import time so the reason shown is accurate
-# for wherever this actually runs, not hardcoded to one machine.
+# STK: no binary at all on darwin/arm64; needs a GL display on Linux, which CI lacks.
 if platform.system() == "Darwin":
     _STK_REASON = ("stk_gym.binary.BinaryNotFound: no darwin/arm64 prebuilt binary "
                    "in the gym-v0.1.3 release")
 else:
     _STK_REASON = "needs a real GL display (no Xvfb/EGL set up in this environment)"
 
-# Configs this machine genuinely cannot run, name -> why. Add an entry only
-# for a real environment/hardware gap (never to silence an actual failure).
+# arc3 needs --extra arc3 (Python >=3.12) plus a one-time `python -m arc3_gym
+# <game>` fetch -- checked live, not hardcoded, so an env with it set up still runs it.
+_ARC3_REASON = "arc3_gym not importable here -- needs --extra arc3 on a Python >=3.12 interpreter"
+_arc3_usable = importlib.util.find_spec("arc3_gym") is not None
+
+# Configs this machine can't run, name -> why. Only for a real env/hardware gap.
 _KNOWN_UNTESTABLE = {
     f"stk__{name}": _STK_REASON
     for name in ("cornfield_crossing", "hacienda", "lighthouse", "scotland", "snowmountain")
 }
+if not _arc3_usable:
+    _KNOWN_UNTESTABLE.update({
+        f"arc3__{name}": _ARC3_REASON
+        for name in ("g50t", "ls20", "re86", "tr87", "tu93", "wa30")
+    })
 
 
 def main() -> int:
