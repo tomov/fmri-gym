@@ -1,0 +1,46 @@
+name: Reproducibility tests
+
+
+"on":
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    #timeout-minutes: 30 default 360
+    env:
+      SDL_VIDEODRIVER: dummy
+      SDL_AUDIODRIVER: dummy
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          
+          submodules: recursive
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          # libportaudio2: every backend (via sounddevice). libopenal1: COOM's
+          # audio. build-essential: baba_auto compiles its C++ engine at install.
+          sudo apt-get install -y --no-install-recommends \
+            libportaudio2 libopenal1 build-essential
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        # Mirrors the README's own install line. SuperTuxKart is part of the
+        # `dbp` extra and installs fine here, but actually RUNNING it needs a
+        # real GL display and a one-time 254 MiB asset download -- out of
+        # scope for a PR check, which is why cli.py's _KNOWN_UNTESTABLE skips
+        # its 5 configs unconditionally.
+        run: uv sync --extra dbp --extra baba_auto
+
+      - name: Install Playwright browsers
+        run: uv run playwright install --with-deps chromium
+
+      - name: Run reproducibility check
+        run: uv run python -m tools.determinism.cli
