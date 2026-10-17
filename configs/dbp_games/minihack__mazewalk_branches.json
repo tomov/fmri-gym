@@ -4,22 +4,19 @@
   "_keys_note": "Discrete(4): 0=N, 1=E, 2=S, 3=W. Four directions only; turn-based.",
   "curriculum": [
     {
-      "type": "message",
-      "align": "left",
-      "text": [
-        "MazeWalk: Branches",
-        "",
-        "Explore the maze and find the staircase.",
-        "The view follows you. Remember paths you have tried.",
-        "",
-        "ARROWS: move (no diagonal movement)",
-        "Hold X: restart / give up",
-        "",
-        "Press SPACE to start."
-      ]
-    },
-    {
       "type": "game", "backend": "minihack", "game": "minihack_levels:MiniHack-MazeWalk-Branches-v0", "seed": 0,
+      "instructions": {
+        "title": "MazeWalk: Branches", "align": "left", "keys_to_dismiss": ["SPACE"],
+        "text": [
+          "Explore the maze and find the staircase.",
+          "The view follows you. Remember paths you have tried.",
+          "",
+          "ARROWS: move (no diagonal movement)",
+          "Hold X: restart / give up",
+          "",
+          "Press SPACE to start."
+        ]
+      },
       "keys": {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3},
       "menu": {"key": "X", "hold": 1.5, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["UP", "DOWN"], "confirm": "SPACE"},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 900, "fps": 15, "turn_based": true

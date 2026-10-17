@@ -2,29 +2,26 @@
   "_game": "AI GameStore game6 (shadow platformer)",
   "_note": "uv sync --extra aigamestore: the vendored aigamestore-gym env (gym/aigamestore), which needs a Chromium browser (system Chrome by default). Lock-stepped: fps must equal 60 / frame_skip (10 with the default frame_skip 6).",
   "_levels_note": "One long level with checkpoints: each episode is one attempt at it, and ends on a win or a loss. Blocking, as the game is: the block is one attempt at the level that counts only when won (mode 'episode', n_episodes 1, advancing_outcomes ['won']); a loss restarts it, and max_duration 300 s (a long level) is the cap.",
-  "_keys_note": "The env's action is MultiBinary over the game's keys, in aigamestore_gym.GAME_KEYS order -- game6: 0=LEFT, 1=RIGHT, 2=UP, 3=SPACE, 4=Z -- so 'keys' values are those indices (the JSON key is what the subject presses) and held keys combine. The env relabels the on-canvas hints to the pressed key; keep the message Controls text in sync with 'keys' by hand.",
+  "_keys_note": "The env's action is MultiBinary over the game's keys, in aigamestore_gym.GAME_KEYS order -- game6: 0=LEFT, 1=RIGHT, 2=UP, 3=SPACE, 4=Z -- so 'keys' values are those indices (the JSON key is what the subject presses) and held keys combine. The env relabels the on-canvas hints to the pressed key; keep the instructions' Controls text in sync with 'keys' by hand.",
   "_keys_reference": "https://github.com/tomov/fmri-gym/blob/main/gym/aigamestore/game6/input.js",
   "curriculum": [
-    {
-      "type": "message",
-      "align": "left",
-      "text": [
-        "Shadow Journey",
-        "",
-        "Side-scrolling platformer through the",
-        "shadows. Reach checkpoints and find your way.",
-        "",
-        "Controls:",
-        "   LEFT / RIGHT        move",
-        "   UP or SPACE         jump",
-        "   Z                   interact",
-        "",
-        "(press SPACE to start)"
-      ]
-    },
-    {"type": "fixation", "duration": 1.0},
+    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {
       "type": "game", "backend": "aigamestore", "game": "game6/level1",
+      "instructions": {
+        "title": "Shadow Journey", "align": "left", "keys_to_dismiss": ["SPACE"],
+        "text": [
+          "Side-scrolling platformer through the",
+          "shadows. Reach checkpoints and find your way.",
+          "",
+          "Controls:",
+          "   LEFT / RIGHT        move",
+          "   UP or SPACE         jump",
+          "   Z                   interact",
+          "",
+          "(press SPACE to start)"
+        ]
+      },
       "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "SPACE": 3, "Z": 4},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 300.0, "fps": 10
     },

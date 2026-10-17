@@ -1,32 +1,29 @@
 {
   "_game": "ViZDoom: Deadly Corridor (Doom action-shooter; COOM engine) -- full movement",
   "_note": "pip install vizdoom. Fight down a corridor to the vest at the end; enemies attack from side alcoves. Unlike DefendCenter this scenario HAS move buttons, so you can walk forward/back and strafe.",
-  "_keys_note": "The env's action is MultiBinary over the scenario's buttons (env_kwargs.max_buttons_pressed 0), so 'keys' values are button indices in the scenario's available_buttons order -- VizdoomDeadlyCorridor-v1: 0=MOVE_LEFT, 1=MOVE_RIGHT, 2=ATTACK, 3=MOVE_FORWARD, 4=MOVE_BACKWARD, 5=TURN_LEFT, 6=TURN_RIGHT. Held keys combine (turn while shooting). The controls the subject sees are a plain 'message' phase; keep its text in sync with 'keys' by hand.",
+  "_keys_note": "The env's action is MultiBinary over the scenario's buttons (env_kwargs.max_buttons_pressed 0), so 'keys' values are button indices in the scenario's available_buttons order -- VizdoomDeadlyCorridor-v1: 0=MOVE_LEFT, 1=MOVE_RIGHT, 2=ATTACK, 3=MOVE_FORWARD, 4=MOVE_BACKWARD, 5=TURN_LEFT, 6=TURN_RIGHT. Held keys combine (turn while shooting). The controls the subject sees are the game phase's 'instructions'; keep their text in sync with 'keys' by hand.",
   "_keys_reference": "https://github.com/Farama-Foundation/ViZDoom/blob/main/scenarios/deadly_corridor.cfg",
   "_audio_note": "env_kwargs.audio_buffer_enabled turns Doom's sound on: it arrives in obs['audio'], is played through the session's speakers, and is logged per frame. Doom makes 1/35 s of sound per step, so fps * env_kwargs.frame_skip must be 35: the session stops the block otherwise, because sound could not follow the frames. This scenario used to run at fps 20, i.e. in slow motion; 35 is Doom's own tic rate, so the corridor now plays at the speed the scenario was designed for.",
   "curriculum": [
-    {
-      "type": "message",
-      "align": "left",
-      "text": [
-        "Deadly Corridor",
-        "",
-        "Fight your way down the corridor to the green",
-        "vest at the far end. Enemies attack from alcoves",
-        "on both sides.",
-        "",
-        "Controls:",
-        "   UP / DOWN      move forward / back",
-        "   LEFT / RIGHT   turn left / right",
-        "   X / Z          move left / right",
-        "   SPACE          shoot",
-        "",
-        "(press SPACE to start)"
-      ]
-    },
-    {"type": "fixation", "duration": 1.0},
+    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {
       "type": "game", "backend": "vizdoom", "game": "VizdoomDeadlyCorridor-v1",
+      "instructions": {
+        "title": "Deadly Corridor", "align": "left", "keys_to_dismiss": ["SPACE"],
+        "text": [
+          "Fight your way down the corridor to the green",
+          "vest at the far end. Enemies attack from alcoves",
+          "on both sides.",
+          "",
+          "Controls:",
+          "   UP / DOWN      move forward / back",
+          "   LEFT / RIGHT   turn left / right",
+          "   X / Z          move left / right",
+          "   SPACE          shoot",
+          "",
+          "(press SPACE to start)"
+        ]
+      },
       "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
       "keys": {"UP": 3, "DOWN": 4, "LEFT": 5, "RIGHT": 6, "Z": 0, "X": 1, "SPACE": 2},
       "mode": "duration", "duration": 300.0, "fps": 35

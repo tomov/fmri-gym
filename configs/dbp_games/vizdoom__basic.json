@@ -1,30 +1,27 @@
 {
   "_game": "ViZDoom: Basic (Doom action-shooter; COOM engine) -- strafe and shoot",
   "_note": "pip install vizdoom. The simplest ViZDoom scenario: one monster on the far wall of a small rectangular room. Line it up and shoot it; the episode ends on the kill (or after 300 tics). There are no turn buttons here, only strafing.",
-  "_keys_note": "The env's action is MultiBinary over the scenario's buttons (env_kwargs.max_buttons_pressed 0), so 'keys' values are button indices in the scenario's available_buttons order -- VizdoomBasic-v1: 0=MOVE_LEFT, 1=MOVE_RIGHT, 2=ATTACK. Held keys combine (turn while shooting). The controls the subject sees are a plain 'message' phase; keep its text in sync with 'keys' by hand.",
+  "_keys_note": "The env's action is MultiBinary over the scenario's buttons (env_kwargs.max_buttons_pressed 0), so 'keys' values are button indices in the scenario's available_buttons order -- VizdoomBasic-v1: 0=MOVE_LEFT, 1=MOVE_RIGHT, 2=ATTACK. Held keys combine (turn while shooting). The controls the subject sees are the game phase's 'instructions'; keep their text in sync with 'keys' by hand.",
   "_keys_reference": "https://github.com/Farama-Foundation/ViZDoom/blob/main/scenarios/basic.cfg",
   "_audio_note": "env_kwargs.audio_buffer_enabled turns Doom's sound on: it arrives in obs['audio'], is played through the session's speakers, and is logged per frame. Doom makes 1/35 s of sound per step, so fps * env_kwargs.frame_skip must be 35: the session stops the block otherwise, because sound could not follow the frames.",
   "curriculum": [
-    {
-      "type": "message",
-      "align": "left",
-      "text": [
-        "Basic",
-        "",
-        "A single monster stands against the far wall.",
-        "Slide left and right to line up your shot, then",
-        "shoot it.",
-        "",
-        "Controls:",
-        "   LEFT / RIGHT   move left / right",
-        "   SPACE          shoot",
-        "",
-        "(press SPACE to start)"
-      ]
-    },
-    {"type": "fixation", "duration": 1.0},
+    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {
       "type": "game", "backend": "vizdoom", "game": "VizdoomBasic-v1",
+      "instructions": {
+        "title": "Basic", "align": "left", "keys_to_dismiss": ["SPACE"],
+        "text": [
+          "A single monster stands against the far wall.",
+          "Slide left and right to line up your shot, then",
+          "shoot it.",
+          "",
+          "Controls:",
+          "   LEFT / RIGHT   move left / right",
+          "   SPACE          shoot",
+          "",
+          "(press SPACE to start)"
+        ]
+      },
       "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
       "keys": {"LEFT": 0, "RIGHT": 1, "Z": 0, "X": 1, "SPACE": 2},
       "mode": "duration", "duration": 300.0, "fps": 35

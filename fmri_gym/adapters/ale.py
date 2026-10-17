@@ -65,8 +65,9 @@ class ALEAdapter(EnvAdapter):
     def restore(self, blob: bytes) -> None:
         self.env.unwrapped.restore_state(pickle.loads(blob))
 
-    def block_extra(self) -> dict | None:
-        """Block-level arrays merged into the npz (the palette, if save_pixels)."""
+    def block_extra(self) -> dict:
+        """The state the block ended in, and the palette if save_pixels."""
+        extra = {"state": pickle.dumps(self.env.unwrapped.clone_state(include_rng=True))}
         if self.save_pixels:
-            return {"palette": self._palette}
-        return None
+            extra["palette"] = self._palette
+        return extra

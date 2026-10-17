@@ -3,6 +3,9 @@
 An episode is replayed from its seed and its actions through a fresh adapter
 built from the block's own ``block_start`` line, so a block's log is enough to
 recreate the game the subject saw, frame for frame, on a deterministic engine.
+An episode a block carried on from an earlier run (``resumed`` on its
+``episode_start``) starts from the savestate on the block's ``resume`` line
+instead, since its seed alone gives the world as it was before that run.
 """
 
 from __future__ import annotations
@@ -11,16 +14,17 @@ from typing import Any
 
 import numpy as np
 
-from .logging import read_events
+from .logging import read_events, read_state
 
 
 def reconstruction_plan(block: str, episode_id: int | None = None) -> dict:
-    """One episode's seed and actions.
+    """One episode's seed, actions, and the savestate it resumed from.
 
     :param block: the block's folder.
     :param episode_id: which episode; ``None`` = the last one started (the
         crash-recovery case).
-    :return: ``{"episode_id", "seed", "actions"}``.
+    :return: ``{"episode_id", "seed", "actions", "state"}``; ``state`` is the
+        savestate a resumed episode starts from, ``None`` for any other.
     :raises ValueError: if the block has no episode.
     """
     events = read_events(block)
@@ -31,7 +35,11 @@ def reconstruction_plan(block: str, episode_id: int | None = None) -> dict:
         episode_id = max(starts)
     actions = [e["action"] for e in events
                if e["type"] == "frame" and e["episode_id"] == episode_id]
-    return {"episode_id": episode_id, "seed": starts[episode_id]["seed"], "actions": actions}
+    state = None
+    if starts[episode_id].get("resumed", False):
+        state = read_state(next(e["state"] for e in events if e["type"] == "resume"))
+    return {"episode_id": episode_id, "seed": starts[episode_id]["seed"], "actions": actions,
+            "state": state}
 
 
 def reconstruct_episode(
@@ -54,6 +62,8 @@ def reconstruct_episode(
         start = read_events(block)[0]
         adapter = get_adapter(start["backend"], start["phase"])
     adapter.reset(plan["seed"])
+    if plan["state"] is not None:
+        adapter.restore(plan["state"])
     actions = plan["actions"] if n_actions is None else plan["actions"][:n_actions]
     for action in actions:
         obs, _, _, _, info = adapter.step(action)

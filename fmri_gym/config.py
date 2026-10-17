@@ -139,9 +139,37 @@ def validate_config(config: dict) -> list[str]:
         problems.append("curriculum: needs at least one phase")
     for i, phase in enumerate(config["curriculum"]):
         problems.extend(f"phase {i}: {p}" for p in _phase_problems(phase))
+    problems.extend(opening_problems(config["curriculum"]))
     problems.extend(trigger_problems(config.get("triggers")))
     problems.extend(trigger_key_clashes(config))
     return problems
+
+
+def opening_problems(curriculum: list[dict]) -> list[str]:
+    """``include_on_resume`` marks the curriculum's opening phases, and only those.
+
+    A resumed run plays the marked phases first (a fixation to settle in, say)
+    and then carries on where the last run stopped, so they must be the
+    phases a fresh run opens with: an unbroken run from phase 0, none of
+    them a game, whose place is the curriculum's.
+
+    :param curriculum: the run's phases.
+    :return: one problem per misplaced or malformed flag.
+    """
+    out = []
+    opening = True
+    for i, phase in enumerate(curriculum):
+        flag = phase.get("include_on_resume", False)
+        if not isinstance(flag, bool):
+            out.append(f"phase {i}: include_on_resume: expected true or false, got {flag!r}")
+        elif flag and phase["type"] == "game":
+            out.append(f"phase {i}: include_on_resume: a game phase resumes where it stopped; "
+                       "the flag is for the opening phases before it")
+        elif flag and not opening:
+            out.append(f"phase {i}: include_on_resume: only the phases the curriculum opens "
+                       "with can have it, with no phase without it before them")
+        opening = opening and flag is True
+    return out
 
 
 def trigger_key_clashes(config: dict) -> list[str]:
@@ -198,6 +226,47 @@ def _phase_problems(phase: dict) -> list[str]:
         out.append(f"outcome_duration: expected seconds >= 0, got {phase['outcome_duration']!r}")
     if "menu" in phase:
         out.extend(menu_problems(phase["menu"]))
+    if "instructions" in phase:
+        out.extend(_instructions_problems(phase["instructions"]))
+    return out
+
+
+def _instructions_problems(spec: Any) -> list[str]:
+    """A game phase's ``instructions``: a title, a text, and how the screen goes away.
+
+    The screen is shown each time a run starts or resumes the phase, so a
+    subject who comes back to a level mid-way is told again what it is.
+    """
+    if not isinstance(spec, dict):
+        return [f"instructions: expected an object, got {spec!r}"]
+    out = []
+    unknown = set(spec) - {"title", "text", "align", "duration", "keys_to_dismiss"}
+    if unknown:
+        out.append(f"instructions: unknown field(s) {sorted(unknown)}; the fields are title, "
+                   "text, align, duration and keys_to_dismiss")
+    if spec.get("align", "center") not in ("center", "left"):
+        out.append(f"instructions: align: expected 'center' or 'left', got {spec['align']!r}")
+    if not isinstance(spec.get("title"), str) or not spec["title"]:
+        out.append('instructions: title: missing; the screen says "Starting <title>" or '
+                   '"Resuming <title>"')
+    text = spec.get("text", "")
+    if not (isinstance(text, str) or (isinstance(text, list)
+                                      and all(isinstance(t, str) for t in text))):
+        out.append(f"instructions: text: expected a string or a list of lines, got {text!r}")
+    duration = spec.get("duration")
+    if duration is not None and (isinstance(duration, bool)
+                                 or not isinstance(duration, (int, float)) or duration <= 0):
+        out.append(f"instructions: duration: expected seconds > 0, got {duration!r}")
+    keys = spec.get("keys_to_dismiss")
+    if keys is not None and (not isinstance(keys, list) or not keys
+                             or not all(isinstance(k, str) for k in keys)):
+        out.append(f"instructions: keys_to_dismiss: expected a list of key names, got {keys!r}")
+    elif keys is not None and set(keys) - KEY_NAMES:
+        out.append(f"instructions: keys_to_dismiss: {sorted(set(keys) - KEY_NAMES)} are not key "
+                   "names; use those in fmri_gym/keys.py (SPACE, RETURN, A-Z, ...)")
+    if duration is None and keys is None:
+        out.append("instructions: give a duration, keys_to_dismiss, or both, or the screen "
+                   "never goes away")
     return out
 
 

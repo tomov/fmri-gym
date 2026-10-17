@@ -633,7 +633,8 @@ class CrafterAdapter(EnvAdapter):
         """Block-level legends for the per-frame variables.
 
         :return: id-indexed name arrays for the action space, the inventory
-            slots, the achievements and the semantic grid.
+            slots, the achievements and the semantic grid, and the state the
+            block ended in.
         """
         import crafter
         # constants.items / .achievements are what the player's dicts are built
@@ -647,6 +648,7 @@ class CrafterAdapter(EnvAdapter):
             "inventory_names": np.array(list(crafter.constants.items)),
             "achievement_names": np.array(list(crafter.constants.achievements)),
             "semantic_names": np.array(_semantic_names(self._game)),
+            "state": pickle.dumps(self.env, protocol=5),
         }
         if self._menu_mode:
             # Decodes menu_idx, and is the order the subject cycles through.

@@ -1,30 +1,27 @@
 {
   "_game": "MiniHack: MiniHack-Room-15x15-v0",
   "_note": "pip install minihack (needs setuptools<81).",
-  "_keys_note": "Discrete(8) compass action space: 0=N,1=E,2=S,3=W,4=NE,5=SE,6=SW,7=NW. Arrows map to the cardinals; NetHack's y/u/b/n map to the diagonals. turn_based:true is required -- noop is action 0 (=move N), so a real-time loop would auto-walk north. Keep the message Controls text in sync with 'keys' by hand.",
+  "_keys_note": "Discrete(8) compass action space: 0=N,1=E,2=S,3=W,4=NE,5=SE,6=SW,7=NW. Arrows map to the cardinals; NetHack's y/u/b/n map to the diagonals. turn_based:true is required -- noop is action 0 (=move N), so a real-time loop would auto-walk north. Keep the instructions' Controls text in sync with 'keys' by hand.",
   "_keys_reference": "https://github.com/facebookresearch/minihack",
   "_curriculum_note": "Blocking: the block is this task played until completed (mode 'episode', n_episodes 1, advancing_outcomes ['won']); a death or the env's own step limit restarts the same level, and max_duration 300 s is the cap. ESC is the experimenter's way out.",
   "curriculum": [
-    {
-      "type": "message",
-      "align": "left",
-      "text": [
-        "MiniHack: Room (15x15)",
-        "",
-        "Explore the room and step onto the down-staircase",
-        "( > ) to descend and win.",
-        "",
-        "Controls:",
-        "   ARROWS       move  N / S / W / E",
-        "   Y / U        move diagonally  NW / NE",
-        "   B / N        move diagonally  SW / SE",
-        "",
-        "(press SPACE to start)"
-      ]
-    },
-    {"type": "fixation", "duration": 1.0},
+    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {
       "type": "game", "backend": "minihack", "game": "MiniHack-Room-15x15-v0",
+      "instructions": {
+        "title": "MiniHack: Room (15x15)", "align": "left", "keys_to_dismiss": ["SPACE"],
+        "text": [
+          "Explore the room and step onto the down-staircase",
+          "( > ) to descend and win.",
+          "",
+          "Controls:",
+          "   ARROWS       move  N / S / W / E",
+          "   Y / U        move diagonally  NW / NE",
+          "   B / N        move diagonally  SW / SE",
+          "",
+          "(press SPACE to start)"
+        ]
+      },
       "keys": {"UP": 0, "DOWN": 2, "LEFT": 3, "RIGHT": 1, "Y": 7, "U": 4, "B": 6, "N": 5},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 300.0, "fps": 15, "turn_based": true
     },

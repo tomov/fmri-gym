@@ -4,22 +4,19 @@
   "_keys_note": "Discrete(4): 0=N, 1=E, 2=S, 3=W. Four directions only; turn-based.",
   "curriculum": [
     {
-      "type": "message",
-      "align": "left",
-      "text": [
-        "Room: Beyond the Next Wall",
-        "",
-        "Explore the dark room and find the staircase.",
-        "Only nearby terrain is revealed.",
-        "Remember the connections you discover.",
-        "",
-        "ARROWS: move; hold X: restart / give up",
-        "",
-        "Press SPACE to start."
-      ]
-    },
-    {
       "type": "game", "backend": "minihack", "game": "minihack_levels:MiniHack-Room-BeyondTheNextWall-v0", "seed": 0,
+      "instructions": {
+        "title": "Room: Beyond the Next Wall", "align": "left", "keys_to_dismiss": ["SPACE"],
+        "text": [
+          "Explore the dark room and find the staircase.",
+          "Only nearby terrain is revealed.",
+          "Remember the connections you discover.",
+          "",
+          "ARROWS: move; hold X: restart / give up",
+          "",
+          "Press SPACE to start."
+        ]
+      },
       "keys": {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3},
       "menu": {"key": "X", "hold": 1.5, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["UP", "DOWN"], "confirm": "SPACE"},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 900, "fps": 15, "turn_based": true

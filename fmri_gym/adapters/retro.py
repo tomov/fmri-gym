@@ -76,3 +76,6 @@ class RetroAdapter(EnvAdapter):
         u = self.env.unwrapped
         u.em.set_state(blob)
         u.data.update_ram()
+
+    def block_extra(self) -> dict:
+        return {"state": self.env.unwrapped.em.get_state()}

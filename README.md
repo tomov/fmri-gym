@@ -359,7 +359,7 @@ class EnvAdapter:
 
 A **run** is one JSON file: a `"curriculum"` of phases, an optional `"triggers"` section (below), and `_`-prefixed notes. A bare list, an unknown top-level key or an unknown phase `type` stops the run at start-up with the reason.
 
-One config is one run. A whole scanning session is a plain shell script with one line per run, in order -- so every run is a process of its own, with a fresh interpreter, display and trigger port:
+One command is one run: it plays a config from its start, or carries a longer one on from where the subject's last run of it stopped ("Resuming a curriculum", below). A whole scanning session is a plain shell script with one line per run, in order -- so every run is a process of its own, with a fresh interpreter, display and trigger port:
 
 ```sh
 #!/bin/sh
@@ -390,12 +390,19 @@ They assume `sub-01` and a 1024x768 window, and take the subject's next free ses
 
 ```jsonc
 {"type": "fixation", "duration": 2.0}                 // "+" for N seconds
+{"type": "fixation", "duration": 1.0, "include_on_resume": true}  // also played first by a resumed run (below)
 {"type": "message", "text": "Get ready", "duration": 2.0}  // text: string or list of lines; omit duration to wait for a key
 {"type": "survey", "n_points": 7, "questions": ["...","..."]}
 
 {"type": "game",
  "backend": "ale",              // "ale" | "retro" | "gym"
  "game": "ALE/Pong-v5",         // env id for that backend
+ "instructions": {"title": "Pong", "text": ["Move with UP / DOWN.", "(press SPACE)"],
+                  "align": "center", "duration": 30.0, "keys_to_dismiss": ["SPACE"]},
+                                // optional: the screen before the block, "Starting Pong" (or
+                                // "Resuming Pong" when a run carries the block on) over the text,
+                                // until duration runs out or one of the keys is pressed (at least
+                                // one of the two). Outside the block's clock, inside the run's
  "mode": "duration",            // "duration" = replay until time up; "episode" = play N episodes
  "duration": 30.0,              // seconds (duration mode)
  "n_episodes": 1,               // episodes (episode mode)
@@ -476,6 +483,20 @@ A subject can get stuck (a Baba Is You puzzle with its rules pushed into a corne
 ```
 
 Holding `key` for `hold` seconds -- even if that key does something in the game -- pauses the game and shows the options; `move` steps through them and `confirm` picks one. `reset` starts the episode over -- a new `reset()` of the env with the same seed, so the very same level instance -- `forfeit` ends the block and moves on to the next phase, `resume` continues. The menu is unavailable for the first `after` seconds of the block (0 = always), and a hold plus a two-key choice is hard to do by accident -- the point is that this is possible but never done lightly. Only `key` is required; the rest default to the values shown, and `options` may list any subset, in the order to show them. The manifest's phase entry records the settings and every pop-up (`menu.events`: when, and what was chosen); a reset or forfeited episode's `episode_outcome` is `reset` / `forfeit` (the env's own `terminated` / `truncated` flags are never touched), and a reset one does not count towards `n_episodes`. `configs/dbp_games/baba__make_win.json` uses it.
+
+### Resuming a curriculum (`--duration`, `--resume`)
+
+A curriculum belongs to the subject, who works through its levels at their own pace; a run is the scanner's, and only says how much of that work fits in one acquisition. `--duration S` gives the run its length in seconds from the trigger: whatever phase is on screen stops 10 s before the end, a block mid-episode included, and the run closes on 10 s of fixation, so the haemodynamic response to the last thing played is still recorded. A run that finishes the curriculum sooner ends on the same 10 s. `--resume` starts where the subject's last run of the same config file (any session) stopped: a game block carries on with its own clock, episode count and seeds, and the episode it was in is restored from its savestate, so the subject sees the board they left. A non-game phase the clock cut off is played again from its beginning, and the phases marked `"include_on_resume": true` -- which must be the ones the curriculum opens with, a fixation to settle in, say -- are played first. A game phase's `instructions` say "Resuming ..." when it carries a block on. ESC saves the place the same way, so a quit run can be resumed. With no earlier run, `--resume` starts at the beginning and says so; on a curriculum already played to its end it refuses.
+
+```sh
+SES=${1:-$(uv run fmri-ses --subject sub-01)}
+uv run fmri-play --curriculum configs/dbp_games/rushhour__complete.json --subject sub-01 --ses "$SES" --run 1 --duration 600 --resume
+uv run fmri-play --curriculum configs/dbp_games/rushhour__complete.json --subject sub-01 --ses "$SES" --run 2 --duration 600 --resume
+```
+
+The place is kept in each run's `manifest.json`, as `progress`: the first phase not yet played to its end, and the last game phase reached -- the phase as the config has it, whether it finished, and for a block the run stopped, its seconds played, episodes counted, base seed and the episode it was in, with that episode's savestate. A config can be edited between runs: the next run finds that game phase again by its game (its backend, game id and every field the adapter or env reads), so levels can be added, removed or retimed, and a field the loop owns (`duration`, `keys`, `instructions`, ...) may change, which the run prints and records under `resume.changed`. A phase whose game changed, or that is in the config twice, stops the run with the reason. An episode of a backend with no savestate (the plain `gym` backend, `baba`, `arc3`) starts again from its seed, which the run also prints and records.
+
+A resumed block's own log says what it was handed: a `resume` line with the earlier run's label, the block's progress and the savestate, and `resumed` on the episode's `episode_start`. `fmri_gym.replay.reconstruct_episode` restores that state rather than replaying from the seed, so each block folder replays alone. Without `--duration` and `--resume` a run plays its config from the start to the end, as one config per run always has.
 
 ## Triggers: fMRI vs MEG/EEG
 
@@ -571,19 +592,20 @@ Data is never overwritten. A run whose folder is already there writes to `..._02
 
 The names follow BIDS apart from that suffix, the contents not yet (no `_beh.tsv` / `_events.tsv`). Each folder holds:
 
-- **`manifest.json`** — subject, curriculum, trigger epoch, per-phase onsets/offsets (+ survey responses; onsets are flip times), the `display` actually opened (size, `vsync`, `refresh_rate`, driver), the `triggers` settings + lifecycle triggers sent (+ what the config left `defaulted`), the `audio` output (device, measured device delay, chosen delay), `dummy_trigger`, the `run` it is (label and `attempt`), the `seeds` (each game phase derived or pinned) and the `versions` of pygame and SDL.
+- **`manifest.json`** — subject, curriculum, trigger epoch, per-phase onsets/offsets (+ survey responses; onsets are flip times), the `display` actually opened (size, `vsync`, `refresh_rate`, driver), the `triggers` settings + lifecycle triggers sent (+ what the config left `defaulted`), the `audio` output (device, measured device delay, chosen delay), `dummy_trigger`, the `run` it is (label and `attempt`), the `seeds` (each game phase derived, pinned or resumed), the `versions` of pygame and SDL, and the run's `duration`, what it `resume`d from and its `progress` (see "Resuming a curriculum").
 - **`block-NN_<backend>_<game>/`** — one folder per game block, written as the block plays (so a crash loses at most the last second), holding:
   - **`events.jsonl`** — one JSON object per line, in order; `type` says which:
 
     | `type` | fields |
     |--------|--------|
     | `block_start` | first line: `format`, `version`, `subject`, `block_index`, `backend`, `game`, `phase` (the config), `base_seed` |
-    | `episode_start` | `episode_id`, `seed` |
+    | `resume` | in a block an earlier run stopped, after `block_start`: `from_run`, `elapsed`, `completed`, `next_episode`, `episode` (its `id`, `seed`, `ep_frame`, `score`), `state` (the savestate it goes on from, as a frame's) |
+    | `episode_start` | `episode_id`, `seed`, `resumed` (whether it carries on an episode from an earlier run, from the `resume` line's state) |
     | `frame` | `frame` (index in the block), `episode_id`, `ep_frame` (index in the episode), `action`, `reward`, `terminated`, `truncated`, `run_time` (seconds since the trigger, after the step), `flip_time` (of the **flip that showed the frame**: its onset; vsync-locked when the display reports `vsync: true`), `wall_time` (Unix), `variables` (the backend's: `ram` for ale/retro, `info_*` for retro, `obs` for gym, …), and when present `env_action` (an adapter's own reading of the keys, e.g. Rush Hour), `trigger` (the code sent on that flip), `audio_chunk` (the chunk this frame's sound was queued as, -1 none; in blocks that play sound), `state` (a savestate, zlib'd then base64, every `state_stride` frames) |
     | `input_event` | `run_time`, `name`, `down`: every key press/release during the block, stamped on arrival (~1 ms), independent of the frame grid; the pause menu's included |
     | `pacing_reset` | `flip_time`, `late`: a flip that ended a stall of more than a frame, and how many seconds late it was; the frame schedule restarted there instead of catching up with a burst of short frames (none in a clean block; why frames fall behind is open, issue #43) |
-    | `episode_end` | `episode_id`, `outcome` (`won`, `lost`, `terminated`, `truncated`, `playing` for the block's clock; `quit`, `reset`, `forfeit` for the subject's) , `terminated`, `truncated`, `score`, `n_pacing_resets` |
-    | `block_end` | last line: `n_episodes`, `n_frames`, `outcomes`, `n_pacing_resets`, `total_reward` (the manifest entry's summary), `audio` (when the block played sound: `onsets`, `[chunk, run_time]` when each chunk reached the DAC, so a frame's sound onset is the entry for its `audio_chunk` and `onset - flip_time` the audio delay achieved; `delay_ms`, `resyncs`, `trimmed_samples`), `extra` (the adapter's block extras, e.g. an ALE palette) |
+    | `episode_end` | `episode_id`, `outcome` (`won`, `lost`, `terminated`, `truncated`, `playing` for the block's clock; `quit`, `reset`, `forfeit` for the subject's) , `terminated`, `truncated`, `score`, `ep_frames`, `n_pacing_resets` |
+    | `block_end` | last line: `n_episodes`, `n_frames`, `outcomes`, `n_pacing_resets`, `total_reward` (the manifest entry's summary), `audio` (when the block played sound: `onsets`, `[chunk, run_time]` when each chunk reached the DAC, so a frame's sound onset is the entry for its `audio_chunk` and `onset - flip_time` the audio delay achieved; `delay_ms`, `resyncs`, `trimmed_samples`), `extra` (the adapter's block extras, e.g. an ALE palette, and `state`, the savestate the block ended in) |
 
   - **`frames.h5`** — the rendered frames, `frames` `(N, H, W, C)` gzip'd one chunk per frame plus `frame_index` `(N,)`, the `frame` of each row: every `frame_stride`-th frame (default every one; `0` keeps none). `fmri_gym.logging.read_frames` / `read_frame` read them.
 

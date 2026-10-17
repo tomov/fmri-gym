@@ -68,3 +68,6 @@ class VGDLAdapter(EnvAdapter):
 
     def restore(self, blob: bytes) -> None:
         self.env.set_state(pickle.loads(blob))
+
+    def block_extra(self) -> dict:
+        return {"state": pickle.dumps(self.env.get_state())}

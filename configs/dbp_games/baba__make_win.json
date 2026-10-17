@@ -1,30 +1,27 @@
 {
   "_game": "Baba Is AI: make_win, a generated puzzle in the style of Baba Is You (language / rule-manipulation puzzle)",
   "_note": "uv sync --extra baba (baba-gym, gym/baba/, pulls baba-is-ai from GitHub). Env ids: env/make_win, env/goto_win, env/you_win, and distractor variants. Push word blocks to rewrite the rules.",
-  "_keys_note": "BabaIsYouEnv.Actions (baba/grid.py): 0=idle, 1=up, 2=right, 3=down, 4=left. Keep the message Controls text in sync with 'keys' by hand.",
+  "_keys_note": "BabaIsYouEnv.Actions (baba/grid.py): 0=idle, 1=up, 2=right, 3=down, 4=left. Keep the instructions' Controls text in sync with 'keys' by hand.",
   "_keys_reference": "https://github.com/nacloos/baba-is-ai/blob/main/baba/grid.py",
   "_menu_note": "A puzzle can be pushed into a dead end, so after 15 s of play holding X for 5 s pauses the game and offers Restart / Give up / Resume (UP/DOWN to choose, SPACE to select). See fmri_gym/menu.py.",
   "_curriculum_note": "Blocking, as Baba Is You is: the block is this level played until won (mode 'episode', n_episodes 1, advancing_outcomes ['won']); a loss -- YOU destroyed or no YOU left -- restarts the same level, as the game itself does, and max_duration 300 s is the cap. The menu's Give up is the way out of a level the subject cannot solve.",
   "curriculum": [
-    {
-      "type": "message",
-      "align": "left",
-      "text": [
-        "Baba Is You: make_win",
-        "",
-        "Push word blocks to rewrite the rules.",
-        "Form \"X IS WIN\", then touch X to win.",
-        "",
-        "Controls:",
-        "   ARROWS   move",
-        "   hold X   pause menu (restart / give up / resume)",
-        "",
-        "(press SPACE to start)"
-      ]
-    },
-    {"type": "fixation", "duration": 1.0},
+    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {
       "type": "game", "backend": "baba", "game": "env/make_win",
+      "instructions": {
+        "title": "Baba Is You: make_win", "align": "left", "keys_to_dismiss": ["SPACE"],
+        "text": [
+          "Push word blocks to rewrite the rules.",
+          "Form \"X IS WIN\", then touch X to win.",
+          "",
+          "Controls:",
+          "   ARROWS   move",
+          "   hold X   pause menu (restart / give up / resume)",
+          "",
+          "(press SPACE to start)"
+        ]
+      },
       "keys": {"UP": 1, "RIGHT": 2, "DOWN": 3, "LEFT": 4},
       "menu": {"key": "X", "hold": 3.0, "after": 0.0,
                "options": ["reset", "forfeit", "resume"],

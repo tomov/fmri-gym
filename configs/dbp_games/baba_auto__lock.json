@@ -1,31 +1,28 @@
 {
   "_game": "Baba Is Auto: Lock (lock), a Baba Is You level on the baba-is-auto engine (language / rule-manipulation puzzle)",
   "_note": "Clone utilForever/baba-is-auto into external/baba_auto at the commit the README pins (README 'External checkouts'), then uv sync --extra baba_auto (baba-auto-gym, gym/baba_auto/, compiles the C++ engine from that checkout: needs a C++17 compiler and python3-dev). 'game' is a map name under the checkout's Resources/Maps (baba_is_you, out_of_reach, volcano, off_limits, grass_yard, pillar_yard, brick_wall, icy_waters, novice_locksmith, lock, affection, turns) or a map file path. Push word blocks to rewrite the rules.",
-  "_keys_note": "baba_auto_gym Discrete(5): 0=wait, 1=up, 2=down, 3=left, 4=right. Keep the message Controls text in sync with 'keys' by hand.",
+  "_keys_note": "baba_auto_gym Discrete(5): 0=wait, 1=up, 2=down, 3=left, 4=right. Keep the instructions' Controls text in sync with 'keys' by hand.",
   "_keys_reference": "gym/baba_auto/baba_auto_gym/env.py",
   "_menu_note": "A puzzle can be pushed into a dead end, so holding X for 3 s pauses the game and offers Restart / Give up / Resume (UP/DOWN to choose, SPACE to select). See fmri_gym/menu.py.",
   "_curriculum_note": "Blocking, as Baba Is You is: the block is this level played until won (mode 'episode', n_episodes 1, advancing_outcomes ['won']); a loss -- YOU destroyed or no YOU left -- restarts the same level, as the game itself does, and max_duration 300 s is the cap. The menu's Give up is the way out of a level the subject cannot solve.",
   "curriculum": [
-    {
-      "type": "message",
-      "align": "left",
-      "text": [
-        "Baba Is You: Lock",
-        "",
-        "You are Baba. Push word blocks to rewrite the rules.",
-        "Change what opens what, or what stops you.",
-        "",
-        "Controls:",
-        "   ARROWS   move",
-        "   SPACE    wait a turn",
-        "   hold X   pause menu (restart / give up / resume)",
-        "",
-        "(press SPACE to start)"
-      ]
-    },
-    {"type": "fixation", "duration": 1.0},
+    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {
       "type": "game", "backend": "baba_auto", "game": "lock", "keys": {"SPACE": 0, "UP": 1, "DOWN": 2, "LEFT": 3, "RIGHT": 4},
+      "instructions": {
+        "title": "Baba Is You: Lock", "align": "left", "keys_to_dismiss": ["SPACE"],
+        "text": [
+          "You are Baba. Push word blocks to rewrite the rules.",
+          "Change what opens what, or what stops you.",
+          "",
+          "Controls:",
+          "   ARROWS   move",
+          "   SPACE    wait a turn",
+          "   hold X   pause menu (restart / give up / resume)",
+          "",
+          "(press SPACE to start)"
+        ]
+      },
       "menu": {"key": "X", "hold": 3.0, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["UP", "DOWN"], "confirm": "SPACE"},
       "mode": "episode", "n_episodes": 1, "advancing_outcomes": ["won"], "max_duration": 300.0, "fps": 15, "turn_based": true
     },
