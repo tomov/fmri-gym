@@ -274,9 +274,18 @@ class AIGameStoreEnv(gym.Env):
 
     def _load(self, seed: int) -> None:
         """Navigate to the game with ``seed`` and tick it up to its START screen."""
+        from playwright.sync_api import Error as PlaywrightError
+
         self._seed = seed          # read by _patch_rng, which the coming navigation triggers
-        self._page.goto(f"{self._url}&seed={seed}")
-        self._page.evaluate("n => window.__aigs.boot(n)", _BOOT_FRAMES)
+        attempts = 3
+        for attempt in range(attempts):
+            try:
+                self._page.goto(f"{self._url}&seed={seed}")
+                self._page.evaluate("n => window.__aigs.boot(n)", _BOOT_FRAMES)
+                return
+            except PlaywrightError:
+                if attempt == attempts - 1:
+                    raise
 
     def _route(self, route: Any) -> None:
         """Answer a request the page makes: its own files, a vendored library, or nothing."""
