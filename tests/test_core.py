@@ -18,7 +18,7 @@ from fmri_gym.audio import AudioBlockLog
 from fmri_gym.adapters.keymap import make_keymap
 from fmri_gym.curriculum import validate_curriculum
 from fmri_gym.logging import (
-    AUDIO_FILENAME, FRAMES_FILENAME, Logger, read_audio, read_events, read_frames, read_state,
+    AUDIO_FILENAME, FRAMES_FILENAME, Logger, read_audio, read_events, read_frames, read_savestate,
 )
 from fmri_gym.replay import frame_arrays, reconstruction_plan
 from fmri_gym.run import Clock
@@ -46,7 +46,7 @@ def test_logger_round_trip(tmp_path):
                           "flip_time": float(i), "wall_time": 0.0,
                           "variables": {"obs": np.array([i, i])},
                           "audio_chunk": i if i < 2 else -1},
-                         frame=frames[i], state=states[i])
+                         frame_rgb=frames[i], savestate=states[i])
         logger.log_audio(Sound(chunks[i], 44100.0) if i < 2 else None)
     logger.log(type="episode_end", episode_id=0, outcome="truncated", score=1.5)
     logger.close_block(n_episodes=1, n_frames=3, extra=None,
@@ -61,7 +61,7 @@ def test_logger_round_trip(tmp_path):
     assert events[0]["backend"] == "gym" and events[0]["phase"] == PHASE
     lines = [e for e in events if e["type"] == "frame"]
     assert [e["frame"] for e in lines] == [0, 1, 2]
-    assert [read_state(e["state"]) for e in lines] == states
+    assert [read_savestate(e["state"]) for e in lines] == states
     assert lines[1]["variables"] == {"obs": [1, 1]}
 
     pixels, index = read_frames(block)
@@ -86,7 +86,7 @@ def test_logger_writes_no_audio_file_for_a_silent_block(tmp_path):
     clock.trigger()
     logger = Logger(str(tmp_path), "sub-test", [PHASE], clock)
     name = logger.open_block(0, "gym", "CartPole-v1", PHASE, base_seed=1)
-    logger.log_frame({"episode_id": 0}, frame=np.zeros((2, 2, 3), np.uint8))
+    logger.log_frame({"episode_id": 0}, frame_rgb=np.zeros((2, 2, 3), np.uint8))
     logger.log_audio(None)
     logger.close_block(n_frames=1)
     logger.close()

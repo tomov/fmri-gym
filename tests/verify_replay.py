@@ -160,12 +160,13 @@ def _step_and_compare(adapter: Any, lines: list[dict], pixels: dict,
     mismatches = 0
     for line in lines:
         obs, reward, terminated, truncated, info = adapter.step(_action(line["action"]))
-        fs = adapter.capture(obs, info, want_blob=False)
+        frame_state = adapter.capture(obs, info, want_blob=False)
         problems = []
         if not np.array_equal(np.asarray(adapter.render()), pixels[line["frame"]]):
             problems.append("pixels")
-        if _jsonable(fs.variables) != line["variables"]:
-            problems.append("variables " + ", ".join(_differing(fs.variables, line["variables"])))
+        if _jsonable(frame_state.variables) != line["variables"]:
+            problems.append("variables " + ", ".join(
+                _differing(frame_state.variables, line["variables"])))
         if (float(reward), bool(terminated), bool(truncated)) != (
                 float(line["reward"]), line["terminated"], line["truncated"]):
             problems.append("reward/termination")

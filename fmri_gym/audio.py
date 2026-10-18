@@ -480,13 +480,13 @@ class Audio:
                 "Leave this block's fps out to play at the engine's own rate, or set "
                 '"audio": false')
 
-    def play(self, sound: Sound | None, flip_t: float) -> None:
+    def play(self, sound: Sound | None, flip_perf: float) -> None:
         """Queue one chunk to start :attr:`delay` after its frame's flip.
 
         :param sound: a :class:`~fmri_gym.adapters.base.Sound`, or ``None`` for
             a frame with nothing to play (which leaves playback alone, rather
             than cutting off what is still queued).
-        :param flip_t: ``perf_counter`` of the flip that showed the frame.
+        :param flip_perf: ``perf_counter`` of the flip that showed the frame.
         :raises ValueError: if the PCM is not shaped ``(samples, channels)``,
             or its amount per step does not match the block's frame rate
             (:meth:`start`).
@@ -513,7 +513,7 @@ class Audio:
             self.stream.play()
         self.last_chunk = self._queued
         self._queued += 1
-        self.stream.put(pcm, flip_t + self.delay, self.last_chunk)
+        self.stream.put(pcm, flip_perf + self.delay, self.last_chunk)
 
     def stop(self) -> None:
         """Stop playback and drop what is still queued.

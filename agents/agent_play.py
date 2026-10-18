@@ -105,24 +105,25 @@ def play_episode(adapter, policy: Policy, logger: Logger, clock: Clock, *,
     terminated = truncated = False
     score = 0.0                         # the episode's cumulative reward
     ep_frame = skipped = 0
-    auto = None                         # see EnvAdapter.autoplay
+    autoplay_action = None              # see EnvAdapter.autoplay
     chunks = n_chunks                   # sound chunks the block logged before this episode
     while not (terminated or truncated) and ep_frame + skipped < max_frames:
-        if auto is not None:
+        if autoplay_action is not None:
             # The env is in a state it takes no action in, so the policy is not
             # asked for one, exactly as the subject is not asked to press. The
             # frames still cost budget: they are engine steps, and the subject
             # pays for them in block time.
-            action = auto
+            action = autoplay_action
         else:
             # The subject's block ends on a wall clock; the model's ends on this
             # frame budget, so the countdown it reads is over its own budget at the
             # block's fps. The alternative, a real clock, would tell the model how
             # long its own inference took, which is not something the game shows.
-            remaining = (max_frames - ep_frame - skipped) / fps
-            status = list(adapter.hud(score, remaining) or [])
-            over = adapter.overlay()
-            action = policy.act(adapter.render(), status + list(over[0] if over else []))
+            remaining_s = (max_frames - ep_frame - skipped) / fps
+            hud_lines = list(adapter.hud(score, remaining_s) or [])
+            overlay = adapter.overlay()
+            action = policy.act(adapter.render(),
+                                hud_lines + list(overlay[0] if overlay else []))
             if action is None:
                 # A turn-based phase with no key pressed: nothing steps, exactly as
                 # in the run loop. It costs the frame, which is what keeps a policy
@@ -131,11 +132,12 @@ def play_episode(adapter, policy: Policy, logger: Logger, clock: Clock, *,
                 continue
 
         observation, reward, terminated, truncated, info = adapter.step(action)
-        auto = adapter.autoplay(info) if turn_based else None
+        autoplay_action = adapter.autoplay(info) if turn_based else None
         score += float(reward)
         # A savestate at the episode's first frame (the replay anchor), then every stride.
-        fs = adapter.capture(observation, info, want_blob=ep_frame % state_stride == 0)
-        fields = {
+        anchor_frame = ep_frame % state_stride == 0
+        frame_state = adapter.capture(observation, info, want_blob=anchor_frame)
+        frame_fields = {
             "episode_id": episode_id, "ep_frame": ep_frame, "action": action, "reward": reward,
             "terminated": bool(terminated), "truncated": bool(truncated),
             "run_time": clock.run_time(),
@@ -143,41 +145,42 @@ def play_episode(adapter, policy: Policy, logger: Logger, clock: Clock, *,
             # NaN, not the step time: the human column is a measured photon onset,
             # and nothing should be able to average the two together by accident.
             "flip_time": float("nan"), "wall_time": clock.wall_time(),
-            "variables": fs.variables,
+            "variables": frame_state.variables,
         }
         if isinstance(info, dict) and "env_action" in info:
-            fields["env_action"] = info["env_action"]
+            frame_fields["env_action"] = info["env_action"]
         # The engine's sound for this frame goes to the log as a subject's does
         # (audio.h5, the chunk's number in audio_chunk); nobody hears it here.
         sound = adapter.sound()
-        fields["audio_chunk"] = -1
+        frame_fields["audio_chunk"] = -1
         if sound is not None and len(sound.pcm):
-            fields["audio_chunk"] = chunks
+            frame_fields["audio_chunk"] = chunks
             chunks += 1
-        logger.log_frame(fields, frame=adapter.render(), state=fs.blob)
-        logger.log_audio(sound if fields["audio_chunk"] >= 0 else None)
+        logger.log_frame(frame_fields, frame_rgb=adapter.render(), savestate=frame_state.blob)
+        logger.log_audio(sound if frame_fields["audio_chunk"] >= 0 else None)
         ep_frame += 1
 
     # Same vocabulary the human blocks log, from the same method: "playing" is
     # the budget cutting the episode off, where a subject's block clock would.
     outcome, _ = adapter.outcome(terminated, truncated)
-    end = EpisodeResult(episode_id, outcome, bool(terminated), bool(truncated), score, 0)
-    logger.log(type="episode_end", **end.record())
-    return end, skipped, chunks
+    episode_result = EpisodeResult(episode_id, outcome, bool(terminated), bool(truncated),
+                                   score, 0)
+    logger.log(type="episode_end", **episode_result.record())
+    return episode_result, skipped, chunks
 
 
-def play_block(phase: dict, index: int, args, logger: Logger,
+def play_block(phase: dict, phase_index: int, args, logger: Logger,
                clock: Clock) -> str:
     """Play every episode of one game block and write its log.
 
     :param phase: the game-phase config, used exactly as a run uses it.
-    :param index: phase index in the curriculum (names the block's folder).
+    :param phase_index: the phase's index in the curriculum (names the block's folder).
     :param args: parsed command-line arguments.
     :param logger: the run's logger writing the block.
     :param clock: the run's clock.
     :return: the block's folder name.
     """
-    game_phase = GamePhase.from_dict(phase, index)
+    game_phase = GamePhase.from_dict(phase, phase_index)
     # A policy has no ears. Whatever the block's curriculum plays to a subject
     # as a sound, it reads as a line of text, so the two players are told the
     # same things; scanner curricula keep that line off the screen to hold the
@@ -185,28 +188,29 @@ def play_block(phase: dict, index: int, args, logger: Logger,
     adapter = get_adapter(game_phase.backend, {**phase, "cue_overlay": True})
     policy = build_policy(args, adapter)
 
-    data_dir = logger.open_block(index, game_phase.backend, game_phase.game, phase,
-                                 game_phase.seed)
+    block_folder_name = logger.open_block(phase_index, game_phase.backend, game_phase.game,
+                                          phase, game_phase.seed)
     episodes: list[EpisodeResult] = []
     skipped = chunks = 0
     for episode_id in range(args.n_episodes):
-        before = logger.n_frames
-        end, n_skipped, chunks = play_episode(
+        n_frames_before = logger.n_frames
+        episode_result, n_skipped, chunks = play_episode(
             adapter, policy, logger, clock, seed=game_phase.seed + episode_id,
             episode_id=episode_id, state_stride=game_phase.state_stride,
             fps=game_phase.fps, turn_based=game_phase.is_turn_based,
             max_frames=args.max_frames, n_chunks=chunks)
-        episodes.append(end)
+        episodes.append(episode_result)
         skipped += n_skipped
         print(f"  episode {episode_id} (seed {game_phase.seed + episode_id}): "
-              f"{logger.n_frames - before} frames, {end.outcome}, score {end.score:g}")
+              f"{logger.n_frames - n_frames_before} frames, {episode_result.outcome}, "
+              f"score {episode_result.score:g}")
 
-    extra = adapter.block_extra()
+    block_extra = adapter.block_extra()
     adapter.close()
     summary = {
         "n_episodes": len(episodes), "n_frames": logger.n_frames,
-        "outcomes": dict(Counter(e.outcome for e in episodes)),
-        "total_reward": sum(e.score for e in episodes),
+        "outcomes": dict(Counter(episode.outcome for episode in episodes)),
+        "total_reward": sum(episode.score for episode in episodes),
         # Which policy produced the block belongs in the block, not in a folder
         # name: a model's log and a human's are otherwise alike by design.
         "policy": args.policy, "policy_model": args.model if args.policy == "vlm" else "",
@@ -215,10 +219,10 @@ def play_block(phase: dict, index: int, args, logger: Logger,
         "skipped_frames": skipped, "invalid_replies": policy.invalid,
         "dropped_calls": policy.dropped,
     }
-    logger.close_block(**summary, extra=extra)
-    logger.log_phase({"index": index, "type": "game", "backend": game_phase.backend,
-                      "game": game_phase.game, **summary, "data_dir": data_dir})
-    return data_dir
+    logger.close_block(**summary, extra=block_extra)
+    logger.log_phase({"index": phase_index, "type": "game", "backend": game_phase.backend,
+                      "game": game_phase.game, **summary, "data_dir": block_folder_name})
+    return block_folder_name
 
 
 def main() -> None:
@@ -241,20 +245,20 @@ def main() -> None:
     if problems:
         raise ValueError(f"{args.curriculum}: " + "; ".join(problems))
     phases = curriculum["curriculum"]
-    outdir = args.outdir or os.path.join(
+    run_folder = args.outdir or os.path.join(
         "data", f"{args.subject}_{time.strftime('%Y%m%d-%H%M%S')}")
     clock = Clock()
     # No scanner here, so the run's zero is simply when it started: the time
     # columns stay the same shape as a human run's, measured from that.
     clock.trigger()
-    logger = Logger(outdir, args.subject, phases, clock)
+    logger = Logger(run_folder, args.subject, phases, clock)
     logger.set_trigger_time()
 
-    for index, phase in enumerate(phases):
+    for phase_index, phase in enumerate(phases):
         if phase.get("type") != "game":
             continue
-        print(f"block {index}: {phase.get('game')} via {args.policy}")
-        print(" ->", play_block(phase, index, args, logger, clock))
+        print(f"block {phase_index}: {phase.get('game')} via {args.policy}")
+        print(" ->", play_block(phase, phase_index, args, logger, clock))
     print("Manifest:", logger.save_manifest())
     logger.close()
 

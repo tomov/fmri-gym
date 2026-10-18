@@ -27,11 +27,11 @@ boundary (`logging.py:114-121`, `_atomic_write` at `logging.py:332`).
 The per-frame producer side is in `Run._episode` (`fmri_gym/run.py:570-613`):
 
 1. `adapter.step(action)`, then
-   `adapter.capture(obs, info, want_blob=save_state)` returns a `FrameState`
+   `adapter.capture(observation, info, want_blob=anchor_frame)` returns a `FrameState`
    with `blob` (savestate bytes or `None`) and `variables` (RAM, info)
    (`run.py:573-574`, contract at `adapters/base.py:14-29`).
-2. `_show` renders, flips, and queues sound (`run.py:640-646`).
-3. `logger.log_frame(fields, frame=frame, state=fs.blob)` then
+2. `_show_frame` renders, flips, and queues sound (`run.py:640-646`).
+3. `logger.log_frame(frame_fields, frame_rgb=frame_rgb, savestate=...)` then
    `logger.log_audio(sound)` (`run.py:612-613`).
 
 ## How often we flush

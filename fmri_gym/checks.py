@@ -183,7 +183,7 @@ def finish(run: Run, session: int, data_root: str) -> bool:
     :return: ``True`` if a test failed or did not finish (the report lists them; the
         session goes on).
     """
-    path = os.path.join(run.outdir, "manifest.json")
+    path = os.path.join(run.run_folder, "manifest.json")
     with open(path) as f:
         m = json.load(f)
     entries = [e for e in m["phases"] if e.get("type") in CHECK_TYPES]
@@ -200,9 +200,9 @@ def finish(run: Run, session: int, data_root: str) -> bool:
              .isoformat(timespec="seconds"),
              versions={**m.get("versions", {}), **versions()},
              platform=platform_info())
-    write_outputs(run.outdir, m, data_root)
+    write_outputs(run.run_folder, m, data_root)
     print(f"rig check {'PASS' if m['status'] == 'pass' else 'FAIL (' + m['failed_tests'] + ')'}"
-          f": {os.path.join(run.outdir, 'report.html')} "
+          f": {os.path.join(run.run_folder, 'report.html')} "
           f"(all checks: {os.path.join(data_root, 'rigchecks.tsv')})", file=sys.stderr)
     return m["status"] != "pass"
 
@@ -212,7 +212,7 @@ def finish(run: Run, session: int, data_root: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def run_check(run: Run, phase: dict, index: int) -> None:
+def run_check(run: Run, phase: dict, phase_index: int) -> None:
     """Play one check phase: measure, record its tests' verdicts, save its arrays.
 
     :raises KeyboardInterrupt: on ESC or window close (the run is quit); the
@@ -224,25 +224,29 @@ def run_check(run: Run, phase: dict, index: int) -> None:
     arrays: dict[str, np.ndarray] = {}
     tests: dict[str, Verdict] = {}
     try:
-        _CHECKS[kind](run, phase, summary, arrays, tests, index)
+        _CHECKS[kind](run, phase, summary, arrays, tests, phase_index)
     except Exception as exc:  # noqa: BLE001 -- a check that breaks fails its tests; the rest run
-        for test in (t for t, k in TESTS.items() if k == kind):
+        for test in (name for name, test_kind in TESTS.items() if test_kind == kind):
             tests.setdefault(test, Verdict("fail", f"{type(exc).__name__}: {exc}"))
     finally:
         if arrays:
-            np.savez_compressed(os.path.join(run.outdir, f"block-{index:02d}_{kind}.npz"),
-                                **arrays)
-        run.logger.log_phase({"index": index, "type": kind, "onset": onset,
+            np.savez_compressed(
+                os.path.join(run.run_folder, f"block-{phase_index:02d}_{kind}.npz"), **arrays)
+        run.logger.log_phase({"index": phase_index, "type": kind, "onset": onset,
                               "offset": run.clock.run_time(), "summary": summary,
-                              "tests": {t: v._asdict() for t, v in tests.items()}})
-        for test, v in tests.items():
-            print(f"rig check: {test}: {v.status}" + (f" -- {v.why}" if v.why else ""),
-                  file=sys.stderr)
-    lines = [f"{t}: {v.status.upper()}" + (f"\n  {v.why[:160]}" if v.why else "")
-             for t, v in tests.items()]
+                              "tests": {test: verdict._asdict()
+                                        for test, verdict in tests.items()}})
+        for test, verdict in tests.items():
+            print(f"rig check: {test}: {verdict.status}"
+                  + (f" -- {verdict.why}" if verdict.why else ""), file=sys.stderr)
+    lines = [f"{test}: {verdict.status.upper()}"
+             + (f"\n  {verdict.why[:160]}" if verdict.why else "")
+             for test, verdict in tests.items()]
     run.display.draw_text("Rig check\n\n" + "\n".join(lines))
     _wait_for_duration(run.display, _VERDICT_S)
-    if index == max(i for i, p in enumerate(run.phases) if p["type"] in CHECK_TYPES):
+    last_check_index = max(index for index, entry in enumerate(run.phases)
+                           if entry["type"] in CHECK_TYPES)
+    if phase_index == last_check_index:
         _summary_screen(run)
 
 
@@ -292,7 +296,7 @@ def _check_triggers(run: Run, phase: dict, summary: dict, arrays: dict, tests: d
         tests["triggers"] = Verdict("fail", f"the trigger line did not open: {error}")
         return
     t = run.triggers
-    pulses = t.sync.mode == "wait" and not run.dummy_trigger
+    pulses = t.sync_settings.mode == "wait" and not run.dummy_trigger
     if not (t.enabled or pulses):
         tests["triggers"] = Verdict("not run", "this config neither sends codes nor waits "
                                                "for the scanner")
@@ -319,7 +323,7 @@ def _count_pulses(run: Run, phase: dict, summary: dict, arrays: dict) -> None:
 
     :raises TriggerError: when none comes in time, or the train is irregular.
     """
-    times = receive_pulses(run.display, run.triggers.sync.key,
+    times = receive_pulses(run.display, run.triggers.sync_settings.key,
                                          phase.get("pulses", 3), phase.get("timeout_s", 60.0),
                                          phase.get("seconds"))
     arrays["pulse_time"] = times - times[0]
@@ -385,7 +389,7 @@ def _check_controls(run: Run, phase: dict, summary: dict, arrays: dict, tests: d
     summary["devices"] = input_devices()
     summary["pad"] = _check_pad(run, phase)
     summary["automatic"] = {name: _round_trip(name) for name in keys}
-    ignore = run.triggers.sync.key if run.triggers.sync.mode == "wait" else None
+    ignore = run.triggers.sync_settings.key if run.triggers.sync_settings.mode == "wait" else None
     results: dict[str, dict] = {}
     try:
         for name, label in keys.items():
@@ -635,7 +639,7 @@ def _play_pattern(run: Run, fps: float, load: str, phase: dict, index: int) -> d
     # The run's own game loop, not a copy: its pacing and triggers are what is measured.
     run._game(game, index)
     entry = run.logger.manifest["phases"][-1]
-    with np.load(os.path.join(run.outdir, entry["data_file"]), allow_pickle=True) as d:
+    with np.load(os.path.join(run.run_folder, entry["data_file"]), allow_pickle=True) as d:
         flips, codes = d["flip_time"], (d["trigger"] if "trigger" in d else None)
     return _judge_frames(run, fps, load, phase, flips, codes, entry)
 
