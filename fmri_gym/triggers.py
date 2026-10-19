@@ -174,32 +174,32 @@ class TriggerSettings:
     defaulted: tuple[str, ...] = ()
 
     @classmethod
-    def from_dict(cls, d: dict | None) -> TriggerSettings:
+    def from_dict(cls, section: dict | None) -> TriggerSettings:
         """Build from the config section, filling defaults and validating.
 
-        :param d: the ``triggers`` dict, or ``None`` for all defaults.
+        :param section: the ``triggers`` dict, or ``None`` for all defaults.
         :return: validated settings.
         :raises ValueError: on an unknown backend or an ambiguous code scheme.
         :raises TriggerError: if ``sync.mode`` is ``send`` with no backend to
             send on.
         """
-        d = dict(d or {})
-        sync_d = d.pop("sync", {})
-        defaulted = tuple(key for key, given in (("sync.mode", "mode" in sync_d),
-                                                 ("backend", "backend" in d)) if not given)
-        sync = SyncSettings.from_dict(sync_d)
-        codes = Codes(**d.pop("codes", {}))
+        section = dict(section or {})
+        sync_section = section.pop("sync", {})
+        defaulted = tuple(key for key, given in (("sync.mode", "mode" in sync_section),
+                                                 ("backend", "backend" in section)) if not given)
+        sync = SyncSettings.from_dict(sync_section)
+        codes = Codes(**section.pop("codes", {}))
         codes.validate()
-        s = cls(sync=sync, codes=codes, defaulted=defaulted, **d)
-        if s.backend not in TRIGGER_BACKENDS:
-            raise ValueError(f"triggers: unknown backend {s.backend!r}; "
+        settings = cls(sync=sync, codes=codes, defaulted=defaulted, **section)
+        if settings.backend not in TRIGGER_BACKENDS:
+            raise ValueError(f"triggers: unknown backend {settings.backend!r}; "
                              f"expected one of {TRIGGER_BACKENDS}")
-        if s.frame_every < 1:
+        if settings.frame_every < 1:
             raise ValueError("triggers: frame_every must be >= 1")
-        if sync.mode == "send" and s.backend == "null":
+        if sync.mode == "send" and settings.backend == "null":
             raise TriggerError('triggers: sync.mode "send" sends scanner_start on the trigger '
                                'line, so triggers.backend must not be "null"')
-        return s
+        return settings
 
 
 # ---------------------------------------------------------------------------
@@ -283,36 +283,36 @@ class _Parallel:
         self.clear()
 
 
-def _open_backend(s: TriggerSettings) -> tuple[_Backend, str]:
+def _open_backend(settings: TriggerSettings) -> tuple[_Backend, str]:
     """Open the configured transport.
 
-    :param s: trigger settings.
+    :param settings: trigger settings.
     :return: ``(backend, description)``; the description names what is open,
         for the manifest and the console.
     :raises TriggerError: if the backend's package is missing, no port is
         configured, or the device cannot be opened -- with the fix in the
         message.
     """
-    if s.backend == "null":
+    if settings.backend == "null":
         return _Null(), "null"
     hint = 'set triggers.backend to "null" to run without trigger codes'
-    target = s.lsl_stream_name if s.backend == "lsl" else s.port
-    if s.backend != "lsl" and not s.port:
-        raise TriggerError(f"triggers: backend {s.backend!r} needs a port "
+    target = settings.lsl_stream_name if settings.backend == "lsl" else settings.port
+    if settings.backend != "lsl" and not settings.port:
+        raise TriggerError(f"triggers: backend {settings.backend!r} needs a port "
                            f"(e.g. /dev/ttyUSB0 or /dev/parport0); {hint}")
     try:
-        if s.backend == "lsl":
-            return _LSL(s.lsl_stream_name), f"lsl:{target}"
-        if s.backend == "serial":
-            return _Serial(s.port), f"serial:{target}"
-        return _Parallel(s.port), f"parallel:{target}"
+        if settings.backend == "lsl":
+            return _LSL(settings.lsl_stream_name), f"lsl:{target}"
+        if settings.backend == "serial":
+            return _Serial(settings.port), f"serial:{target}"
+        return _Parallel(settings.port), f"parallel:{target}"
     except ImportError as exc:
-        pkg = {"lsl": "pylsl", "serial": "pyserial", "parallel": "pyparallel"}[s.backend]
-        raise TriggerError(f"triggers: the {s.backend} backend needs the {pkg} "
-                           f"package (pip install {pkg}); {hint}") from exc
+        package = {"lsl": "pylsl", "serial": "pyserial", "parallel": "pyparallel"}[settings.backend]
+        raise TriggerError(f"triggers: the {settings.backend} backend needs the {package} "
+                           f"package (pip install {package}); {hint}") from exc
     except Exception as exc:  # noqa: BLE001 -- any device failure, reworded with the fix
-        raise TriggerError(f"triggers: cannot open {s.backend} triggers on {target}: {exc}; "
-                           f"check the device and permissions, or {hint}") from exc
+        raise TriggerError(f"triggers: cannot open {settings.backend} triggers on {target}: "
+                           f"{exc}; check the device and permissions, or {hint}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -330,7 +330,7 @@ class Triggers:
     unconditionally. Events are stamped with ``perf_counter``;
     :meth:`describe` converts them to session time once given the clock.
 
-    :ivar sync: the start-sync settings, for the session's trigger screen.
+    :ivar sync_settings: the start-sync settings, for the session's trigger screen.
     :ivar enabled: ``False`` for the ``null`` backend -- the session then skips
         logging a per-frame ``trigger`` column.
     :ivar events: every lifecycle trigger sent, with its value and times.
@@ -343,7 +343,7 @@ class Triggers:
         :raises TriggerError: if the backend cannot be opened.
         """
         self.settings = settings
-        self.sync = settings.sync
+        self.sync_settings = settings.sync
         self.codes = settings.codes
         self._backend, self.active = _open_backend(settings)
         self.enabled = settings.backend != "null"
@@ -389,13 +389,13 @@ class Triggers:
         :return: the value sent, or 0 when this frame is thinned out or frame
             triggers are off (the level then stays as it was).
         """
-        s = self.settings
-        n = self._n_sent
+        settings = self.settings
+        n_sent_before = self._n_sent
         self._n_sent += 1
         self.last_frame = 0
-        if not s.on_frame or n % s.frame_every:
+        if not settings.on_frame or n_sent_before % settings.frame_every:
             return 0
-        self._level = self.codes.frame(n // s.frame_every)
+        self._level = self.codes.frame(n_sent_before // settings.frame_every)
         self._backend.send(self._level)
         self.last_frame = self._level
         return self._level
@@ -429,12 +429,12 @@ class Triggers:
         :param hold_s: seconds before the lines are cleared.
         :return: seconds the send call itself took.
         """
-        t0 = time.perf_counter()
+        send_start_perf = time.perf_counter()
         self._backend.send(value)
-        took = time.perf_counter() - t0
+        send_took_s = time.perf_counter() - send_start_perf
         time.sleep(hold_s)
         self._backend.clear()
-        return took
+        return send_took_s
 
     def status(self) -> str:
         """One line saying what this run will do, for the experimenter screen and the console.
@@ -446,13 +446,13 @@ class Triggers:
         :return: e.g. ``"wait for scanner key '=' | no trigger codes sent
             (backend null) | NOT SET in config: sync.mode, backend"``.
         """
-        sync = self.sync
-        start = {"wait": f"wait for scanner key {sync.key!r}",
-                 "send": f"send scanner_start, then wait {sync.delay:g} s",
-                 "none": "no scanner sync (start on SPACE)"}[sync.mode]
-        out = (f"codes over {self.active}" if self.enabled
-               else "no trigger codes sent (backend null)")
-        parts = [start, out]
+        sync = self.sync_settings
+        sync_part = {"wait": f"wait for scanner key {sync.key!r}",
+                     "send": f"send scanner_start, then wait {sync.delay:g} s",
+                     "none": "no scanner sync (start on SPACE)"}[sync.mode]
+        codes_part = (f"codes over {self.active}" if self.enabled
+                      else "no trigger codes sent (backend null)")
+        parts = [sync_part, codes_part]
         if self.settings.defaulted:
             parts.append("NOT SET in config: " + ", ".join(self.settings.defaulted))
         return " | ".join(parts)
@@ -465,10 +465,10 @@ class Triggers:
             the anchor).
         :return: a JSON-serializable dict for the manifest.
         """
-        events = [dict(e) for e in self.events]
-        if clock is not None and clock.t0_perf is not None:
-            for e in events:
-                e["run_time"] = clock.from_perf(e["perf_time"])
+        events = [dict(event) for event in self.events]
+        if clock is not None and clock.trigger_perf is not None:
+            for event in events:
+                event["run_time"] = clock.from_perf(event["perf_time"])
         settings = asdict(self.settings)
         defaulted = settings.pop("defaulted")
         return {"settings": settings, "defaulted": defaulted, "active": self.active,

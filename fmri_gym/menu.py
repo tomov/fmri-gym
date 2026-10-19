@@ -61,58 +61,61 @@ class MenuSettings:
     confirm: str
 
     @classmethod
-    def from_dict(cls, spec: dict) -> MenuSettings:
+    def from_dict(cls, menu_spec: dict) -> MenuSettings:
         """Read a phase's ``menu`` dict (already validated by :func:`menu_problems`)."""
-        cfg = {**_DEFAULTS, **spec}
-        prev_key, next_key = cfg["move"]
-        return cls(key=cfg["key"].upper(), hold=float(cfg["hold"]), after=float(cfg["after"]),
-                   options=tuple(cfg["options"]), move=(prev_key.upper(), next_key.upper()),
-                   confirm=cfg["confirm"].upper())
+        filled = {**_DEFAULTS, **menu_spec}
+        previous_key, next_key = filled["move"]
+        return cls(key=filled["key"].upper(), hold=float(filled["hold"]),
+                   after=float(filled["after"]), options=tuple(filled["options"]),
+                   move=(previous_key.upper(), next_key.upper()),
+                   confirm=filled["confirm"].upper())
 
 
-def menu_problems(spec: object) -> list[str]:
+def menu_problems(menu_spec: object) -> list[str]:
     """What is wrong with a phase's ``menu`` dict, for :func:`curriculum.validate_curriculum`.
 
-    :param spec: the phase's ``"menu"`` value.
+    :param menu_spec: the phase's ``"menu"`` value.
     :return: human-readable problems, empty when the menu is usable.
     """
-    if not isinstance(spec, dict):
-        return [f"menu: expected a dict with at least 'key', got {spec!r}"]
-    out = []
-    if not isinstance(spec.get("key"), str):
-        out.append("menu.key: the key to hold is required, e.g. \"X\"")
-    for field in ("hold", "after"):
-        value = spec.get(field, _DEFAULTS[field])
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
-            out.append(f"menu.{field}: expected seconds (>= 0), got {value!r}")
-    options = spec.get("options", _DEFAULTS["options"])
+    if not isinstance(menu_spec, dict):
+        return [f"menu: expected a dict with at least 'key', got {menu_spec!r}"]
+    problems = []
+    if not isinstance(menu_spec.get("key"), str):
+        problems.append("menu.key: the key to hold is required, e.g. \"X\"")
+    for field_name in ("hold", "after"):
+        seconds = menu_spec.get(field_name, _DEFAULTS[field_name])
+        if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or seconds < 0:
+            problems.append(f"menu.{field_name}: expected seconds (>= 0), got {seconds!r}")
+    options = menu_spec.get("options", _DEFAULTS["options"])
     if not isinstance(options, list) or not options or set(options) - set(OPTIONS):
-        out.append(f"menu.options: expected a non-empty list from {list(OPTIONS)}, got {options!r}")
-    move = spec.get("move", _DEFAULTS["move"])
-    if not (isinstance(move, list) and len(move) == 2 and all(isinstance(k, str) for k in move)):
-        out.append(f"menu.move: expected two key names [previous, next], got {move!r}")
-    if not isinstance(spec.get("confirm", _DEFAULTS["confirm"]), str):
-        out.append(f"menu.confirm: expected a key name, got {spec.get('confirm')!r}")
-    unknown = set(spec) - {"key"} - set(_DEFAULTS)
+        problems.append(f"menu.options: expected a non-empty list from {list(OPTIONS)}, "
+                        f"got {options!r}")
+    move = menu_spec.get("move", _DEFAULTS["move"])
+    if not (isinstance(move, list) and len(move) == 2
+            and all(isinstance(key, str) for key in move)):
+        problems.append(f"menu.move: expected two key names [previous, next], got {move!r}")
+    if not isinstance(menu_spec.get("confirm", _DEFAULTS["confirm"]), str):
+        problems.append(f"menu.confirm: expected a key name, got {menu_spec.get('confirm')!r}")
+    unknown = set(menu_spec) - {"key"} - set(_DEFAULTS)
     if unknown:
-        out.append(f"menu: unknown fields {sorted(unknown)}")
-    return out
+        problems.append(f"menu: unknown fields {sorted(unknown)}")
+    return problems
 
 
 class Menu:
     """One game block's menu: the hold that arms it, and the pop-up itself.
 
-    :param spec: the phase's ``"menu"`` dict (already validated).
-    :param block_start: ``perf_counter`` at which the block began.
+    :param menu_spec: the phase's ``"menu"`` dict (already validated).
+    :param block_start_perf: ``perf_counter`` at which the block began.
     :param held: returns the names of the keys held now (a test can fake it).
     """
 
-    def __init__(self, spec: dict, block_start: float,
+    def __init__(self, menu_spec: dict, block_start_perf: float,
                  held: Callable[[], frozenset[str]] = held_key_names) -> None:
-        self.settings = MenuSettings.from_dict(spec)
-        self.available_from = block_start + self.settings.after
+        self.settings = MenuSettings.from_dict(menu_spec)
+        self.available_from_perf = block_start_perf + self.settings.after
         self._held = held
-        self._held_since: float | None = None
+        self._held_since_perf: float | None = None
         self.pending = False        # the hold completed; the pop-up is due
         self.events: list[dict] = []  # one per pop-up: when, and what was chosen
 
@@ -126,13 +129,13 @@ class Menu:
         Call often while the game runs. The hold only counts once the menu is
         available, and starts over on every release.
         """
-        now = time.perf_counter()
-        if self.settings.key not in self._held() or now < self.available_from:
-            self._held_since = None
+        now_perf = time.perf_counter()
+        if self.settings.key not in self._held() or now_perf < self.available_from_perf:
+            self._held_since_perf = None
             return False
-        if self._held_since is None:
-            self._held_since = now
-        if now - self._held_since < self.settings.hold or self.pending:
+        if self._held_since_perf is None:
+            self._held_since_perf = now_perf
+        if now_perf - self._held_since_perf < self.settings.hold or self.pending:
             return False
         self.pending = True
         return True
@@ -146,12 +149,12 @@ class Menu:
             logged like any other.
         :return: the chosen option, or ``"quit"`` on window close / ESC.
         """
-        self.pending, self._held_since = False, None
-        s = self.settings
-        opened = run_time()
-        choice = 0
+        self.pending, self._held_since_perf = False, None
+        settings = self.settings
+        opened_run_time = run_time()
+        choice_index = 0
         while True:
-            self._draw(display, choice)
+            self._draw(display, choice_index)
             for event in get_events():
                 if event.type == pygame.QUIT:
                     return "quit"
@@ -159,27 +162,30 @@ class Menu:
                     continue
                 if event.key == pygame.K_ESCAPE:
                     return "quit"
-                name = key_name(event.key)
-                if name is None:
+                key = key_name(event.key)
+                if key is None:
                     continue
-                logger.log(type="input_event", run_time=run_time(), name=name,
-                             down=event.type == pygame.KEYDOWN)
+                logger.log(type="input_event", run_time=run_time(), name=key,
+                           down=event.type == pygame.KEYDOWN)
                 if event.type != pygame.KEYDOWN:
                     continue
-                if name == s.move[0]:
-                    choice = (choice - 1) % len(s.options)
-                elif name == s.move[1]:
-                    choice = (choice + 1) % len(s.options)
-                elif name == s.confirm:
-                    chosen = s.options[choice]
-                    self.events.append({"opened": opened, "closed": run_time(), "choice": chosen})
+                if key == settings.move[0]:
+                    choice_index = (choice_index - 1) % len(settings.options)
+                elif key == settings.move[1]:
+                    choice_index = (choice_index + 1) % len(settings.options)
+                elif key == settings.confirm:
+                    chosen = settings.options[choice_index]
+                    self.events.append({"opened": opened_run_time, "closed": run_time(),
+                                        "choice": chosen})
                     return chosen
             display.idle(time.perf_counter() + 0.005, poll=0.005)
 
-    def _draw(self, display: Display, choice: int) -> None:
-        """Render the option list with ``choice`` marked."""
-        s = self.settings
-        rows = [f"{'>' if i == choice else ' '}  {_LABELS[o]}" for i, o in enumerate(s.options)]
+    def _draw(self, display: Display, choice_index: int) -> None:
+        """Render the option list with the option at ``choice_index`` marked."""
+        settings = self.settings
+        rows = [f"{'>' if index == choice_index else ' '}  {_LABELS[option]}"
+                for index, option in enumerate(settings.options)]
         display.draw_text("Paused\n\n" + "\n".join(rows) + "\n\n"
-                          f"({s.move[0]}/{s.move[1]} to choose, {s.confirm} to select)",
+                          f"({settings.move[0]}/{settings.move[1]} to choose, "
+                          f"{settings.confirm} to select)",
                           align="left")

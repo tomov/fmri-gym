@@ -132,16 +132,16 @@ class GamePhase:
 
     @property
     def frame_period(self) -> float:
-        """Seconds per frame."""
+        """Seconds per frame: ``1 / fps``."""
         return 1.0 / self.fps
 
     @classmethod
-    def from_dict(cls, phase: dict, index: int) -> GamePhase:
+    def from_dict(cls, phase: dict, phase_index: int) -> GamePhase:
         """Read a game phase's dict, filling in the defaults.
 
         :param phase: the phase, of type ``game``, with the fields
             :func:`validate_curriculum` insists on (``game``, ``fps``, ``keys``).
-        :param index: its index in the curriculum, which the default seed is from.
+        :param phase_index: its index in the curriculum, which the default seed is from.
         :raises ValueError: ``live_hud`` on a real-time block, or an ``audio``
             that is not true or false.
         """
@@ -164,7 +164,7 @@ class GamePhase:
             rewind_on=tuple(phase.get("rewind_on", ())),
             rewind_frames=phase.get("rewind_frames"),
             show_outcome_duration=float(phase.get("outcome_duration", 2.0)),
-            seed=phase.get("seed", 1000 + index),
+            seed=phase.get("seed", 1000 + phase_index),
             state_stride=max(1, int(phase.get("state_stride", 1))),
             is_turn_based=is_turn_based,
             has_latched_keys=bool(phase.get("latched_keys", False)),
@@ -183,14 +183,14 @@ def check_shape(curriculum: Any, where: str) -> dict:
     """
     if not isinstance(curriculum, dict) or not isinstance(curriculum.get("curriculum"), list):
         raise ValueError(f'{where}: expected a JSON object with a "curriculum" list')
-    unknown = [k for k in curriculum if k not in SECTIONS and not k.startswith("_")]
+    unknown = [key for key in curriculum if key not in SECTIONS and not key.startswith("_")]
     if unknown:
         raise ValueError(f"{where}: unknown top-level key(s) {unknown}; the sections are "
                          f'{SECTIONS}, and a note must start with "_"')
-    for i, phase in enumerate(curriculum["curriculum"]):
+    for phase_index, phase in enumerate(curriculum["curriculum"]):
         if not isinstance(phase, dict) or phase.get("type") not in PHASE_TYPES:
-            raise ValueError(f'{where}: phase {i} must be an object whose "type" is one of '
-                             f"{PHASE_TYPES}")
+            raise ValueError(f'{where}: phase {phase_index} must be an object whose "type" is '
+                             f"one of {PHASE_TYPES}")
     return curriculum
 
 
@@ -202,8 +202,8 @@ def load_curriculum(path: str) -> dict:
     :raises ValueError: if the file does not have the curriculum shape
         (see :func:`check_shape`).
     """
-    with open(path) as f:
-        return check_shape(json.load(f), path)
+    with open(path) as file:
+        return check_shape(json.load(file), path)
 
 
 def save_curriculum(curriculum: dict, path: str) -> None:
@@ -212,9 +212,9 @@ def save_curriculum(curriculum: dict, path: str) -> None:
     :param curriculum: curriculum dict.
     :param path: destination file path.
     """
-    with open(path, "w") as f:
-        json.dump(curriculum, f, indent=2)
-        f.write("\n")
+    with open(path, "w") as file:
+        json.dump(curriculum, file, indent=2)
+        file.write("\n")
 
 
 def new_curriculum() -> dict:
@@ -260,8 +260,9 @@ def validate_curriculum(curriculum: dict) -> list[str]:
     phases = curriculum["curriculum"]
     if not phases:
         problems.append("curriculum: needs at least one phase")
-    for i, phase in enumerate(phases):
-        problems.extend(f"phase {i}: {p}" for p in _phase_problems(phase, i))
+    for phase_index, phase in enumerate(phases):
+        problems.extend(f"phase {phase_index}: {problem}"
+                        for problem in _phase_problems(phase, phase_index))
     problems.extend(_opening_problems(phases))
     problems.extend(trigger_problems(curriculum.get("triggers")))
     problems.extend(trigger_key_clashes(curriculum))
@@ -283,13 +284,13 @@ def trigger_key_clashes(curriculum: dict) -> list[str]:
         sync = TriggerSettings.from_dict(curriculum.get("triggers")).sync
     except (TypeError, ValueError, TriggerError):
         return []  # trigger_problems says why
-    name = sync.key.upper()
-    if sync.mode != "wait" or not (len(name) == 1 and name.isalnum()):
+    scanner_key = sync.key.upper()
+    if sync.mode != "wait" or not (len(scanner_key) == 1 and scanner_key.isalnum()):
         return []  # "=" is no game key: nothing can clash
-    return [f"phase {i}: keys: {combo} uses {sync.key!r}, the key the scanner types at every "
-            f"volume (triggers.sync.key): bind another key"
-            for i, phase in enumerate(curriculum["curriculum"])
-            for combo in phase.get("keys", {}) if name in combo.upper().split("+")]
+    return [f"phase {phase_index}: keys: {combo} uses {sync.key!r}, the key the scanner types "
+            f"at every volume (triggers.sync.key): bind another key"
+            for phase_index, phase in enumerate(curriculum["curriculum"])
+            for combo in phase.get("keys", {}) if scanner_key in combo.upper().split("+")]
 
 
 def _opening_problems(phases: list[dict]) -> list[str]:
@@ -298,20 +299,21 @@ def _opening_problems(phases: list[dict]) -> list[str]:
     A resumed run plays them before carrying on (a fixation to settle in), so
     they are an unbroken run of non-game phases from phase 0.
     """
-    out = []
+    problems = []
     opening = True
-    for i, phase in enumerate(phases):
+    for phase_index, phase in enumerate(phases):
         flag = phase.get("include_on_resume", False)
         if not isinstance(flag, bool):
-            out.append(f"phase {i}: include_on_resume: expected true or false, got {flag!r}")
+            problems.append(f"phase {phase_index}: include_on_resume: expected true or false, "
+                            f"got {flag!r}")
         elif flag and (phase["type"] == "game" or not opening):
-            out.append(f"phase {i}: include_on_resume: only for the non-game phases the "
-                       "curriculum opens with, with none without it before them")
+            problems.append(f"phase {phase_index}: include_on_resume: only for the non-game "
+                            "phases the curriculum opens with, with none without it before them")
         opening = opening and flag is True
-    return out
+    return problems
 
 
-def _phase_problems(phase: dict, index: int) -> list[str]:
+def _phase_problems(phase: dict, phase_index: int) -> list[str]:
     if phase["type"].startswith("check_"):
         from .checks import phase_problems
         return phase_problems(phase)
@@ -319,40 +321,44 @@ def _phase_problems(phase: dict, index: int) -> list[str]:
         return _dismiss_problems("keys_to_dismiss", phase.get("keys_to_dismiss"))
     if phase["type"] != "game":
         return []
-    out = []
+    problems = []
     if not phase.get("game"):
-        out.append("game: missing env id")
+        problems.append("game: missing env id")
     if phase.get("mode", "duration") not in [mode.value for mode in BlockMode]:
-        out.append(f"mode: expected 'duration' or 'episode', got {phase.get('mode')!r}")
-    out.extend(_fps_problems(phase))
-    out.extend(_keys_problems(phase))
+        problems.append(f"mode: expected 'duration' or 'episode', got {phase.get('mode')!r}")
+    problems.extend(_fps_problems(phase))
+    problems.extend(_keys_problems(phase))
     # advancing_outcomes gates n_episodes, so it means nothing to a block that
     # ends on the clock; the names are EnvAdapter.outcome's plus the menu's.
     if "advancing_outcomes" in phase:
-        names = phase["advancing_outcomes"]
-        if not isinstance(names, list) or not names or not all(isinstance(n, str) for n in names):
-            out.append(f"advancing_outcomes: expected a list of outcome names, got {names!r}")
-        elif set(names) - OUTCOMES:
-            out.append(f"advancing_outcomes: unknown {sorted(set(names) - OUTCOMES)}; "
-                       f"the names are {sorted(OUTCOMES)}")
+        outcome_names = phase["advancing_outcomes"]
+        if (not isinstance(outcome_names, list) or not outcome_names
+                or not all(isinstance(name, str) for name in outcome_names)):
+            problems.append("advancing_outcomes: expected a list of outcome names, got "
+                            f"{outcome_names!r}")
+        elif set(outcome_names) - OUTCOMES:
+            problems.append("advancing_outcomes: unknown "
+                            f"{sorted(set(outcome_names) - OUTCOMES)}; the names are "
+                            f"{sorted(OUTCOMES)}")
         elif phase.get("mode", "duration") != "episode":
-            out.append("advancing_outcomes: only in mode 'episode' (a duration block ends on the "
-                       "clock)")
+            problems.append("advancing_outcomes: only in mode 'episode' (a duration block ends "
+                            "on the clock)")
     if "outcome_duration" in phase and not (
             isinstance(phase["outcome_duration"], (int, float))
             and phase["outcome_duration"] >= 0):
-        out.append(f"outcome_duration: expected seconds >= 0, got {phase['outcome_duration']!r}")
+        problems.append("outcome_duration: expected seconds >= 0, got "
+                        f"{phase['outcome_duration']!r}")
     if "menu" in phase:
-        out.extend(menu_problems(phase["menu"]))
+        problems.extend(menu_problems(phase["menu"]))
     if "instructions" in phase:
-        out.extend(_instructions_problems(phase["instructions"]))
-    out.extend(_rewind_problems(phase))
-    if not out:     # the fields above are what from_dict takes as given
+        problems.extend(_instructions_problems(phase["instructions"]))
+    problems.extend(_rewind_problems(phase))
+    if not problems:     # the fields above are what from_dict takes as given
         try:
-            GamePhase.from_dict(phase, index)
+            GamePhase.from_dict(phase, phase_index)
         except ValueError as exc:
-            out.append(str(exc))
-    return out
+            problems.append(str(exc))
+    return problems
 
 
 #: Outcomes a block may rewind on: the game's own endings. Not `truncated`,
@@ -364,41 +370,43 @@ def _rewind_problems(phase: dict) -> list[str]:
     """``rewind_on`` (outcomes) and ``rewind_frames`` (how far back) come as a pair."""
     if "rewind_on" not in phase and "rewind_frames" not in phase:
         return []
-    names, frames = phase.get("rewind_on"), phase.get("rewind_frames")
-    out = []
-    if not isinstance(names, list) or not names or not all(isinstance(n, str) for n in names):
-        out.append(f"rewind_on: expected a list of outcome names, got {names!r}")
-    elif set(names) - REWINDABLE:
-        out.append(f"rewind_on: {sorted(set(names) - REWINDABLE)} cannot be rewound; the "
-                   f"game's own endings are {sorted(REWINDABLE)}")
-    if isinstance(frames, bool) or not isinstance(frames, int) or frames < 1:
-        out.append(f"rewind_frames: expected the frames to go back, >= 1, got {frames!r}")
-    return out
+    outcome_names, n_frames = phase.get("rewind_on"), phase.get("rewind_frames")
+    problems = []
+    if (not isinstance(outcome_names, list) or not outcome_names
+            or not all(isinstance(name, str) for name in outcome_names)):
+        problems.append(f"rewind_on: expected a list of outcome names, got {outcome_names!r}")
+    elif set(outcome_names) - REWINDABLE:
+        problems.append(f"rewind_on: {sorted(set(outcome_names) - REWINDABLE)} cannot be "
+                        f"rewound; the game's own endings are {sorted(REWINDABLE)}")
+    if isinstance(n_frames, bool) or not isinstance(n_frames, int) or n_frames < 1:
+        problems.append(f"rewind_frames: expected the frames to go back, >= 1, got {n_frames!r}")
+    return problems
 
 
-def _instructions_problems(spec: Any) -> list[str]:
+def _instructions_problems(instructions_spec: Any) -> list[str]:
     """A game phase's ``instructions``: a title, a text, and what makes the screen go away."""
-    if not isinstance(spec, dict):
-        return [f"instructions: expected an object, got {spec!r}"]
-    out = []
-    unknown = set(spec) - {"title", "text", "align", "duration", "keys_to_dismiss"}
+    if not isinstance(instructions_spec, dict):
+        return [f"instructions: expected an object, got {instructions_spec!r}"]
+    problems = []
+    unknown = set(instructions_spec) - {"title", "text", "align", "duration", "keys_to_dismiss"}
     if unknown:
-        out.append(f"instructions: unknown field(s) {sorted(unknown)}; the fields are title, "
-                   "text, align, duration and keys_to_dismiss")
-    if not isinstance(spec.get("title"), str) or not spec["title"]:
-        out.append('instructions: title: missing (the screen says "Starting <title>" or '
-                   '"Resuming <title>")')
-    if spec.get("align", "center") not in ("center", "left"):
-        out.append(f"instructions: align: expected 'center' or 'left', got {spec['align']!r}")
-    duration = spec.get("duration")
+        problems.append(f"instructions: unknown field(s) {sorted(unknown)}; the fields are "
+                        "title, text, align, duration and keys_to_dismiss")
+    if not isinstance(instructions_spec.get("title"), str) or not instructions_spec["title"]:
+        problems.append('instructions: title: missing (the screen says "Starting <title>" or '
+                        '"Resuming <title>")')
+    if instructions_spec.get("align", "center") not in ("center", "left"):
+        problems.append("instructions: align: expected 'center' or 'left', got "
+                        f"{instructions_spec['align']!r}")
+    duration = instructions_spec.get("duration")
     if duration is not None and (isinstance(duration, bool)
                                  or not isinstance(duration, (int, float)) or duration <= 0):
-        out.append(f"instructions: duration: expected seconds > 0, got {duration!r}")
-    keys = spec.get("keys_to_dismiss")
-    out.extend(_dismiss_problems("instructions: keys_to_dismiss", keys))
-    if duration is None and keys is None:
-        out.append("instructions: give a duration, keys_to_dismiss, or both")
-    return out
+        problems.append(f"instructions: duration: expected seconds > 0, got {duration!r}")
+    keys_to_dismiss = instructions_spec.get("keys_to_dismiss")
+    problems.extend(_dismiss_problems("instructions: keys_to_dismiss", keys_to_dismiss))
+    if duration is None and keys_to_dismiss is None:
+        problems.append("instructions: give a duration, keys_to_dismiss, or both")
+    return problems
 
 
 def _dismiss_problems(where: str, keys: Any) -> list[str]:
@@ -423,7 +431,7 @@ def _keys_problems(phase: dict) -> list[str]:
         return ['keys: missing; map each key to the env action it sends, e.g. {"": 0, "LEFT": 3, '
                 '"RIGHT": 2, "UP+SPACE": 5} ("" is no key held; names as in fmri_gym/keys.py; '
                 "there is no default map)"]
-    unknown = sorted({k for combo in keys if combo for k in combo.split("+")} - KEY_NAMES)
+    unknown = sorted({key for combo in keys if combo for key in combo.split("+")} - KEY_NAMES)
     if unknown:
         return [f"keys: {unknown} are not key names; use those in fmri_gym/keys.py (UP, SPACE, "
                 "RETURN, LSHIFT, A-Z, 0-9, F1-F12, KP0-KP9, ...)"]
@@ -457,9 +465,9 @@ def trigger_problems(section: dict | None) -> list[str]:
     :return: at most one problem (the first the settings raise).
     """
     try:
-        s = TriggerSettings.from_dict(section)
+        settings = TriggerSettings.from_dict(section)
     except (TypeError, ValueError, TriggerError) as exc:
         return [str(exc)]
-    if s.backend in ("serial", "parallel") and not s.port:
-        return [f"triggers: backend {s.backend!r} needs a port"]
+    if settings.backend in ("serial", "parallel") and not settings.port:
+        return [f"triggers: backend {settings.backend!r} needs a port"]
     return []

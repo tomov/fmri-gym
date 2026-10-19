@@ -97,14 +97,14 @@ class RunProgress:
     def record(self) -> dict:
         """The manifest's ``resumed_from`` entry: everything but the savestate's bytes."""
         last_game = self.last_game
-        out = {"run": self.run_label,
-               "last_game": None if last_game is None else
-               {"index": last_game.phase_index, "phase": last_game.phase},
-               "index": self.phase_index}
+        entry = {"run": self.run_label,
+                 "last_game": None if last_game is None else
+                 {"index": last_game.phase_index, "phase": last_game.phase},
+                 "index": self.phase_index}
         if self.block_progress is not None:
-            out["block_time_elapsed"] = self.block_progress.block_time_elapsed
-            out["num_completed_episodes"] = self.block_progress.num_completed_episodes
-        return out
+            entry["block_time_elapsed"] = self.block_progress.block_time_elapsed
+            entry["num_completed_episodes"] = self.block_progress.num_completed_episodes
+        return entry
 
 
 def subject_label(subject: str) -> str:
@@ -192,17 +192,18 @@ def fold_seeds(phases: list[dict], label: str) -> dict:
         same episodes.
     :return: the manifest's ``seeds`` entry: the run label, and phase -> how set.
     """
-    how = {}
-    for i, phase in enumerate(phases):
+    how_seeded = {}
+    for phase_index, phase in enumerate(phases):
         if phase["type"] != "game":
             continue
-        how[i] = "pinned" if "seed" in phase else "derived"
-        phase.setdefault("seed", phase_seed(label, i))
-        print(f"seeds: phase {i} = {phase['seed']} ({how[i]})", file=sys.stderr)
-    return {"derived_from": label, "phases": how}
+        how_seeded[phase_index] = "pinned" if "seed" in phase else "derived"
+        phase.setdefault("seed", phase_seed(label, phase_index))
+        print(f"seeds: phase {phase_index} = {phase['seed']} ({how_seeded[phase_index]})",
+              file=sys.stderr)
+    return {"derived_from": label, "phases": how_seeded}
 
 
-def phase_seed(label: str, index: int) -> int:
+def phase_seed(label: str, phase_index: int) -> int:
     """A game phase's base seed when it pins none: its episodes get ``seed, seed + 1, ...``.
 
     A hash of the run's label and the phase's index: stable across processes
@@ -211,10 +212,10 @@ def phase_seed(label: str, index: int) -> int:
     two blocks' ranges practically never meet (``1000 + phase`` made them share).
 
     :param label: :func:`run_label`.
-    :param index: the phase's index in the curriculum.
+    :param phase_index: the phase's index in the curriculum.
     :return: a seed in ``0 .. 2**31 - 1``.
     """
-    digest = hashlib.sha256(f"{label}|phase-{index}".encode()).digest()
+    digest = hashlib.sha256(f"{label}|phase-{phase_index}".encode()).digest()
     return int.from_bytes(digest[:4], "big") >> 1
 
 
@@ -236,44 +237,49 @@ def last_position(root: str, subject: str, curriculum_path: str) -> RunProgress 
     :return: the progress, with ``block_progress`` for a block that is carried
         on; ``None`` if no run of this curriculum got past its opening phases.
     """
-    from .logging import read_events, read_state
+    from .logging import read_events, read_savestate
     task = task_label(curriculum_path)
     pattern = os.path.join(root, subject, "ses-*", "beh", f"{subject}_ses-*_task-{task}_run-*",
                            "manifest.json")
-    runs = []
-    for path in glob.glob(pattern):
-        with open(path) as f:
-            manifest = json.load(f)
+    # (start_epoch, run folder, manifest, the phase entries played): one per run of the config
+    candidate_runs = []
+    for manifest_path in glob.glob(pattern):
+        with open(manifest_path) as file:
+            manifest = json.load(file)
         # index None: the run's closing fixation
-        played = [p for p in manifest["phases"] if p["index"] is not None
-                  and not manifest["curriculum"][p["index"]].get("include_on_resume", False)]
-        if played:
-            runs.append((manifest["start_epoch"], os.path.dirname(path), manifest, played))
-    if not runs:
+        played_entries = [
+            entry for entry in manifest["phases"] if entry["index"] is not None
+            and not manifest["curriculum"][entry["index"]].get("include_on_resume", False)]
+        if played_entries:
+            candidate_runs.append((manifest["start_epoch"], os.path.dirname(manifest_path),
+                                   manifest, played_entries))
+    if not candidate_runs:
         return None
-    _, folder, manifest, played = max(runs, key=lambda r: r[0])
-    games = [p for p in played if p["type"] == "game"]
-    last_game = None if not games else LastGame(
-        games[-1]["index"], manifest["curriculum"][games[-1]["index"]])
-    run = manifest["run"]["label"]
-    last = played[-1]
-    if last["type"] != "game":
-        final = last["index"] == len(manifest["curriculum"]) - 1
-        return RunProgress(run, last["index"] + final, last_game)
-    events = read_events(os.path.join(folder, last["data_dir"]))
-    end = events[-1]
-    if not end["block_did_not_finish"]:
-        return RunProgress(run, last["index"] + 1, last_game)
-    episode_ends = [e for e in events if e["type"] == "episode_end"]
-    state = (end["extra"] or {}).get("state")
-    going = bool(episode_ends) and episode_ends[-1]["outcome"] in ("playing", "quit")
-    if going and state is None:
-        print(f"resume: {last['backend']} keeps no savestate, so the episode phase "
-              f"{last['index']} stopped in starts over", file=sys.stderr)
+    _, run_folder, manifest, played_entries = max(candidate_runs, key=lambda run: run[0])
+    game_entries = [entry for entry in played_entries if entry["type"] == "game"]
+    last_game = None if not game_entries else LastGame(
+        game_entries[-1]["index"], manifest["curriculum"][game_entries[-1]["index"]])
+    run_label = manifest["run"]["label"]
+    last_entry = played_entries[-1]
+    if last_entry["type"] != "game":
+        was_last_phase = last_entry["index"] == len(manifest["curriculum"]) - 1
+        return RunProgress(run_label, last_entry["index"] + was_last_phase, last_game)
+    events = read_events(os.path.join(run_folder, last_entry["data_dir"]))
+    block_end_record = events[-1]
+    if not block_end_record["block_did_not_finish"]:
+        return RunProgress(run_label, last_entry["index"] + 1, last_game)
+    episode_end_records = [event for event in events if event["type"] == "episode_end"]
+    savestate_text = (block_end_record["extra"] or {}).get("state")
+    episode_was_going = (bool(episode_end_records)
+                         and episode_end_records[-1]["outcome"] in ("playing", "quit"))
+    if episode_was_going and savestate_text is None:
+        print(f"resume: {last_entry['backend']} keeps no savestate, so the episode phase "
+              f"{last_entry['index']} stopped in starts over", file=sys.stderr)
     block_progress = BlockProgress(
-        end["block_time_elapsed"], end["num_completed_episodes"],
-        read_state(state) if going and state is not None else None)
-    return RunProgress(run, last["index"], last_game, block_progress)
+        block_end_record["block_time_elapsed"], block_end_record["num_completed_episodes"],
+        read_savestate(savestate_text) if episode_was_going and savestate_text is not None
+        else None)
+    return RunProgress(run_label, last_entry["index"], last_game, block_progress)
 
 
 def _beh(root: str, subject: str, session: int) -> str:

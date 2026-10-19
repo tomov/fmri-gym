@@ -80,10 +80,10 @@ class MultiBinaryKeymap(Keymap):
         return value
 
     def resolve(self, held: frozenset[str]) -> list[int]:
-        vec = [0] * self.n
+        buttons = [0] * self.n
         for combo in self._matched(held):
-            vec[self.combos[combo]] = 1
-        return vec
+            buttons[self.combos[combo]] = 1
+        return buttons
 
 
 class DiscreteKeymap(Keymap):
@@ -108,26 +108,26 @@ class BoxKeymap(DiscreteKeymap):
         return action
 
 
-def make_keymap(spec: dict, space: gym.Space) -> Keymap:
+def make_keymap(phase: dict, space: gym.Space) -> Keymap:
     """The phase's :class:`Keymap`, of the class its env's action space calls for.
 
-    :param spec: the game-phase config (``keys``, ``turn_based``).
+    :param phase: the game-phase config (``keys``, ``turn_based``).
     :param space: the env's action space.
     :raises TypeError: an action space other than MultiBinary, Discrete or Box.
     :raises ValueError: a real-time Discrete / Box phase whose ``keys`` lack ``""``.
     """
-    keys = spec["keys"]
+    keys = phase["keys"]
     if isinstance(space, spaces.MultiBinary):
         return MultiBinaryKeymap(keys, space)
     if isinstance(space, spaces.Discrete):
-        cls: type[Keymap] = DiscreteKeymap
+        keymap_class: type[Keymap] = DiscreteKeymap
     elif isinstance(space, spaces.Box):
-        cls = BoxKeymap
+        keymap_class = BoxKeymap
     else:
         raise TypeError(f"keys: the env's action space is {space}; a keymap drives "
                         "MultiBinary, Discrete or Box only")
-    if "" not in keys and not spec.get("turn_based", False):
+    if "" not in keys and not phase.get("turn_based", False):
         raise ValueError(f'keys: "" missing; the env\'s action space is {space}, so name the '
                          'action sent on a frame with no key held ("": 0, say), or set '
                          '"turn_based": true to step only on key presses')
-    return cls(keys, space)
+    return keymap_class(keys, space)
