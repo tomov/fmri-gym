@@ -37,7 +37,7 @@ uv run python -m tests.changed                                                  
 
 A selected backend this machine cannot play is **skipped, with the fix in the reason** (`-ra` prints them: `uv sync --extra X`, `git submodule update --init`, install Chrome, fetch the game files). It **fails** instead when it was named with `--backend`, when the change hit its own files, or under `--strict-backends` (CI): a suite that silently passed on a backend it never played would be the worst thing it could do (AGENTS.md, rule 4).
 
-Other switches: `--thorough` plays every config of each selected backend through the quick check and runs the long sweeps (CI); `--no-audio` keeps the headless runs off the sound device (CI, or a machine without one; detected when the option is absent); `--frames N` and `--run-seconds S` size the recordings and the headless runs.
+Other switches: `--thorough` plays every config of each selected backend through the quick check and runs the long sweeps (CI); `--no-audio` keeps the headless runs off the sound device (CI, or a machine without one; detected when the option is absent); `--frames N` and `--run-seconds S` size the recordings and the headless runs (15 s by default, 25 in CI; the game plays 10 s less, the run closing on its fixation); `--window` runs the headless runs in a real window instead of SDL's dummy driver, for a change a real display could break. A core change under `--changed` plays headless runs only for the backends it touches directly and for `LOOP_SAMPLE` (gym, minihack, vizdoom); every other selected backend still gets its adapter, recording and replay checks.
 
 ## CI
 

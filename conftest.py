@@ -30,5 +30,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
                 help="headless runs leave the sound device alone (CI, or no output here)")
     g.addoption("--frames", type=int, default=120,
                 help="frames per episode the recordings play (default 120)")
-    g.addoption("--run-seconds", type=float, default=25.0,
-                help="length of each headless run; the game plays 10 s less (default 25)")
+    g.addoption("--run-seconds", type=float, default=15.0,
+                help="length of each headless run; the game plays 10 s less (default 15; "
+                     "CI: 25)")
+    g.addoption("--window", action="store_true",
+                help="headless runs open a real window (one at a time) instead of SDL's "
+                     "dummy driver, to catch what only a display shows")

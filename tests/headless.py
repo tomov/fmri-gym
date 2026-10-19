@@ -3,8 +3,8 @@
 ``fmri_play.main()`` runs in this process, so the trigger wait, the
 instructions screen, the window, the key queue, the pacing and the logger are
 the ones a subject gets. Two things stand in for the rig: SDL's dummy video
-driver (a window that is never shown) and a key script registered with
-:mod:`fmri_gym.keys` the way the gamepad is (:func:`~fmri_gym.keys
+driver (a window that is never shown; ``--window`` opens a real one) and a key
+script registered with :mod:`fmri_gym.keys` the way the gamepad is (:func:`~fmri_gym.keys
 .register_event_source` for the presses, :func:`~fmri_gym.keys
 .register_held_source` for what counts as held), so every press travels the
 route a real key does. The script presses the phase's own keys at random,
@@ -32,7 +32,8 @@ import sys
 import time
 
 # Before pygame is imported anywhere: the driver is read when the display opens.
-os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+if "--window" not in sys.argv:
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame  # noqa: E402
@@ -104,6 +105,8 @@ def main() -> None:
     p.add_argument("--duration", type=float, default=25.0,
                    help="seconds the run lasts; the phases stop 10 s before")
     p.add_argument("--rate", type=float, default=6.0, help="presses per second")
+    p.add_argument("--window", action="store_true",
+                   help="open a real window (SDL's default driver) instead of the dummy one")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--no-audio", action="store_true", help="for a machine without an output")
     args = p.parse_args()

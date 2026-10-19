@@ -12,7 +12,10 @@ it could do (AGENTS.md, rule 4).
 
 ``--thorough`` plays every config of a selected backend through the quick
 check and runs the long sweeps, where the default plays the backend's smoke
-configs only. ``--no-audio`` keeps the headless runs off the sound device, for
+configs only. The headless runs of the real loop are the slow part: a core
+change under ``--changed`` plays them for the backends it touches directly
+and for :data:`~tests.backends.LOOP_SAMPLE`, not for every backend, unless
+``--thorough``. ``--window`` runs them in a real window. ``--no-audio`` keeps the headless runs off the sound device, for
 a machine without one. The options themselves are declared in the repo root's
 ``conftest.py``, which says why they cannot live here.
 """
@@ -25,7 +28,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.backends import BACKENDS, REPO, configs_of, game_phases, phase_backend
+from tests.backends import BACKENDS, LOOP_SAMPLE, REPO, configs_of, game_phases, phase_backend
 from tests.changed import changed_files, select
 
 
@@ -35,11 +38,14 @@ class Plan:
 
     selected: list[str]
     direct: set[str]
+    #: the selected backends whose smoke configs also get a headless run of the real loop
+    headless: list[str]
     strict: bool
     thorough: bool
     no_audio: bool
     frames: int
     run_seconds: float
+    has_window: bool
     why: str
 
     def gate(self, backend: str) -> None:
@@ -58,9 +64,10 @@ def _plan(config: pytest.Config) -> Plan:
     if names and base is not None:
         raise pytest.UsageError("give --backend or --changed, not both")
     direct: set[str] = set()
+    is_core = False
     if base is not None:
         selection = select(changed_files(base))
-        selected, direct = selection.backends, selection.direct
+        selected, direct, is_core = selection.backends, selection.direct, selection.core
         why = f"files changed against {base}" + (" (a core change)" if selection.core else "")
     elif names == ["none"]:
         selected, why = [], "--backend none"
@@ -72,9 +79,13 @@ def _plan(config: pytest.Config) -> Plan:
         direct, why = set(selected), "named on the command line"
     else:
         selected, why = list(BACKENDS), "every backend"
-    return Plan(selected, direct, config.getoption("--strict-backends"),
-                config.getoption("--thorough"), config.getoption("--no-audio"),
-                config.getoption("--frames"), config.getoption("--run-seconds"), why)
+    thorough = config.getoption("--thorough")
+    headless = selected
+    if is_core and not thorough:
+        headless = [b for b in selected if b in direct or b in LOOP_SAMPLE]
+    return Plan(selected, direct, headless, config.getoption("--strict-backends"), thorough,
+                config.getoption("--no-audio"), config.getoption("--frames"),
+                config.getoption("--run-seconds"), config.getoption("--window"), why)
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -87,6 +98,9 @@ def pytest_report_header(config: pytest.Config) -> list[str]:
     missing = {b: BACKENDS[b].missing() for b in plan.selected}
     lines = [f"fmri-gym backends ({plan.why}): "
              + (", ".join(b for b in plan.selected if not missing[b]) or "none")]
+    if plan.headless != plan.selected:
+        lines.append("  headless runs: " + (", ".join(plan.headless) or "none")
+                     + " (a core change; --thorough runs them all)")
     for b, reason in missing.items():
         if reason:
             verb = "FAIL" if plan.strict or b in plan.direct else "skip"
@@ -99,7 +113,9 @@ def pytest_report_header(config: pytest.Config) -> list[str]:
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
     plan: Plan = metafunc.config.fmri_plan
     if "smoke_config" in metafunc.fixturenames:
-        pairs = [(b, c) for b in plan.selected for c in BACKENDS[b].smoke]
+        backends = plan.headless if metafunc.function.__name__ == "test_headless_run" \
+            else plan.selected
+        pairs = [(b, c) for b in backends for c in BACKENDS[b].smoke]
         metafunc.parametrize("smoke_config", pairs, indirect=True,
                              ids=[f"{b}/{Path(c).stem}" for b, c in pairs])
     if "game_phase" in metafunc.fixturenames:

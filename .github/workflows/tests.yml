@@ -51,7 +51,7 @@ jobs:
       - name: Lint
         run: uv run ruff check fmri_gym fmri_play.py agents tests gym/*/tests
       - name: Engine-free tests and the gym backend
-        run: uv run pytest --backend gym --strict-backends --thorough --no-audio
+        run: uv run pytest --backend gym --strict-backends --thorough --no-audio --run-seconds 25
 
   backend:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
@@ -93,7 +93,7 @@ jobs:
       - name: Play the backend
         run: >
           uv run pytest --backend ${{ matrix.backend }} --strict-backends --thorough --no-audio
-          --durations=15
+          --run-seconds 25 --durations=15
       - name: Keep the run folders of a failed job
         if: failure()
         uses: actions/upload-artifact@v4

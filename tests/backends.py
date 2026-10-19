@@ -125,6 +125,10 @@ BACKENDS: dict[str, Backend] = {b.name: b for b in (
             ci="the game pack is Linux x86_64 only and renders through a real GL display"),
 )}
 
+#: The backends whose headless runs stand for the run loop when only core files changed:
+#: a real-time phase (gym), a turn-based one (minihack), held-key combos with sound (vizdoom).
+LOOP_SAMPLE = ("gym", "minihack", "vizdoom")
+
 #: The backends a hosted Linux runner can play.
 CI_BACKENDS = tuple(b.name for b in BACKENDS.values() if b.ci is None)
 

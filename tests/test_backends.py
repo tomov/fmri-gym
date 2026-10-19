@@ -206,9 +206,12 @@ def test_headless_run(smoke_config, plan, tmp_path):
     no_audio = plan.no_audio or not _audio_output_here()
     cmd = [sys.executable, "-m", "tests.headless", "--curriculum", str(config),
            "--data-root", str(tmp_path / "data"), "--duration", str(plan.run_seconds)]
-    done = subprocess.run(cmd + (["--no-audio"] if no_audio else []), cwd=REPO,
-                          capture_output=True, text=True, timeout=plan.run_seconds + 180,
-                          env={**os.environ, "SDL_VIDEODRIVER": "dummy"})
+    cmd += ["--no-audio"] * no_audio + ["--window"] * plan.has_window
+    env = {**os.environ}
+    if not plan.has_window:
+        env["SDL_VIDEODRIVER"] = "dummy"
+    done = subprocess.run(cmd, cwd=REPO, capture_output=True, text=True,
+                          timeout=plan.run_seconds + 180, env=env)
     assert done.returncode == 0, f"fmri-play exited {done.returncode}:\n{done.stderr[-3000:]}"
 
     manifests = list((tmp_path / "data").glob("sub-test/ses-001/beh/*/manifest.json"))

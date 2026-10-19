@@ -16,7 +16,7 @@ uv run ruff check fmri_gym fmri_play.py agents tests gym/*/tests
 
 Read the summary. A skip says what this machine lacks and how to get it (`uv sync --extra X`, `git submodule update --init`, install Chrome, fetch game files). A backend whose own files you changed does not skip: it fails until you can play it. If you cannot install it here, say so in the PR and let CI play it.
 
-`--changed` selects by the files that differ from `origin/main`, committed or not. Name backends instead with `--backend crafter,minihack`; `--backend none` is the engine-free tests alone. Plain `pytest` is everything this machine can play (long: about 25 s of headless run per smoke config).
+`--changed` selects by the files that differ from `origin/main`, committed or not. Name backends instead with `--backend crafter,minihack`; `--backend none` is the engine-free tests alone. Plain `pytest` is everything this machine can play (long: about 15 s of headless run per smoke config). A core change under `--changed` checks every backend's adapter, recording and replay, but plays the real loop headless only for the backends it touches directly and for `LOOP_SAMPLE` in `tests/backends.py` (gym, minihack, vizdoom); the full sweep is CI's. Tests run one at a time, so the suite leaves the rest of the machine to whoever is using it. Headless means SDL's dummy video driver: a bug only a real display shows (a window that does not open, vsync, a monitor) is not caught, here or in CI; add `--window` to run the headless runs in real windows, one at a time, when a change touches the display.
 
 ## Reading a failure
 
