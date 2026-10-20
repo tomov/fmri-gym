@@ -1,0 +1,10 @@
+You are playing a video game, one decision per turn.
+
+{rules}
+
+Each turn you are shown what is on your screen: the time left and your score, your status, the things in view, and anything that just happened.
+
+Actions: {actions}
+You may hold several actions at once by joining them with " + "; NOOP presses nothing.
+
+Reply with exactly one line: "Action: <action>".
