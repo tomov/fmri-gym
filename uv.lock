@@ -606,6 +606,7 @@ dependencies = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "vizdoom" },
+    { name = "vizdoom-gym" },
 ]
 
 [package.metadata]
@@ -613,6 +614,7 @@ requires-dist = [
     { name = "gymnasium" },
     { name = "numpy" },
     { name = "vizdoom" },
+    { name = "vizdoom-gym" },
 ]
 
 [[package]]
@@ -804,6 +806,7 @@ box2d = [
 coom = [
     { name = "coom-gym" },
     { name = "replay-state-gym" },
+    { name = "vizdoom-gym" },
 ]
 crafter = [
     { name = "crafter-gym" },
@@ -921,6 +924,7 @@ requires-dist = [
     { name = "tile-match-gym", marker = "extra == 'tilematch'" },
     { name = "vgdl-gym", marker = "extra == 'vgdl'", editable = "gym/vgdl" },
     { name = "vizdoom", marker = "extra == 'vizdoom'" },
+    { name = "vizdoom-gym", marker = "extra == 'coom'", editable = "gym/vizdoom" },
     { name = "vizdoom-gym", marker = "extra == 'vizdoom'", editable = "gym/vizdoom" },
 ]
 provides-extras = ["ale", "retro", "crafter", "baba", "baba-auto", "vgdl", "minihack", "nethack", "aigamestore", "arc3", "vizdoom", "coom", "rushhour", "stk", "box2d", "mujoco", "shimmy", "tilematch", "triggers", "gui", "dbp", "all"]

@@ -8,6 +8,7 @@ One system library, then everything else, from the repo root:
 
 ```bash
 sudo apt install libportaudio2                  # Linux only: PortAudio (macOS/Windows wheels bundle it)
+brew install openal-soft                        # Apple Silicon Mac only: OpenAL Soft, for ViZDoom/COOM sound
 curl -LsSf https://astral.sh/uv/install.sh | sh # if you don't have uv
 uv sync --extra dbp --extra gui                 # every game below + the editor, into .venv/
 uv run fmri-play --help                         # check: prints usage

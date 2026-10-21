@@ -114,7 +114,7 @@ BACKENDS: dict[str, Backend] = {b.name: b for b in (
     Backend("vizdoom", "vizdoom", "vizdoom_gym", (_C + "vizdoom/levels/basic.json",),
             gym_dirs=("vizdoom", "replay_state")),
     Backend("coom", "coom", "coom_gym", (_C + "coom/levels/pitfall.json",),
-            gym_dirs=("coom", "replay_state"), external="coom",
+            gym_dirs=("coom", "vizdoom", "replay_state"), external="coom",
             marker="COOM/env/scenarios/pitfall/conf.cfg"),
     Backend("vgdl", "vgdl", "vgdl_gym", (_C + "vgdl/levels/aliens.json",),
             gym_dirs=("vgdl",), external="vgdl", marker="games/aliens_v0/aliens.txt"),

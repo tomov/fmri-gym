@@ -46,6 +46,7 @@ instead: the seed and the actions since, restored by replay.
 
 from __future__ import annotations
 
+import sys
 from typing import Any
 
 import gymnasium as gym
@@ -62,10 +63,11 @@ class VizDoomAdapter(EnvAdapter):
 
         :param spec: game-phase config dict from the curriculum.
         :return: a ViZDoom Gymnasium environment.
+        :raises RuntimeError: sound is on, on a Mac without OpenAL Soft.
         """
         from replay_state_gym import ReplayState
         from vizdoom import gymnasium_wrapper  # noqa: F401  (registers Vizdoom*-v1)
-        from vizdoom_gym import KeyboardOnlyAction, StartedEpisodes
+        from vizdoom_gym import KeyboardOnlyAction, StartedEpisodes, use_openal_soft
         env = gym.make(spec["game"], render_mode="rgb_array",
                        **spec.get("env_kwargs", {}))
         if env.unwrapped.game.is_audio_buffer_enabled():
@@ -75,6 +77,11 @@ class VizDoomAdapter(EnvAdapter):
             # Doom's reverb only colours the buffer, so turn EFX off; the audio
             # buffer itself still carries the real sound.
             env.unwrapped.game.add_game_args("+snd_efx 0")
+            # The engine starts, and reads dyld's path, at the first reset (StartedEpisodes).
+            if sys.platform == "darwin" and use_openal_soft() is None:
+                env.close()
+                raise RuntimeError("ViZDoom audio on macOS requires OpenAL Soft: "
+                                   "brew install openal-soft")
         if isinstance(env.action_space, gym.spaces.Dict):
             env = KeyboardOnlyAction(env)
         return ReplayState(StartedEpisodes(env))

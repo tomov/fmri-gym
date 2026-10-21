@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "vizdoom-gym"
 version = "0.1.0"
-description = "Wrappers over ViZDoom's Gymnasium envs: keyboard-only actions, episodes that all begin alike."
+description = "Wrappers over ViZDoom's Gymnasium envs: keyboard-only actions, episodes that all begin alike, and OpenAL Soft for their sound on macOS."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["gymnasium", "numpy", "vizdoom"]

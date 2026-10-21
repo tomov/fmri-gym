@@ -21,6 +21,8 @@ uv run pytest --backend none             # the engine-free tests only
 | `test_resume_between_phases.py` | gym | `--resume` of a run whose clock stopped it in a message after a finished game block: the next run starts at that message, from its beginning, after the `include_on_resume` phases, and does not play the block again |
 | `test_crafter_cues.py` | crafter | the adapter's predicted sound cue against the engine's own outcome, press by press |
 | `gym/minihack/tests/` | minihack | the `minihack-levels` package's own tests, collected when minihack is selected |
+| `gym/vizdoom/tests/` | vizdoom | `use_openal_soft`: where it finds OpenAL Soft on a Mac, and that it keeps dyld's defaults and leaves other platforms alone |
+| `gym/coom/tests/` | coom | a COOM env with sound on a Mac without OpenAL Soft raises before the engine starts; with sound off it plays |
 
 The repo root's `conftest.py` declares the suite's options (it has to be at the root: pytest reads an unknown option's value as a path, and `--backend gym` names the `gym/` directory). `backends.py` is the table: one row per backend with the extra that installs it, the import that proves it, the checkout, browser or game files it needs, its smoke configs, and why CI cannot play it, if it cannot. `changed.py` maps changed files to backends. `verify_replay.py` and `headless.py` are the two steps the backend tests drive, and both work on their own; `tap.py` is what a headless run is watched with (`--tap`), and its fake sound card (`--fake-audio`) is what a machine without one plays into:
 

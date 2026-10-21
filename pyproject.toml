@@ -55,7 +55,7 @@ arc3 = ["arc3-gym; python_version >= '3.12'", "replay-state-gym"]
 vizdoom = ["vizdoom", "vizdoom-gym", "replay-state-gym"]
 # COOM scenarios as a gym env, from gym/coom (see tool.uv.sources). Needs the
 # external/coom checkout too; the COOM package itself is not installed.
-coom = ["coom-gym", "replay-state-gym"]
+coom = ["coom-gym", "vizdoom-gym", "replay-state-gym"]
 rushhour = ["rushhour-gym>=0.7.0", "replay-state-gym"]
 # SuperTuxKart, game included. The wheel is pure Python; it fetches the
 # game and a trimmed asset pack (254 MiB) from the matching GitHub release on
@@ -116,7 +116,7 @@ dev = ["pytest>=8", "pytest-timeout", "ruff"]
 [tool.pytest.ini_options]
 # tests/ is the suite; a gym/<pkg>/tests/ folder is that package's own tests,
 # collected when its backend is selected (tests/conftest.py).
-testpaths = ["tests", "gym/minihack/tests"]
+testpaths = ["tests", "gym/minihack/tests", "gym/vizdoom/tests", "gym/coom/tests"]
 # -ra: every skip and its reason in the summary. A backend this machine cannot
 # run is skipped, and the summary is where that must be seen.
 addopts = "-ra"

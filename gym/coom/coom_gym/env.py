@@ -33,6 +33,7 @@ from typing import Any, ClassVar
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
+from vizdoom_gym import use_openal_soft
 
 
 def _actions() -> list[list[bool]]:
@@ -53,12 +54,16 @@ _CLONE = "git submodule update --init external/coom  (a submodule of fmri-gym)"
 def _configure_audio(game: Any, *, enabled: bool, efx: bool) -> None:
     """Turn the audio buffer on before ``init``, or leave it off.
 
+    On macOS, turning it on also puts OpenAL Soft on dyld's path
+    (:func:`vizdoom_gym.use_openal_soft`).
+
     :param game: a ``vizdoom.DoomGame`` that has not been initialised yet.
     :param enabled: whether this step should produce a PCM buffer.
     :param efx: whether Doom's reverb filter is on. Older OpenAL builds abort
         while setting it up, so the caller states the choice.
     :raises TypeError: if either flag is not a bool.
-    :raises RuntimeError: audio was requested on Linux and OpenAL is missing.
+    :raises RuntimeError: audio was requested and OpenAL is missing (libopenal1
+        on Linux, OpenAL Soft on macOS).
     """
     import vizdoom as vzd
 
@@ -73,6 +78,8 @@ def _configure_audio(game: Any, *, enabled: bool, efx: bool) -> None:
         except OSError as error:
             raise RuntimeError("COOM audio requires OpenAL: install libopenal1 "
                                "(Ubuntu: sudo apt install libopenal1)") from error
+    if sys.platform == "darwin" and use_openal_soft() is None:
+        raise RuntimeError("COOM audio on macOS requires OpenAL Soft: brew install openal-soft")
     game.set_audio_sampling_rate(vzd.SamplingRate.SR_44100)
     game.set_audio_buffer_size(1)
     game.add_game_args(f"+snd_efx {int(efx)}")
@@ -92,8 +99,8 @@ class COOMEnv(gym.Env):
     :param seed: seed applied before the game is initialised.
     :param audio_buffer_enabled: record one PCM buffer per tic.
     :param audio_efx: Doom's reverb on that buffer.
-    :raises RuntimeError: no such scenario at the checkout, or the scenario does
-        not have COOM's 4-button layout.
+    :raises RuntimeError: no such scenario at the checkout, the scenario does
+        not have COOM's 4-button layout, or audio is on and OpenAL is missing.
     """
 
     metadata: ClassVar[dict[str, Any]] = {"render_modes": ["rgb_array"], "render_fps": 35}
