@@ -418,21 +418,21 @@ class CheckControls(CheckPhase):
     keys: dict[str, str] | None
     #: seconds to press each key
     timeout_s: float
-    #: measure a plugged-in controller first
+    #: calibrate a plugged-in controller first
     has_pad: bool
-    #: cued presses per control, when the controller is measured
-    pad_reps: int
 
     @classmethod
     def from_dict(cls, d: dict, index: int) -> CheckControls:
         return cls(**cls._shared(d), keys=None if d.get("keys") is None else dict(d["keys"]),
-                   timeout_s=d.get("timeout_s", 10.0), has_pad=d.get("has_pad", True),
-                   pad_reps=d.get("pad_reps", 3))
+                   timeout_s=d.get("timeout_s", 10.0), has_pad=d.get("has_pad", True))
 
     @staticmethod
     def problems(d: dict) -> list[str]:
         keys = d.get("keys")
-        out = _positive_problems(d, ("timeout_s", "pad_reps")) + _bool_problems(d, ("has_pad",))
+        out = _positive_problems(d, ("timeout_s",)) + _bool_problems(d, ("has_pad",))
+        if "pad_reps" in d:
+            out.append("pad_reps: the calibration asks for each control until it comes twice "
+                       "in a row, with no count to set; remove it")
         if keys is None:
             return out  # the rig's bindings
         if not isinstance(keys, dict) or not keys:

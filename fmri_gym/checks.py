@@ -91,7 +91,7 @@ import numpy as np
 import pygame
 from gymnasium import spaces
 
-from . import pad
+from . import pad, pad_calibration
 from .bids import has_session, next_session
 from .config import rig as rig_file
 from .config.phases import (CHECK_PHASES, CheckControls, CheckDisplay, CheckFrames, CheckPhase,
@@ -445,55 +445,31 @@ def _check_controls(run: Run, phase: CheckControls, summary: dict, arrays: dict,
     tests["controls"] = Verdict("fail", "; ".join(problems)) if problems else _PASS
 
 
-#: Under this many degrees between the direction a push was meant for and its
-#: runner-up, the stick is being classified on luck.
-PAD_MARGIN_DEG = 10.0
-
-
 def _check_pad(run: Run, phase: CheckControls) -> dict[str, Any]:
-    """Measure the controller, if there is one, before asking for any keys.
+    """Calibrate the controller, if there is one, before asking for any keys.
 
-    A pad on an fMRI interface sends joystick buttons, not keystrokes, and its
-    stick has to be measured per rig before a threshold means anything (see
-    :mod:`fmri_gym.pad`). So when one is plugged in the calibration runs here,
-    inside the check, and writes the site's ``pad.json`` that every later run on
-    this rig reads. With no pad there is nothing to measure: whatever device is
-    plugged in is expected to send the keys itself, which the prompts below are
-    what tests. ``"has_pad": false`` in the phase skips the measurement and leaves
-    any existing calibration alone.
+    A pad on an fMRI interface sends joystick buttons, not keystrokes, and each of
+    its sticks has to be measured on the rig before a threshold means anything (see
+    :mod:`fmri_gym.pad_calibration`). So when one is plugged in the calibration runs
+    here, and writes a calibration of that pad, which every later run on this rig
+    with it reads. With no pad there is nothing to measure: whatever device is
+    plugged in is expected to send the keys itself, which the prompts below test.
+    ``"has_pad": false`` in the phase skips the measurement and leaves any existing
+    calibration alone.
     """
-    device = pad.detect()
-    if not device:
+    found = pad.find()
+    if found is None:
         return {"present": False}
     if not phase.has_pad:
-        return {"present": True, "device": device, "measured": False,
-                "why": "", "note": 'skipped ("has_pad": false)'}
-    rig = {k: run.config.rig.fields[k] for k in ("site", "rig")}  # filed with the pad's
-    _title(run, f"measuring {device}")
-    try:
-        out = pad.calibrate(int(phase.pad_reps), screen=run.display.screen,
-                            extra=rig)
-    except SystemExit as exc:                 # no pad by the time it looked
-        return {"present": True, "device": device, "measured": False, "why": str(exc)}
-    out.update(present=True, why=_pad_problem(out))
-    return out
-
-
-def _pad_problem(out: dict) -> str:
-    """What keeps a finished calibration from being usable; "" when it is fine."""
-    if not out.get("measured"):
-        return out.get("why") or "calibration did not finish"
-    why = []
-    if out.get("trials_with_no_push"):
-        why.append(f"{out['trials_with_no_push']} cued trials had no push")
-    if out.get("trials") and out["hits"] < out["trials"]:
-        why.append(f"{out['trials'] - out['hits']} of {out['trials']} cues read as "
-                   "another control")
-    margin = out.get("margin_as_shipped_deg")
-    if margin is not None and margin < PAD_MARGIN_DEG:
-        why.append(f"only {margin:.0f} deg between a push and the next direction "
-                   f"(wanted {PAD_MARGIN_DEG:.0f})")
-    return "; ".join(why)
+        return {"present": True, "device": found.name, "measured": False, "why": "",
+                "note": 'skipped ("has_pad": false)'}
+    result = pad_calibration.calibrate(found, run.display.screen, pygame.display.flip,
+                                       found.sticks())
+    if result is None:
+        return {"present": True, "device": found.name, "measured": False,
+                "why": "stopped before it finished; nothing written"}
+    pad.use((result.path, result.calibration))      # the keys below are read through it
+    return {"present": True, "why": "", **result.record()}
 
 
 def _key_problem(name: str, result: dict | None) -> str:
@@ -1119,10 +1095,10 @@ COLUMNS: list[tuple[str, tuple[str, ...], str, str | None]] = [
      "Median time from the prompt to the press (a person's, not the device's)", "ms"),
     ("pad_device", ("rig_check", "controls", "pad", "device"),
      "The controller found, whose buttons are read as keys", None),
-    ("pad_axis_on", ("rig_check", "controls", "pad", "axis_on"),
-     "Fraction of the stick's travel that counts as pushed", None),
-    ("pad_margin_deg", ("rig_check", "controls", "pad", "margin_as_shipped_deg"),
-     "Degrees between a cued push and the next direction, worst trial", "deg"),
+    ("pad_axis_on", ("rig_check", "controls", "pad", "sticks", "left", "on"),
+     "Fraction of the left stick's travel that counts as pushed", None),
+    ("pad_corrections", ("rig_check", "controls", "pad", "corrections"),
+     "Wrong controls pressed, and asked again, while the calibration confirmed each", None),
     ("input_devices", ("rig_check", "controls", "devices"),
      "Keyboards, button boxes and joysticks plugged in", None),
     ("frames_blocks", ("rig_check", "frames", "played"),
@@ -2122,12 +2098,11 @@ def _pad_line(pad_out: dict) -> str:
     device = pad_out.get("device", "a controller")
     if not pad_out.get("measured"):
         return f"{device} plugged in, not measured: {pad_out.get('note') or pad_out.get('why')}."
-    return (f"{device} measured: stick on past {pad_out['axis_on']:.2f} of its travel and off "
-            f"under {pad_out['axis_off']:.2f}, a direction believed after "
-            f"{pad_out['stick_dwell_s'] * 1000:.0f} ms, "
-            f"{pad_out.get('hits', 0)}/{pad_out.get('trials', 0)} cues read as themselves, "
-            f"{pad_out['margin_as_shipped_deg']:.0f} deg to the next direction. "
-            f"Written to {pad_out['config']}, and every run on this rig reads it.")
+    sticks = "; ".join(f"{name} stick on past {s['on']:.2f} of its travel and off under "
+                       f"{s['off']:.2f}" for name, s in pad_out["sticks"].items())
+    return (f"{device} measured: {sticks or 'no stick'}; {pad_out['confirmed']} controls "
+            f"confirmed, {pad_out['corrections']} wrong presses asked again. Written to "
+            f"{pad_out['config']}, and every run on this rig with it reads it.")
 
 
 def _html_photodiode(m: dict, folder: str) -> str:
