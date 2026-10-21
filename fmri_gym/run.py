@@ -380,6 +380,7 @@ class Run:
         self.resume_from = resume_from
         #: ``perf_counter`` at which the phases stop for the closing fixation.
         self._run_end = math.inf
+        self._end_fixation_onset: float | None = None   # perf_counter, once the cross is up
         self.logger.set_extra("duration", config.duration)
         self.logger.set_extra("resumed_from",
                               None if resume_from is None else resume_from.record())
@@ -898,7 +899,9 @@ class Run:
             **({"instructions": instructions} if instructions else {}),
         })
 
-        # Close adapter and environment
+        # Close adapter and environment; at the run's end, behind the closing cross
+        if self._time_up():
+            self._end_fixation_onset = self.display.draw_fixation()
         adapter.close()
         self.display.ensure() # Some gym envs call pygame.display.quit() on close() which tears down our shared window
 
@@ -988,8 +991,10 @@ class Run:
         return time.perf_counter() >= self._run_end
 
     def _end_fixation(self) -> None:
-        """Close the run on ``end_fixation`` seconds of fixation."""
-        onset = self.clock.from_perf(self.display.draw_fixation())
-        _wait_for_duration(self.display, self.config.end_fixation)
+        """Close the run on ``end_fixation`` seconds of fixation, from when the cross went up."""
+        flip = self.display.draw_fixation()   # again: a closing env may have taken the window
+        start = flip if self._end_fixation_onset is None else self._end_fixation_onset
+        onset = self.clock.from_perf(start)
+        _wait_for_duration(self.display, math.inf, until=start + self.config.end_fixation)
         self.logger.log_phase({"index": None, "type": "fixation", "end_of_run": True,
                                "onset": onset, "offset": self.clock.run_time()})
