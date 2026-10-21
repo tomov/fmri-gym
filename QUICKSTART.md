@@ -192,7 +192,7 @@ Controls: arrow keys (N/E/S/W). Needs `setuptools<81` (already a core dependency
 uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/rigs/example/empty.json --curriculum configs/curricula/stk/levels/hacienda.json
 ```
 
-Needs a real GL display (does **not** work under `SDL_VIDEODRIVER=dummy`); the game itself comes with `supertuxkart-gym`, which fetches it on first use (no checkout, no build). See the README section "Running SuperTuxKart". Controls: arrows steer/accelerate/brake, SPACE fire, V skid, N nitro, BACKSPACE rescue.
+Needs a real GL display (does **not** work under `SDL_VIDEODRIVER=dummy`); the game itself comes with `supertuxkart-gym`, which fetches it on first use (no checkout, no build) on Linux x86_64; on a Mac, run `tools/stk_macos.sh` once and export the `STK_ENV_BIN` it prints. See the README section "Running SuperTuxKart". Controls: arrows steer/accelerate/brake, SPACE fire, V skid, N nitro, BACKSPACE rescue.
 
 ## Tips
 
