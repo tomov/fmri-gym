@@ -1,0 +1,240 @@
+diff --git a/src/graphics/irr_driver.cpp b/src/graphics/irr_driver.cpp
+index fd5a56d..ba02217 100644
+--- a/src/graphics/irr_driver.cpp
++++ b/src/graphics/irr_driver.cpp
+@@ -2138,7 +2138,7 @@ void IrrDriver::updateDisplace(float dt)
+     if (!Track::getCurrentTrack())
+         return;
+ 
+-    const float time = m_device->getTimer()->getTime() / 1000.0f;
++    const float time = World::getWorld() ? World::getWorld()->getTime() : 0.0f;
+     const float speed = Track::getCurrentTrack()->getDisplacementSpeed();
+ 
+     float strength = time;
+@@ -2183,7 +2183,7 @@ void IrrDriver::update(float dt, bool is_loading)
+     else if (show_dialog_warn)
+         new ConfirmResolutionDialog(true);
+ 
+-    m_wind->update();
++    m_wind->update(dt);
+ 
+     PropertyAnimator::get()->update(dt);
+ #ifndef SERVER_ONLY
+diff --git a/src/graphics/irr_driver.hpp b/src/graphics/irr_driver.hpp
+index d276e89..1e73c3f 100644
+--- a/src/graphics/irr_driver.hpp
++++ b/src/graphics/irr_driver.hpp
+@@ -330,6 +330,7 @@ public:
+     void giveBoost(unsigned int cam_index) { m_renderer->giveBoost(cam_index);}
+     // ------------------------------------------------------------------------
+     inline core::vector3df getWind()  {return m_wind->getWind();}
++    inline void reseedWind(int seed) {m_wind->reseed(seed);}
+ 
+     // -----------------------------------------------------------------------
+     /** Returns a pointer to the spherical harmonics coefficients. */
+diff --git a/src/graphics/lod_node.cpp b/src/graphics/lod_node.cpp
+index 7e68b9e..46cd81e 100644
+--- a/src/graphics/lod_node.cpp
++++ b/src/graphics/lod_node.cpp
+@@ -284,15 +284,6 @@ void LODNode::add(int level, scene::ISceneNode* node, bool reparent)
+     Box = node->getBoundingBox();
+     m_area = Box.getArea();
+ 
+-    // samuncle suggested to put a slight randomisation in LOD
+-    // I'm not convinced (Auria) but he's the artist pro, so I listen ;P
+-    // The last level should not be randomized because after that the object disappears,
+-    // and the location is disapparition needs to be deterministic
+-    if (m_detail.size() > 0 && m_detail.back() < level * level)
+-    {
+-        m_detail[m_detail.size() - 1] += (int)(((rand()%1000)-500)/500.0f*(m_detail[m_detail.size() - 1]*0.2f));
+-    }
+-
+     assert(node != NULL);
+ 
+     node->grab();
+diff --git a/src/graphics/sp/sp_base.cpp b/src/graphics/sp/sp_base.cpp
+index e31fa8e..8be6ef4 100644
+--- a/src/graphics/sp/sp_base.cpp
++++ b/src/graphics/sp/sp_base.cpp
+@@ -24,6 +24,7 @@
+ #include "graphics/frame_buffer.hpp"
+ #include "graphics/irr_driver.hpp"
+ #include "graphics/material_manager.hpp"
++#include "modes/world.hpp"
+ #include "graphics/shader_based_renderer.hpp"
+ #include "graphics/shared_gpu_objects.hpp"
+ #include "graphics/shader_based_renderer.hpp"
+@@ -739,8 +740,8 @@ void prepareDrawCalls()
+         return;
+     }
+     g_bounding_boxes.clear();
+-    sp_wind_dir = core::vector3df(1.0f, 0.0f, 0.0f) *
+-        (irr_driver->getDevice()->getTimer()->getTime() / 1000.0f) * 1.5f;
++    const float sim_time = World::getWorld() ? World::getWorld()->getTime() : 0.0f;
++    sp_wind_dir = core::vector3df(1.0f, 0.0f, 0.0f) * sim_time * 1.5f;
+     sp_solid_poly_count = sp_shadow_poly_count = 0;
+     // 1st one is identity
+     g_skinning_offset = 1;
+@@ -1142,7 +1143,12 @@ void updateModelMatrix()
+                 g_final_draw_calls[i][dc].second.emplace_back
+                     (texture_names,
+                     std::vector<std::pair<SPMeshBuffer*, int> >());
+-                for (SPMeshBuffer* spmb : q.second)
++                std::vector<SPMeshBuffer*> sorted_q(q.second.begin(),
++                    q.second.end());
++                std::sort(sorted_q.begin(), sorted_q.end(),
++                    [](SPMeshBuffer* a, SPMeshBuffer* b)
++                    { return a->getCreationOrder() < b->getCreationOrder(); });
++                for (SPMeshBuffer* spmb : sorted_q)
+                 {
+                     g_final_draw_calls[i][dc].second[texture].second.push_back
+                         (std::make_pair(spmb, material_id == -1 ?
+@@ -1220,9 +1226,16 @@ void uploadAll()
+         g_stk_sbr->getShadowMatrices()->getMatricesData());
+     glBindBuffer(GL_UNIFORM_BUFFER, 0);
+ 
+-    for (SPMeshBuffer* spmb : g_instances)
+     {
+-        spmb->uploadInstanceData();
++        std::vector<SPMeshBuffer*> sorted_instances(g_instances.begin(),
++            g_instances.end());
++        std::sort(sorted_instances.begin(), sorted_instances.end(),
++            [](SPMeshBuffer* a, SPMeshBuffer* b)
++            { return a->getCreationOrder() < b->getCreationOrder(); });
++        for (SPMeshBuffer* spmb : sorted_instances)
++        {
++            spmb->uploadInstanceData();
++        }
+     }
+ 
+     g_dy_dc.erase(std::remove_if(g_dy_dc.begin(), g_dy_dc.end(),
+@@ -1290,7 +1303,12 @@ void drawGlow()
+     for (auto& p : g_glow_meshes)
+     {
+         glow_color_assigner->setValue(p.second.first);
+-        for (SPMeshBuffer* spmb : p.second.second)
++        std::vector<SPMeshBuffer*> sorted_meshes(p.second.second.begin(),
++            p.second.second.end());
++        std::sort(sorted_meshes.begin(), sorted_meshes.end(),
++            [](SPMeshBuffer* a, SPMeshBuffer* b)
++            { return a->getCreationOrder() < b->getCreationOrder(); });
++        for (SPMeshBuffer* spmb : sorted_meshes)
+         {
+             spmb->draw(DCT_NORMAL, -1/*material_id*/);
+         }
+diff --git a/src/graphics/sp/sp_mesh_buffer.cpp b/src/graphics/sp/sp_mesh_buffer.cpp
+index 25050b5..1b9b463 100644
+--- a/src/graphics/sp/sp_mesh_buffer.cpp
++++ b/src/graphics/sp/sp_mesh_buffer.cpp
+@@ -35,6 +35,8 @@
+ namespace SP
+ {
+ // ----------------------------------------------------------------------------
++unsigned SPMeshBuffer::s_next_creation_order = 0;
++// ----------------------------------------------------------------------------
+ SPMeshBuffer::~SPMeshBuffer()
+ {
+ #ifndef SERVER_ONLY
+diff --git a/src/graphics/sp/sp_mesh_buffer.hpp b/src/graphics/sp/sp_mesh_buffer.hpp
+index 3fb98c9..727bc1b 100644
+--- a/src/graphics/sp/sp_mesh_buffer.hpp
++++ b/src/graphics/sp/sp_mesh_buffer.hpp
+@@ -83,15 +83,22 @@ private:
+ 
+     bool m_skinned;
+ 
++    unsigned m_creation_order;
++
++    static unsigned s_next_creation_order;
++
+     // ------------------------------------------------------------------------
+     bool initTexture();
+ 
+ public:
++    unsigned getCreationOrder() const                 { return m_creation_order; }
++    // ------------------------------------------------------------------------
+     SPMeshBuffer()
+     {
+ #ifdef _DEBUG
+         setDebugName("SMeshBuffer");
+ #endif
++        m_creation_order = s_next_creation_order++;
+         m_stk_material.resize(1, std::make_tuple(0u, 0u, nullptr));
+ 
+         for (unsigned i = 0; i < DCT_FOR_VAO; i++)
+diff --git a/src/graphics/wind.cpp b/src/graphics/wind.cpp
+index cae31d1..3129f64 100644
+--- a/src/graphics/wind.cpp
++++ b/src/graphics/wind.cpp
+@@ -23,7 +23,13 @@
+ 
+ Wind::Wind()
+ {
+-    m_seed = (float)((rand() % 1000) - 500);
++    m_seed = 0.0f;
++    m_time = 0.0f;
++}
++
++void Wind::reseed(int seed)
++{
++    m_seed = (float)((seed % 1000) - 500);
+ }
+ 
+ vector3df Wind::getWind() const
+@@ -31,10 +37,11 @@ vector3df Wind::getWind() const
+     return m_wind;
+ }
+ 
+-void Wind::update()
++void Wind::update(float dt)
+ {
+     vector3df dir(0, 0, 1);
+-    const u32 now = irr_driver->getDevice()->getTimer()->getTime();
++    m_time += dt;
++    const float now = m_time * 1000.0f;
+ 
+     const float rotation = asinf(noise2d(m_seed, now / 100000.0f)) * RAD_TO_DEGREE;
+     dir.rotateXZBy(rotation);
+diff --git a/src/graphics/wind.hpp b/src/graphics/wind.hpp
+index 9fe12a8..1778f99 100644
+--- a/src/graphics/wind.hpp
++++ b/src/graphics/wind.hpp
+@@ -28,11 +28,13 @@ public:
+     Wind();
+ 
+     vector3df getWind() const;
+-    void update();
++    void update(float dt);
++    void reseed(int seed);
+ 
+ private:
+     vector3df m_wind;
+     float m_seed;
++    float m_time;
+ };
+ 
+ #endif
+diff --git a/src/gym/gym_server.cpp b/src/gym/gym_server.cpp
+index ccc9348..b0c4162 100644
+--- a/src/gym/gym_server.cpp
++++ b/src/gym/gym_server.cpp
+@@ -38,6 +38,9 @@
+ #include "utils/log.hpp"
+ #include "utils/random_generator.hpp"
+ 
++#include <IrrlichtDevice.h>
++#include <IRandomizer.h>
++
+ #include <cstdlib>
+ #include <iostream>
+ 
+@@ -824,6 +827,9 @@ std::string GymServer::handle(const std::string &line)
+             const int s = seed.asInt(0);
+             RandomGenerator::seed(s);
+             srand((unsigned int)s);
++            irr_driver->reseedWind(s);
++            if (irr_driver->getDevice() && irr_driver->getDevice()->getRandomizer())
++                irr_driver->getDevice()->getRandomizer()->reset(s);
+             // Item boxes and powerup draws are seeded from the clock when the
+             // track loads; a reset that does not reseed them is not replayable
+             // past the first item.
