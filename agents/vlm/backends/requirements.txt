@@ -1,0 +1,14 @@
+# What each VLM backend needs beyond the fmri-gym install. Install the lines for
+# the backends you use; the GPU builds of torch and the kernels must match the
+# machine's CUDA (reason-to-play ran them on HGX B200, CUDA 12.8, Python 3.12).
+
+# transformers: hidden states and replies from any Hugging Face vision-language checkpoint
+torch>=2.10
+transformers>=5.0
+accelerate            # device_map over several GPUs
+pillow                # image content parts
+# flash-attn          # optional; used when installed
+# flash-linear-attention causal-conv1d   # optional; fast kernels for Qwen3.5's linear attention
+
+# openrouter: replies from API models
+# openai httpx pillow

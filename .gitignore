@@ -35,3 +35,5 @@ gym/rush-hour-src/
 *.so
 build/
 external/arc3/
+external/stk-code/
+external/stk-assets/
