@@ -111,3 +111,30 @@ def test_every_key_is_optional_and_site_and_rig_are_the_files_place(tmp_path):
     (tmp_path / "site1" / "bare.json").write_text(json.dumps({"site": "elsewhere"}))
     with pytest.raises(ValueError, match="its folder is the site"):
         RigConfig.open("site1/bare.json")
+
+
+def test_a_run_without_duration_is_refused_unless_it_is_a_rig_check():
+    from fmri_gym.config.curriculum import Curriculum
+    from fmri_gym.config.run import RunConfig
+    from fmri_gym.run import Run
+    game = {"type": "game", "game": "CartPole-v1", "fps": 30, "keys": {"": 0, "LEFT": 1}}
+    curriculum = Curriculum.from_dict({"curriculum": [game]}, "cartpole.json")
+    config = RunConfig(curriculum=curriculum, rig=RigConfig.open(write("plain")),
+                       subject="sub-01", ses=1, run=1, duration=None, end_fixation=10.0,
+                       resume=False, dummy_trigger=True)
+    with pytest.raises(ValueError, match="--duration: required"):
+        Run.from_config(config)
+
+
+def test_the_editor_writes_and_reads_each_runs_duration():
+    from fmri_gym import gui
+    launch = gui.Launch(subject="sub-01", ses=None, rig="configs/rigs/example/laptop.json",
+                        duration=300.0, dummy_trigger=False)
+    script = gui.write_session([{"config": "configs/curricula/ale/all.json", "skip": False}],
+                               launch)
+    assert "--duration 300" in script
+    steps, read = gui.read_session(script)
+    assert read == launch and steps == [{"config": "configs/curricula/ale/all.json",
+                                         "skip": False}]
+    with pytest.raises(ValueError, match="--duration: required"):
+        gui.launch_values({"subject": "sub-01", "rig": launch.rig})
