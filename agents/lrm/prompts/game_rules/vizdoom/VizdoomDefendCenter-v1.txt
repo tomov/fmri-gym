@@ -1,8 +1,0 @@
-You stand in the centre of a circular room and cannot move, only turn. Monsters (Demon, MarineChainsawVzd) spawn along the wall and walk toward you; when they reach you they hurt you.
-
-- TURN_LEFT / TURN_RIGHT rotate you in place.
-- ATTACK fires your pistol straight ahead. Each shot costs one bullet; you cannot reload.
-- Killing a monster scores +1. A new monster spawns to replace it.
-- The episode ends when your HEALTH reaches 0 (dying costs one point), or when time runs out.
-
-Things in view are given by their direction from straight ahead (your crosshair) and their distance.
