@@ -8,3 +8,8 @@
 [submodule "external/baba_auto"]
 	path = external/baba_auto
 	url = https://github.com/utilForever/baba-is-auto.git
+[submodule "external/stk-code"]
+	path = external/stk-code
+	url = https://github.com/tomov/stk-code.git
+	update = none
+	shallow = true
