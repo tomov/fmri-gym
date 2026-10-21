@@ -229,8 +229,9 @@ def _headless(config: Path, data_root: Path, plan, tap: Path, backend: str,
               *more: str) -> subprocess.CompletedProcess:
     """Play ``config`` headless into ``data_root``, tapped; the finished process."""
     fake = _fake_card(plan)
+    seconds = max(plan.run_seconds, BACKENDS[backend].run_seconds)
     cmd = [sys.executable, "-m", "tests.headless", "--curriculum", str(config),
-           "--data-root", str(data_root), "--duration", str(plan.run_seconds),
+           "--data-root", str(data_root), "--duration", str(seconds),
            "--tap", str(tap), *more]
     window = plan.has_window or BACKENDS[backend].needs_display
     cmd += ["--fake-audio"] * fake + ["--window"] * window
@@ -238,7 +239,7 @@ def _headless(config: Path, data_root: Path, plan, tap: Path, backend: str,
     if not window:
         env["SDL_VIDEODRIVER"] = "dummy"
     return subprocess.run(cmd, cwd=REPO, capture_output=True, text=True,
-                          timeout=plan.run_seconds + 180, env=env)
+                          timeout=seconds + 180, env=env)
 
 
 def _play(config: Path, data_root: Path, plan, tap: Path, backend: str, *more: str) -> Session:
