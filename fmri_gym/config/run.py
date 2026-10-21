@@ -49,8 +49,8 @@ class RunConfig:
     ses: int
     #: this task's run number in the session, from 1.
     run: int
-    #: the run's seconds from the trigger, closing fixation included;
-    #: ``None`` plays the curriculum to its end.
+    #: the run's seconds from the trigger, closing fixation included; ``None``
+    #: only for a rig check, which plays its curriculum to its end.
     duration: float | None
     #: seconds of the fixation a run with a ``duration`` closes on.
     end_fixation: float

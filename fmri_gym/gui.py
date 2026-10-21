@@ -94,6 +94,8 @@ class Launch:
     ses: int | None
     #: the rig file
     rig: str
+    #: each run's ``--duration`` in seconds; ``None`` until the Launch tab says it
+    duration: float | None
     dummy_trigger: bool
 
     def data_root(self) -> str:
@@ -108,7 +110,7 @@ class Launch:
 #: tab (or an opened session script) says otherwise. The window, the controller,
 #: the audio and the data root are the rig's (:mod:`fmri_gym.config.rig`), not a launch's.
 DEFAULT_LAUNCH = Launch(subject="sub-test", ses=None, rig="configs/rigs/example/laptop.json",
-                        dummy_trigger=False)
+                        duration=None, dummy_trigger=False)
 
 #: Keys are the argparse names of ``fmri_play.py``'s flags; labels are the flags.
 LAUNCH_FIELDS = [
@@ -123,6 +125,9 @@ LAUNCH_FIELDS = [
     Field("rig", "--rig", "combo", (),
           tip="The rig file it is played on: it says the window, the controller, the audio "
               "and where the data goes. Edit rig... changes it, or makes it when it is missing."),
+    Field("duration", "--duration", "float",
+          tip="Each run's length in seconds from the scanner trigger, required: the phases stop "
+              "10 s before it and the run closes on a fixation cross."),
     Field("dummy_trigger", "--dummy-trigger", "bool", default=False,
           tip="Skip the experimenter and scanner waits. A test run, not a session -- though its "
               "data is saved like any run's and takes the next run number."),
@@ -480,9 +485,9 @@ def launch_values(form: dict) -> Launch:
     """The Launch form as the flags ``fmri_play`` reads, every flag present.
 
     :param form: what :func:`field_values` returned for :data:`LAUNCH_FIELDS`.
-    :raises ValueError: if the subject or the rig is blank.
+    :raises ValueError: if the subject, the rig or the duration is blank.
     """
-    for key in ("subject", "rig"):
+    for key in ("subject", "rig", "duration"):
         if key not in form:
             raise ValueError(f"--{key}: required")
     off = {f.key: False for f in LAUNCH_FIELDS if f.kind == "bool"}
@@ -616,9 +621,9 @@ def write_session(steps: list[dict], launch: Launch) -> str:
         # fmri-gym session: one line per run, in order.
         set -e
         SES=${1:-$(uv run fmri-ses --subject sub-01)}
-        uv run fmri-play --curriculum configs/pong.json --subject sub-01 --ses "$SES" --run 1 ...
+        uv run fmri-play --curriculum configs/pong.json --subject sub-01 --ses "$SES" --run 1 --duration 300 ...
         ./scripts/localizer.sh "$SES"
-        # uv run fmri-play --curriculum configs/mario.json --subject sub-01 --ses "$SES" --run 1 ...
+        # uv run fmri-play --curriculum configs/mario.json --subject sub-01 --ses "$SES" --run 1 --duration 300 ...
 
     ``SES=`` picks the session once for all the runs: the script's own argument
     (``sh ses1.sh 003`` resumes that session), else the subject's next free one.
@@ -704,7 +709,8 @@ def play_command(config_path: str, launch: Launch, ses: str, run: int) -> list[s
     """
     switches = [f"--{key.replace('_', '-')}" for key in SWITCHES if getattr(launch, key)]
     return [*PLAY.split(), "--curriculum", config_path, "--subject", launch.subject,
-            "--ses", ses, "--run", str(run), "--rig", launch.rig, *switches]
+            "--ses", ses, "--run", str(run), "--rig", launch.rig,
+            "--duration", f"{launch.duration:g}", *switches]
 
 
 def _ses_line(launch: Launch) -> str:
@@ -742,6 +748,7 @@ def _parse_play_line(line: str) -> tuple[str, Launch, int] | None:
         parser.add_argument(flag, required=True)
     parser.add_argument("--run", type=int, required=True)
     parser.add_argument("--rig", required=True)
+    parser.add_argument("--duration", type=float, required=True)
     for key in SWITCHES:
         parser.add_argument(f"--{key.replace('_', '-')}", action="store_true")
     try:

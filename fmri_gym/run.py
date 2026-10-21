@@ -407,10 +407,14 @@ class Run:
         :param config: the curriculum, the rig and the command line, as the run reads them.
         :return: the run, ready to :meth:`play`.
         :raises ValueError: on a BIDS name or number, a monitor or a window
-            size this machine or this subject refuses; a duration no longer
-            than the closing fixation; a progress to resume from that this
+            size this machine or this subject refuses; no duration (outside a
+            rig check), or one no longer than the closing fixation; a progress
+            to resume from that this
             curriculum cannot carry on (see :func:`_run_progress`).
         """
+        if config.duration is None and not config.curriculum.has_checks:
+            raise ValueError("--duration: required, the run's length in seconds from the "
+                             "trigger (e.g. --duration 300)")
         if config.end_fixation < 0:
             raise ValueError(f"--end-fixation {config.end_fixation:g}: expected seconds >= 0")
         if config.duration is not None and config.duration <= config.end_fixation:

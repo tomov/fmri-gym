@@ -75,4 +75,4 @@ def test_loop_without_duration_is_refused(tmp_path):
         cwd=REPO, capture_output=True, text=True, timeout=60,
         env={**os.environ, "SDL_VIDEODRIVER": "dummy"})
     assert done.returncode != 0
-    assert "--loop plays the curriculum until --duration" in done.stderr
+    assert "--duration: required" in done.stderr

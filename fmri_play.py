@@ -14,8 +14,9 @@ goes -- is the rig's, not the command's: each rig has a file
 (:mod:`fmri_gym.config.rig`), and ``--rig`` names it.
 
 Usage (--ses and --run say which run of which session this is; a session
-script passes the same --ses to all of its runs, each with its own --run):
-    python fmri_play.py --subject sub-01 --ses 1 --run 1 \
+script passes the same --ses to all of its runs, each with its own --run;
+--duration is the run's length, required except for a rig check):
+    python fmri_play.py --subject sub-01 --ses 1 --run 1 --duration 300 \
         --rig configs/rigs/example/laptop.json --curriculum my.json
     python fmri_play.py ... --dummy-trigger    # testing: no experimenter/scanner wait
     python fmri_play.py ... --duration 600 --resume  # a 10-min run of a longer curriculum
@@ -64,10 +65,10 @@ def _parser() -> argparse.ArgumentParser:
                    help="this task's run number in the session, from 1: which run of the "
                    "design this is, so it stays the same however the session went. A run that "
                    "already has data is re-acquired beside it, never overwritten")
-    p.add_argument("--duration", type=float, default=None,
-                   help="the run's length in seconds from the scanner trigger: the phases stop "
-                   "--end-fixation seconds before it, whatever is playing, and the run closes "
-                   "on a fixation cross. Default: play the curriculum to its end")
+    p.add_argument("--duration", type=float,
+                   help="the run's length in seconds from the scanner trigger, required (a rig "
+                   "check may leave it out): the phases stop --end-fixation seconds before it, "
+                   "whatever is playing, and the run closes on a fixation cross")
     p.add_argument("--end-fixation", type=float, default=END_FIXATION_S, metavar="SECONDS",
                    help="seconds of the fixation a run with --duration closes on, for the "
                    f"haemodynamic response to the last thing played (default {END_FIXATION_S:g})")
