@@ -21,8 +21,8 @@ names of :class:`RigConfig` and :class:`ScreenConfig`, so the file and the code
 say the same thing:
 
 - ``"screen"``: ``{"size": "1024x768", "is_fullscreen": false, "monitor": 0,
-  "has_vsync": true}``, the monitor by index (0: the first); fullscreen takes
-  the monitor's resolution;
+  "has_vsync": true}``, the monitor by index (0: the first); fullscreen scales
+  ``size`` to the monitor, aspect kept, at the monitor's own resolution;
 - ``"has_pad"``: read a plugged-in game controller (:mod:`fmri_gym.pad`);
 - ``"bindings"``: which keyboard key each of the controller's controls presses
   (:data:`fmri_gym.pad.CONTROLS` -> a key name, as curricula write keys),
@@ -218,8 +218,8 @@ class RigConfig:
     def status(self) -> str:
         """One line for the console: which file, and what it settles."""
         screen = self.screen
-        window = ("fullscreen" if screen.is_fullscreen
-                  else f"{screen.size[0]}x{screen.size[1]} window")
+        window = (f"{screen.size[0]}x{screen.size[1]} "
+                  f"{'fullscreen' if screen.is_fullscreen else 'window'}")
         return (f"{self.path} | {window} on monitor {screen.monitor}, vsync "
                 f"{'on' if screen.has_vsync else 'off'} | pad {'on' if self.has_pad else 'off'}"
                 f" | audio {'on' if self.has_audio else 'off'} | data in {self.data_root}"

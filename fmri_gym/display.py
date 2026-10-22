@@ -67,9 +67,8 @@ class Display:
     ) -> None:
         """Create and show the display window.
 
-        :param size: requested ``(width, height)`` in pixels (windowed mode;
-            fullscreen uses the desktop resolution, so frames are never
-            rescaled twice).
+        :param size: ``(width, height)`` of the canvas every phase draws on; in
+            fullscreen the GPU scales it to fill the screen, aspect kept.
         :param fullscreen: if ``True``, open in fullscreen mode.
         :param caption: window title string.
         :param vsync: ask for a flip locked to the vertical blank (default).
@@ -106,27 +105,29 @@ class Display:
     def _open(self) -> pygame.Surface:
         """Open the window, trying for a vsync-locked flip.
 
-        A plain surface is tried first (fullscreen at desktop resolution, so
-        nothing is rescaled). Some drivers only honour vsync through SDL's
-        renderer path, which pygame exposes as ``SCALED`` and which needs an
-        explicit logical size; that is the fallback, and a plain unsynced
-        window the last resort.
+        Fullscreen keeps the monitor's own mode (and refresh rate) and has SDL's
+        renderer (pygame's ``SCALED``) scale the requested size up to it, with
+        black bars where the aspects differ, so the screen geometry is the
+        rig's on any monitor. A window is a plain surface first; some drivers
+        only honour vsync through the renderer path, which is its fallback, and
+        a plain unsynced window the last resort.
 
         :return: the screen surface.
         """
-        size = (0, 0) if self._fullscreen else self._req_size
-        flags = pygame.FULLSCREEN if self._fullscreen else 0
-        at = self._monitor
+        size, at = self._req_size, self._monitor
+        if self._fullscreen:
+            flags = pygame.FULLSCREEN | pygame.SCALED
+            return (_try_mode(size, flags, vsync=int(self._want_vsync), display=at)
+                    or pygame.display.set_mode(size, flags, display=at))
         if not self._want_vsync:
-            return pygame.display.set_mode(size, flags, display=at)
-        screen = _try_mode(size, flags, vsync=1, display=at)
+            return pygame.display.set_mode(size, 0, display=at)
+        screen = _try_mode(size, 0, vsync=1, display=at)
         if screen is not None and pygame.display.is_vsync():
             return screen
-        logical = screen.get_size() if screen is not None else self._req_size
-        scaled = _try_mode(logical, flags | pygame.SCALED, vsync=1, display=at)
+        scaled = _try_mode(size, pygame.SCALED, vsync=1, display=at)
         if scaled is not None:
             return scaled
-        return pygame.display.set_mode(size, flags, display=at)
+        return pygame.display.set_mode(size, 0, display=at)
 
     def _flips_block(self, n: int = 24) -> bool:
         """Measure whether a burst of flips waits for the blank.
@@ -409,9 +410,11 @@ class Display:
     def describe(self) -> dict[str, Any]:
         """What was actually opened, for the manifest.
 
-        :return: size, fullscreen, monitor, measured vsync, refresh rate, SDL driver.
+        :return: size, the window it is scaled to, fullscreen, monitor, measured vsync,
+            refresh rate, SDL driver.
         """
         return {"size": list(self.size), "requested_size": list(self._req_size),
+                "window_size": list(pygame.display.get_window_size()),
                 "fullscreen": self._fullscreen, "monitor": self._monitor, "vsync": self.vsync,
                 "refresh_rate": self.refresh_rate, "driver": pygame.display.get_driver()}
 

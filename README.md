@@ -147,7 +147,7 @@ Runtime flow: experimenter screen (**SPACE**) → "Waiting for scanner..." → s
 | key | what it says | when left out |
 |---|---|---|
 | `site`, `rig`, `pi`, `modality`, `monitor`, `photodiode`, `audio_path`, `trigger_hardware`, `notes` | what the rig is, for people: notes nothing plays from, filed with every run and pooled by the rig check; `site` and `rig`, if written, must be the file's folder and name | left out; `site` and `rig` are the file's folder and name |
-| `"screen"` | the window: `{"size": "1024x768", "is_fullscreen": true, "monitor": 1, "has_vsync": true}`; `monitor` by index, 0 the first, and fullscreen takes the monitor's resolution (see [Timing](#timing-what-is-stamped-when)) | 1024x768 windowed on monitor 0, vsync on |
+| `"screen"` | the window: `{"size": "1024x768", "is_fullscreen": true, "monitor": 1, "has_vsync": true}`; `monitor` by index, 0 the first, and fullscreen scales `size` up to the monitor, aspect kept, black bars on the sides, without changing the monitor's mode or refresh rate (see [Timing](#timing-what-is-stamped-when)) | 1024x768 windowed on monitor 0, vsync on |
 | `"has_pad"` | read a plugged-in game controller | `true` |
 | `"bindings"` | which keyboard key each control of the controller presses (below) | none: a plugged-in controller is warned about and presses nothing |
 | `"has_audio"` | play game audio; a block plays sound when this and its game phase's `has_audio` are both true | `true` |
