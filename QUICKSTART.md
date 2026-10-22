@@ -5,7 +5,7 @@ Commands to install fmri-gym and play each game on a laptop, in order. What they
 ## 1. Install
 
 ```bash
-sudo apt install libportaudio2                  # Linux only
+sudo apt install libportaudio2 libopenal1 libsdl2-2.0-0 libxcb-cursor0   # Linux only
 curl -LsSf https://astral.sh/uv/install.sh | sh # if you don't have uv
 git submodule update --init                     # if you cloned without --recursive
 uv sync --extra dbp --extra gui
