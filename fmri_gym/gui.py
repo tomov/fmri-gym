@@ -47,7 +47,7 @@ from typing import Any, Sequence
 from . import bids
 from .config import curriculum
 from .config.rig import RigConfig
-from .triggers import (SYNC_MODES, TRIGGER_BACKENDS, TriggerSettings)
+from .triggers import (HID_DEVICES, SYNC_MODES, TRIGGER_BACKENDS, TriggerSettings)
 
 #: Suggestions for a game phase's ``backend`` (free text is accepted too; the
 #: adapter registry, not this list, decides what exists).
@@ -149,12 +149,16 @@ SYNC_ROWS = {"wait": ("key",), "send": ("scanner_start", "delay"), "none": ()}
 
 TRIGGER_FIELDS = [
     Field("backend", "backend", "choice", TRIGGER_BACKENDS,
-          tip="null = no codes sent (fMRI). serial (pyserial), parallel (pyparallel) or lsl "
+          tip="null = no codes sent (fMRI). serial (pyserial), parallel (pyparallel), hid "
+              "(hidapi: a USB DAQ's digital port) or lsl "
               "(pylsl). A backend that cannot be opened stops the run at the desk with the reason."),
-    Field("port", "port", tip="serial/parallel device, e.g. /dev/ttyUSB0, COM3, /dev/parport0."),
+    Field("port", "port", tip="serial/parallel device, e.g. /dev/ttyUSB0, COM3, /dev/parport0; "
+                              "hid: the box's digital port, e.g. A."),
+    Field("hid_device", "hid_device", "combo", tuple(HID_DEVICES),
+          tip="hid only: which USB box (blank = mcc-1208fs, a Measurement Computing USB-1208FS)."),
     Field("lsl_stream_name", "lsl_stream_name", tip="lsl only: name of the trigger stream."),
     Field("pulse_ms", "pulse_ms", "float",
-          tip="parallel only: how long a code stays on the port between blocks "
+          tip="parallel and hid only: how long a code stays on the port between blocks "
               "(inside a block the next frame code replaces it)."),
     Field("on_frame", "on_frame", "bool", default=True,
           tip="Send a code on every displayed game frame (cycling 1..2^frame_bits-1)."),
@@ -563,7 +567,8 @@ def describe_triggers(section: dict) -> str:
     """
     m = TriggerSettings.from_dict(section)
     sync = m.sync
-    where = m.lsl_stream_name if m.backend == "lsl" else m.port
+    where = {"lsl": m.lsl_stream_name,
+             "hid": f"{m.hid_device} port {m.port}"}.get(m.backend, m.port)
     lines = ["After the experimenter's SPACE:"]
     if sync.mode == "wait":
         lines.append(f"  wait for {sync.key!r} from the trigger box, then anchor the clock (t=0).")

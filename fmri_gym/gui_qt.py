@@ -1554,8 +1554,8 @@ class _Editor(QtWidgets.QMainWindow):
             self.trigger_text.setText(f"test failed: {exc}")
             return
         if not triggers.enabled:
-            self.trigger_text.setText("backend is null: nothing to send. Pick serial, parallel "
-                                      "or lsl first.")
+            self.trigger_text.setText("backend is null: nothing to send. Pick serial, parallel, "
+                                      "hid or lsl first.")
             return
         value = triggers.lifecycle("task_start")
         triggers.close()

@@ -91,6 +91,10 @@ TRIGGER_PRESETS: dict[str, dict] = {
     # MEG and EEG alike: the stimulus PC starts the recording and marks it, over serial.
     "MEG (start from the trigger line, serial codes)": {
         "sync": {"mode": "send", "delay": 0.0}, "backend": "serial", "port": "/dev/ttyUSB0"},
+    # A Mac has no parallel port: a USB DAQ's digital port wired to the trigger input instead.
+    "MEG (start from the trigger line, USB-1208FS codes over HID)": {
+        "sync": {"mode": "send", "delay": 0.0}, "backend": "hid", "hid_device": "mcc-1208fs",
+        "port": "A"},
     "EEG (start from the trigger line, serial codes)": {
         "sync": {"mode": "send", "delay": 0.0}, "backend": "serial", "port": "/dev/ttyUSB0"},
     "Behavioural (no scanner)": {
@@ -336,6 +340,6 @@ def trigger_problems(section: Any) -> list[str]:
         s = TriggerSettings.from_dict(section)
     except (TypeError, ValueError, TriggerError) as exc:
         return [str(exc)]
-    if s.backend in ("serial", "parallel") and not s.port:
+    if s.backend in ("serial", "parallel", "hid") and not s.port:
         return [f"triggers: backend {s.backend!r} needs a port"]
     return []

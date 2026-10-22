@@ -4,6 +4,7 @@ repo is one a run would start on."""
 from __future__ import annotations
 
 import json
+import sys
 
 import pytest
 
@@ -80,6 +81,51 @@ def test_triggers_are_the_rigs():
     assert not RigConfig.open(write("plain")).has_trigger_setup
     with pytest.raises(ValueError, match="needs a port"):
         RigConfig.open(write("plain", triggers={"backend": "serial"}))
+    with pytest.raises(ValueError, match="needs a port"):
+        RigConfig.open(write("plain", triggers={"backend": "hid"}))
+    with pytest.raises(ValueError, match="has no port 'C'"):
+        RigConfig.open(write("plain", triggers={"backend": "hid", "port": "C"}))
+    with pytest.raises(ValueError, match="unknown hid_device"):
+        RigConfig.open(write("plain", triggers={"backend": "hid", "hid_device": "x", "port": "A"}))
+
+
+class _FakeHid:
+    """The ``hid`` module of hidapi, over one USB-1208FS whose reports are kept."""
+
+    def __init__(self) -> None:
+        self.reports: list[list[int]] = []
+        reports = self.reports
+
+        class device:  # noqa: N801 -- hidapi's name
+            def open_path(self, path: bytes) -> None:
+                assert path == b"if0"
+
+            def write(self, report: list[int]) -> int:
+                reports.append(list(report))
+                return len(report)
+
+            def close(self) -> None:
+                reports.append(["closed"])
+
+        self.device = device
+
+    def enumerate(self, vid: int, pid: int) -> list[dict]:
+        assert (vid, pid) == (0x09DB, 0x0082)
+        return [{"interface_number": n, "path": f"if{n}".encode()} for n in (1, 0)]
+
+
+def test_a_hid_box_is_set_to_output_zero_then_holds_each_code(monkeypatch):
+    from fmri_gym.triggers import Triggers
+    fake = _FakeHid()
+    monkeypatch.setitem(sys.modules, "hid", fake)
+    triggers = Triggers.from_dict({"sync": {"mode": "send"}, "backend": "hid", "port": "B"})
+    assert triggers.active == "hid:mcc-1208fs:B"
+    assert fake.reports == [[0x01, 1, 0], [0x04, 1, 0]]  # port B an output, at 0
+    del fake.reports[:]
+    triggers.frame()
+    triggers.block_end()
+    triggers.close()
+    assert fake.reports == [[0x04, 1, 1], [0x04, 1, 0], [0x04, 1, 0], ["closed"]]
 
 
 def test_a_game_key_the_scanner_types_is_refused_on_that_rig():

@@ -16,10 +16,11 @@ One section, two concerns:
   systems start recording on it), or ``none``.
 * the rest (:class:`TriggerSettings`) -- which codes go out, over what.
   Backends: ``null`` (default, sends nothing), ``lsl``, ``serial``,
-  ``parallel``. A backend that cannot be opened raises :class:`TriggerError`
-  when :class:`Triggers` is built -- in ``fmri_play.py`` that is before the
-  window even opens: better a clear stop at the desk than a silent recording
-  without triggers.
+  ``parallel``, ``hid`` (a USB DAQ's digital port, :data:`HID_DEVICES`). A
+  backend that cannot be opened raises :class:`TriggerError` when
+  :class:`Triggers` is built -- in ``fmri_play.py`` that is before the window
+  even opens: better a clear stop at the desk than a silent recording without
+  triggers.
 
 Code scheme -- disjoint bit fields, so coincident triggers stay decodable
 -----------------------------------------------------------------------
@@ -41,8 +42,8 @@ Action triggers are deliberately absent: every action is already logged per
 frame with its session time, which is enough to realign it to the frame
 triggers and the emulator state.
 
-Backend deps (pylsl, pyserial, pyparallel) are imported lazily, in the backend
-that needs them, so the core stays dependency-free.
+Backend deps (pylsl, pyserial, pyparallel, hidapi) are imported lazily, in the
+backend that needs them, so the core stays dependency-free.
 """
 
 from __future__ import annotations
@@ -59,7 +60,32 @@ log = logging.getLogger(__name__)
 
 LIFECYCLE_EVENTS = ("task_start", "task_stop", "episode_start", "scanner_start")
 SYNC_MODES = ("wait", "send", "none")
-TRIGGER_BACKENDS = ("null", "lsl", "serial", "parallel")
+TRIGGER_BACKENDS = ("null", "lsl", "serial", "parallel", "hid")
+
+
+@dataclass(frozen=True)
+class HidDevice:
+    """A USB box whose digital port is the trigger line, driven by HID output reports."""
+
+    vendor_id: int
+    product_id: int
+    #: its digital ports, by the name a rig's ``port`` gives, as its reports number them.
+    ports: dict[str, int]
+    #: report ``[dconfig, port, 0]`` makes a port an output, ``[dout, port, value]`` sets it.
+    dconfig: int
+    dout: int
+    #: the HID interface the commands go to.
+    interface: int = 0
+
+
+#: The HID trigger boxes ``triggers.hid_device`` can name. The USB-1208FS's two
+#: 8-bit ports come up as inputs (floating high) at power-up, so opening one
+#: makes it an output at 0 before the first code; Psychtoolbox's
+#: ``DaqDConfigPort`` / ``DaqDOut`` send the same reports.
+HID_DEVICES = {
+    "mcc-1208fs": HidDevice(vendor_id=0x09DB, product_id=0x0082, ports={"A": 0, "B": 1},
+                            dconfig=0x01, dout=0x04),
+}
 
 
 class TriggerError(RuntimeError):
@@ -161,8 +187,10 @@ class TriggerSettings:
     backend: str = "null"
     port: str | None = None
     lsl_stream_name: str = "fmri_gym"
-    #: parallel only: how long a lifecycle code is held when no frame level
-    #: is in force (between blocks); inside a block the next frame clears it.
+    #: hid only: which box of :data:`HID_DEVICES`; ``port`` is then its digital port (``A``).
+    hid_device: str = "mcc-1208fs"
+    #: parallel and hid only: how long a lifecycle code is held when no frame
+    #: level is in force (between blocks); inside a block the next frame clears it.
     pulse_ms: float = 10.0
     on_frame: bool = True
     frame_every: int = 1
@@ -195,6 +223,14 @@ class TriggerSettings:
         if s.backend not in TRIGGER_BACKENDS:
             raise ValueError(f"triggers: unknown backend {s.backend!r}; "
                              f"expected one of {TRIGGER_BACKENDS}")
+        if s.backend == "hid":
+            if s.hid_device not in HID_DEVICES:
+                raise ValueError(f"triggers: unknown hid_device {s.hid_device!r}; "
+                                 f"expected one of {tuple(HID_DEVICES)}")
+            ports = HID_DEVICES[s.hid_device].ports
+            if s.port is not None and s.port not in ports:
+                raise ValueError(f"triggers: {s.hid_device} has no port {s.port!r}; "
+                                 f"expected one of {tuple(ports)}")
         if s.frame_every < 1:
             raise ValueError("triggers: frame_every must be >= 1")
         if sync.mode == "send" and s.backend == "null":
@@ -209,7 +245,7 @@ class TriggerSettings:
 
 
 class _Backend(Protocol):
-    #: True when the transport holds the last value on its lines (parallel),
+    #: True when the transport holds the last value on its lines (parallel, hid),
     #: so a lifecycle code sent between blocks must be cleared after a pulse.
     holds_level: bool
 
@@ -284,6 +320,38 @@ class _Parallel:
         self.clear()
 
 
+class _HID:
+    holds_level = True
+
+    def __init__(self, device: str, port: str) -> None:
+        import hid
+        self._spec = spec = HID_DEVICES[device]
+        self._port_n = spec.ports[port]
+        found = [d for d in hid.enumerate(spec.vendor_id, spec.product_id)
+                 if d["interface_number"] in (spec.interface, -1)]
+        if not found:
+            raise OSError(f"no {device} plugged in "
+                          f"(USB {spec.vendor_id:04x}:{spec.product_id:04x})")
+        self._dev = hid.device()
+        self._dev.open_path(found[0]["path"])
+        self._write([spec.dconfig, self._port_n, 0])
+        self.clear()
+
+    def _write(self, report: list[int]) -> None:
+        if self._dev.write(report) < 0:
+            raise OSError(f"HID write {report} failed: {self._dev.error()}")
+
+    def send(self, value: int) -> None:
+        self._write([self._spec.dout, self._port_n, value & 0xFF])
+
+    def clear(self) -> None:
+        self.send(0)
+
+    def close(self) -> None:
+        self.clear()
+        self._dev.close()
+
+
 def _open_backend(s: TriggerSettings) -> tuple[_Backend, str]:
     """Open the configured transport.
 
@@ -297,18 +365,23 @@ def _open_backend(s: TriggerSettings) -> tuple[_Backend, str]:
     if s.backend == "null":
         return _Null(), "null"
     hint = 'set triggers.backend to "null" to run without trigger codes'
-    target = s.lsl_stream_name if s.backend == "lsl" else s.port
+    target = {"lsl": s.lsl_stream_name, "hid": f"{s.hid_device}:{s.port}"}.get(s.backend, s.port)
     if s.backend != "lsl" and not s.port:
+        example = ("A or B, the box's digital port" if s.backend == "hid"
+                   else "/dev/ttyUSB0 or /dev/parport0")
         raise TriggerError(f"triggers: backend {s.backend!r} needs a port "
-                           f"(e.g. /dev/ttyUSB0 or /dev/parport0); {hint}")
+                           f"(e.g. {example}); {hint}")
     try:
         if s.backend == "lsl":
             return _LSL(s.lsl_stream_name), f"lsl:{target}"
         if s.backend == "serial":
             return _Serial(s.port), f"serial:{target}"
+        if s.backend == "hid":
+            return _HID(s.hid_device, s.port), f"hid:{target}"
         return _Parallel(s.port), f"parallel:{target}"
     except ImportError as exc:
-        pkg = {"lsl": "pylsl", "serial": "pyserial", "parallel": "pyparallel"}[s.backend]
+        pkg = {"lsl": "pylsl", "serial": "pyserial", "parallel": "pyparallel",
+               "hid": "hidapi"}[s.backend]
         raise TriggerError(f"triggers: the {s.backend} backend needs the {pkg} "
                            f"package (pip install {pkg}); {hint}") from exc
     except Exception as exc:  # noqa: BLE001 -- any device failure, reworded with the fix

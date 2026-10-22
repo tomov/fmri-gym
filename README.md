@@ -350,7 +350,7 @@ fmri_gym/
   logging.py        # manifest.json + one crash-safe JSONL/HDF5 log per game block
   replay.py         # replay an episode from a block's log; its frame fields as arrays
   menu.py           # the hold-a-key pause menu (reset / forfeit / resume), opt-in per game phase
-  triggers.py       # run-start sync (wait/send/none) + MEG/EEG trigger codes over lsl/serial/parallel
+  triggers.py       # run-start sync (wait/send/none) + MEG/EEG trigger codes over lsl/serial/parallel/hid
   photodiode.py     # `python -m fmri_gym.photodiode`: flash a patch to measure the flip-to-photon offset
   checks.py         # the rig check: its phases, report.html/.md, rigchecks.tsv, `pool`
   adapters/
@@ -592,15 +592,15 @@ The rig file's `"triggers"` section (see *Rigs*) says how a run starts and what 
 | `send` | send the start code on the trigger line, wait `delay` s, then start |
 | `none` | start immediately |
 
-`backend`: `null`, `lsl`, `serial` or `parallel` — `uv sync --extra triggers` (pylsl / pyserial / pyparallel); `port` for serial/parallel, `lsl_stream_name` for LSL.
+`backend`: `null`, `lsl`, `serial`, `parallel` or `hid` — `uv sync --extra triggers` (pylsl / pyserial / pyparallel / hidapi); `port` for serial/parallel, `lsl_stream_name` for LSL. `hid` drives the digital port of a USB DAQ wired to the trigger input, where a PC has no parallel port (a Mac): `"hid_device"` names the box (`mcc-1208fs`, a Measurement Computing USB-1208FS, the default) and `port` its digital port (`A` or `B`). It holds each code on the lines like a parallel port, and opening it sets the port to 0.
 
 Which of these a rig needs varies: the scanner may type a key at every volume, or start its recording when the stimulus PC sends a code, or neither. So the rig file says what happens rather than naming a modality, and the editor's Triggers tab offers a template per common setup:
 
 | setup | `sync.mode` | `backend` |
 |---|---|---|
 | the scanner types a key at every volume | `wait` | `null` (no trigger line) |
-| the recording starts from the trigger input | `send` | `serial` / `parallel` / `lsl` |
-| the recording is started by hand, the PC gets the scanner's key | `wait` | `serial` / `parallel` / `lsl` |
+| the recording starts from the trigger input | `send` | `serial` / `parallel` / `hid` / `lsl` |
+| the recording is started by hand, the PC gets the scanner's key | `wait` | `serial` / `parallel` / `hid` / `lsl` |
 | bench test, nothing connected | `none` | `null` |
 
 Leaving `sync.mode` or `backend` out defaults to `wait` / `null`, and says so: the experimenter screen, the console and the manifest all report it (`NOT SET in the rig file: sync.mode, backend`), as they do for `--dummy-trigger`.
@@ -628,7 +628,7 @@ Frames are shown with a vsync-locked flip and each frame's onset is logged as `f
   |---|---|---|
   | `check_display` | display | flips are not locked to the refresh (missed refreshes are counted) |
   | `check_frames` | frames | a built-in test pattern, played as a game through the session's own game loop at each of `rates` fps and under each of `loads` (`cpu`: every core busy), loses a frame, shows one a refresh later than its rate allows, resets its pacing, or its frame triggers do not mark every frame in their cycle (and, given `recording_hz`, for 2 samples each) |
-  | `check_triggers` | triggers | the line does not open, LSL does not read back what was sent, or the scanner's pulses do not come or come irregularly (counted when the run waits for the scanner). This PC's ports and LSL are listed first, with a warning when none is usable. Codes sent over serial/parallel are printed: check them in the recording |
+  | `check_triggers` | triggers | the line does not open, LSL does not read back what was sent, or the scanner's pulses do not come or come irregularly (counted when the run waits for the scanner). This PC's ports and LSL are listed first, with a warning when none is usable. Codes sent over serial/parallel/hid are printed: check them in the recording |
   | `check_controls` | controls | a key is not read back through the event queue as itself (automatic), or is not pressed when asked for on screen (the input devices plugged in are listed) |
   | `check_photodiode` | photodiode | the diode misses a flash, or sees only the flashes with a click (it hears sound). `"readout": "recording"`: matched offline to the frame triggers |
   | | audio | a tone burst (every other flash, through the session's output) never reaches the DAC, or with `"has_mic": true` a microphone at the ear on input 1 misses one |
@@ -769,7 +769,7 @@ Many games already expose a Gymnasium API and drop straight into the `gym` backe
 - [x] Configurable **state stride** (`"state_stride": K`) — done.
 - [x] **VGDL backend** ([tomov/language_and_experience @ dbp](https://github.com/tomov/language_and_experience/tree/dbp)), ported to gymnasium so it runs in the same env as the other backends — done.
 - [ ] Finish the **old-`gym` / shimmy** path against a real game (Sokoban, chess) — either port its source (VGDL recipe above) or run via shimmy in a `numpy<2` env; code path exists but is untested end-to-end.
-- [x] **LSL / serial / parallel-port triggers** and a send-mode start signal for MEG/EEG (`"triggers"` section) -- done.
+- [x] **LSL / serial / parallel-port / HID triggers** and a send-mode start signal for MEG/EEG (`"triggers"` section) -- done.
 - [x] **Photodiode calibration task** (`python -m fmri_gym.photodiode`) to measure the flip-to-photon offset of a rig -- done; an always-on sync square in the corner of every frame remains an option if a lab wants per-frame verification.
 - [ ] **retro `.bk2` movie logging** as an alternative to per-frame states (frame-exact, tiny).
 - [ ] Per-subject deterministic curriculum generation; multi-run structure with one trigger per fMRI run.

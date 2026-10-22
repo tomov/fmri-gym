@@ -13,8 +13,8 @@ Its curriculum holds check phases where a game run holds games:
   every frame, in order -- and, given ``recording_hz``, for two samples each.
   The run's own loop, not a copy of it: its pacing is what is measured.
 * ``check_triggers`` -- the trigger outputs this PC has (serial ports with
-  hardware behind them, parallel ports, whether LSL reads back), with a warning
-  when none is usable; then the config's line: every bit alone and every code
+  hardware behind them, parallel ports, HID trigger boxes, whether LSL reads
+  back), with a warning when none is usable; then the config's line: every bit alone and every code
   of its scheme sent (read back, over LSL), and scanner pulses counted when the
   run waits for the scanner. Only the configured port is written to: another
   may be wired to a response box or an eye tracker, and a write that succeeds
@@ -102,7 +102,7 @@ from .photodiode import (AudioRecorder, Verdict, _clicker, _light_verdict,
                          _log_clicks, _readout, _sound_verdict, run_flashes)
 from .replay import frame_arrays
 from .run import _wait_for_duration
-from .triggers import LIFECYCLE_EVENTS, Codes, TriggerError, Triggers
+from .triggers import HID_DEVICES, LIFECYCLE_EVENTS, Codes, TriggerError, Triggers
 
 if TYPE_CHECKING:
     from .config.run import RunConfig
@@ -784,11 +784,16 @@ def send_codes(triggers: Triggers, repeat: int, hold_s: float, gap_s: float,
 
 
 def detect_outputs() -> list[dict[str, Any]]:
-    """The serial ports with hardware behind them and the parallel ports; nothing is opened.
+    """The serial ports with hardware behind them, the parallel ports and the HID trigger
+    boxes of :data:`~fmri_gym.triggers.HID_DEVICES`; nothing is opened.
 
     Linux lists a ``ttyS`` for every slot its driver reserves, most with no
     UART behind them (``hwid`` ``n/a``); writes to those succeed and go
     nowhere, so they are left out.
+
+    A HID box is listed once per digital port, as a rig names it (``device``,
+    ``port``), with its device node in ``path``. Only Linux guards one with file
+    permissions (``/dev/hidraw*``); elsewhere it is writable by anyone.
 
     :return: one dict per port: ``kind``, ``port``, ``what``, ``writable`` (by this user).
     """
@@ -805,7 +810,27 @@ def detect_outputs() -> list[dict[str, Any]]:
         found.append({"kind": "parallel", "port": dev, "what": ""})
     for f in found:
         f["writable"] = os.access(f["port"], os.R_OK | os.W_OK)
+    try:
+        import hid
+    except ImportError:
+        print("  hid: hidapi not installed, HID trigger boxes not listed (pip install hidapi)")
+        hid = None
+    for name, spec in HID_DEVICES.items() if hid else []:
+        boxes = [d for d in hid.enumerate(spec.vendor_id, spec.product_id)
+                 if d["interface_number"] in (spec.interface, -1)]
+        for d in boxes:
+            path = d["path"].decode(errors="replace")
+            writable = not path.startswith("/dev/") or os.access(path, os.R_OK | os.W_OK)
+            for port in spec.ports:
+                found.append({"kind": "hid", "port": port, "device": name, "path": path,
+                              "writable": writable,
+                              "what": f"{d['product_string']} serial {d['serial_number']}"})
     return found
+
+
+def _port_name(o: dict[str, Any]) -> str:
+    """A port of :func:`detect_outputs` as a rig names it: ``/dev/ttyUSB0``, ``mcc-1208fs:A``."""
+    return f"{o['device']}:{o['port']}" if o["kind"] == "hid" else o["port"]
 
 
 def _lsl_inlet(source_id: str, timeout: float) -> Any:
@@ -864,15 +889,16 @@ def discover() -> dict[str, Any]:
     print("trigger outputs on this PC:")
     outputs = detect_outputs()
     for o in outputs:
-        access = "writable" if o["writable"] else (
-            "NOT writable by you: add yourself to the "
-            f"{'dialout' if o['kind'] == 'serial' else 'lp'} group")
-        print(f"  {o['kind']} {o['port']}  {o['what']}  {access}")
+        fix = {"serial": "add yourself to the dialout group",
+               "parallel": "add yourself to the lp group",
+               "hid": f"give {o.get('path')} to your user (a udev rule)"}[o["kind"]]
+        access = "writable" if o["writable"] else f"NOT writable by you: {fix}"
+        print(f"  {o['kind']} {_port_name(o)}  {o['what']}  {access}")
     lsl = lsl_probe()
     print(f"  lsl: {lsl}")
     if not (lsl == "OK" or any(o["writable"] for o in outputs)):
-        print("WARNING: no usable trigger output on this PC (no writable serial or parallel "
-              "port, no working LSL): nothing could send codes to a recording")
+        print("WARNING: no usable trigger output on this PC (no writable serial, parallel "
+              "or HID port, no working LSL): nothing could send codes to a recording")
     return {"ports": outputs, "n_writable": sum(o["writable"] for o in outputs), "lsl": lsl}
 
 
@@ -1590,7 +1616,7 @@ def _md_display(d: dict) -> list[str]:
 
 def _md_triggers(t: dict) -> list[str]:
     o = t["outputs"]
-    lines = [f"- ports: {', '.join(p['port'] for p in o['ports']) or 'none with hardware'} "
+    lines = [f"- ports: {', '.join(map(_port_name, o['ports'])) or 'none with hardware'} "
              f"({o['n_writable']} writable); LSL: {o['lsl']}"]
     if not (o["n_writable"] or o["lsl"] == "OK"):
         lines.append("- **warning: no usable trigger output on this PC**")
@@ -2075,7 +2101,7 @@ def _html_frames(m: dict, folder: str) -> str:
 def _html_triggers(m: dict, folder: str) -> str:
     t = m["rig_check"]["triggers"]
     o = t["outputs"]
-    ports = ", ".join(p["port"] for p in o["ports"]) or "none with hardware"
+    ports = ", ".join(map(_port_name, o["ports"])) or "none with hardware"
     out = [f'<p class="note">This PC: {_e(ports)} ({o["n_writable"]} writable); LSL: '
            f'{_e(o["lsl"])}.</p>']
     if "triggers" in t:
