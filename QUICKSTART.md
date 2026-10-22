@@ -8,6 +8,7 @@ Commands to install fmri-gym and play each game on a laptop, in order. What they
 sudo apt install libportaudio2                  # Linux only
 curl -LsSf https://astral.sh/uv/install.sh | sh # if you don't have uv
 git submodule update --init                     # if you cloned without --recursive
+$env:PYTHONUTF8 = "1"                           # Windows only (PowerShell): crafter's setup.py needs UTF-8 mode
 uv sync --extra dbp --extra gui
 uv run fmri-play --help                         # check: prints usage
 ```
