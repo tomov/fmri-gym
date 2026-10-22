@@ -648,6 +648,9 @@ class Run:
         # catch-up frames. The reset frame's sound is not played: it is not a
         # step's, and it would start the episode's sound off its flips.
         flip_t0, _, _ = self._show(adapter, False, score, block_end)
+        # Keys held as the block begins (the one that dismissed its instructions)
+        # act only once released: an engine starting up can swallow the release.
+        stale = held_key_names() if episode_id == 0 else frozenset()
         self.logger.log(type="episode_start", episode_id=episode_id, seed=seed,
                         initial_state=initial_state, flip_time=self.clock.from_perf(flip_t0))
         next_t = flip_t0 + dt
@@ -688,7 +691,9 @@ class Run:
             elif not game_phase.is_turn_based and action is None:
                 # No latched press this frame (or the phase never asked for
                 # one): the action is whatever is held down at the tick.
-                action = adapter.keymap.resolve(held_key_names())
+                held = held_key_names()
+                stale &= held
+                action = adapter.keymap.resolve(held - stale)
 
             observation, reward, terminated, truncated, info = adapter.step(action)
             auto = adapter.autoplay(info) if game_phase.is_turn_based else None
