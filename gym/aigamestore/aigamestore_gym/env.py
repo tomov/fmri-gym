@@ -27,10 +27,12 @@ An episode is one level: ``reset`` starts ``level`` afresh (score 0, full
 lives) through the game's ``window.loadLevel(n)`` hook, and the episode is over
 as soon as the game leaves PLAYING (a win, a loss or a level-complete screen)
 or its level counter moves -- the games differ in which of these they do when a
-level is cleared, and this rule covers all of them. The game is then stepped
-``end_steps`` more times with no key held, so the win / lose / level-complete
-screen stays up long enough to be read (2 s at the default rate) instead of
-flashing for one frame; ``terminated`` is reported on the last of them. A game
+level is cleared, and this rule covers all of them. A game that leaves PLAYING
+is then stepped ``end_steps`` more times with no key held, so the win / lose /
+level-complete screen stays up long enough to be read (2 s at the default rate)
+instead of flashing for one frame; ``terminated`` is reported on the last of
+them. A game that goes straight on PLAYING the next level has no such screen:
+its episode ends on that step, on the last frame of the level cleared. A game
 without levels (game4, an endless runner) has episodes that end when it is lost.
 
 Not supported: sound (the games have none) and savestates (replay from seed).
@@ -235,17 +237,25 @@ class AIGameStoreEnv(gym.Env):
     def step(self, action: Any) -> tuple[np.ndarray, float, bool, bool, dict]:
         """Hold the keys ``action`` marks and advance ``frame_skip`` frames.
 
-        Once the game has left PLAYING or changed level the keys are no longer
-        passed on (a press could skip the end screen or start the next level),
-        and ``terminated`` comes ``end_steps`` steps later.
+        Once the game has left PLAYING the keys are no longer passed on (a
+        press could skip the end screen or start the next level), and
+        ``terminated`` comes ``end_steps`` steps later. A step that lands
+        PLAYING another level is ``terminated`` at once and returns the cleared
+        level's last frame.
 
         :param action: 0/1 per entry of :attr:`keys`.
         :return: ``(frame, score delta, terminated, False, {"state": ...})``.
         """
         names = [] if self._ended else [k for k, on in zip(self.keys, action) if on]
+        cleared = self._frame
         frame, state = self._step(names, self.frame_skip)
         score = float(state.get("score", self._score))
         reward, self._score = score - self._score, score
+        if not self._ended and self._moved_on(state):
+            # Straight into the next level, with no screen to hold: end now,
+            # on the last frame of the level just cleared.
+            self._frame = cleared
+            return cleared, reward, True, False, {"state": state}
         if self._ended or self._over(state):
             self._ended += 1
         return frame, reward, self._ended > self.end_steps, False, {"state": state}
@@ -275,6 +285,11 @@ class AIGameStoreEnv(gym.Env):
         """
         level = _level(state)
         return state.get("gamePhase") != "PLAYING" or (level is not None and level != self.level)
+
+    def _moved_on(self, state: dict) -> bool:
+        """Whether ``state`` is already PLAYING another level: the level was cleared without a screen."""
+        level = _level(state)
+        return state.get("gamePhase") == "PLAYING" and level is not None and level != self.level
 
     def _load(self, seed: int) -> None:
         """Navigate to the game with ``seed`` and tick it up to its START screen."""
