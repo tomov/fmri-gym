@@ -119,7 +119,8 @@ def use_fake_sound_card() -> None:
 
     audio.sounddevice.OutputStream = FakeOutputStream
     audio.sounddevice.query_devices = query_devices
-    audio.sounddevice.query_hostapis = lambda index=None: {"name": "fake"}
+    hostapi = {"name": "fake", "default_output_device": 0}
+    audio.sounddevice.query_hostapis = lambda index=None: hostapi if index is not None else [hostapi]
 
 
 class _StreamTap:

@@ -29,6 +29,7 @@ from __future__ import annotations
 import glob
 import os
 import platform
+import sys
 import time
 from collections import deque
 from collections.abc import Callable
@@ -46,9 +47,7 @@ if TYPE_CHECKING:
 # or one that is busy and fails to open). Pointing alsa-lib at the system
 # config adds the distro's `pulse`/`default` plugin PCMs, which route to
 # whatever the desktop is playing through. Must happen before sounddevice
-# imports, i.e. before PortAudio initialises. All no-ops off Linux, where
-# PortAudio talks to CoreAudio / WASAPI and its default device is already the
-# one the desktop uses.
+# imports, i.e. before PortAudio initialises. All no-ops off Linux.
 _SYSTEM_ALSA_CONF = "/usr/share/alsa/alsa.conf"
 _SYSTEM_ALSA_PLUGIN_DIRS = ("/usr/lib/*-linux-gnu/alsa-lib", "/usr/lib*/alsa-lib")
 if "ALSA_CONFIG_PATH" not in os.environ and os.path.exists(_SYSTEM_ALSA_CONF):
@@ -145,7 +144,8 @@ def _device_lead(device: int | str | None, blocksize: int, seconds: float = 0.5)
                      if timing.outputBufferDacTime else float("nan"))
 
     with sounddevice.OutputStream(device=device, blocksize=blocksize, latency="low",
-                                  channels=1, callback=callback):
+                                  channels=1, callback=callback,
+                                  extra_settings=_stream_settings(device)):
         time.sleep(seconds)
     settled = leads[len(leads) // 4:]       # skip the start-up transient
     if not settled or np.isnan(settled).any():
@@ -159,18 +159,36 @@ def _device_lead(device: int | str | None, blocksize: int, seconds: float = 0.5)
 def _preferred_output_device() -> int | None:
     """Pick the desktop's mixer PCM, so sound goes where the subject hears it.
 
-    :return: index of the first available ``pulse``/``default`` output device,
-        or ``None`` to let PortAudio choose (typically a raw ALSA card).
+    On Windows that is WASAPI's default output: PortAudio's own default there is
+    MME, which delays sound by ~115 ms and reports coarse DAC times.
+
+    :return: index of WASAPI's default output on Windows, elsewhere of the first
+        available ``pulse``/``default`` output device, or ``None`` to let
+        PortAudio choose (typically a raw ALSA card).
     """
     try:
         devices = sounddevice.query_devices()
     except sounddevice.PortAudioError:  # no audio at all -- let the stream raise instead
         return None
+    if sys.platform == "win32":
+        return next((int(api["default_output_device"]) for api in sounddevice.query_hostapis()
+                     if api["name"] == "Windows WASAPI" and api["default_output_device"] >= 0),
+                    None)
     for name in ("pulse", "default"):
         for device in devices:
             if device["name"] == name and device["max_output_channels"] > 0:
                 return int(device["index"])
     return None
+
+
+def _stream_settings(device: int | None) -> Any:
+    """WASAPI shared mode opens only at the mixer's rate; let Windows convert to it."""
+    if device is None or sys.platform != "win32":
+        return None
+    hostapi = sounddevice.query_hostapis(sounddevice.query_devices(device)["hostapi"])
+    if hostapi["name"] != "Windows WASAPI":
+        return None
+    return sounddevice.WasapiSettings(auto_convert=True)
 
 
 class SoundDeviceGameBlockStream:
@@ -234,6 +252,7 @@ class SoundDeviceGameBlockStream:
             samplerate=sample_rate, blocksize=block_size, latency="low",
             device=device, channels=channels, callback=self.callback, dtype=dtype,
             prime_output_buffers_using_stream_callback=False,
+            extra_settings=_stream_settings(device),
         )
 
     def callback(self, outdata: np.ndarray, frames: int, timing: Any, status: Any) -> None:
