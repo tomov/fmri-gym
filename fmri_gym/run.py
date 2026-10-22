@@ -751,7 +751,6 @@ class Run:
                                n_pacing_resets)
         self.logger.log(type="episode_end", **result.record())
         if message and game_phase.show_outcome_duration > 0 and not self._time_up():
-            self.audio.stop()               # the episode's last sounds, still queued
             self.display.draw_text(f"Final score: {score:g}\n{message}")
             _wait_for_duration(self.display, game_phase.show_outcome_duration,
                                until=self._run_end)
