@@ -11,11 +11,11 @@
           "The floor layout is randomized every episode.",
           "",
           "Controls:",
-          "   UP           move forward",
-          "   LEFT / RIGHT turn left / right",
-          "   SPACE        jump",
+          "   [UP]           move forward",
+          "   [LEFT] / [RIGHT] turn left / right",
+          "   [SPACE]        jump",
           "",
-          "(press SPACE to start)"
+          "(press [SPACE] to start)"
         ]
       },
       "keys": {"": 0, "LEFT": 8, "RIGHT": 4, "UP": 2, "LEFT+UP": 10, "RIGHT+UP": 6, "SPACE": 1, "UP+SPACE": 3}
@@ -31,11 +31,11 @@
           "saw them in half at melee range.",
           "",
           "Controls:",
-          "   UP           move forward",
-          "   LEFT / RIGHT turn left / right",
-          "   SPACE        attack",
+          "   [UP]           move forward",
+          "   [LEFT] / [RIGHT] turn left / right",
+          "   [SPACE]        attack",
           "",
-          "(press SPACE to start)"
+          "(press [SPACE] to start)"
         ]
       },
       "keys": {"": 0, "LEFT": 8, "RIGHT": 4, "UP": 2, "LEFT+UP": 10, "RIGHT+UP": 6, "SPACE": 1, "UP+SPACE": 3}
@@ -51,14 +51,14 @@
           "health kits when you're low.",
           "",
           "Controls:",
-          "   UP           move forward",
-          "   LEFT / RIGHT turn left / right",
-          "   LSHIFT       run",
+          "   [UP]           move forward",
+          "   [LEFT] / [RIGHT] turn left / right",
+          "   [SPACE]       run",
           "",
-          "(press SPACE to start)"
+          "(press [SPACE] to start)"
         ]
       },
-      "keys": {"": 0, "LEFT": 8, "RIGHT": 4, "UP": 2, "LEFT+UP": 10, "RIGHT+UP": 6, "LSHIFT": 1, "UP+LSHIFT": 3}
+      "keys": {"": 0, "LEFT": 8, "RIGHT": 4, "UP": 2, "LEFT+UP": 10, "RIGHT+UP": 6, "SPACE": 1, "UP+SPACE": 3}
     },
     {"type": "fixation", "duration": 1.0},
     {
@@ -72,14 +72,14 @@
           "poison vials.",
           "",
           "Controls:",
-          "   UP           move forward",
-          "   LEFT / RIGHT turn left / right",
-          "   LSHIFT       run",
+          "   [UP]           move forward",
+          "   [LEFT] / [RIGHT] turn left / right",
+          "   [SPACE]       run",
           "",
-          "(press SPACE to start)"
+          "(press [SPACE] to start)"
         ]
       },
-      "keys": {"": 0, "LEFT": 8, "RIGHT": 4, "UP": 2, "LEFT+UP": 10, "RIGHT+UP": 6, "LSHIFT": 1, "UP+LSHIFT": 3}
+      "keys": {"": 0, "LEFT": 8, "RIGHT": 4, "UP": 2, "LEFT+UP": 10, "RIGHT+UP": 6, "SPACE": 1, "UP+SPACE": 3}
     },
     {"type": "fixation", "duration": 1.0},
     {
@@ -92,14 +92,14 @@
           "to the platform that appears after each pickup.",
           "",
           "Controls:",
-          "   UP           move forward",
-          "   LEFT / RIGHT turn left / right",
-          "   LSHIFT       run",
+          "   [UP]           move forward",
+          "   [LEFT] / [RIGHT] turn left / right",
+          "   [SPACE]       run",
           "",
-          "(press SPACE to start)"
+          "(press [SPACE] to start)"
         ]
       },
-      "keys": {"": 0, "LEFT": 8, "RIGHT": 4, "UP": 2, "LEFT+UP": 10, "RIGHT+UP": 6, "LSHIFT": 1, "UP+LSHIFT": 3}
+      "keys": {"": 0, "LEFT": 8, "RIGHT": 4, "UP": 2, "LEFT+UP": 10, "RIGHT+UP": 6, "SPACE": 1, "UP+SPACE": 3}
     },
     {"type": "fixation", "duration": 1.0},
     {
@@ -112,11 +112,11 @@
           "gaps and up ledges as you go.",
           "",
           "Controls:",
-          "   UP           move forward",
-          "   LEFT / RIGHT turn left / right",
-          "   SPACE        jump",
+          "   [UP]           move forward",
+          "   [LEFT] / [RIGHT] turn left / right",
+          "   [SPACE]        jump",
           "",
-          "(press SPACE to start)"
+          "(press [SPACE] to start)"
         ]
       },
       "keys": {"": 0, "LEFT": 8, "RIGHT": 4, "UP": 2, "LEFT+UP": 10, "RIGHT+UP": 6, "SPACE": 1, "UP+SPACE": 3}
@@ -133,14 +133,14 @@
           "before it's too late.",
           "",
           "Controls:",
-          "   UP           move forward",
-          "   LEFT / RIGHT turn left / right",
-          "   E            press switch",
+          "   [UP]           move forward",
+          "   [LEFT] / [RIGHT] turn left / right",
+          "   [SPACE]            press switch",
           "",
-          "(press SPACE to start)"
+          "(press [SPACE] to start)"
         ]
       },
-      "keys": {"": 0, "LEFT": 8, "RIGHT": 4, "UP": 2, "LEFT+UP": 10, "RIGHT+UP": 6, "E": 1, "UP+E": 3}
+      "keys": {"": 0, "LEFT": 8, "RIGHT": 4, "UP": 2, "LEFT+UP": 10, "RIGHT+UP": 6, "SPACE": 1, "UP+SPACE": 3}
     },
     {"type": "fixation", "duration": 1.0},
     {
@@ -153,11 +153,11 @@
           "the maze. You have unlimited ammunition.",
           "",
           "Controls:",
-          "   UP           move forward",
-          "   LEFT / RIGHT turn left / right",
-          "   SPACE        shoot",
+          "   [UP]           move forward",
+          "   [LEFT] / [RIGHT] turn left / right",
+          "   [SPACE]        shoot",
           "",
-          "(press SPACE to start)"
+          "(press [SPACE] to start)"
         ]
       },
       "keys": {"": 0, "LEFT": 8, "RIGHT": 4, "UP": 2, "LEFT+UP": 10, "RIGHT+UP": 6, "SPACE": 1, "UP+SPACE": 3}
@@ -174,14 +174,14 @@
           "you can.",
           "",
           "Controls:",
-          "   UP           move forward",
-          "   LEFT / RIGHT turn left / right",
-          "   LSHIFT       run",
+          "   [UP]           move forward",
+          "   [LEFT] / [RIGHT] turn left / right",
+          "   [SPACE]       run",
           "",
-          "(press SPACE to start)"
+          "(press [SPACE] to start)"
         ]
       },
-      "keys": {"": 0, "LEFT": 8, "RIGHT": 4, "UP": 2, "LEFT+UP": 10, "RIGHT+UP": 6, "LSHIFT": 1, "UP+LSHIFT": 3}
+      "keys": {"": 0, "LEFT": 8, "RIGHT": 4, "UP": 2, "LEFT+UP": 10, "RIGHT+UP": 6, "SPACE": 1, "UP+SPACE": 3}
     },
     {"type": "fixation", "duration": 2.0}
   ]

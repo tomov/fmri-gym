@@ -50,7 +50,7 @@ def test_a_six_button_controller_plays_it(path, pad):
     """A rig with a controller plays every curriculum whose games fit six buttons, only those."""
     curriculum = Curriculum.load(str(path))
     run = RunConfig(curriculum=curriculum, rig=pad, subject="sub-01", ses=1, run=1,
-                    duration=None, end_fixation=10.0, resume=False, dummy_trigger=True)
+                    duration=None, end_fixation=10.0, resume=False, loop=False, dummy_trigger=True)
     is_too_big = any(_button_actions(p) > 6 for p in curriculum.phases if isinstance(p, GamePhase))
     if is_too_big:
         assert run.problems(), "plays on six buttons, though a game in it has more actions"

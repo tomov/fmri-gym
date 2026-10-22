@@ -11,15 +11,15 @@
           "across the line.",
           "",
           "Controls:",
-          "   UP             accelerate",
-          "   DOWN           brake / reverse",
-          "   LEFT / RIGHT   steer",
-          "   SPACE          fire item",
-          "   V              skid",
-          "   N              nitro (boost)",
-          "   BACKSPACE      rescue",
+          "   [UP]             accelerate",
+          "   [DOWN]           brake / reverse",
+          "   [LEFT] / [RIGHT]   steer",
+          "   [SPACE]          fire item",
+          "   [C]              skid",
+          "   [X]              nitro (boost)",
+          "   [Z]      rescue",
           "",
-          "(press SPACE to start)"
+          "(press [SPACE] to start)"
         ]
       },
       "track": "hacienda"
@@ -35,15 +35,15 @@
           "across the line.",
           "",
           "Controls:",
-          "   UP             accelerate",
-          "   DOWN           brake / reverse",
-          "   LEFT / RIGHT   steer",
-          "   SPACE          fire item",
-          "   V              skid",
-          "   N              nitro (boost)",
-          "   BACKSPACE      rescue",
+          "   [UP]             accelerate",
+          "   [DOWN]           brake / reverse",
+          "   [LEFT] / [RIGHT]   steer",
+          "   [SPACE]          fire item",
+          "   [C]              skid",
+          "   [X]              nitro (boost)",
+          "   [Z]      rescue",
           "",
-          "(press SPACE to start)"
+          "(press [SPACE] to start)"
         ]
       },
       "track": "cornfield_crossing"
@@ -59,15 +59,15 @@
           "across the line.",
           "",
           "Controls:",
-          "   UP             accelerate",
-          "   DOWN           brake / reverse",
-          "   LEFT / RIGHT   steer",
-          "   SPACE          fire item",
-          "   V              skid",
-          "   N              nitro (boost)",
-          "   BACKSPACE      rescue",
+          "   [UP]             accelerate",
+          "   [DOWN]           brake / reverse",
+          "   [LEFT] / [RIGHT]   steer",
+          "   [SPACE]          fire item",
+          "   [C]              skid",
+          "   [X]              nitro (boost)",
+          "   [Z]      rescue",
           "",
-          "(press SPACE to start)"
+          "(press [SPACE] to start)"
         ]
       },
       "track": "lighthouse"
@@ -83,15 +83,15 @@
           "across the line.",
           "",
           "Controls:",
-          "   UP             accelerate",
-          "   DOWN           brake / reverse",
-          "   LEFT / RIGHT   steer",
-          "   SPACE          fire item",
-          "   V              skid",
-          "   N              nitro (boost)",
-          "   BACKSPACE      rescue",
+          "   [UP]             accelerate",
+          "   [DOWN]           brake / reverse",
+          "   [LEFT] / [RIGHT]   steer",
+          "   [SPACE]          fire item",
+          "   [C]              skid",
+          "   [X]              nitro (boost)",
+          "   [Z]      rescue",
           "",
-          "(press SPACE to start)"
+          "(press [SPACE] to start)"
         ]
       },
       "track": "scotland"
@@ -107,15 +107,15 @@
           "across the line.",
           "",
           "Controls:",
-          "   UP             accelerate",
-          "   DOWN           brake / reverse",
-          "   LEFT / RIGHT   steer",
-          "   SPACE          fire item",
-          "   V              skid",
-          "   N              nitro (boost)",
-          "   BACKSPACE      rescue",
+          "   [UP]             accelerate",
+          "   [DOWN]           brake / reverse",
+          "   [LEFT] / [RIGHT]   steer",
+          "   [SPACE]          fire item",
+          "   [C]              skid",
+          "   [X]              nitro (boost)",
+          "   [Z]      rescue",
           "",
-          "(press SPACE to start)"
+          "(press [SPACE] to start)"
         ]
       },
       "track": "snowmountain"
