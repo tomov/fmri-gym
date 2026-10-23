@@ -18,9 +18,15 @@ One step is one Doom tic. ``conf.cfg`` asks for a 160x120 training view; the
 screen here is 640x480. Reward is ViZDoom's raw reward, not COOM's shaping.
 ``audio_buffer_enabled`` puts one 44.1 kHz stereo buffer for that tic on the
 live ``DoomGame`` (``env.game``). The labels/objects/sectors buffers are
-turned on here (COOM's own scenarios leave them off) so ``game.get_state()``
-also carries every object in the level and the level's own sector geometry,
-not just ``game_variables``.
+turned on here (COOM's own scenarios leave them off) so the state also carries
+every object in the level and the level's own sector geometry, not just
+``game_variables``.
+
+``env.state`` is that state for the current tic, fetched once per ``reset`` and
+``step``. Read it rather than ``game.get_state()``: ViZDoom builds every buffer
+afresh on each call (a few ms with the sectors on), so a frame that asks for
+the screen, the sound and the variables separately pays for the state three
+times and falls behind real speed, which the sound plays out as gaps.
 """
 
 from __future__ import annotations
@@ -134,6 +140,8 @@ class COOMEnv(gym.Env):
         self.action_space = spaces.Discrete(len(_ACTIONS))
         h, w = game.get_screen_height(), game.get_screen_width()
         self.observation_space = spaces.Box(0, 255, (h, w, 3), dtype=np.uint8)
+        #: the current tic's ``GameState``; ``None`` on the tic an episode ends
+        self.state: Any = None
         self._last_frame: np.ndarray | None = None
 
     def reset(
@@ -149,6 +157,7 @@ class COOMEnv(gym.Env):
         if seed is not None:
             self.game.set_seed(int(seed))
         self.game.new_episode()
+        self.state = self.game.get_state()
         return self._frame(), {}
 
     def step(self, action: Any) -> tuple[np.ndarray, float, bool, bool, dict]:
@@ -159,6 +168,7 @@ class COOMEnv(gym.Env):
         """
         reward = self.game.make_action([int(b) for b in _ACTIONS[int(action)]])
         terminated = self.game.is_episode_finished()
+        self.state = self.game.get_state()
         return self._frame(), float(reward), bool(terminated), False, {}
 
     def render(self) -> np.ndarray:
@@ -175,9 +185,9 @@ class COOMEnv(gym.Env):
     def _frame(self) -> np.ndarray:
         """RGB frame from the current state, falling back to the last one.
 
-        ``get_state()`` returns ``None`` on the tic an episode ends.
+        The state is ``None`` on the tic an episode ends.
         """
-        state = self.game.get_state()
+        state = self.state
         if state is None:
             if self._last_frame is None:
                 h, w = self.game.get_screen_height(), self.game.get_screen_width()
