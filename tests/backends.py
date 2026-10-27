@@ -86,8 +86,9 @@ def _arc3_files() -> str | None:
 
 
 def _stk() -> str | None:
-    """stk needs the Linux x86_64 game pack and a real GL display."""
-    if platform.system() == "Linux" and platform.machine() == "x86_64":
+    """stk needs a game pack (Linux x86_64, macOS x86_64 or arm64) and a real GL display."""
+    if (platform.system(), platform.machine()) in {("Linux", "x86_64"), ("Darwin", "x86_64"),
+                                                   ("Darwin", "arm64")}:
         return None
     if os.path.exists(os.environ.get("STK_ENV_BIN", "")):
         return None
@@ -128,7 +129,7 @@ BACKENDS: dict[str, Backend] = {b.name: b for b in (
             gym_dirs=("aigamestore", "replay_state")),
     Backend("arc3", "arc3", "arc3_gym", (_C + "arc3/levels/ls20.json",), gym_dirs=("arc3",)),
     Backend("stk", "stk", "stk_gym", (_C + "stk/levels/hacienda.json",),
-            ci="the game pack is Linux x86_64 only and renders through a real GL display",
+            ci="the game renders through a real GL display, which a hosted runner lacks",
             needs_display=True),
 )}
 

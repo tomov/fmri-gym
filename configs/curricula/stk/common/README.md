@@ -4,7 +4,7 @@ The `stk` backend's curricula: one per race track, each including `common/race.j
 
 ## Setup
 
-`uv sync --extra stk` (supertuxkart-gym). The wheel fetches the game and a 270 MiB asset pack from its GitHub release on first use, Linux x86_64 only: no checkout and no build; `STK_ENV_BIN` overrides the binary it fetched. It needs a real OpenGL display: the game renders into a hidden window and every frame is read back and shown here, so it does not work under `SDL_VIDEODRIVER=dummy` or with `--render-driver=vulkan`.
+`uv sync --extra stk` (supertuxkart-gym). The wheel fetches the game and a 270 MiB asset pack from its GitHub release on first use, for Linux x86_64 and macOS (x86_64, arm64): no checkout and no build; `STK_ENV_BIN` overrides the binary it fetched. It needs a real OpenGL display: the game renders into a hidden window and every frame is read back and shown here, so it does not work under `SDL_VIDEODRIVER=dummy` or with `--render-driver=vulkan`.
 
 ## Tracks
 

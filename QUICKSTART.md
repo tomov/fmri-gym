@@ -120,8 +120,6 @@ uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/em
 
 ### SuperTuxKart
 
-**On a Mac, first run** `tools/stk_macos.sh` (once, about 20 minutes), then in every new shell `export STK_ENV_BIN=~/.cache/supertuxkart-gym/macos/SuperTuxKart-gym-macos-$(uname -m)/supertuxkart`.
-
 ```bash
 uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/empty.json --curriculum configs/curricula/stk/levels/hacienda.json
 ```
