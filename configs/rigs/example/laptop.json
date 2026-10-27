@@ -1,7 +1,0 @@
-{
-  "screen": {"size": "1024x768", "is_fullscreen": false, "monitor": 0, "has_vsync": true},
-  "has_pad": false,
-  "has_audio": true,
-  "data_root": "data",
-  "triggers": {"sync": {"mode": "none"}, "backend": "null"}
-}

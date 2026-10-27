@@ -21,7 +21,7 @@ Then play it, through the suite and by hand:
 
 ```bash
 uv run pytest --backend <BACKEND>
-uv run fmri-play --subject sub-test --dummy-trigger --ses 1 --run 1 --rig configs/rigs/example/laptop.json \
+uv run fmri-play --subject sub-test --dummy-trigger --ses 1 --run 1 --rig configs/examples/rigs/laptop.json \
     --curriculum configs/curricula/<BACKEND>/levels/<GAME>.json
 uv run ruff check fmri_gym fmri_play.py agents tests
 ```

@@ -1,4 +1,10 @@
 {
+  "pi": "EX",
+  "modality": "behav",
+  "monitor": "Example: any desk monitor",
+  "photodiode": "Example: none",
+  "audio_path": "Example: desk speakers or headphones",
+  "trigger_hardware": "Example: none (no scanner)",
   "notes": "Example: an Xbox controller, at a desk; no scanner",
   "screen": {"size": "1024x768", "is_fullscreen": false, "monitor": 0, "has_vsync": true},
   "has_pad": true,

@@ -39,7 +39,6 @@
     },
     {
       "type": "check_photodiode",
-      "readout": "soundcard",
       "n": 10,
       "on_ms": 50,
       "gap_min_ms": 150,

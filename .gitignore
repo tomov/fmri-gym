@@ -29,7 +29,8 @@ gym/rush-hour-src/
 
 # The rig check's description of this machine (its form fills it in; one per machine)
 /rig.json
-# What each rig check measured on this machine's rig (configs/rigs/<site>/measured/<rig>-<n>.json)
+# What each rig check measured on this machine's rig (configs/<team>/rigs/measured/<rig>-<n>.json)
+/configs/*/rigs/measured/
 /configs/rigs/*/measured/
 
 # Compiled extension modules and setuptools build dirs (gym/baba_auto builds pyBaba into its package)

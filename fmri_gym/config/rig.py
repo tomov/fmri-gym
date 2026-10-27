@@ -1,9 +1,9 @@
 """The rig config: how one rig plays every run, whatever its curriculum.
 
 A **rig** is one setup a run is played on -- a monitor, a scanner, a response
-device, a trigger line -- and a site can have several. Each has its own rig
-file, kept in the repo as ``configs/rigs/<site>/<rig>.json``
-(``configs/rigs/README.md``), so every site's rigs are reviewed with the code. A
+device, a trigger line -- and a team can have several. Each has its own rig
+file, kept in the repo as ``configs/<team>/rigs/<rig>.json`` (the examples in
+``configs/examples/rigs/``), so every team's rigs are reviewed with the code. A
 curriculum says what is played and plays the same on every rig; the rig file
 says how this rig plays it, and every run played on the rig reads it.
 
@@ -12,8 +12,9 @@ curriculum's (:meth:`RigConfig.open`); it is required, since which window,
 controller and data folder a session gets is not something to guess.
 
 Every key of a rig file is optional: an empty ``{}`` plays on the defaults. The
-rig check files its results under ``site`` and ``rig``, the file's folder and
-name; written in the file they must say the same. It may describe the rig for
+rig check files its results under ``site`` and ``rig``: the team's folder
+(:func:`site_of`) and the file's name; written in the file they must say the
+same. It may describe the rig for
 people -- :data:`FIELDS`, notes
 nothing plays from, filed with every run and pooled by the rig check -- and
 say how its runs are played (:data:`DEFAULTS` when left out), under the field
@@ -25,20 +26,30 @@ say the same thing:
   ``size`` to the monitor, aspect kept, at the monitor's own resolution;
 - ``"has_pad"``: read a plugged-in game controller (:mod:`fmri_gym.pad`);
 - ``"bindings"``: which keyboard key each of the controller's controls presses
-  (:data:`fmri_gym.pad.CONTROLS` -> a key name, as curricula write keys),
-  ``{"A": "SPACE", "B": "Z", "UP": "UP", ...}``: one map for every game played
-  on the rig, so a curriculum's keys stay keyboard keys. A control left out
-  presses nothing; with none at all a plugged-in controller is warned about
-  (a controller that types keys itself needs none);
+  (:data:`fmri_gym.pad.CONTROLS` -> a key name), ``{"A": "SPACE", "B": "Z",
+  "UP": "UP", ...}``, for a controller that sends no keys of its own (a
+  gamepad); a control left out presses nothing;
+- ``"response_keys"``: the keys a response device types by itself (a button
+  box, a fORP in a key mode), each with what it stands for, ``{"1": "index
+  finger", ...}``: the rig check asks for each;
 - ``"has_audio"``: play game audio; ``false`` mutes every block;
 - ``"data_root"``: where the BIDS tree goes, ``<root>/sub-XX/ses-NNN/beh/<run>/``;
 - ``"triggers"``: the scanner's start sync and the trigger codes, over which
   line (:class:`~fmri_gym.triggers.TriggerSettings`); left out, the run waits
   for ``=`` and sends no codes, and says so on the experimenter screen and in
-  the manifest (``defaulted``).
+  the manifest (``defaulted``);
+- ``"rig_check"``: what the rig check measures with (:class:`RigCheckConfig`):
+  the photodiode, a microphone, the recording's rate, more frame rates.
 
-It is written by hand or in the rig form (``python -m fmri_gym.checks rig --rig
-<file>``), which a rig check also opens when its rig has no valid file.
+**Three kinds of keys**, never mixed. A curriculum's **game keys** (a game
+phase's ``"keys"``) are keyboard key names, mapped to the game's actions; they
+are the same on every rig. A rig's **bindings** make a controller press game
+keys. Its **response keys** are keys a device types itself; a curriculum
+binds them like any key. What the rig check asks to press is the bindings'
+keys and the response keys: what this rig's participant can press.
+
+It is written by hand or in the rig form (``rig-config --rig <file>``), which a
+rig check also opens when its rig has no valid file.
 """
 
 from __future__ import annotations
@@ -58,8 +69,10 @@ MODALITIES = ("fmri", "meg", "eeg", "behav")
 #: What the rig is, for people: notes nothing plays from, each optional, filed with
 #: every run and pooled by the rig check (``site`` and ``rig`` are the file's place).
 FIELDS = {
-    "site": "the site, and the rig file's folder: letters, digits, _ and -",
-    "rig": "this rig at the site, and the rig file's name: letters, digits, _ and -",
+    "site": "the team, the folder its rigs are in (configs/<team>/rigs/): letters, digits, "
+            "_ and -",
+    "rig": "this rig of the team, the rig file's name, its place included (mgh-prisma): "
+           "letters, digits, _ and -",
     "pi": "the PI's initials, in capitals (Momchil Tomov: MT)",
     "modality": f"one of {', '.join(MODALITIES)}",
     "monitor": "monitor or projector, make and model, and its settings that matter",
@@ -70,7 +83,7 @@ FIELDS = {
 }
 #: What each of :data:`FIELDS` looks like, for the form's placeholders.
 EXAMPLES = {
-    "site": "mri_3T", "rig": "stimpc1", "pi": "MT", "modality": "fmri",
+    "site": "MT", "rig": "mgh-prisma", "pi": "MT", "modality": "fmri",
     "monitor": "BOLDscreen 32 LCD, 120 Hz, 1920x1080",
     "photodiode": "BioSemi photodiode on sound card input 0",
     "audio_path": "RME Babyface -> Sensimetrics S14 insert earphones",
@@ -81,6 +94,17 @@ EXAMPLES = {
 DEFAULTS: dict[str, Any] = {
     "screen": {"size": "1024x768", "is_fullscreen": False, "monitor": 0, "has_vsync": True},
     "has_pad": True, "has_audio": True, "data_root": "data", "triggers": {}, "bindings": {},
+    "response_keys": {}, "rig_check": {},
+}
+#: How a rig check can read its photodiode: not at all, on this PC's sound card
+#: (input 0), or in the MEG/EEG recording (matched offline).
+PHOTODIODE_READOUTS = ("none", "soundcard", "recording")
+#: Where the photodiode check's patch is, under the diode.
+CORNERS = ("br", "bl", "tr", "tl")
+#: A rig file's ``"rig_check"`` where it says nothing (:class:`RigCheckConfig`).
+RIG_CHECK_DEFAULTS: dict[str, Any] = {
+    "photodiode": "none", "input_device": None, "has_mic": False, "corner": "br",
+    "patch_px": 120, "recording_hz": None, "frame_rates": [],
 }
 #: Trigger presets the editor and the rig check offer. Each names ``sync.mode``
 #: and ``backend`` outright: a section that leaves them out runs, but is
@@ -102,15 +126,52 @@ TRIGGER_PRESETS: dict[str, dict] = {
 }
 #: Site and rig: values in the TSV, never in a file name, so BIDS's letters-and-digits
 #: rule does not bind them; still no spaces, as rows are grouped by them when pooled.
-_LABEL = re.compile(r"[A-Za-z0-9_-]+")
+LABEL = re.compile(r"[A-Za-z0-9_-]+")
 _INITIALS = re.compile(r"[A-Z]{2,4}")
 _SIZE = re.compile(r"([1-9]\d*)x([1-9]\d*)")
 _MAKE = ("make it with the rig's long rig check, which opens a form for it: fmri-play "
          "--subject sub-rig --ses 1 --run 1 --rig <file> --curriculum "
-         "configs/curricula/checks/rig-check-long.json (python -m fmri_gym.checks rig --rig "
-         "<file> opens the form alone), or start from configs/rigs/example/empty.json")
-#: The rig files kept in the repo, which the editor offers.
-REPO_RIGS = Path(__file__).resolve().parents[2] / "configs" / "rigs"
+         "configs/curricula/checks/rig-check-long.json (rig-config --rig <file> opens the "
+         "form alone), or start from configs/examples/rigs/empty.json")
+#: The repo's ``configs/``: a folder per team, each with its ``rigs/``, and the examples.
+CONFIGS = Path(__file__).resolve().parents[2] / "configs"
+#: The folder a team keeps its rig files in.
+RIGS_DIRNAME = "rigs"
+
+
+@dataclass(frozen=True, slots=True)
+class RigCheckConfig:
+    """What a rig check measures this rig with: a rig file's ``"rig_check"``. The check
+    curricula say only for how long and how many."""
+
+    #: one of :data:`PHOTODIODE_READOUTS`; ``none``: the rig has no photodiode
+    photodiode: str
+    #: the sound-card input the diode (and microphone) are on: index or name; ``None``: default
+    input_device: int | str | None
+    #: a microphone at the ear on the sound card's input 1 times the sound as heard
+    has_mic: bool
+    #: where the flashing patch is, under the diode: one of :data:`CORNERS`
+    corner: str
+    patch_px: int
+    #: the MEG/EEG recording's sampling rate: each frame code must last two samples there
+    recording_hz: float | None
+    #: frame rates this rig's games use, tested besides the check curriculum's
+    frame_rates: tuple[float, ...]
+
+    @classmethod
+    def from_dict(cls, section: dict) -> RigCheckConfig:
+        """Read a checked ``"rig_check"`` (:func:`problems`), defaults where it says nothing."""
+        d = {**RIG_CHECK_DEFAULTS, **section}
+        device = d["input_device"]
+        if isinstance(device, str) and device.isdigit():
+            device = int(device)
+        return cls(photodiode=d["photodiode"], input_device=device, has_mic=d["has_mic"],
+                   corner=d["corner"], patch_px=d["patch_px"], recording_hz=d["recording_hz"],
+                   frame_rates=tuple(d["frame_rates"]))
+
+    def record(self) -> dict[str, Any]:
+        """As a rig file writes it."""
+        return {**asdict(self), "frame_rates": list(self.frame_rates)}
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,12 +215,16 @@ class RigConfig:
     has_pad: bool
     #: the controller's control -> the key it presses
     bindings: dict[str, str]
+    #: the keys a response device types itself -> what each stands for
+    response_keys: dict[str, str]
     #: play game audio; ``False`` mutes every block and opens no output.
     has_audio: bool
     #: the BIDS tree's root.
     data_root: str
     #: the scanner's start sync and the trigger codes, over which line.
     triggers: TriggerSettings
+    #: what the rig check measures with.
+    rig_check: RigCheckConfig
 
     @classmethod
     def from_dict(cls, rig: dict, path: str) -> RigConfig:
@@ -171,22 +236,24 @@ class RigConfig:
         :raises ValueError: naming each field that is unknown or invalid, and how to fix it.
         """
         found = problems(rig)
-        site, rig_name = Path(path).parent.name, Path(path).stem
-        found += [f'"{k}" is {rig[k]!r}, but the file is {path}: its folder is the site, '
-                  f"its name the rig" for k, own in (("site", site), ("rig", rig_name))
+        site, rig_name = site_of(path), Path(path).stem
+        found += [f'"{k}" is {rig[k]!r}, but the file is {path}: the site is its team\'s '
+                  f"folder, the rig its name" for k, own in (("site", site), ("rig", rig_name))
                   if rig.get(k, own) != own]
         if found:
             raise ValueError(f"{path}: " + "; ".join(found) + ". Fix it by hand, or in the "
-                             f"form: python -m fmri_gym.checks rig --rig {path}")
+                             f"form: rig-config --rig {path}")
         settings = {**DEFAULTS, **rig}
         fields = {"site": site, "rig": rig_name,
                   **{k: rig[k] for k in FIELDS if k in rig and k not in ("site", "rig")}}
         return cls(path=path, fields=fields,
                    screen=ScreenConfig.from_dict(rig.get("screen", {})),
                    has_pad=settings["has_pad"], bindings=dict(settings["bindings"]),
+                   response_keys=dict(settings["response_keys"]),
                    has_audio=settings["has_audio"],
                    data_root=settings["data_root"],
-                   triggers=TriggerSettings.from_dict(settings["triggers"]))
+                   triggers=TriggerSettings.from_dict(settings["triggers"]),
+                   rig_check=RigCheckConfig.from_dict(settings["rig_check"]))
 
     @classmethod
     def open(cls, path: str) -> RigConfig:
@@ -216,8 +283,9 @@ class RigConfig:
     def record(self) -> dict[str, Any]:
         """The rig file as the run played it, every default written out: the manifest's."""
         return {"path": self.path, **self.fields, "screen": self.screen.record(), "has_pad": self.has_pad,
-                "bindings": self.bindings, "has_audio": self.has_audio, "data_root": self.data_root,
-                "triggers": asdict(self.triggers)}
+                "bindings": self.bindings, "response_keys": self.response_keys,
+                "has_audio": self.has_audio, "data_root": self.data_root,
+                "triggers": asdict(self.triggers), "rig_check": self.rig_check.record()}
 
     def status(self) -> str:
         """One line for the console: which file, and what it settles."""
@@ -230,10 +298,23 @@ class RigConfig:
                 f" | triggers {self.triggers.sync.mode}, codes over {self.triggers.backend}")
 
 
+def site_of(path: str) -> str:
+    """The site a rig file is filed under: the folder holding its ``rigs/`` folder
+    (``configs/<team>/rigs/<rig>.json``: the team), or else its own folder."""
+    folder = Path(os.path.abspath(path)).parent
+    return folder.parent.name if folder.name == RIGS_DIRNAME else folder.name
+
+
+def repo_rig_files() -> list[Path]:
+    """The rig files kept in the repo: every team's (``configs/<team>/rigs/``), examples
+    included."""
+    return sorted(CONFIGS.glob(f"*/{RIGS_DIRNAME}/*.json"))
+
+
 def rig_files() -> list[str]:
-    """The rig files kept in the repo (``configs/rigs/<site>/<rig>.json``), as paths
-    from the working directory where they can be, for the editor to offer."""
-    files = sorted(REPO_RIGS.glob("*/*.json"))
+    """The rig files kept in the repo (:func:`repo_rig_files`), as paths from the working
+    directory where they can be, for the editor to offer."""
+    files = repo_rig_files()
     return [os.path.relpath(f) if not os.path.relpath(f).startswith("..") else str(f)
             for f in files]
 
@@ -282,7 +363,7 @@ def problems(rig: dict) -> list[str]:
     out += [f"{k!r} must be a string" for k, v in fields.items() if not isinstance(v, str)]
     out += [f"{k!r} is empty" for k, v in fields.items() if k != "notes" and v == ""]
     for k in ("site", "rig"):
-        if isinstance(rig.get(k), str) and rig[k] and not _LABEL.fullmatch(rig[k]):
+        if isinstance(rig.get(k), str) and rig[k] and not LABEL.fullmatch(rig[k]):
             out.append(f"{k!r} must be letters, digits, _ or -, got {rig[k]!r}")
     if isinstance(rig.get("pi"), str) and rig["pi"] and not _INITIALS.fullmatch(rig["pi"]):
         out.append(f"'pi' must be 2 to 4 capital letters (initials), got {rig['pi']!r}")
@@ -312,7 +393,8 @@ def _setting_problems(rig: dict) -> list[str]:
     root = rig.get("data_root", DEFAULTS["data_root"])
     if not isinstance(root, str) or not root:
         out.append(f'"data_root" must be a folder, got {root!r}')
-    return out + trigger_problems(rig.get("triggers", {})) + _binding_problems(rig)
+    return (out + trigger_problems(rig.get("triggers", {})) + _binding_problems(rig)
+            + _response_key_problems(rig) + _rig_check_problems(rig.get("rig_check", {})))
 
 
 def _binding_problems(rig: dict) -> list[str]:
@@ -324,6 +406,53 @@ def _binding_problems(rig: dict) -> list[str]:
              for c in bindings if c not in CONTROLS]
             + [f'"bindings": {c!r}: {k!r} is not a key name (as in fmri_gym/keys.py)'
                for c, k in bindings.items() if k not in KEY_NAMES])
+
+
+def _response_key_problems(rig: dict) -> list[str]:
+    """``response_keys``: keys a device types, each to a short text of what it stands for."""
+    keys = rig.get("response_keys", {})
+    if not isinstance(keys, dict):
+        return [f'"response_keys": expected {{key: what it stands for}}, got {keys!r}']
+    return ([f'"response_keys": {k!r} is not a key name (as in fmri_gym/keys.py)'
+             for k in keys if k not in KEY_NAMES]
+            + [f'"response_keys": {k!r}: say what it stands for, as text' for k, v in keys.items()
+               if not isinstance(v, str)])
+
+
+def _rig_check_problems(section: Any) -> list[str]:
+    """``rig_check``: :data:`RIG_CHECK_DEFAULTS`' keys, each of the right kind."""
+    if not isinstance(section, dict):
+        return [f'"rig_check": expected an object, got {section!r}']
+    d = {**RIG_CHECK_DEFAULTS, **section}
+    out = [f'"rig_check": unknown key {k!r}' for k in section if k not in RIG_CHECK_DEFAULTS]
+    if d["photodiode"] not in PHOTODIODE_READOUTS:
+        out.append(f'"rig_check": "photodiode" must be one of {PHOTODIODE_READOUTS}, '
+                   f'got {d["photodiode"]!r}')
+    if not isinstance(d["has_mic"], bool):
+        out.append(f'"rig_check": "has_mic" must be true or false, got {d["has_mic"]!r}')
+    if d["has_mic"] and d["photodiode"] != "soundcard":
+        out.append('"rig_check": "has_mic" needs "photodiode": "soundcard" -- the microphone '
+                   "is read on the sound card, next to the diode")
+    if d["corner"] not in CORNERS:
+        out.append(f'"rig_check": "corner" must be one of {CORNERS}, got {d["corner"]!r}')
+    if not _is_positive(d["patch_px"], int):
+        out.append(f'"rig_check": "patch_px" must be a whole number of pixels, got '
+                   f'{d["patch_px"]!r}')
+    if d["recording_hz"] is not None and not _is_positive(d["recording_hz"]):
+        out.append(f'"rig_check": "recording_hz" must be a rate in Hz, or null, got '
+                   f'{d["recording_hz"]!r}')
+    rates = d["frame_rates"]
+    if not (isinstance(rates, list) and all(_is_positive(r) for r in rates)):
+        out.append(f'"rig_check": "frame_rates" must be a list of frames per second, got '
+                   f"{rates!r}")
+    if not (d["input_device"] is None or isinstance(d["input_device"], (int, str))):
+        out.append(f'"rig_check": "input_device" must be an index or a name, got '
+                   f'{d["input_device"]!r}')
+    return out
+
+
+def _is_positive(v: Any, kind: type | tuple[type, ...] = (int, float)) -> bool:
+    return isinstance(v, kind) and not isinstance(v, bool) and v > 0
 
 
 def trigger_problems(section: Any) -> list[str]:

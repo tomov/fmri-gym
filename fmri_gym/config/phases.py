@@ -29,8 +29,6 @@ OUTCOMES = frozenset({"won", "lost", "terminated", "truncated", "playing", "forf
 REWINDABLE = frozenset({"won", "lost", "terminated"})
 #: What a frames check plays its rates under: nothing else, or every core kept busy.
 LOADS = ("none", "cpu")
-#: Where a photodiode check's patch is, under the diode.
-CORNERS = ("br", "bl", "tr", "tl")
 
 
 class BlockMode(str, Enum):
@@ -359,19 +357,16 @@ class CheckFrames(CheckPhase):
     loads: tuple[str, ...]
     #: seconds per rate and load
     seconds: float
-    #: the recording's sampling rate: each frame code must last two samples; ``None``: unchecked
-    recording_hz: float | None
 
     @classmethod
     def from_dict(cls, d: dict, index: int) -> CheckFrames:
         return cls(**cls._shared(d), rates=tuple(d.get("rates", (60,))),
-                   loads=tuple(d.get("loads", ("none",))), seconds=d.get("seconds", 2.0),
-                   recording_hz=d.get("recording_hz"))
+                   loads=tuple(d.get("loads", ("none",))), seconds=d.get("seconds", 2.0))
 
     @staticmethod
     def problems(d: dict) -> list[str]:
         rates, loads = d.get("rates", [60]), d.get("loads", ["none"])
-        out = _positive_problems(d, ("seconds", "recording_hz"))
+        out = _positive_problems(d, ("seconds",)) + _rig_owned(d, ("recording_hz",))
         if not (isinstance(rates, list) and rates and all(_positive(r) for r in rates)):
             out.append(f"rates: expected frames per second, e.g. [60, 30], got {rates!r}")
         if not (isinstance(loads, list) and loads and all(x in LOADS for x in loads)):
@@ -409,13 +404,11 @@ class CheckTriggers(CheckPhase):
 
 @dataclass(frozen=True, slots=True)
 class CheckControls(CheckPhase):
-    """A rig check: each key asked for on screen and pressed on the device: the phase's
-    ``keys``, or without them each control of the rig's controller ``"bindings"``,
-    expected as the key it is bound to."""
+    """A rig check: each key the rig's response devices press, asked for on screen and
+    pressed on the device -- the rig's controller ``"bindings"`` and its
+    ``"response_keys"`` (:mod:`fmri_gym.config.rig`)."""
 
     type: ClassVar[str] = "check_controls"
-    #: key name -> what it stands for, shown when it is asked for; ``None``: the rig's bindings
-    keys: dict[str, str] | None
     #: seconds to press each key
     timeout_s: float
     #: calibrate a plugged-in controller first
@@ -423,38 +416,28 @@ class CheckControls(CheckPhase):
 
     @classmethod
     def from_dict(cls, d: dict, index: int) -> CheckControls:
-        return cls(**cls._shared(d), keys=None if d.get("keys") is None else dict(d["keys"]),
-                   timeout_s=d.get("timeout_s", 10.0), has_pad=d.get("has_pad", True))
+        return cls(**cls._shared(d), timeout_s=d.get("timeout_s", 10.0),
+                   has_pad=d.get("has_pad", True))
 
     @staticmethod
     def problems(d: dict) -> list[str]:
-        keys = d.get("keys")
         out = _positive_problems(d, ("timeout_s",)) + _bool_problems(d, ("has_pad",))
         if "pad_reps" in d:
             out.append("pad_reps: the calibration asks for each control until it comes twice "
                        "in a row, with no count to set; remove it")
-        if keys is None:
-            return out  # the rig's bindings
-        if not isinstance(keys, dict) or not keys:
-            return out + ['keys: expected the keys to test, as {key: what it stands for} '
-                          '(e.g. {"1": "LEFT"}), or none to test the rig\'s bindings']
-        return out + [f"keys: {k!r} is not a key the games can read (one key, a name such as "
-                      "1, A, LEFT or SPACE)" for k in keys if k not in KEY_NAMES]
+        return out + _rig_owned(d, ("keys",))
 
 
 @dataclass(frozen=True, slots=True)
 class CheckPhotodiode(CheckPhase):
-    """A rig check: the flip-to-photon offset, and on the same flashes the audio test."""
+    """A rig check: the flip-to-photon offset, and on the same flashes the audio test.
+
+    Which of the two it measures, and with what, is the rig's ``"rig_check"``
+    (:class:`~fmri_gym.config.rig.RigCheckConfig`): this is only how many flashes and
+    how they are timed."""
 
     type: ClassVar[str] = "check_photodiode"
-    #: ``soundcard`` (the diode on this PC's input 0) or ``recording`` (in the MEG/EEG data)
-    readout: str
-    #: a microphone at the ear on input 1 times the clicks as heard
-    has_mic: bool
-    #: a tone burst on every other flash, timed at the DAC
-    has_audio: bool
-    #: the sound-card input, index or name; ``None``: the default
-    input_device: int | str | None
+    #: the sound-card input's rate
     samplerate: int
     #: flashes
     n: int
@@ -462,39 +445,24 @@ class CheckPhotodiode(CheckPhase):
     gap_min_ms: float
     gap_max_ms: float
     settle_ms: float
-    corner: str
-    patch_px: int
     seed: int
 
     @classmethod
     def from_dict(cls, d: dict, index: int) -> CheckPhotodiode:
-        device = d.get("input_device") or None
-        if isinstance(device, str) and device.isdigit():
-            device = int(device)
-        return cls(**cls._shared(d), readout=d.get("readout", "soundcard"),
-                   has_mic=d.get("has_mic", False), has_audio=d.get("has_audio", True),
-                   input_device=device,
-                   samplerate=d.get("samplerate", 48000), n=d.get("n", 10),
+        return cls(**cls._shared(d), samplerate=d.get("samplerate", 48000), n=d.get("n", 10),
                    on_ms=d.get("on_ms", 50.0), gap_min_ms=d.get("gap_min_ms", 150.0),
                    gap_max_ms=d.get("gap_max_ms", 250.0), settle_ms=d.get("settle_ms", 300.0),
-                   corner=d.get("corner", "br"), patch_px=d.get("patch_px", 120),
                    seed=d.get("seed", 0))
 
     @staticmethod
     def problems(d: dict) -> list[str]:
         out = _positive_problems(d, ("n", "on_ms", "gap_min_ms", "gap_max_ms", "settle_ms",
-                                     "patch_px", "samplerate"))
-        out += _bool_problems(d, ("has_mic", "has_audio"))
-        if d.get("readout", "soundcard") not in ("soundcard", "recording"):
-            out.append(f"readout: expected soundcard or recording, got {d['readout']!r}")
-        if d.get("has_mic") and d.get("readout", "soundcard") != "soundcard":
-            out.append("has_mic: the microphone is read on the sound card, next to the diode: "
-                       "readout must be soundcard (on the recording, record it there)")
+                                     "samplerate"))
+        out += _rig_owned(d, ("readout", "input_device", "has_mic", "has_audio", "corner",
+                              "patch_px"))
         low, high = d.get("gap_min_ms", 150), d.get("gap_max_ms", 250)
         if _positive(low) and _positive(high) and low > high:
             out.append(f"gap_min_ms ({low}) is above gap_max_ms ({high})")
-        if d.get("corner", "br") not in CORNERS:
-            out.append(f"corner: expected one of {CORNERS}, got {d['corner']!r}")
         return out
 
 
@@ -522,6 +490,13 @@ def phase_problems(d: dict) -> list[str]:
 
 def _positive(v: Any) -> bool:
     return isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0
+
+
+def _rig_owned(d: dict, keys: tuple[str, ...]) -> list[str]:
+    """Keys a check phase may not set: they describe the rig, so its rig file says them."""
+    return [f"{k}: this is the rig's, not the curriculum's: set it in the rig file "
+            "(rig-config: the Rig check equipment step, or Response devices for response keys)"
+            for k in keys if k in d]
 
 
 def _positive_problems(d: dict, keys: tuple[str, ...]) -> list[str]:

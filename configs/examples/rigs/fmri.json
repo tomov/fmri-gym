@@ -1,6 +1,10 @@
 {
+  "pi": "EX",
   "modality": "fmri",
-  "trigger_hardware": "the 932 interface types '=' at each volume",
+  "monitor": "Example: the scanner's projector or MR-safe screen",
+  "photodiode": "Example: none",
+  "audio_path": "Example: MR-safe insert earphones",
+  "trigger_hardware": "Example: the 932 interface types '=' at each volume",
   "notes": "Example: an MRI scanner, the participant on a Current Designs controller (one stick, six buttons)",
   "screen": {"size": "1024x768", "is_fullscreen": true, "monitor": 0, "has_vsync": true},
   "has_pad": true,

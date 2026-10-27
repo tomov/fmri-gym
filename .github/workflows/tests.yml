@@ -4,8 +4,9 @@
 #
 # One job for the core (lint, the engine-free tests, the `gym` backend that
 # ships with gymnasium), then one job per game backend a hosted Linux runner
-# can play, each with only its own extra synced -- so a backend's job fails for
-# its own reasons, and a missing dependency in one does not hide another.
+# can play, each with only its own game's extra synced -- so a backend's job fails
+# for its own reasons, and a missing dependency in one does not hide another.
+# Every job also syncs `gui`, so the windows' tests (tests/test_gui.py) run too.
 # `--strict-backends`: a backend a job was told to play but cannot is a
 # failure, never a skip (AGENTS.md, rule 4). `--thorough`: every config of the
 # backend, not just the smoke ones. What a hosted runner cannot play (stk: a
@@ -46,9 +47,10 @@ jobs:
       - name: System libraries
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libportaudio2
-      - name: Sync the core and the dev group
-        run: uv sync
+          # libegl1 libxkbcommon0: Qt's offscreen windows (the gui extra).
+          sudo apt-get install -y --no-install-recommends libportaudio2 libegl1 libxkbcommon0
+      - name: Sync the core, the gui and the dev group
+        run: uv sync --extra gui
       - name: Lint
         run: uv run ruff check fmri_gym fmri_play.py agents tests gym/*/tests
       - name: Engine-free tests and the gym backend
@@ -78,10 +80,11 @@ jobs:
           sudo apt-get update
           # libportaudio2: sounddevice imports it. libopenal1: ViZDoom's audio buffer.
           # build-essential + cmake: baba_auto compiles its C++ engine at install.
+          # libegl1 libxkbcommon0: Qt's offscreen windows (the gui extra).
           sudo apt-get install -y --no-install-recommends \
-            libportaudio2 libopenal1 build-essential cmake
-      - name: Sync the backend's extra
-        run: uv sync --extra ${{ matrix.backend }}
+            libportaudio2 libopenal1 build-essential cmake libegl1 libxkbcommon0
+      - name: Sync the backend's extra and the gui
+        run: uv sync --extra ${{ matrix.backend }} --extra gui
       - name: Browser for the AI GameStore pages
         if: matrix.backend == 'aigamestore'
         run: uv run playwright install --with-deps chrome

@@ -1,6 +1,10 @@
 {
+  "pi": "EX",
   "modality": "meg",
-  "trigger_hardware": "a serial port into the MEG's trigger channel",
+  "monitor": "Example: the MEG room's projector",
+  "photodiode": "Example: photodiode recorded by the MEG",
+  "audio_path": "Example: the MEG's air-tube earphones",
+  "trigger_hardware": "Example: a serial port into the MEG's trigger channel",
   "notes": "Example: a MEG, the participant on a Current Designs controller (one stick, six buttons); the run starts the recording and codes its events",
   "screen": {"size": "1024x768", "is_fullscreen": true, "monitor": 0, "has_vsync": true},
   "has_pad": true,
@@ -11,5 +15,6 @@
     "sync": {"mode": "send", "delay": 0.0},
     "backend": "serial", "port": "/dev/ttyUSB0",
     "codes": {"frame_bits": 3, "task_start": 8, "task_stop": 16, "episode_start": 32, "scanner_start": 64}
-  }
+  },
+  "rig_check": {"photodiode": "recording", "recording_hz": 1000}
 }

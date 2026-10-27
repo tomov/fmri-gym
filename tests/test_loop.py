@@ -70,7 +70,7 @@ def test_loop_without_duration_is_refused(tmp_path):
     config = write_curriculum(CURRICULUM, tmp_path / "loop.json")
     done = subprocess.run(
         [sys.executable, "fmri_play.py", "--curriculum", str(config), "--subject", "sub-test",
-         "--ses", "1", "--run", "1", "--rig", "configs/rigs/example/laptop.json", "--loop",
+         "--ses", "1", "--run", "1", "--rig", "configs/examples/rigs/laptop.json", "--loop",
          "--dummy-trigger"],
         cwd=REPO, capture_output=True, text=True, timeout=60,
         env={**os.environ, "SDL_VIDEODRIVER": "dummy"})

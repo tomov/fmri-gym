@@ -9,13 +9,14 @@ import sys
 import pytest
 
 from fmri_gym.config import rig
+from fmri_gym.config.phases import phase_problems
 from fmri_gym.config.rig import RigConfig
 
 FIELDS = {**{k: "x" for k in rig.FIELDS}, "site": "site1", "pi": "MT", "modality": "fmri",
           "notes": ""}
 
 
-@pytest.mark.parametrize("path", [str(p) for p in sorted(rig.REPO_RIGS.glob("*/*.json"))])
+@pytest.mark.parametrize("path", [str(p) for p in rig.repo_rig_files()])
 def test_repo_rig_files_are_valid(path):
     assert RigConfig.open(path).path == path
 
@@ -64,7 +65,7 @@ def test_a_missing_file_says_how_to_make_one():
     ({"audio": False}, "unknown key 'audio'"),
     ({"data_root": ""}, '"data_root"'),
     ({"bogus": 1}, "unknown key 'bogus'"),
-    ({"rig": "other"}, "its folder is the site, its name the rig"),
+    ({"rig": "other"}, "the site is its team.s folder, the rig its name"),
 ])
 def test_a_wrong_file_is_refused(change, problem):
     path = write("r")
@@ -181,5 +182,33 @@ def test_every_key_is_optional_and_site_and_rig_are_the_files_place(tmp_path):
     bare = RigConfig.open("site1/bare.json")
     assert bare.fields == {"site": "site1", "rig": "bare"} and bare.has_audio
     (tmp_path / "site1" / "bare.json").write_text(json.dumps({"site": "elsewhere"}))
-    with pytest.raises(ValueError, match="its folder is the site"):
+    with pytest.raises(ValueError, match="the site is its team's folder"):
         RigConfig.open("site1/bare.json")
+
+
+def test_a_teams_rig_is_filed_under_the_team(tmp_path):
+    (tmp_path / "MT" / "rigs").mkdir(parents=True)
+    (tmp_path / "MT" / "rigs" / "mgh-prisma.json").write_text("{}")
+    rig = RigConfig.open(str(tmp_path / "MT" / "rigs" / "mgh-prisma.json"))
+    assert rig.fields == {"site": "MT", "rig": "mgh-prisma"}
+
+
+@pytest.mark.parametrize("phase", [
+    {"type": "check_photodiode", "readout": "soundcard"},
+    {"type": "check_photodiode", "corner": "br"},
+    {"type": "check_frames", "recording_hz": 1000},
+    {"type": "check_controls", "keys": {"1": "index"}},
+])
+def test_a_check_curriculum_cannot_set_what_is_the_rigs(phase):
+    assert any("rig-config" in p for p in phase_problems(phase))
+
+
+@pytest.mark.parametrize("values, problem", [
+    ({"response_keys": {"NOSUCHKEY": "index"}}, "not a key name"),
+    ({"rig_check": {"photodiode": "eyes"}}, '"photodiode"'),
+    ({"rig_check": {"has_mic": True}}, '"has_mic" needs'),
+    ({"rig_check": {"frame_rates": [0]}}, '"frame_rates"'),
+    ({"rig_check": {"what": 1}}, "unknown key"),
+])
+def test_a_wrong_rig_check_section_is_refused(values, problem):
+    assert any(problem in p for p in rig.problems(values))

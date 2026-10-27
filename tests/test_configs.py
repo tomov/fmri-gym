@@ -19,7 +19,7 @@ from tests.backends import BACKENDS, REPO, all_configs, game_phases, phase_backe
 
 CONFIGS = all_configs()
 #: The repo's rig files that play with a controller and bind its controls.
-PAD_RIGS = [r for r in (RigConfig.open(str(p)) for p in sorted(rig.REPO_RIGS.glob("*/*.json")))
+PAD_RIGS = [r for r in (RigConfig.open(str(p)) for p in rig.repo_rig_files())
             if r.has_pad and r.bindings]
 #: The directions; every other key a game's action needs is a button.
 ARROWS = {"UP", "DOWN", "LEFT", "RIGHT"}

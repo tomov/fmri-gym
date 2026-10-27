@@ -1,33 +1,38 @@
 """The rig check: measure the rig with the very window, trigger line and audio a run opens.
 
-A rig check is a run like any other (``configs/curricula/checks/rig-check.json``): the editor
-edits its triggers and its controls as it does any config's, ``fmri-play``
-plays it -- first in a session, or on its own -- and it writes a run folder.
-Its curriculum holds check phases where a game run holds games:
+A rig check is a run like any other (``configs/curricula/checks/rig-check.json``):
+``fmri-play`` plays it -- first in a session, from ``rig-config``, or on its own --
+and it writes a run folder. Its curriculum holds check phases where a game run
+holds games, and says only for how long and how many; **what is tested, and
+with what, is the rig file's** (:mod:`fmri_gym.config.rig`), so a check is
+complete for the rig it runs on and asks nothing of what the rig does not have.
+A test the rig gives no reason to run is recorded as "not run", with why:
 
 * ``check_display`` -- are flips locked to the refresh; missed refreshes.
 * ``check_frames`` -- a test pattern (:class:`TestPattern`) played as a game,
-  through the run's own game loop, at each of ``rates`` frames per second and
-  under each of ``loads`` (``cpu``: every core kept busy): frames lost, frames
-  shown a refresh late, pacing resets, and whether the frame triggers marked
-  every frame, in order -- and, given ``recording_hz``, for two samples each.
+  through the run's own game loop, at each of ``rates`` frames per second (and
+  the rig's ``rig_check.frame_rates``) and under each of ``loads`` (``cpu``:
+  every core kept busy): frames lost, frames shown a refresh late, pacing
+  resets, and -- when the rig sends frame codes -- whether they marked every
+  frame, in order, and given the rig's ``recording_hz``, for two samples each.
   The run's own loop, not a copy of it: its pacing is what is measured.
 * ``check_triggers`` -- the trigger outputs this PC has (serial ports with
   hardware behind them, parallel ports, HID trigger boxes, whether LSL reads
-  back), with a warning when none is usable; then the config's line: every bit alone and every code
+  back), with a warning when none is usable; then the rig's line: every bit alone and every code
   of its scheme sent (read back, over LSL), and scanner pulses counted when the
   run waits for the scanner. Only the configured port is written to: another
   may be wired to a response box or an eye tracker, and a write that succeeds
   says nothing of where it went.
-* ``check_controls`` -- the response device. The keys asked for are the
-  phase's ``keys``, or without them each control of the rig's ``"bindings"``,
-  expected as the key it is bound to. Every key is first checked
+* ``check_controls`` -- the response devices: each key the rig's participant
+  can press, i.e. each control of its ``"bindings"`` (expected as the key it is
+  bound to) and each of its ``"response_keys"``. Every key is first checked
   automatically -- one that comes back through the event queue as itself --
   and the input devices plugged in are listed; then each key is asked for on
   screen and pressed on the real device.
-* ``check_photodiode`` -- the flip-to-photon offset, and on the same flashes
-  the audio test: a tone burst on every other flash, timed at the DAC, and at
-  a microphone at the ear with ``"has_mic": true``.
+* ``check_photodiode`` -- the flip-to-photon offset, read as the rig's
+  ``rig_check.photodiode`` says, and on the same flashes the audio test when the
+  rig plays audio: a tone burst on every other flash, timed at the DAC, and at
+  a microphone at the ear when the rig has one.
 
 The screen says what each check does while it does it, then its verdict. A
 check does not raise: it records a verdict for each of its tests (pass, fail,
@@ -62,7 +67,6 @@ shared; these are one machine's measurements, and stay on it (``.gitignore``).
 A run on a rig with none says so, and the first run of a session, on a
 terminal, offers to run a check first (:func:`offer_check`)::
 
-    python -m fmri_gym.checks rig --rig configs/rigs/<site>/<rig>.json   # fill in / update a rig file
     python -m fmri_gym.checks report <run folder>...   # re-file checks already run
     python -m fmri_gym.checks pool data/ /mnt/siteB/data/ --out rigchecks.tsv
 """
@@ -110,9 +114,9 @@ if TYPE_CHECKING:
 
 
 #: The rig checks a run on a rig never measured offers to play first, by the key that picks one.
-_RIG_CHECKS = {key: str(Path(__file__).resolve().parents[1] / "configs" / "curricula" / "checks"
-                        / name)
-               for key, name in (("q", "rig-check.json"), ("l", "rig-check-long.json"))}
+RIG_CHECKS = {key: str(Path(__file__).resolve().parents[1] / "configs" / "curricula" / "checks"
+                       / name)
+              for key, name in (("q", "rig-check.json"), ("l", "rig-check-long.json"))}
 #: The check phases' types, as a manifest's phase entries name them.
 CHECK_TYPES = tuple(c.type for c in CHECK_PHASES)
 #: Seconds each check's verdict stays on screen.
@@ -154,20 +158,18 @@ def prepare(rig: rig_file.RigConfig) -> tuple[rig_file.RigConfig, str | None]:
 
 
 def _ask_triggers(rig: rig_file.RigConfig) -> rig_file.RigConfig:
-    """The rig with the trigger settings the dialog gives, saved in its file.
+    """The rig once its file has trigger settings, chosen in rig-config's Triggers step.
 
-    :raises ValueError: with no screen for the dialog, or when it is cancelled.
+    :raises ValueError: with no screen for the form, or when it is cancelled.
     """
     where = rig.path
-    fix = (f'{where} has no "triggers": set them on the editor\'s Triggers tab (fmri-edit) '
-           "or in the file, or answer the dialog a rig check opens")
+    fix = (f'{where} has no "triggers": set them with rig-config --rig {where} or in the '
+           "file, or in the form a rig check opens")
     if not can_show_form():
-        raise ValueError(f"rig check: {fix}; there is no screen here for the dialog")
-    from .gui_qt import choose_triggers
-    section = choose_triggers(where)
-    if section is None:
+        raise ValueError(f"rig check: {fix}; there is no screen here for the form")
+    from .gui.rig_config import fill_rig
+    if fill_rig(rig_file.load(where), where, need_triggers=True) is None:
         raise ValueError(f"rig check: {fix}; it was cancelled")
-    rig_file.save({**rig_file.load(where), "triggers": section}, where)
     print(f"rig check: trigger settings saved in {where}", file=sys.stderr)
     return rig_file.RigConfig.open(where)
 
@@ -189,7 +191,7 @@ def offer_check(config: RunConfig) -> None:
     args = ["--subject", "sub-rig", "--ses", str(next_session(rig.data_root, "sub-rig")),
             "--run", "1", "--rig", rig.path]
     if not sys.stdin.isatty():
-        curriculum = os.path.relpath(_RIG_CHECKS["l"])
+        curriculum = os.path.relpath(RIG_CHECKS["l"])
         print("  measure it: uv run fmri-play " + " ".join(args + ["--curriculum", curriculum]),
               file=sys.stderr)
         return
@@ -198,10 +200,10 @@ def offer_check(config: RunConfig) -> None:
                        "minutes), Enter to go on without: ").strip().lower()
     except EOFError:  # Ctrl+D: nothing typed
         answer = ""
-    if answer not in _RIG_CHECKS:
+    if answer not in RIG_CHECKS:
         return
     subprocess.run([sys.executable, "-m", "fmri_play", *args,
-                    "--curriculum", _RIG_CHECKS[answer]], check=False)
+                    "--curriculum", RIG_CHECKS[answer]], check=False)
     print(f"rig check done; the run starts on {rig.path}", file=sys.stderr)
 
 
@@ -328,8 +330,8 @@ def _check_triggers(run: Run, phase: CheckTriggers, summary: dict, arrays: dict,
     t = run.triggers
     pulses = t.sync.mode == "wait" and not run.config.dummy_trigger
     if not (t.enabled or pulses):
-        tests["triggers"] = Verdict("not run", "this config neither sends codes nor waits "
-                                               "for the scanner")
+        tests["triggers"] = Verdict("not run", "this rig sends no codes and waits for no "
+                                               "scanner (rig-config, Triggers step)")
         return
     if t.enabled:
         def on_send(label: str, value: int, number: int, total: int) -> None:
@@ -414,11 +416,13 @@ def _round_trip(name: str) -> bool:
 
 def _check_controls(run: Run, phase: CheckControls, summary: dict, arrays: dict, tests: dict,
                     index: int) -> None:
-    keys = phase.keys if phase.keys is not None else {
-        key: f"the {control} control" for control, key in run.config.rig.bindings.items()}
+    rig = run.config.rig
+    keys = {**{key: f"the controller's {pad.CONTROL_LABELS.get(control, control)}"
+               for control, key in rig.bindings.items() if rig.has_pad},
+            **rig.response_keys}
     if not keys:
-        tests["controls"] = Verdict("not run", "the phase lists no keys and the rig file has "
-                                               'no "bindings" to test')
+        tests["controls"] = Verdict("not run", "this rig binds no controller and types no "
+                                               "response keys (rig-config, Response devices step)")
         return
     summary["devices"] = input_devices()
     summary["pad"] = _check_pad(run, phase)
@@ -460,6 +464,9 @@ def _check_pad(run: Run, phase: CheckControls) -> dict[str, Any]:
     found = pad.find()
     if found is None:
         return {"present": False}
+    if not run.config.rig.has_pad:
+        return {"present": True, "device": found.name, "measured": False, "why": "",
+                "note": 'skipped: the rig reads no controller ("has_pad": false)'}
     if not phase.has_pad:
         return {"present": True, "device": found.name, "measured": False, "why": "",
                 "note": 'skipped ("has_pad": false)'}
@@ -542,17 +549,23 @@ def _held(name: str, pressed: float, pending: list[tuple[bool, str]],
 
 def _check_photodiode(run: Run, phase: CheckPhotodiode, summary: dict, arrays: dict,
                       tests: dict, index: int) -> None:
-    readout = phase.readout
-    clicks = phase.has_audio and run.audio.enabled
-    if phase.has_audio and not run.audio.enabled:
+    rig = run.config.rig.rig_check
+    readout = rig.photodiode
+    clicks = run.audio.enabled
+    if not clicks:
         tests["audio"] = Verdict("not run",
-                                 "the audio output is off (the rig's \"has_audio\": false)")
-    summary.update(display=run.display.describe(), readout=readout, mic=phase.has_mic,
+                                 "the rig plays no game audio (its \"has_audio\": false)")
+    summary.update(display=run.display.describe(), readout=readout, mic=rig.has_mic,
                    n=phase.n, on_ms=phase.on_ms, gap_ms=[phase.gap_min_ms, phase.gap_max_ms],
-                   corner=phase.corner, patch_px=phase.patch_px)
-    recorder = _recorder(phase, tests) if readout == "soundcard" else None
+                   corner=rig.corner, patch_px=rig.patch_px)
+    if readout == "none":
+        tests["photodiode"] = Verdict("not run", "the rig has no photodiode (rig-config, "
+                                                 "Rig check equipment step)")
+        if not clicks:
+            return
+    recorder = _recorder(rig, phase.samplerate, tests) if readout == "soundcard" else None
     click, chunks, clicked = _clicker(run.audio) if clicks else (None, [], [])
-    what = "photodiode + audio" if clicks else "photodiode"
+    what = " + ".join(w for w, on in (("photodiode", readout != "none"), ("audio", clicks)) if on)
 
     def caption(i: int) -> str:
         sound = ", with a click" if clicks and i % 2 == 0 else ""
@@ -576,16 +589,16 @@ def _check_photodiode(run: Run, phase: CheckPhotodiode, summary: dict, arrays: d
         tests["audio"] = _sound_verdict(arrays, clicks, None)
 
 
-def _recorder(phase: CheckPhotodiode, tests: dict) -> AudioRecorder | None:
+def _recorder(rig: rig_file.RigCheckConfig, samplerate: int,
+              tests: dict) -> AudioRecorder | None:
     """The sound-card input, started; ``None`` (and the photodiode failed) if it will not open."""
     try:
-        recorder = AudioRecorder(phase.input_device, phase.samplerate,
-                                 channels=2 if phase.has_mic else 1)
+        recorder = AudioRecorder(rig.input_device, samplerate, channels=2 if rig.has_mic else 1)
         recorder.start()
         return recorder
     except Exception as exc:  # noqa: BLE001 -- any device error fails the photodiode, not the rest
         tests["photodiode"] = Verdict("fail", f"the sound-card input did not open: {exc}")
-        if phase.has_mic:
+        if rig.has_mic:
             tests["audio"] = Verdict("fail", f"the microphone's input did not open: {exc}")
         return None
 
@@ -596,15 +609,16 @@ def _recorder(phase: CheckPhotodiode, tests: dict) -> AudioRecorder | None:
 def _check_frames(run: Run, phase: CheckFrames, summary: dict, arrays: dict, tests: dict,
                   index: int) -> None:
     blocks = []
+    rates = list(dict.fromkeys([*phase.rates, *run.config.rig.rig_check.frame_rates]))
     for load in phase.loads:
-        for fps in phase.rates:
+        for fps in rates:
             with _load(load):
                 blocks.append(_play_pattern(run, fps, load, phase, index))
     summary["blocks"] = blocks
     summary["played"] = [f"{b['fps']:g}/{b['load']}" for b in blocks]
     summary["refresh_rate"] = run.display.refresh_rate
     summary["vsync"] = run.display.vsync
-    summary["recording_hz"] = phase.recording_hz
+    summary["recording_hz"] = run.config.rig.rig_check.recording_hz
     for key in ("late", "lost", "pacing_resets"):
         summary[f"{key}_total"] = sum(b[key] for b in blocks)
     summary["triggers_ok"] = all(b["triggers"]["ok"] for b in blocks if b["triggers"])
@@ -710,7 +724,7 @@ def _frame_marks(run: Run, codes: np.ndarray | None, dt: float,
     if not (np.array_equal(sent, should) and np.array_equal(codes[sent], cycle)):
         out.update(ok=False, why=f"frame triggers marked {len(sent)} of {len(should)} frames "
                                  "or broke their cycle")
-    hz = phase.recording_hz
+    hz = run.config.rig.rig_check.recording_hz
     if hz and hold_ms * hz / 1000 < 2:
         out.update(ok=False, why=f"a frame code lasts {hold_ms:.1f} ms, under 2 samples at "
                                  f"{hz:g} Hz: raise frame_every")
@@ -1076,6 +1090,11 @@ COLUMNS: list[tuple[str, tuple[str, ...], str, str | None]] = [
     ("fmri_gym_version", ("versions", "fmri_gym"), "fmri-gym package version", None),
     ("git_commit", ("versions", "git"), "git describe of the checkout (-dirty: edited)", None),
     ("os", ("platform", "system"), "Operating system", None),
+    ("python", ("versions", "python"), "Python version", None),
+    ("cpu", ("machine", "cpu"), "Processor", None),
+    ("cores", ("machine", "cores"), "Processor cores", None),
+    ("memory_gb", ("machine", "memory_gb"), "Memory", "GB"),
+    ("gpus", ("machine", "gpus"), "Graphics cards, separated by ;", None),
     ("monitor", ("rig", "monitor"), "Monitor or projector, from the rig file", None),
     ("photodiode", ("rig", "photodiode"), "Photodiode, from the rig file", None),
     ("audio_path", ("rig", "audio_path"), "Sound path to the ear, from the rig file", None),
@@ -1181,7 +1200,7 @@ NAMES = tuple(c[0] for c in COLUMNS)
 
 def ensure_rig(path: str) -> rig_file.RigConfig:
     """The rig a rig check plays on; when its file is missing or invalid, the form to
-    fill it in first (:func:`fmri_gym.gui_qt.fill_rig`), then the file.
+    fill it in first (:func:`fmri_gym.gui.rig_config.fill_rig`), then the file.
 
     The form needs the ``gui`` extra and a screen; without them, or when it is
     cancelled, the rig file's own error is raised.
@@ -1195,7 +1214,7 @@ def ensure_rig(path: str) -> rig_file.RigConfig:
         if not can_show_form():
             raise
         print(f"{error}\nrig check: opening the rig form", file=sys.stderr)
-        from .gui_qt import fill_rig
+        from .gui.rig_config import fill_rig
         if fill_rig(rig_file.draft(path), path) is None:
             raise
     return rig_file.RigConfig.open(path)
@@ -1346,7 +1365,8 @@ def machine() -> dict[str, Any]:
     return {**platform_info(), "python": platform.python_version(), "cpu": _cpu(),
             "cores": os.cpu_count(), "memory_gb": _memory_gb(), "displays": displays,
             "gpus": _gpus(), "audio_devices": _audio_devices(),
-            "input_devices": inputs, "usb_devices": _usb_devices()}
+            "input_devices": inputs, "usb_devices": _usb_devices(),
+            "trigger_ports": detect_outputs()}
 
 
 def _pygame_devices() -> tuple[list[dict[str, Any]], list[str]]:
@@ -1576,9 +1596,42 @@ def report(m: dict) -> str:
         measured = m["rig_check"].get(TESTS[test].removeprefix("check_"))
         if measured:
             lines += section(measured)
-    lines += ["", "## Versions", ""]
-    lines += [f"- {k}: {v}" for k, v in {**m["versions"], **m["platform"]}.items()]
+    lines += ["", "## This computer"]
+    for title, head, table in computer(m):
+        lines += ["", f"### {title}", "", "| " + " | ".join(head) + " |",
+                  "|" + "---|" * len(head)]
+        lines += ["| " + " | ".join(_cell(c) for c in row) + " |" for row in table]
     return "\n".join(lines) + "\n"
+
+
+def computer(m: dict) -> list[tuple[str, list[str], list[list[Any]]]]:
+    """The computer a check ran on and what was plugged into it, as titled tables.
+
+    :param m: the check's manifest (an older one may lack ``machine``: its tables are empty).
+    :return: ``(title, column names, rows)`` per table; a table with nothing found says so.
+    """
+    mc, p = m.get("machine", {}), m.get("platform", {})
+    none = [["none found"]]
+    return [
+        ("Computer", ["", ""], [[k, v] for k, v in (
+            ("system", p.get("system")), ("architecture", p.get("machine")),
+            ("host", p.get("hostname")), ("processor", mc.get("cpu")), ("cores", mc.get("cores")),
+            ("memory (GB)", mc.get("memory_gb")), ("graphics", mc.get("gpus")))]),
+        ("Screens", ["screen", "size", "refresh (Hz)"],
+         [[i, d.get("size"), d.get("refresh_hz")] for i, d in enumerate(mc.get("displays", []))]
+         or none),
+        ("Sound devices", ["name", "system", "inputs", "outputs", "rate (Hz)", "default for"],
+         [[d.get("name"), d.get("hostapi"), d.get("inputs"), d.get("outputs"),
+           d.get("default_samplerate"), d.get("default")] for d in mc.get("audio_devices", [])]
+         or none),
+        ("Response devices (keyboards, button boxes, controllers)", ["name"],
+         [[n] for n in mc.get("input_devices", [])] or none),
+        ("Trigger ports", ["kind", "port", "what", "writable"],
+         [[o.get("kind"), _port_name(o), o.get("what"), o.get("writable")]
+          for o in mc.get("trigger_ports", [])] or none),
+        ("USB devices", ["device"], [[d] for d in mc.get("usb_devices", [])] or none),
+        ("Software", ["", "version"], [[k, v] for k, v in m.get("versions", {}).items()]),
+    ]
 
 
 def _md_display(d: dict) -> list[str]:
@@ -1652,9 +1705,15 @@ def _md_controls(c: dict) -> list[str]:
     return lines
 
 
+def _diode_text(readout: str) -> str:
+    """How the photodiode was read, in words."""
+    return {"soundcard": "the diode read on the sound card",
+            "recording": "the diode read in the recording (match offline)"}.get(
+                readout, "no photodiode on this rig")
+
+
 def _md_photodiode(p: dict) -> list[str]:
-    lines = [f"- {p['n']} flashes of {p['on_ms']:g} ms, diode read on the "
-             f"{'sound card' if p['readout'] == 'soundcard' else 'recording (match offline)'}"]
+    lines = [f"- {p['n']} flashes of {p['on_ms']:g} ms, {_diode_text(p['readout'])}"]
     return lines + _md_offsets(p, (("offset", "flip → photodiode"),))
 
 
@@ -1694,10 +1753,9 @@ def _md_offsets(p: dict, keys: tuple[tuple[str, str], ...]) -> list[str]:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="The rig file, and pooling rig checks.")
+    p = argparse.ArgumentParser(description="Re-file and pool rig checks. A rig file is "
+                                            "filled in with rig-config.")
     sub = p.add_subparsers(dest="command", required=True)
-    r = sub.add_parser("rig", help="fill in or update a rig file, in a form")
-    r.add_argument("--rig", required=True, help="the rig file, made when it is missing")
     f = sub.add_parser("report", help="re-file checks already run: their reports and the "
                                       "data root's rigchecks.tsv, with this version")
     f.add_argument("folders", nargs="+", help="rig-check run folders")
@@ -1706,9 +1764,6 @@ def main() -> None:
     q.add_argument("roots", nargs="+")
     q.add_argument("--out", help="file to write (default: stdout)")
     args = p.parse_args()
-    if args.command == "rig":
-        _edit_rig(args.rig)
-        return
     if args.command == "report":
         for folder in args.folders:
             with open(os.path.join(folder, "manifest.json")) as fh:
@@ -1727,18 +1782,6 @@ def main() -> None:
             out.write(text)
     else:
         sys.stdout.write(text)
-
-
-def _edit_rig(path: str) -> None:
-    """Open the form on the rig file at ``path`` (a new one if there is none), and save it."""
-    if not can_show_form():
-        raise RuntimeError("rig check: the rig form needs PySide6 (pip install "
-                           "'fmri-gym[gui]') and a screen; or edit the file by hand")
-    from .gui_qt import fill_rig
-    if fill_rig(rig_file.draft(path), path) is None:
-        print("rig check: cancelled, the rig file is unchanged", file=sys.stderr)
-        return
-    print(f"saved: {path}")
 
 
 # ---------------------------------------------------------------------------
@@ -1769,6 +1812,7 @@ body { margin:0; background:var(--page); color:var(--ink);
 main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
 header .meta { color: var(--ink-2); font-size: 13px; }
 h1 { font-size: 22px; margin: 0 0 4px; font-weight: 600; }
+h3 { font-size: 15px; margin: 20px 0 6px; font-weight: 600; }
 h2 { font-size: 17px; margin: 40px 0 8px; font-weight: 600; display:flex; gap:10px;
   align-items:center; }
 .hero { font-size: 48px; font-weight: 600; line-height: 1.1; margin: 20px 0 4px; }
@@ -2133,8 +2177,7 @@ def _pad_line(pad_out: dict) -> str:
 
 def _html_photodiode(m: dict, folder: str) -> str:
     p = m["rig_check"]["photodiode"]
-    out = [f'<p class="note">{p["n"]} flashes of {p["on_ms"]:g} ms; the diode read on the '
-           f'{"sound card" if p["readout"] == "soundcard" else "recording (match offline)"}; '
+    out = [f'<p class="note">{p["n"]} flashes of {p["on_ms"]:g} ms; {_diode_text(p["readout"])}; '
            f'a click on every other flash'
            + (f' through {_e(p["audio_out"].get("device"))}, delay chosen '
               f'{p["audio_out"].get("delay_ms", 0):.1f} ms' if "audio_out" in p else "")
@@ -2229,10 +2272,11 @@ def render_html(m: dict, folder: str, history: list[dict[str, str]]) -> str:
     body.append(f'<h2>This rig over time</h2><div class="card">{_html_history(m, history)}</div>')
     body.append('<h2>Rig</h2><div class="card">' + _html_table(["", ""], [
         [_e(k), _e(v)] for k, v in rig.items()]) + "</div>")
-    body.append('<details><summary>Versions and platform</summary><div class="card">'
-                + _html_table(["", ""], [[_e(k), _e(v)] for k, v in {**m["versions"],
-                                                                **m["platform"]}.items()])
-                + "</div></details>")
+    body.append("<h2>This computer</h2>")
+    for title, head, table in computer(m):
+        body.append(f'<h3>{_e(title)}</h3><div class="card">'
+                    + _html_table(head, [[_e(_cell(c)) for c in row] for row in table])
+                    + "</div>")
     return ("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
             f"<title>Rig check {_e(rig['site'])}/{_e(rig['rig'])}</title>"

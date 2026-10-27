@@ -74,7 +74,7 @@ shimmy = ["shimmy"]  # old-`gym` envs via "legacy_gym": true
 tilematch = ["tile-match-gym"]  # display + logging only
 # MEG/EEG trigger backends (README "Triggers"): `triggers.backend` lsl / serial / parallel / hid.
 triggers = ["pylsl", "pyserial", "pyparallel", "hidapi"]
-# The fmri-edit config editor. Essentials is the widgets half of PySide6 (LGPL),
+# The windows: rig-config and session-editor. Essentials is the widgets half of PySide6 (LGPL),
 # without the WebEngine/3D add-ons, which would triple the download.
 gui = ["PySide6-Essentials>=6.6"]
 
@@ -90,19 +90,20 @@ all = [
 
 [project.scripts]
 fmri-play = "fmri_play:main"
-# The config editor (the `gui` extra). Separate from fmri-play, which only ever
-# plays one run: what Play starts there is an fmri-play command like any other.
-fmri-edit = "fmri_gym.gui:main"
+# A rig file, in a form (the `gui` extra): how this rig plays every run.
+rig-config = "fmri_gym.gui:rig_config_main"
+# Sessions and their runs' configs (the `gui` extra). Separate from fmri-play, which
+# only ever plays one run: a session is played by running its script.
+session-editor = "fmri_gym.gui:session_editor_main"
 # The next free session number for a subject: a session script's first line, so
 # all of its runs land in one session. Nothing else reads the disk for a number.
 fmri-ses = "fmri_gym.bids:main"
-# The controller plugged in: calibrate it (a new file in ~/.config/fmri-gym/pads/,
-# the newest of which every run with that controller reads), see what it sends and
-# what fmri-gym makes of it, and tune how its sticks are read, with its buttons.
-fmri-pad = "fmri_gym.pad_scope:main"
+# The game controller plugged in: calibrate it (each run with that controller reads
+# its newest calibration), see what it sends, and tune how its sticks are read.
+pad-calibration = "fmri_gym.pad_scope:main"
 
 [tool.setuptools]
-packages = ["fmri_gym", "fmri_gym.adapters"]
+packages = ["fmri_gym", "fmri_gym.adapters", "fmri_gym.gui"]
 py-modules = ["fmri_play"]
 
 # `uv sync` installs the `dev` group by default, so every checkout can run the

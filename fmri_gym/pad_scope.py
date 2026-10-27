@@ -1,4 +1,4 @@
-"""``fmri-pad``: calibrate a controller, see what it sends, and tune how it is read.
+"""``pad-calibration``: calibrate a controller, see what it sends, and tune how it is read.
 
 It shows what the pad plugged in sends and what :mod:`fmri_gym.pad` makes of
 it, through the newest calibration of it (:mod:`fmri_gym.pad_calibration`), and
@@ -263,7 +263,7 @@ class _Scope:
     """The tool's window: what the pad sends, what is made of it, and the buttons."""
 
     def __init__(self, bindings: dict[str, str], has_rig: bool) -> None:
-        self.canvas = _Canvas("fmri-pad")
+        self.canvas = _Canvas("pad-calibration")
         font = "Menlo,Monaco,monospace"
         self.f_big, self.f, self.f_sm = (pygame.font.SysFont(font, n) for n in (17, 13, 11))
         self.bindings, self.has_rig = bindings, has_rig
@@ -510,7 +510,7 @@ _ACTIONS: dict[str, Callable[[_Scope], None]] = {
 
 
 def main() -> None:
-    """``fmri-pad [--rig <rig file>]``."""
+    """``pad-calibration [--rig <rig file>]``."""
     p = argparse.ArgumentParser(
         description="Calibrate the controller plugged in, see what it sends and what fmri-gym "
                     "makes of it, and tune how its sticks are read, with the buttons along the "

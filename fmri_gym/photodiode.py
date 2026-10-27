@@ -7,7 +7,7 @@ the screen can. This task, run once per rig with the same :class:`Display`
 and :class:`Triggers` a session uses, flashes a patch and records the flips,
 so the offset can be measured and then subtracted in analysis::
 
-    python -m fmri_gym.photodiode --fullscreen --rig configs/rigs/<site>/<rig>.json
+    python -m fmri_gym.photodiode --fullscreen --rig configs/<team>/rigs/<rig>.json
 
 The patch (default 120 px, bottom-right) goes white ``n`` times for
 ``--on-ms`` and black again, with a randomized gap in between so nothing

@@ -7,7 +7,7 @@ per game block in the curriculum; the experiment loop is identical for all.
 One config file is one run, and this plays it: nothing here loops over runs,
 opens an editor or writes a config. A session of several runs is a shell
 script with one of these commands per line (README, "Runs and sessions"),
-which ``fmri-edit`` writes and any shell plays.
+which ``session-editor`` writes and any shell plays.
 
 How it is played -- the window, the controller, the audio, where the data
 goes -- is the rig's, not the command's: each rig has a file
@@ -16,7 +16,7 @@ goes -- is the rig's, not the command's: each rig has a file
 Usage (--ses and --run say which run of which session this is; a session
 script passes the same --ses to all of its runs, each with its own --run):
     python fmri_play.py --subject sub-01 --ses 1 --run 1 \
-        --rig configs/rigs/example/laptop.json --curriculum my.json
+        --rig configs/examples/rigs/laptop.json --curriculum my.json
     python fmri_play.py ... --dummy-trigger    # testing: no experimenter/scanner wait
     python fmri_play.py ... --duration 600 --resume  # a 10-min run of a longer curriculum
 
@@ -56,7 +56,7 @@ def _parser() -> argparse.ArgumentParser:
     p = _Parser(description="Run any gym game as an fMRI task.")
     p.add_argument("--subject", default="sub-test", help="BIDS subject: sub-<letters/digits>")
     p.add_argument("--curriculum", required=True, help="the run's curriculum JSON (see "
-                   "README); fmri-edit writes one without the JSON")
+                   "README); session-editor writes one without the JSON")
     p.add_argument("--ses", type=int, required=True,
                    help="BIDS session number, from 1: which scanning session this run belongs "
                    "to. A session script takes it once and passes it to every run (fmri-ses)")
@@ -78,7 +78,7 @@ def _parser() -> argparse.ArgumentParser:
                    help="when the curriculum ends before --duration, play it again from its "
                    "first phase, until --duration (which it needs)")
     p.add_argument("--rig", required=True,
-                   help="the rig file it is played on, e.g. configs/rigs/example/laptop.json: "
+                   help="the rig file it is played on, e.g. configs/examples/rigs/laptop.json: "
                    "it says the window, controller, audio and data root. A rig check makes "
                    "one when the file is missing")
     p.add_argument("--dummy-trigger", action="store_true")
