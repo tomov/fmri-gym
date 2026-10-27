@@ -41,7 +41,8 @@ from .adapters import get_adapter
 from .audio import Audio
 from .bids import BlockProgress, RunProgress
 from .config.curriculum import Curriculum, game_changes
-from .config.phases import CHECK_PHASES, BlockMode, Fixation, GamePhase, Message, Phase, Survey
+from .config.phases import (CHECK_PHASES, BlockMode, CheckControls, Fixation, GamePhase, Message,
+                             Phase, Survey)
 from .config.run import RunConfig
 from .display import Display, check_monitor
 from .keys import get_events, held_key_names, key_name
@@ -443,7 +444,10 @@ class Run:
                   "this is a test run, not a session", file=sys.stderr)
         audio = Audio(enabled=config.rig.has_audio)
         print(f"audio: {audio.status()}", file=sys.stderr)
-        pad_status = pad.init(config.rig.has_pad, config.rig.bindings)
+        makes_calibration = any(isinstance(p, CheckControls) and p.has_pad
+                                for p in config.curriculum.phases)
+        pad_status = pad.init(config.rig.has_pad, config.rig.bindings,
+                              is_calibration_required=not makes_calibration)
         print(f"pad: {pad_status}", file=sys.stderr)
         screen = config.rig.screen
         display = Display(size=screen.size, fullscreen=screen.is_fullscreen,
