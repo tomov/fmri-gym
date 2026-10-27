@@ -39,6 +39,8 @@ class Backend:
     :ivar ci: why CI cannot run it; ``None`` when it can.
     :ivar needs_display: its engine draws in a window of its own, so a headless
         run gives it a real display (SDL's dummy driver would reach the engine too).
+    :ivar run_seconds: the shortest headless run it plays frames in, for an engine
+        that loads for seconds first; a longer ``--run-seconds`` wins.
     """
 
     name: str
@@ -50,6 +52,7 @@ class Backend:
     marker: str = ""
     ci: str | None = None
     needs_display: bool = False
+    run_seconds: float = 0.0
 
     def installed(self) -> bool:
         """Whether the backend's package imports here."""
@@ -129,7 +132,7 @@ BACKENDS: dict[str, Backend] = {b.name: b for b in (
     Backend("arc3", "arc3", "arc3_gym", (_C + "arc3/levels/ls20.json",), gym_dirs=("arc3",)),
     Backend("stk", "stk", "stk_gym", (_C + "stk/levels/hacienda.json",),
             ci="the game pack is Linux x86_64 only and renders through a real GL display",
-            needs_display=True),
+            needs_display=True, run_seconds=20.0),
 )}
 
 #: The backends whose headless runs stand for the run loop when only core files changed:
