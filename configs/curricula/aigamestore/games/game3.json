@@ -1,0 +1,13 @@
+{
+  "curriculum": [
+    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
+    {"__include": "../common/game3.json", "game": "game3/level1", "instructions": {"title": "Floor Sweep, level 1 of 7"}},
+    {"__include": "../common/game3.json", "game": "game3/level2", "instructions": {"title": "Floor Sweep, level 2 of 7"}},
+    {"__include": "../common/game3.json", "game": "game3/level3", "instructions": {"title": "Floor Sweep, level 3 of 7"}},
+    {"__include": "../common/game3.json", "game": "game3/level4", "instructions": {"title": "Floor Sweep, level 4 of 7"}},
+    {"__include": "../common/game3.json", "game": "game3/level5", "instructions": {"title": "Floor Sweep, level 5 of 7"}},
+    {"__include": "../common/game3.json", "game": "game3/level6", "instructions": {"title": "Floor Sweep, level 6 of 7"}},
+    {"__include": "../common/game3.json", "game": "game3/level7", "instructions": {"title": "Floor Sweep, level 7 of 7"}},
+    {"type": "fixation", "duration": 2.0}
+  ]
+}

@@ -1,6 +1,6 @@
 # AI GameStore curricula
 
-The `aigamestore` backend's curricula: the ten public [AI GameStore](https://aigamestore.org) games, one file per game with one game phase per level, plus `all.json`, all ten for 15 s each. Every game has `common/<game>.json`, which its phases include, stating only the level and its title (README, "Shared phases"). All of them sit in `aigamestore/` itself, the one-level games too, so the ten games share one layout.
+The `aigamestore` backend's curricula: the ten public [AI GameStore](https://aigamestore.org) games, one file per game in `games/` with one game phase per level, plus `games/all.json`, all ten for 15 s each. Every game has `common/<game>.json`, which its phases include (`../common/<game>.json` from `games/`), stating only the level and its title (README, "Shared phases").
 
 ## Setup
 
@@ -35,14 +35,14 @@ An episode is one level: it ends on a win, a loss or a level clear, and `reset()
 
 | file | plays |
 |---|---|
-| `all.json` | the ten games, 15 s each (`mode` `duration`) |
-| `game1.json` | Water Sort, levels 1–9 |
-| `game2.json` | Angry-Birds-like, levels 1–9 |
-| `game3.json` | twin-stick / top-down shooter (Three.js + canvas HUD), levels 1–7 |
-| `game4.json` | jetpack runner, 10 runs |
-| `game5.json` | mouse / cheese platformer, levels 1–6 |
-| `game6.json` | shadow platformer, one long level |
-| `game7.json` | top-down extract shooter, levels 1–5 |
-| `game8.json` | bubble shooter, levels 1–9 |
-| `game9.json` | Mega Man-like action platformer, levels 1–7 |
-| `game10.json` | haunted mansion escape, levels 1–6 |
+| `games/all.json` | the ten games, 15 s each (`mode` `duration`) |
+| `games/game1.json` | Water Sort, levels 1–9 |
+| `games/game2.json` | Angry-Birds-like, levels 1–9 |
+| `games/game3.json` | twin-stick / top-down shooter (Three.js + canvas HUD), levels 1–7 |
+| `games/game4.json` | jetpack runner, 10 runs |
+| `games/game5.json` | mouse / cheese platformer, levels 1–6 |
+| `games/game6.json` | shadow platformer, one long level |
+| `games/game7.json` | top-down extract shooter, levels 1–5 |
+| `games/game8.json` | bubble shooter, levels 1–9 |
+| `games/game9.json` | Mega Man-like action platformer, levels 1–7 |
+| `games/game10.json` | haunted mansion escape, levels 1–6 |

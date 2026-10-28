@@ -2,47 +2,47 @@
   "curriculum": [
     {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {
-      "__include": "common/game8.json",
+      "__include": "../common/game8.json",
       "game": "game8/level1",
       "instructions": {"title": "Bubble Shooter, level 1 of 9"}
     },
     {
-      "__include": "common/game8.json",
+      "__include": "../common/game8.json",
       "game": "game8/level2",
       "instructions": {"title": "Bubble Shooter, level 2 of 9"}
     },
     {
-      "__include": "common/game8.json",
+      "__include": "../common/game8.json",
       "game": "game8/level3",
       "instructions": {"title": "Bubble Shooter, level 3 of 9"}
     },
     {
-      "__include": "common/game8.json",
+      "__include": "../common/game8.json",
       "game": "game8/level4",
       "instructions": {"title": "Bubble Shooter, level 4 of 9"}
     },
     {
-      "__include": "common/game8.json",
+      "__include": "../common/game8.json",
       "game": "game8/level5",
       "instructions": {"title": "Bubble Shooter, level 5 of 9"}
     },
     {
-      "__include": "common/game8.json",
+      "__include": "../common/game8.json",
       "game": "game8/level6",
       "instructions": {"title": "Bubble Shooter, level 6 of 9"}
     },
     {
-      "__include": "common/game8.json",
+      "__include": "../common/game8.json",
       "game": "game8/level7",
       "instructions": {"title": "Bubble Shooter, level 7 of 9"}
     },
     {
-      "__include": "common/game8.json",
+      "__include": "../common/game8.json",
       "game": "game8/level8",
       "instructions": {"title": "Bubble Shooter, level 8 of 9"}
     },
     {
-      "__include": "common/game8.json",
+      "__include": "../common/game8.json",
       "game": "game8/level9",
       "instructions": {"title": "Bubble Shooter, level 9 of 9"}
     },

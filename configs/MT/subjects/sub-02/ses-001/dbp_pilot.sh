@@ -8,14 +8,14 @@ SES=${1:-001}
 # uv run fmri-play --curriculum configs/curricula/coom/all.json --subject "$SUBJECT" --ses "$SES" --run 2 --rig "$RIG" --duration 60 --loop --resume
 uv run fmri-play --curriculum configs/curricula/vizdoom/take_cover_defend_line.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 60 --loop --resume
 uv run fmri-play --curriculum configs/curricula/vizdoom/take_cover_defend_line.json --subject "$SUBJECT" --ses "$SES" --run 2 --rig "$RIG" --duration 60 --loop --resume
-uv run fmri-play --curriculum configs/curricula/aigamestore/game1.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 60 --loop --resume
-uv run fmri-play --curriculum configs/curricula/aigamestore/game1.json --subject "$SUBJECT" --ses "$SES" --run 2 --rig "$RIG" --duration 60 --loop --resume
-uv run fmri-play --curriculum configs/curricula/aigamestore/game4.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 60 --loop --resume
-uv run fmri-play --curriculum configs/curricula/aigamestore/game4.json --subject "$SUBJECT" --ses "$SES" --run 2 --rig "$RIG" --duration 60 --loop --resume
-uv run fmri-play --curriculum configs/curricula/aigamestore/game7.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 60 --loop --resume
-uv run fmri-play --curriculum configs/curricula/aigamestore/game7.json --subject "$SUBJECT" --ses "$SES" --run 2 --rig "$RIG" --duration 60 --loop --resume
-uv run fmri-play --curriculum configs/curricula/aigamestore/game8.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 60 --loop --resume
-uv run fmri-play --curriculum configs/curricula/aigamestore/game8.json --subject "$SUBJECT" --ses "$SES" --run 2 --rig "$RIG" --duration 60 --loop --resume
+uv run fmri-play --curriculum configs/curricula/aigamestore/games/game1.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 60 --loop --resume
+uv run fmri-play --curriculum configs/curricula/aigamestore/games/game1.json --subject "$SUBJECT" --ses "$SES" --run 2 --rig "$RIG" --duration 60 --loop --resume
+uv run fmri-play --curriculum configs/curricula/aigamestore/games/game4.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 60 --loop --resume
+uv run fmri-play --curriculum configs/curricula/aigamestore/games/game4.json --subject "$SUBJECT" --ses "$SES" --run 2 --rig "$RIG" --duration 60 --loop --resume
+uv run fmri-play --curriculum configs/curricula/aigamestore/games/game7.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 60 --loop --resume
+uv run fmri-play --curriculum configs/curricula/aigamestore/games/game7.json --subject "$SUBJECT" --ses "$SES" --run 2 --rig "$RIG" --duration 60 --loop --resume
+uv run fmri-play --curriculum configs/curricula/aigamestore/games/game8.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 60 --loop --resume
+uv run fmri-play --curriculum configs/curricula/aigamestore/games/game8.json --subject "$SUBJECT" --ses "$SES" --run 2 --rig "$RIG" --duration 60 --loop --resume
 uv run fmri-play --curriculum configs/curricula/crafter/levels/L1.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 60 --loop --resume
 uv run fmri-play --curriculum configs/curricula/crafter/levels/L1.json --subject "$SUBJECT" --ses "$SES" --run 2 --rig "$RIG" --duration 60 --loop --resume
 uv run fmri-play --curriculum configs/curricula/rushhour/complete.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 60 --loop --resume

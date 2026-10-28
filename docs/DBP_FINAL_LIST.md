@@ -7,7 +7,7 @@ The games settled on for the DBP study, and how each runs in **fmri-gym**. All 8
 | Category | Game | Backend / how | Config | Status |
 |---|---|---|---|---|
 | Action/shooter | **COOM** | `vizdoom` (COOM's exact Doom engine) | `curricula/vizdoom/levels/defend_center.json` … (9 stock scenarios + 1 pair) | ✅ |
-| Action/shooter, Puzzle | **AI GameStore** | `aigamestore` (p5.js via headless browser) | `curricula/aigamestore/game1.json` … | ✅ |
+| Action/shooter, Puzzle | **AI GameStore** | `aigamestore` (p5.js via headless browser) | `curricula/aigamestore/games/game1.json` … | ✅ |
 | Building/open-world | **Crafter** | `crafter` (crafter-gym, `gym/crafter/`, over crafter's old-gym env) | `curricula/crafter/levels/L4.json` | ✅ |
 | Building/open-world | **Craftium** | `gym` + `import_module` (Luanti voxel) | none (see README, "Games without a curriculum") | ✅ |
 | Puzzle | **Rush Hour** | `rushhour` (Go engine + colored board) | `curricula/rushhour/levels/easy.json` | ✅ |

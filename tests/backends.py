@@ -125,7 +125,7 @@ BACKENDS: dict[str, Backend] = {b.name: b for b in (
             marker="CMakeLists.txt"),
     Backend("rushhour", "rushhour", "rushhour_gym", (_C + "rushhour/levels/easy.json",),
             gym_dirs=("replay_state",)),
-    Backend("aigamestore", "aigamestore", "aigamestore_gym", (_C + "aigamestore/game1.json",),
+    Backend("aigamestore", "aigamestore", "aigamestore_gym", (_C + "aigamestore/games/game1.json",),
             gym_dirs=("aigamestore", "replay_state")),
     Backend("arc3", "arc3", "arc3_gym", (_C + "arc3/levels/ls20.json",), gym_dirs=("arc3",)),
     Backend("stk", "stk", "stk_gym", (_C + "stk/levels/hacienda.json",),
