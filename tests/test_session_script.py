@@ -49,7 +49,7 @@ def test_a_line_the_editor_cannot_write_is_kept_as_typed():
 def test_a_runs_flags_are_written_and_read_back():
     steps = [{"config": PONG, "skip": False,
               "flags": {"duration": 60.0, "loop": True, "resume": True}},
-             {"config": MARIO, "skip": True, "flags": {"duration": 300.0, "end_fixation": 5.0}}]
+             {"config": MARIO, "skip": True, "flags": {"duration": 300.0, "loop": True}}]
     text = write_session(Session(steps, "sub-01", RIG, None))
     assert "--duration 60 --loop --resume" in text
     assert read_session(text).steps == steps

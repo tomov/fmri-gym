@@ -45,7 +45,6 @@ from ..config import curriculum
 from ..config import rig as rig_file
 from ..config.curriculum import Curriculum
 from ..config.run import RunConfig
-from ..run import END_FIXATION_S
 from . import Field, rig_config
 from . import widgets as ui
 
@@ -95,12 +94,9 @@ SESSION_FIELDS = [
 #: (:data:`fmri_gym.session_script.RUN_FLAGS`).
 RUN_FLAG_FIELDS = [
     Field("duration", "run length (s)", "float",
-          tip="How long the run lasts, in seconds from its start, closing fixation included: "
-              "whatever is playing stops in time for it. Blank: the run lasts as long as its "
-              "phases take."),
-    Field("end_fixation", "closing fixation (s)", "float",
-          tip=f"Seconds of fixation cross the run ends on, after the games stop. Blank: "
-              f"{END_FIXATION_S:g} s."),
+          tip="How long the run lasts, in seconds from its start, the rig's fixations "
+              "included: whatever is playing stops in time for the closing one. Blank: the run "
+              "lasts as long as its phases take."),
     Field("loop", "start again when it ends", "bool", default=False,
           tip="When the phases end before the run length, play them again from the first."),
     Field("resume", "carry on where the last run stopped", "bool", default=False,
@@ -867,9 +863,9 @@ class _Editor(QtWidgets.QMainWindow):
             step.pop("flags", None)
 
     def _flag_rows(self) -> list[str]:
-        """Closing fixation and looping only mean something for a run with a length."""
+        """Looping only means something for a run with a length."""
         timed = bool(self.flags_form.widgets["duration"].text().strip())
-        return ["duration", "resume"] + ["end_fixation", "loop"] * timed
+        return ["duration", "resume"] + ["loop"] * timed
 
     def _flags_edited(self) -> None:
         self.flags_form.show_rows(self._flag_rows())
@@ -1729,7 +1725,6 @@ class _Editor(QtWidgets.QMainWindow):
             flags = step.get("flags", {})
             run = RunConfig(curriculum=played, rig=rig, subject="sub-check", ses=1, run=1,
                             duration=flags.get("duration"),
-                            end_fixation=flags.get("end_fixation", END_FIXATION_S),
                             resume=flags.get("resume", False), loop=flags.get("loop", False),
                             dummy_trigger=False)
             label = f"run {i}: " if self._is_session() else ""
@@ -1756,12 +1751,10 @@ def _short(path: str) -> str:
 
 
 def _flag_problems(flags: dict) -> list[str]:
-    """What fmri-play refuses in a run's flags before it starts."""
-    end = flags.get("end_fixation", END_FIXATION_S)
-    out = [f"closing fixation {end:g} s: expected 0 or more seconds"] * (end < 0)
-    if flags.get("duration") is not None and flags["duration"] <= end:
-        out.append(f"run length {flags['duration']:g} s: it must be longer than its closing "
-                   f"fixation ({end:g} s)")
+    """What fmri-play refuses in a run's flags before it starts, whatever the rig."""
+    out = []
+    if flags.get("duration") is not None and flags["duration"] <= 0:
+        out.append(f"run length {flags['duration']:g} s: expected more than 0 seconds")
     if flags.get("loop") and flags.get("duration") is None:
         out.append("start again when it ends: give the run a length")
     return out

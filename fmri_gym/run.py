@@ -15,12 +15,13 @@ Recording-device concerns (waiting for or sending the scanner start, trigger
 codes for MEG/EEG) go through :mod:`fmri_gym.triggers`; with no ``triggers``
 config the loop behaves as the fMRI default and sends nothing.
 
-A run is the scanner's and a curriculum the subject's, so a run can stop
-part-way through one: given a duration, the run stops whatever phase is on
-screen the closing fixation's length before its end (``--end-fixation``,
-default :data:`END_FIXATION_S`) and closes on a fixation cross,
-for the haemodynamic response to the last thing played. A later run started
-with ``--resume`` carries on from there (:func:`~fmri_gym.bids.last_position`).
+A rig may give every run a fixation cross after the trigger and one at its end
+(its ``start_fixation`` and ``end_fixation``), the modality's baseline: for
+fMRI, the haemodynamic response to the last thing played. A run is the
+scanner's and a curriculum the subject's, so a run can stop part-way through
+one: given a duration, the run stops whatever phase is on screen in time for
+its closing fixation. A later run started with ``--resume`` carries on from
+there (:func:`~fmri_gym.bids.last_position`).
 """
 
 from __future__ import annotations
@@ -61,8 +62,6 @@ _SAME_SPEED = 2e-3
 #: The HUD's coarsest field is a whole second, so this only has to be fast
 #: enough that the number is never seen a second behind.
 HUD_REPAINT_S = 0.2
-#: Seconds of fixation that close a run given a duration, unless it is given another.
-END_FIXATION_S = 10.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -408,16 +407,9 @@ class Run:
         :param config: the curriculum, the rig and the command line, as the run reads them.
         :return: the run, ready to :meth:`play`.
         :raises ValueError: on a BIDS name or number, a monitor or a window
-            size this machine or this subject refuses; a duration no longer
-            than the closing fixation; a progress to resume from that this
-            curriculum cannot carry on (see :func:`_run_progress`).
+            size this machine or this subject refuses; a progress to resume
+            from that this curriculum cannot carry on (see :func:`_run_progress`).
         """
-        if config.end_fixation < 0:
-            raise ValueError(f"--end-fixation {config.end_fixation:g}: expected seconds >= 0")
-        if config.duration is not None and config.duration <= config.end_fixation:
-            raise ValueError(f"--duration {config.duration:g}: a run closes on "
-                             f"{config.end_fixation:g} s of fixation (--end-fixation), so it "
-                             "must be longer than that")
         if config.loop and config.duration is None:
             raise ValueError("--loop plays the curriculum until --duration: give a --duration")
         out = bids.run_output(config.rig.data_root, config.subject, config.curriculum.path,
@@ -944,12 +936,14 @@ class Run:
         return {"native_fps": native, "speed": speed}
 
     def play(self) -> bool:
-        """Play the curriculum: trigger wait, then each phase in order.
+        """Play the curriculum: trigger wait, the opening fixation, each phase in order,
+        the closing fixation.
 
         A resumed run skips the phases an earlier run played, except the
         ``include_on_resume`` opening ones, and hands the block it carries on
         what that run left of it. A run with a duration stops its phases
-        ``end_fixation`` seconds before the end and closes on a fixation cross.
+        ``end_fixation`` seconds before the end. Either fixation is shown only
+        when the run has one (:attr:`RunConfig.start_fixation`).
         Always writes the run's manifest in ``finally``, including after an
         interrupt (partial data).
 
@@ -970,7 +964,9 @@ class Run:
             self._trigger()
             if self.config.duration is not None:
                 self._run_end = (self.clock.t0_perf + self.config.duration
-                                 - self.config.end_fixation)
+                                 - (self.config.end_fixation or 0))
+            if self.config.start_fixation is not None:
+                self._run_fixation(self.config.start_fixation, "start_of_run", self._run_end)
 
             reached_end = True
             for index, phase in self._schedule(start):
@@ -984,8 +980,10 @@ class Run:
                     continue
                 handler(phase, index)
 
-            if self.config.duration is not None:
-                self._end_fixation()
+            if self.config.end_fixation is not None:
+                self._run_fixation(self.config.end_fixation, "end_of_run",
+                                   math.inf if self.config.duration is None
+                                   else self.clock.t0_perf + self.config.duration)
             if reached_end:
                 self.display.draw_text("Done. Thank you!")
                 time.sleep(2.0)
@@ -1015,10 +1013,14 @@ class Run:
         """Whether the run has reached its closing fixation."""
         return time.perf_counter() >= self._run_end
 
-    def _end_fixation(self) -> None:
-        """Close the run on fixation: ``end_fixation`` seconds, cut short at the run's end."""
+    def _run_fixation(self, seconds: float, which: str, until: float) -> None:
+        """The rig's fixation at one end of the run, outside the curriculum.
+
+        :param seconds: how long it is shown.
+        :param which: ``"start_of_run"`` or ``"end_of_run"``: its phase record's flag.
+        :param until: the ``perf_counter`` it is cut short at.
+        """
         onset = self.clock.from_perf(self.display.draw_fixation())
-        _wait_for_duration(self.display, self.config.end_fixation,
-                           until=self.clock.t0_perf + self.config.duration)
-        self.logger.log_phase({"index": None, "type": "fixation", "end_of_run": True,
+        _wait_for_duration(self.display, seconds, until=until)
+        self.logger.log_phase({"index": None, "type": "fixation", which: True,
                                "onset": onset, "offset": self.clock.run_time()})

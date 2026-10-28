@@ -228,7 +228,7 @@ def last_position(root: str, subject: str, curriculum_path: str) -> RunProgress 
     for path in glob.glob(pattern):
         with open(path) as f:
             manifest = json.load(f)
-        # index None: the run's closing fixation
+        # index None: phases that are always shown at the start of the run (e.g. general instructions)
         played = [p for p in manifest["phases"] if p["index"] is not None
                   and not manifest["curriculum"][p["index"]].get("include_on_resume", False)]
         if played:

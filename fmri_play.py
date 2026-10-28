@@ -35,7 +35,6 @@ from fmri_gym.config.curriculum import EXIT_QUIT, Curriculum
 from fmri_gym.display import quit_like_esc
 from fmri_gym.config.rig import RigConfig
 from fmri_gym.config.run import RunConfig
-from fmri_gym.run import END_FIXATION_S
 
 
 
@@ -65,12 +64,9 @@ def _parser() -> argparse.ArgumentParser:
                    "design this is, so it stays the same however the session went. A run that "
                    "already has data is re-acquired beside it, never overwritten")
     p.add_argument("--duration", type=float, default=None,
-                   help="the run's length in seconds from the scanner trigger: the phases stop "
-                   "--end-fixation seconds before it, whatever is playing, and the run closes "
-                   "on a fixation cross. Default: play the curriculum to its end")
-    p.add_argument("--end-fixation", type=float, default=END_FIXATION_S, metavar="SECONDS",
-                   help="seconds of the fixation a run with --duration closes on, for the "
-                   f"haemodynamic response to the last thing played (default {END_FIXATION_S:g})")
+                   help="the run's length in seconds from the scanner trigger, the rig's "
+                   "fixations included: the phases stop in time for the rig's end_fixation, "
+                   "whatever is playing. Default: play the curriculum to its end")
     p.add_argument("--resume", action="store_true",
                    help="carry on from where this subject's latest run of this config (any "
                    "session) stopped, mid-block included. Default: start at the beginning")
@@ -96,6 +92,8 @@ def main() -> None:
     if do_rig_check:  # its triggers, and a line that opens, first
         rig, trigger_error = checks.prepare(rig)
     print(f"rig: {rig.status()}", file=sys.stderr)
+    if rig.fixation_warning and not do_rig_check:
+        print(f"rig: WARNING: {rig.fixation_warning}", file=sys.stderr)
     run_config = RunConfig.from_args(args, curriculum, rig)
     problems = run_config.problems()
     if problems:

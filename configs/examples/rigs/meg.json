@@ -11,6 +11,8 @@
   "bindings": {"A": "SPACE", "X": "X", "B": "C", "Y": "Z", "LT": "A", "RT": "S", "UP": "UP", "DOWN": "DOWN", "LEFT": "LEFT", "RIGHT": "RIGHT"},
   "has_audio": true,
   "data_root": "data",
+  "start_fixation": 2,
+  "end_fixation": 2,
   "triggers": {
     "sync": {"mode": "send", "delay": 0.0},
     "backend": "serial", "port": "/dev/ttyUSB0",

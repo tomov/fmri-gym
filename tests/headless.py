@@ -16,7 +16,7 @@ Audio is the one thing a script cannot fake: the run opens the machine's
 output unless ``--no-audio`` is passed, which is what a machine without one
 (a CI runner) needs. ``--duration`` ends the run on the clock, as the scanner
 would, so a five-minute block plays for the seconds a test can afford, and the
-closing fixation lasts ``--end-fixation`` (1 s here; a session's is 10).
+rig's closing fixation lasts ``--end-fixation`` (1 s here; an fMRI rig's is 10).
 
     python -m tests.headless --curriculum configs/curricula/minihack/levels/room5x5.json \\
         --data-root /tmp/headless --duration 25
@@ -103,7 +103,7 @@ def script_for(curriculum_path: str, rate: float, seed: int) -> KeyScript:
     return KeyScript(names, dismiss or ["SPACE"], rate, seed)
 
 
-def use_rig(data_root: str, has_audio: bool) -> str:
+def use_rig(data_root: str, has_audio: bool, end_fixation: float) -> str:
     """Write a rig file for this process alone, in a temporary folder.
 
     :return: the rig file.
@@ -113,7 +113,8 @@ def use_rig(data_root: str, has_audio: bool) -> str:
               "pi": "TT", "modality": "behav", "notes": "",
               "screen": {"size": "640x480", "is_fullscreen": False, "monitor": 0,
                          "has_vsync": False},
-              "has_pad": False, "has_audio": has_audio, "data_root": data_root}, path)
+              "has_pad": False, "has_audio": has_audio, "data_root": data_root,
+              "end_fixation": end_fixation}, path)
     return path
 
 
@@ -124,7 +125,7 @@ def main() -> None:
     p.add_argument("--duration", type=float, default=25.0,
                    help="seconds the run lasts; the phases stop --end-fixation before")
     p.add_argument("--end-fixation", type=float, default=1.0,
-                   help="seconds of the closing fixation (a session's default is 10)")
+                   help="the rig's end_fixation, in seconds (an fMRI rig's is 10)")
     p.add_argument("--rate", type=float, default=6.0, help="presses per second")
     p.add_argument("--window", action="store_true",
                    help="open a real window (SDL's default driver) instead of the dummy one")
@@ -153,10 +154,10 @@ def main() -> None:
     script = script_for(args.curriculum, args.rate, args.seed)
     keys.register_event_source(script.pump)
     keys.register_held_source(script.held)
-    name = use_rig(args.data_root, has_audio=not args.no_audio)
+    name = use_rig(args.data_root, has_audio=not args.no_audio, end_fixation=args.end_fixation)
     sys.argv = ["fmri-play", "--curriculum", args.curriculum, "--subject", "sub-test",
                 "--ses", "1", "--run", str(args.run), "--rig", name, "--dummy-trigger",
-                "--duration", str(args.duration), "--end-fixation", str(args.end_fixation)] + ["--resume"] * args.resume + ["--loop"] * args.loop
+                "--duration", str(args.duration)] + ["--resume"] * args.resume + ["--loop"] * args.loop
     import fmri_play
     try:
         fmri_play.main()

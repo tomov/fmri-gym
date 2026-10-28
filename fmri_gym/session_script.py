@@ -29,8 +29,8 @@ SUBJECT_VAR, RIG_VAR, SES_VAR = '"$SUBJECT"', '"$RIG"', '"$SES"'
 USAGE = "run as: SUBJECT=sub-01 RIG=configs/<team>/rigs/<rig>.json sh $0 [session]"
 #: The flags of ``fmri-play`` a run's line may carry besides where it is filed, as
 #: ``(argparse name, flag, kind)``: a number, or a switch.
-RUN_FLAGS = (("duration", "--duration", float), ("end_fixation", "--end-fixation", float),
-             ("loop", "--loop", bool), ("resume", "--resume", bool))
+RUN_FLAGS = (("duration", "--duration", float), ("loop", "--loop", bool),
+             ("resume", "--resume", bool))
 _HEAD = re.compile(r"(SUBJECT|RIG|SES)=(.*)")
 _PINNED = re.compile(r"\$\{1:-(\d+)\}")
 

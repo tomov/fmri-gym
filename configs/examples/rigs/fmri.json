@@ -11,5 +11,7 @@
   "bindings": {"A": "SPACE", "X": "X", "B": "C", "Y": "Z", "LT": "A", "RT": "S", "UP": "UP", "DOWN": "DOWN", "LEFT": "LEFT", "RIGHT": "RIGHT"},
   "has_audio": true,
   "data_root": "data",
+  "start_fixation": 10,
+  "end_fixation": 10,
   "triggers": {"sync": {"mode": "wait", "key": "="}, "backend": "null"}
 }

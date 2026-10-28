@@ -34,6 +34,9 @@ say the same thing:
   finger", ...}``: the rig check asks for each;
 - ``"has_audio"``: play game audio; ``false`` mutes every block;
 - ``"data_root"``: where the BIDS tree goes, ``<root>/sub-XX/ses-NNN/beh/<run>/``;
+- ``"start_fixation"``, ``"end_fixation"``: seconds of fixation cross every run
+  opens on after the trigger and closes on, the modality's baseline (fMRI: 10
+  each, for the haemodynamic lag); left out, the run shows none;
 - ``"triggers"``: the scanner's start sync and the trigger codes, over which
   line (:class:`~fmri_gym.triggers.TriggerSettings`); left out, the run waits
   for ``=`` and sends no codes, and says so on the experimenter screen and in
@@ -66,6 +69,8 @@ from ..pad import CONTROLS
 from ..triggers import TriggerError, TriggerSettings
 
 MODALITIES = ("fmri", "meg", "eeg", "behav")
+#: The modalities that record the brain: their runs need a fixation baseline at each end.
+NEUROIMAGING = ("fmri", "meg", "eeg")
 #: What the rig is, for people: notes nothing plays from, each optional, filed with
 #: every run and pooled by the rig check (``site`` and ``rig`` are the file's place).
 FIELDS = {
@@ -90,11 +95,11 @@ EXAMPLES = {
     "trigger_hardware": "fORP 932 USB, '=' at each volume",
 }
 #: How a run is played where the rig file says nothing: a window at the desk,
-#: the pad and the audio on.
+#: the pad and the audio on, no fixation at either end.
 DEFAULTS: dict[str, Any] = {
     "screen": {"size": "1024x768", "is_fullscreen": False, "monitor": 0, "has_vsync": True},
-    "has_pad": True, "has_audio": True, "data_root": "data", "triggers": {}, "bindings": {},
-    "response_keys": {}, "rig_check": {},
+    "has_pad": True, "has_audio": True, "data_root": "data", "start_fixation": None,
+    "end_fixation": None, "triggers": {}, "bindings": {}, "response_keys": {}, "rig_check": {},
 }
 #: How a rig check can read its photodiode: not at all, on this PC's sound card
 #: (input 0), or in the MEG/EEG recording (matched offline).
@@ -221,6 +226,10 @@ class RigConfig:
     has_audio: bool
     #: the BIDS tree's root.
     data_root: str
+    #: seconds of fixation every run opens on after the trigger; ``None``: none.
+    start_fixation: float | None
+    #: seconds of fixation every run closes on; ``None``: none.
+    end_fixation: float | None
     #: the scanner's start sync and the trigger codes, over which line.
     triggers: TriggerSettings
     #: what the rig check measures with.
@@ -252,6 +261,8 @@ class RigConfig:
                    response_keys=dict(settings["response_keys"]),
                    has_audio=settings["has_audio"],
                    data_root=settings["data_root"],
+                   start_fixation=settings["start_fixation"],
+                   end_fixation=settings["end_fixation"],
                    triggers=TriggerSettings.from_dict(settings["triggers"]),
                    rig_check=RigCheckConfig.from_dict(settings["rig_check"]))
 
@@ -285,6 +296,7 @@ class RigConfig:
         return {"path": self.path, **self.fields, "screen": self.screen.record(), "has_pad": self.has_pad,
                 "bindings": self.bindings, "response_keys": self.response_keys,
                 "has_audio": self.has_audio, "data_root": self.data_root,
+                "start_fixation": self.start_fixation, "end_fixation": self.end_fixation,
                 "triggers": asdict(self.triggers), "rig_check": self.rig_check.record()}
 
     def status(self) -> str:
@@ -292,10 +304,36 @@ class RigConfig:
         screen = self.screen
         window = (f"{screen.size[0]}x{screen.size[1]} "
                   f"{'fullscreen' if screen.is_fullscreen else 'window'}")
+        fixations = "".join(f" | {s:g} s fixation at the {end}" for end, s in
+                            (("start", self.start_fixation), ("end", self.end_fixation))
+                            if s is not None)
         return (f"{self.path} | {window} on monitor {screen.monitor}, vsync "
                 f"{'on' if screen.has_vsync else 'off'} | pad {'on' if self.has_pad else 'off'}"
                 f" | audio {'on' if self.has_audio else 'off'} | data in {self.data_root}"
+                f"{fixations}"
                 f" | triggers {self.triggers.sync.mode}, codes over {self.triggers.backend}")
+
+    @property
+    def fixation_warning(self) -> str | None:
+        """What is odd about the fixations for the rig's modality: a brain recording with
+        no baseline at an end; ``None`` when nothing is."""
+        return fixation_warning(self.fields.get("modality"), self.start_fixation,
+                                self.end_fixation)
+
+
+def fixation_warning(modality: str | None, start: float | None,
+                     end: float | None) -> str | None:
+    """A neuroimaging rig whose runs have no fixation at one end, or both, in words.
+
+    :return: the warning; ``None`` for another modality, or fixations at both ends.
+    """
+    if modality not in NEUROIMAGING:
+        return None
+    missing = [name for name, s in (("start_fixation", start), ("end_fixation", end)) if not s]
+    if not missing:
+        return None
+    return (f"the rig's modality is {modality}, but it has no {' and no '.join(missing)}: its "
+            "runs have no fixation baseline there (10 s each is usual for fMRI)")
 
 
 def site_of(path: str) -> str:
@@ -373,7 +411,8 @@ def problems(rig: dict) -> list[str]:
 
 
 def _setting_problems(rig: dict) -> list[str]:
-    """What is wrong with the file's ``screen``, ``has_pad``, ``has_audio`` and ``data_root``."""
+    """What is wrong with the file's ``screen``, ``has_pad``, ``has_audio``, ``data_root``,
+    fixations, triggers, bindings, response keys and ``rig_check``."""
     screen = rig.get("screen", {})
     if not isinstance(screen, dict):
         return [f'"screen": expected {{"size", "is_fullscreen", "monitor", "has_vsync"}}, '
@@ -393,6 +432,9 @@ def _setting_problems(rig: dict) -> list[str]:
     root = rig.get("data_root", DEFAULTS["data_root"])
     if not isinstance(root, str) or not root:
         out.append(f'"data_root" must be a folder, got {root!r}')
+    out += [f'"{k}" must be seconds, 0 or more, or null for none, got {rig[k]!r}'
+            for k in ("start_fixation", "end_fixation")
+            if rig.get(k) is not None and not _is_seconds(rig[k])]
     return (out + trigger_problems(rig.get("triggers", {})) + _binding_problems(rig)
             + _response_key_problems(rig) + _rig_check_problems(rig.get("rig_check", {})))
 
@@ -453,6 +495,10 @@ def _rig_check_problems(section: Any) -> list[str]:
 
 def _is_positive(v: Any, kind: type | tuple[type, ...] = (int, float)) -> bool:
     return isinstance(v, kind) and not isinstance(v, bool) and v > 0
+
+
+def _is_seconds(v: Any) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and v >= 0
 
 
 def trigger_problems(section: Any) -> list[str]:

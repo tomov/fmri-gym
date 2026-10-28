@@ -138,7 +138,7 @@ def test_a_game_key_the_scanner_types_is_refused_on_that_rig():
         game = {"type": "game", "game": "CartPole-v1", "fps": 30, "keys": keys}
         curriculum = Curriculum.from_dict({"curriculum": [game]}, "cartpole.json")
         return RunConfig(curriculum=curriculum, rig=box, subject="sub-01", ses=1, run=1,
-                         duration=None, end_fixation=10.0, resume=False, loop=False,
+                         duration=None, resume=False, loop=False,
                          dummy_trigger=True)
 
     assert run_of({"": 0, "5": 1}).problems() and not run_of({"": 0, "LEFT": 1}).problems()
@@ -153,7 +153,7 @@ def test_what_the_controller_cannot_press_is_refused_on_that_rig():
     def problems(phase: dict, on: RigConfig = pad) -> list[str]:
         curriculum = Curriculum.from_dict({"curriculum": [phase]}, "c.json")
         return RunConfig(curriculum=curriculum, rig=on, subject="sub-01", ses=1, run=1,
-                         duration=None, end_fixation=10.0, resume=False, loop=False,
+                         duration=None, resume=False, loop=False,
                          dummy_trigger=True).problems()
 
     def game(keys: dict, **more) -> dict:

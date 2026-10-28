@@ -132,6 +132,11 @@ _ABOUT_LABELS = {"pi": "PI", "modality": "modality", "monitor": "monitor or proj
                  "trigger_hardware": "trigger hardware", "notes": "notes (optional)"}
 #: The fields describing the rig that may be left blank in the window.
 _OPTIONAL = ("notes",)
+#: The rig's fixations, as the window names them.
+_FIXATIONS = {"start_fixation": "fixation at the start (s)",
+              "end_fixation": "fixation at the end (s)"}
+#: What a new rig's fixations start on: fMRI's, for the haemodynamic lag.
+NEW_RIG_FIXATION_S = 10.0
 
 
 def window_sizes(width: int, height: int) -> list[str]:
@@ -216,10 +221,15 @@ def _describe(rig: rig_file.RigConfig, triggers: dict | None) -> str:
                   else "used, but no control is bound to a key: it presses nothing")
     responses = (f"; response keys {', '.join(rig.response_keys)}" if rig.response_keys
                  else "")
+    ends = [f"{s:g} s at the {end}" for end, s in (("start", rig.start_fixation),
+                                                     ("end", rig.end_fixation)) if s is not None]
+    fixation = f"Fixation cross: {' and '.join(ends) if ends else 'none'}" + (
+        f".   WARNING: {rig.fixation_warning}" if rig.fixation_warning else "")
     return "\n".join([
         f"Screen: {window} on monitor {screen.monitor}, vsync {'on' if screen.has_vsync else 'off'}",
         f"Game controller: {controller}{responses}",
         f"Game sound: {'on' if rig.has_audio else 'off'}.   Data saved in: {rig.data_root}",
+        fixation,
         describe_triggers(triggers) if triggers else
         "Triggers: NOT SET -- a run waits for '=' and sends no codes."])
 
@@ -413,9 +423,10 @@ _STEPS = [
      "Describe this setup so that you, and anyone reading its rig check reports, can tell it "
      "apart from others. Say what is actually plugged in; write \"none\" for a part this rig "
      "does not have."),
-    ("Screen, sound and data",
+    ("Screen, sound, fixation and data",
      "Which screen the participant sees and how the games are shown on it, whether game sound "
-     "is played, and where the data of every run on this rig is saved."),
+     "is played, how long the fixation cross at the start and end of every run lasts, and "
+     "where the data of every run on this rig is saved."),
     ("Response devices",
      "How the participant answers. Games are played with keyboard keys. A game controller "
      "(Xbox, Current Designs gamepad) sends no keys by itself: choose the keyboard key each of "
@@ -572,7 +583,9 @@ class _RigWindow(QtWidgets.QDialog):
                 else widget.text())
 
     def _refresh_reports(self) -> None:
-        """The trigger summary, the check plan and the save step's summary, as things stand."""
+        """The fixation warning, the trigger summary, the check plan and the save step's
+        summary, as things stand."""
+        self._refresh_fixation_note()
         self.trigger_text.setText(self._trigger_report())
         try:
             rig = rig_file.RigConfig.from_dict(self.rig, self.path)
@@ -680,9 +693,58 @@ class _RigWindow(QtWidgets.QDialog):
         row.addWidget(self.data_root, 1)
         row.addWidget(browse)
         form.addRow("data folder", row)
+        self.fixations: dict[str, QtWidgets.QLineEdit] = {}
+        for key, label in _FIXATIONS.items():
+            form.addRow(label, self._fixation_field(key, values))
+        self.fixation_note = QtWidgets.QLabel()
+        self.fixation_note.setWordWrap(True)
+        self.fixation_note.setStyleSheet("color: #d35400")
+        form.addRow("", self.fixation_note)
         layout.addLayout(form)
         layout.addStretch(1)
         return page
+
+    def _fixation_field(self, key: str, values: dict) -> QtWidgets.QLineEdit:
+        """Seconds of one of the rig's fixations; a new rig starts on fMRI's."""
+        seconds = values.get(key, None if values else NEW_RIG_FIXATION_S)
+        edit = QtWidgets.QLineEdit("" if seconds is None else
+                                   f"{seconds:g}" if isinstance(seconds, (int, float))
+                                   else str(seconds))
+        edit.setPlaceholderText("none")
+        edit.setToolTip(f"Seconds of fixation cross every run on this rig shows "
+                        f"{'right after the trigger' if key == 'start_fixation' else 'at its end'}"
+                        ", outside its curriculum: the baseline the recording needs (fMRI: "
+                        "10 s, for the slow blood response; MEG, EEG: a few seconds). Blank: "
+                        "none. A rig check shows none.")
+        edit.textChanged.connect(self._check)
+        self.fixations[key] = edit
+        return edit
+
+    def _fixation_seconds(self) -> dict[str, float]:
+        """The fixations typed, a blank one left out.
+
+        :raises ValueError: a number half typed, named in the message.
+        """
+        out = {}
+        for key, edit in self.fixations.items():
+            text = edit.text().strip()
+            if not text:
+                continue
+            try:
+                out[key] = float(text)
+            except ValueError:
+                raise ValueError(f"{_FIXATIONS[key]}: {text!r} is not a number") from None
+        return out
+
+    def _refresh_fixation_note(self) -> None:
+        try:
+            seconds = self._fixation_seconds()
+        except ValueError:
+            return  # the step's problems say it
+        warning = rig_file.fixation_warning(self._about().get("modality"),
+                                            seconds.get("start_fixation"),
+                                            seconds.get("end_fixation"))
+        self.fixation_note.setText(f"Warning: {warning}." if warning else "")
 
     def _browse_data_root(self) -> None:
         folder = QtWidgets.QFileDialog.getExistingDirectory(self, "Data folder",
@@ -726,15 +788,19 @@ class _RigWindow(QtWidgets.QDialog):
         self.size_pick.blockSignals(False)
 
     def _screen(self) -> dict[str, Any]:
+        """:raises ValueError: a fixation half typed, named in the message."""
         return {"screen": {"size": self.size_pick.currentText().strip(),
                            "is_fullscreen": self.switches["is_fullscreen"].isChecked(),
                            "monitor": self.monitor_pick.currentData(),
                            "has_vsync": self.switches["has_vsync"].isChecked()},
                 "has_audio": self.switches["has_audio"].isChecked(),
-                "data_root": self.data_root.text().strip()}
+                "data_root": self.data_root.text().strip(), **self._fixation_seconds()}
 
     def _screen_problems(self) -> list[str]:
-        return rig_file.problems(self._screen())
+        try:
+            return rig_file.problems(self._screen())
+        except ValueError as exc:
+            return [str(exc)]
 
     # -- step 3: response devices -------------------------------------------------
 

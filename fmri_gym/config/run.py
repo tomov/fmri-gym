@@ -49,11 +49,9 @@ class RunConfig:
     ses: int
     #: this task's run number in the session, from 1.
     run: int
-    #: the run's seconds from the trigger, closing fixation included;
+    #: the run's seconds from the trigger, the rig's fixations included;
     #: ``None`` plays the curriculum to its end.
     duration: float | None
-    #: seconds of the fixation a run with a ``duration`` closes on.
-    end_fixation: float
     #: carry on from where the subject's latest run of this curriculum stopped.
     resume: bool
     #: play the curriculum again from its start when it ends, until ``duration``.
@@ -71,8 +69,19 @@ class RunConfig:
         :param rig: the rig ``--rig`` picked.
         """
         return cls(curriculum=curriculum, rig=rig, subject=args.subject, ses=args.ses,
-                   run=args.run, duration=args.duration, end_fixation=args.end_fixation,
-                   resume=args.resume, loop=args.loop, dummy_trigger=args.dummy_trigger)
+                   run=args.run, duration=args.duration, resume=args.resume, loop=args.loop,
+                   dummy_trigger=args.dummy_trigger)
+
+    @property
+    def start_fixation(self) -> float | None:
+        """Seconds of fixation the run opens on: the rig's; ``None`` for none, and for a
+        rig check, which measures rather than scans."""
+        return None if self.curriculum.has_checks else self.rig.start_fixation
+
+    @property
+    def end_fixation(self) -> float | None:
+        """Seconds of fixation the run closes on: the rig's; ``None`` as for the start."""
+        return None if self.curriculum.has_checks else self.rig.end_fixation
 
     def problems(self) -> list[str]:
         """What keeps this curriculum from being played on this rig, which neither shows alone.
@@ -81,11 +90,22 @@ class RunConfig:
         Designs: ``5``). With the rig waiting for that key (``sync.mode``
         ``wait``), a game bound to it would act at every volume. A rig played
         with a controller presses only the keys its ``"bindings"`` name, so a
-        phase needing another would leave the participant a dead button.
+        phase needing another would leave the participant a dead button. A
+        ``duration`` must leave time for something besides the rig's fixations.
 
-        :return: one problem per clashing binding and per thing no control can do.
+        :return: one problem per clashing binding, per thing no control can do, and
+            a duration the fixations fill.
         """
-        return self._scanner_key_problems() + self._unpressable_problems()
+        return (self._scanner_key_problems() + self._unpressable_problems()
+                + self._duration_problems())
+
+    def _duration_problems(self) -> list[str]:
+        """A ``duration`` no longer than the rig's fixations together."""
+        fixed = (self.start_fixation or 0) + (self.end_fixation or 0)
+        if self.duration is None or self.duration > fixed:
+            return []
+        return [f"--duration {self.duration:g}: {self.rig.path}'s fixations take {fixed:g} s "
+                "(its start_fixation and end_fixation), so the run must be longer than that"]
 
     def _scanner_key_problems(self) -> list[str]:
         """The game keys the rig's scanner types at every volume."""
