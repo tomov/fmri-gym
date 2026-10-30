@@ -142,7 +142,7 @@ These were tried and do not play here, so nothing in `configs/` names them:
 - **Tile Match**: `Discrete(84)` swaps, no keyboard play.
 - **2048** (its own `reset()` crashes), **Pathery** and **Wordle** (text or placement actions, no real-time frame), **Mastermind** (needs Python ≥ 3.13).
 
-Runtime flow: experimenter screen (**SPACE**) → "Waiting for scanner..." → scanner **trigger `=`** (anchors the session clock) → the rig's start fixation, if it has one → curriculum phases → the rig's end fixation, if it has one → done. `ESC` quits early but still saves.
+Runtime flow: experimenter screen (**SPACE**) → "Waiting for scanner..." → scanner **trigger `=`** (anchors the session clock) → the rig's start fixation, if it has one → curriculum phases → the rig's end fixation, if it has one → done. `ESC` quits early but still saves. Before the window opens, the run builds, resets and closes each distinct game of its curriculum once (`games:` on the console, with the seconds each took): a game that cannot start -- a backend whose extra is not synced, a missing game file -- stops the run there with the run's other problems, naming the phase and the fix, and each backend's first-launch cost is paid at the desk rather than in the first block.
 
 **Rigs: how a run is played.** A curriculum says what is played, and plays the same on every rig. How it is played is the rig's: a **rig** is one setup -- a monitor, a scanner, a response device, a trigger line -- and a team can have several. Each has its own **rig file** in the repo, `configs/<team>/rigs/<rig>.json` (see `configs/examples/rigs/README.md`), which every run played on that rig reads:
 
