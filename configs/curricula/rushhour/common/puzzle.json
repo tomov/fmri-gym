@@ -28,6 +28,7 @@
     ]
   },
   "keys": {"A": 4, "S": 5, "3": 4, "4": 5, "LEFT": 8, "RIGHT": 9, "UP": 10, "DOWN": 11, "1": 6, "2": 7, "Z": 6, "X": 7},
-  "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 1800.0, "movable_only": true, "fps": 60,
+  "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 1800.0,
+  "env_kwargs": {"movable_only": true}, "fps": 60,
   "is_turn_based": true
 }
