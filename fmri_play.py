@@ -95,7 +95,7 @@ def main() -> None:
     if rig.fixation_warning and not do_rig_check:
         print(f"rig: WARNING: {rig.fixation_warning}", file=sys.stderr)
     run_config = RunConfig.from_args(args, curriculum, rig)
-    problems = run_config.problems(load_games=True)  # each game built once, before the window
+    problems = run_config.problems(load_games=False)  # each game built once, before the window
     if problems:
         raise ValueError(f"{args.curriculum} on {rig.path}: " + "; ".join(problems))
     if not do_rig_check:
