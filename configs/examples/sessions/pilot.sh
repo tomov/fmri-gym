@@ -7,7 +7,7 @@ set -e  # Exit on error
 SUBJECT=sub-01
 RIG=configs/examples/rigs/fmri-curdes-v1-ABXY-nav.json
 SES=1
-RUN_DURATION=30
+RUN_DURATION=600 # seconds
 
 # Runs, one per line
 
