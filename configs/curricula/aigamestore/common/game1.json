@@ -3,13 +3,13 @@
   "instructions": {
     "align": "left", "keys_to_dismiss": ["SPACE"],
     "text": [
-      "Sort colored water into matching tubes.",
+      "Sort fluids into matching tubes.",
       "Pour until every tube is uniform (or empty).",
       "",
       "Controls:",
       "   [LEFT] / [RIGHT]   highlight a tube",
-      "   [SPACE]          select / pour",
-      "   [Z]              undo",
+      "   [SPACE]            select / pour",
+      "   [Z]                undo",
       "",
       "(press [SPACE] to start)"
     ]

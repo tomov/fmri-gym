@@ -7,6 +7,8 @@ SES=${1:-$(uv run fmri-ses --subject "$SUBJECT" --rig "$RIG")}
 
 uv run fmri-play --curriculum configs/curricula/baba_auto/all.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 600 --loop
 
+#uv run fmri-tasks --config localizers/motor.json
+
 uv run fmri-play --curriculum configs/curricula/vizdoom/take_cover_defend_line.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 600 --loop
 
 uv run fmri-play --curriculum configs/curricula/minihack/all.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 600 --loop
