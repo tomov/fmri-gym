@@ -44,18 +44,23 @@ def test_config_validates(path):
     assert not problems, "\n".join(problems)
 
 
-@pytest.mark.parametrize("pad", PAD_RIGS, ids=[r.path for r in PAD_RIGS])
 @pytest.mark.parametrize("path", CONFIGS, ids=[str(p.relative_to(REPO)) for p in CONFIGS])
-def test_a_six_button_controller_plays_it(path, pad):
-    """A rig with a controller plays every curriculum whose games fit six buttons, only those."""
+def test_a_six_button_controller_plays_it(path):
+    """A curriculum whose games fit six buttons has a rig with a controller that plays it; one
+    with more has none. A rig's bindings are written for its curricula, so not every rig plays it.
+    """
     curriculum = Curriculum.load(str(path))
-    run = RunConfig(curriculum=curriculum, rig=pad, subject="sub-01", ses=1, run=1,
-                    duration=None, resume=False, loop=False, dummy_trigger=True)
+    problems = {pad.path: RunConfig(curriculum=curriculum, rig=pad, subject="sub-01", ses=1,
+                                    run=1, duration=None, resume=False, loop=False,
+                                    dummy_trigger=True).problems()
+                for pad in PAD_RIGS}
+    playing = [rig_path for rig_path, found in problems.items() if not found]
     is_too_big = any(_button_actions(p) > 6 for p in curriculum.phases if isinstance(p, GamePhase))
     if is_too_big:
-        assert run.problems(), "plays on six buttons, though a game in it has more actions"
+        assert not playing, f"plays on six buttons ({playing}), though a game in it has more actions"
     else:
-        assert not run.problems(), "\n".join(run.problems())
+        assert playing, "no rig with a controller plays it:\n" + "\n".join(
+            f"{rig_path}: {found[0]}" for rig_path, found in problems.items())
 
 
 @pytest.mark.parametrize("path", CONFIGS, ids=[str(p.relative_to(REPO)) for p in CONFIGS])
