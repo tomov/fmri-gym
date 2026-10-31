@@ -1,0 +1,35 @@
+{
+  "type": "game", "backend": "rushhour", "game": "RushHourHuman-v0",
+  "instructions": {
+    "align": "left", "keys_to_dismiss": ["A"],
+    "text": [
+      "On each puzzle, get the RED car out through the opening",
+      "on the right wall.",
+      "",
+      "Vehicles only slide along their own axis, and cannot pass",
+      "through each other.",
+      "",
+      "One car is outlined in white; the arrows on it show which ways",
+      "it can still move.",
+      "",
+      "Cars that cannot move at all are skipped: choosing only ever",
+      "lands on a car with at least one arrow.",
+      "",
+      "   [L] / [R]     previous / next car",
+      "   [X] / [B]     move car left / right",
+      "   [Y] / [A]     move car up / down",
+      "   hold [L]      pause menu (restart / give up / resume)",
+      "",
+      "There are 49 puzzles. The first 12 get harder one by one;",
+      "after that, easy and hard ones come in any order.",
+      "Take all the time you need.",
+      "",
+      "(press [A] to begin)"
+    ]
+  },
+  "keys": {"L": 4, "R": 5, "X": 8, "B": 9, "Y": 10, "A": 11},
+  "menu": {"key": "L", "hold": 3.0, "after": 300.0, "options": ["reset", "forfeit", "resume"], "move": ["Y", "A"], "confirm": "R"},
+  "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 480.0,
+  "env_kwargs": {"movable_only": true}, "fps": 60,
+  "is_turn_based": true
+}

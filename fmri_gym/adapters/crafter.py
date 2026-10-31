@@ -104,11 +104,9 @@ means three achievements.
 ``menu`` mode draws the cursor over the player rather than in the strip,
 because that is where the eyes already are between presses, and only while the
 last press was a ``cycle`` or a ``confirm``. The rig instead fades it out on a
-3 s wall clock (``frontend_pygame.py --menu-s``), which a turn-based block
-cannot copy: it repaints only when a key is pressed, so nothing would clear the
-line until the next press anyway. "While you are using it" is the closest
-equivalent, and it has the better property of being reconstructible from the
-logged actions alone.
+3 s wall clock (``frontend_pygame.py --menu-s``); "while you are using it" is
+kept instead because, unlike a fade, it is reconstructible from the logged
+actions alone.
 
 Cues
 ----

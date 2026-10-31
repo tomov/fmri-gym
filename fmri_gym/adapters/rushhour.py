@@ -23,7 +23,7 @@ it, and the block ends when it is solved (``mode: "episode"``,
 ``n_episodes: 1``). The program's trial flow -- a self-paced ready screen, a
 blank interval, a "PUZZLE SOLVED!" hold -- is not the env's business here: the
 curriculum lists each as a ``message`` phase around the game phase, and
-run.py runs them (see ``configs/curricula/rushhour/complete.json``).
+run.py runs them (see ``configs/curricula/rushhour/all.json``).
 
 Env constructor options live in ``env_kwargs``: ``puzzle`` (``"p07"``),
 ``puzzle_indices``, ``min_moves_range``, ``movable_only`` (default true), and

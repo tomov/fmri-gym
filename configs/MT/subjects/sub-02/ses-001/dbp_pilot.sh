@@ -18,8 +18,8 @@ uv run fmri-play --curriculum configs/curricula/aigamestore/games/game8.json --s
 uv run fmri-play --curriculum configs/curricula/aigamestore/games/game8.json --subject "$SUBJECT" --ses "$SES" --run 2 --rig "$RIG" --duration 60 --loop --resume
 uv run fmri-play --curriculum configs/curricula/crafter/levels/L1.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 60 --loop --resume
 uv run fmri-play --curriculum configs/curricula/crafter/levels/L1.json --subject "$SUBJECT" --ses "$SES" --run 2 --rig "$RIG" --duration 60 --loop --resume
-uv run fmri-play --curriculum configs/curricula/rushhour/complete.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 60 --loop --resume
-uv run fmri-play --curriculum configs/curricula/rushhour/complete.json --subject "$SUBJECT" --ses "$SES" --run 2 --rig "$RIG" --duration 60 --loop --resume
+uv run fmri-play --curriculum configs/curricula/rushhour/all.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 60 --loop --resume
+uv run fmri-play --curriculum configs/curricula/rushhour/all.json --subject "$SUBJECT" --ses "$SES" --run 2 --rig "$RIG" --duration 60 --loop --resume
 uv run fmri-play --curriculum configs/curricula/baba_auto/all.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 60 --loop --resume
 uv run fmri-play --curriculum configs/curricula/baba_auto/all.json --subject "$SUBJECT" --ses "$SES" --run 2 --rig "$RIG" --duration 60 --loop --resume
 uv run fmri-play --curriculum configs/curricula/minihack/all.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 60 --loop --resume

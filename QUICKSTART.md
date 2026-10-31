@@ -65,7 +65,7 @@ uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/em
 
 ```bash
 uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/empty.json --curriculum configs/curricula/rushhour/levels/easy.json      # 5 min of random easy puzzles
-uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/empty.json --curriculum configs/curricula/rushhour/complete.json    # Rush-Hour's own session: 12 puzzles, easiest first, self-paced
+uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/empty.json --curriculum configs/curricula/rushhour/all.json    # Rush-Hour's own session: 12 puzzles, easiest first, self-paced
 ```
 
 ### Baba Is AI

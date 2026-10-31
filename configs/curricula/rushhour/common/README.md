@@ -1,6 +1,6 @@
 # Rush Hour curricula
 
-The `rushhour` backend's curricula: slide cars to free the red one. The 49 puzzles of `complete.json` include `common/rushhour.json` (keys, rules text, settings) and state only their puzzle and title; `easy.json`, a different task, stands alone.
+The `rushhour` backend's curricula: slide cars to free the red one. The 49 puzzles of `all.json` include `common/rushhour.json` (keys, rules text, settings) and state only their puzzle and title; `easy.json`, a different task, stands alone.
 
 ## Setup
 
@@ -16,10 +16,11 @@ White triangles on the selected car show which of its two slides are legal (from
 
 | file | plays |
 |---|---|
-| `complete.json` | the complete session of Rush-Hour's own program: all 49 puzzles of the library |
+| `all.json` | the complete session of Rush-Hour's own program: all 49 puzzles of the library |
+| `all-ABXY-nav.json` | the same 49 puzzles on an ABXY gamepad rig, from `common/rushhour-ABXY-nav.json`: L/R choose the car, X/B/Y/A slide it, hold L for the pause menu |
 | `easy.json` | 5 min of random easy puzzles (`min_moves_range` 0-12), one after another |
 
-## `complete.json`
+## `all.json`
 
 It ports the participant flow of https://github.com/chrplr/Rush-Hour `main.go`: one game phase per puzzle, each blocking (`advance_on` `["won"]`: a puzzle counts once solved, which is also the only way the engine ends one). The first 12 puzzles of the library come in its order (easiest first, what Rush-Hour's `-n` presents), then the other 37 (p13-p49) once each in a fixed shuffled order (`random.Random(20260913).shuffle`); `puzzle` names each.
 

@@ -1,0 +1,47 @@
+{
+  "pi": "MT",
+  "modality": "behav",
+  "monitor": "Laptop monitor",
+  "photodiode": "none",
+  "audio_path": "mac speakers",
+  "trigger_hardware": "none",
+  "screen": {
+    "size": "1024x768",
+    "is_fullscreen": false,
+    "monitor": 0,
+    "has_vsync": true
+  },
+  "has_audio": true,
+  "data_root": "data",
+  "has_pad": true,
+  "bindings": {
+    "UP": "UP",
+    "DOWN": "DOWN",
+    "LEFT": "LEFT",
+    "RIGHT": "RIGHT",
+    "Y": "Z",
+    "B": "C",
+    "X": "X",
+    "LT": "A",
+    "A": "SPACE",
+    "RT": "S"
+  },
+  "triggers": {
+    "sync": {
+      "mode": "none"
+    },
+    "backend": "null",
+    "lsl_stream_name": "fmri_gym",
+    "pulse_ms": 10.0,
+    "on_frame": true,
+    "frame_every": 1,
+    "on_episode_start": true,
+    "codes": {
+      "frame_bits": 3,
+      "task_start": 8,
+      "task_stop": 16,
+      "episode_start": 32,
+      "scanner_start": 64
+    }
+  }
+}
