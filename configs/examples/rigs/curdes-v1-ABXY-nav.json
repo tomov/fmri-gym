@@ -1,0 +1,15 @@
+{
+  "pi": "EX",
+  "modality": "behav",
+  "monitor": "Example: any desk monitor",
+  "photodiode": "Example: none",
+  "audio_path": "Example: desk speakers or headphones",
+  "trigger_hardware": "Example: none (no scanner)",
+  "notes": "Example: a Current Designs controller (one stick, six buttons) on its 932 interface, at a desk; no scanner",
+  "screen": {"size": "1024x768", "is_fullscreen": false, "monitor": 0, "has_vsync": true},
+  "has_pad": true,
+  "bindings": {"A": "A", "X": "X", "B": "B", "Y": "Y", "LT": "L", "RT": "R", "UP": "1", "DOWN": "2", "LEFT": "3", "RIGHT": "4"},
+  "has_audio": true,
+  "data_root": "data",
+  "triggers": {"sync": {"mode": "none"}, "backend": "null"}
+}

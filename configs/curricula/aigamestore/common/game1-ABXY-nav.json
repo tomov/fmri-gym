@@ -1,0 +1,19 @@
+{
+  "type": "game", "backend": "aigamestore",
+  "instructions": {
+    "align": "left", "keys_to_dismiss": ["A"],
+    "text": [
+      "Sort fluids into matching tubes.",
+      "Pour until every tube is uniform (or empty).",
+      "",
+      "Controls:",
+      "   [X] / [B]         highlight a tube",
+      "   [R]              select / pour",
+      "   [L]             undo",
+      "",
+      "(press [A] to start)"
+    ]
+  },
+  "keys": {"X": 0, "B": 1, "L": 2, "R": 3},
+  "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 600.0, "fps": 10
+}
