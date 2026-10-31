@@ -249,7 +249,10 @@ class GamePhase(Phase):
     #: advance ONE step per deliberate key PRESS, not once per frame. In a
     #: real-time loop they would auto-step every frame with the noop action
     #: (which for e.g. FrozenLake is action 0 = LEFT), so the agent "moves on
-    #: its own" and a single held key fires many times.
+    #: its own" and a single held key fires many times. The standing frame is
+    #: redrawn a few times a second while the block waits for a press, so the
+    #: HUD's clock keeps time; that redraw is pixels only (no step, no log row,
+    #: no trigger, no sound).
     is_turn_based: bool
     #: Real-time blocks poll HELD keys, so a press that starts and ends
     #: between two frames is never seen -- at a grid world's few frames per
@@ -258,13 +261,6 @@ class GamePhase(Phase):
     #: repeats). Off by default: backends whose actions are key COMBINATIONS
     #: must keep polling.
     has_latched_keys: bool
-    #: A turn-based block draws a frame only when the subject presses, so
-    #: the seconds its HUD shows stop between presses while the clock the
-    #: block actually ends on does not. ``has_live_hud`` redraws the standing
-    #: frame a few times a second through the wait, which changes nothing
-    #: but the pixels: no step, no log row, no trigger, no sound. Off by
-    #: default, so a block that has run this way keeps running this way.
-    has_live_hud: bool
     #: the game has sound to play, and the block plays it (with the rig's own
     #: ``has_audio``); muting never changes what is logged
     has_audio: bool
@@ -300,7 +296,7 @@ class GamePhase(Phase):
             seed=d.get("seed"), state_stride=max(1, int(d.get("state_stride", 1))),
             is_turn_based=d.get("is_turn_based", False),
             has_latched_keys=d.get("has_latched_keys", False),
-            has_live_hud=d.get("has_live_hud", False), has_audio=d.get("has_audio", True),
+            has_audio=d.get("has_audio", True),
             fps=d["fps"],
             instructions=None if instructions is None else Instructions.from_dict(instructions),
             text=d.get("text"))
@@ -313,11 +309,7 @@ class GamePhase(Phase):
         if d.get("mode", "duration") not in [mode.value for mode in BlockMode]:
             out.append(f"mode: expected 'duration' or 'episode', got {d.get('mode')!r}")
         out += _fps_problems(d) + _keys_problems(d) + _advance_problems(d) + _rewind_problems(d)
-        out += _bool_problems(d, ("is_turn_based", "has_latched_keys", "has_live_hud",
-                                  "has_audio"))
-        if d.get("has_live_hud") and not d.get("is_turn_based"):
-            out.append('"has_live_hud" is for is_turn_based blocks, whose wait is unbounded; '
-                       "a real-time block already redraws every frame")
+        out += _bool_problems(d, ("is_turn_based", "has_latched_keys", "has_audio"))
         seconds = d.get("show_outcome_duration", 0)
         if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or seconds < 0:
             out.append(f"show_outcome_duration: expected seconds >= 0, got {seconds!r}")

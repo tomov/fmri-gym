@@ -3,6 +3,6 @@
   "instructions": {"align": "left", "keys_to_dismiss": ["SPACE"]},
   "env_kwargs": {"size": [384, 384], "length": 0},
   "keys": {"LEFT": 1, "RIGHT": 2, "UP": 3, "DOWN": 4, "SPACE": 5, "S": 6, "X": 17, "A": 18},
-  "mode": "duration", "duration": 300.0, "fps": 15, "is_turn_based": true, "has_latched_keys": false, "has_live_hud": true, "state_stride": 25,
+  "mode": "duration", "duration": 300.0, "fps": 15, "is_turn_based": true, "has_latched_keys": false, "state_stride": 25,
   "show_score": true, "cues": true, "cue_overlay": false, "seed": 0
 }

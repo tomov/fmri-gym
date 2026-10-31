@@ -501,15 +501,12 @@ The `MT` team's sessions are in `configs/MT/subjects/`: three of about an hour f
                                 // at its real speed and fits its sound; session-editor's
                                 // Check with the engine shows it. Any other value plays the game slower or faster: the
                                 // manifest logs "speed" and the console says so when it is not 1
- "is_turn_based": false,        // step only on a key PRESS, not per frame (grid/toy_text games)
+ "is_turn_based": false,        // step only on a key PRESS, not per frame (grid/toy_text games).
+                                // While it waits for the press the standing frame is redrawn, so
+                                // the clock in the HUD keeps up with the block's; that draws pixels
+                                // and nothing else -- no step, no log row, no trigger, no sound
  "has_latched_keys": false,     // real-time: a fresh key PRESS beats the held-key poll, so a tap
                                 // shorter than one frame is not dropped (games below ~10 fps)
- "has_live_hud": false,         // is_turn_based only: redraw the standing frame while the loop waits
-                                // for the press, so the clock in the HUD keeps up with the block's.
-                                // Draws pixels and nothing else -- no step, no log row, no trigger,
-                                // no sound. A duration block ends on the wall clock whether anyone
-                                // presses or not, so without this a subject who is thinking reads
-                                // the time their last press left behind
  "has_audio": true,             // false mutes the speakers for this block; logged sound is unchanged
  "seed": 1234,                  // optional base seed: episodes play with seed, seed+1, ...
                                 // Pinned, every participant and run gets the same episodes.

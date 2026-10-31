@@ -58,10 +58,10 @@ EXPERIMENTER_KEY = " "
 #: How far ``fps`` may sit from the engine's own rate and still count as real
 #: speed: what the audio output absorbs by resampling.
 _SAME_SPEED = 2e-3
-#: Seconds between the redraws a ``has_live_hud`` phase asks for while it waits.
+#: Seconds between the redraws of a turn-based block's frame while it waits for a press.
 #: The HUD's coarsest field is a whole second, so this only has to be fast
 #: enough that the number is never seen a second behind.
-HUD_REPAINT_S = 0.2
+HUD_REDRAW_S = 0.2
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,7 +146,7 @@ def _poll_keys_until(
     key_to_action: dict | None = None,
     menu: Menu | None = None,
     latch: bool = False,
-    repaint: Callable[[], float] | None = None,
+    redraw: Callable[[], float] | None = None,
 ) -> tuple[object | None, bool]:
     """Poll the keyboard until ``deadline``, logging every press/release.
 
@@ -169,14 +169,14 @@ def _poll_keys_until(
     :param menu: the block's :class:`~.menu.Menu`, if the phase has one.
     :param latch: keep waiting after a mapped keydown and return the last one
         seen, instead of ending the wait at the first.
-    :param repaint: called every :data:`HUD_REPAINT_S` while waiting, for a
-        wait long enough that the screen would otherwise go stale (see
-        ``has_live_hud``). It redraws; it must not step, log or trigger.
+    :param redraw: called every :data:`HUD_REDRAW_S` while waiting, for a
+        wait long enough that the screen would otherwise go stale. It
+        redraws; it must not step, log or trigger.
     :return: ``(action_or_None, user_quit)``; ``action`` is set only when
         ``key_to_action`` is given, ``user_quit`` on window close / ESC.
     """
     latched_action = None
-    next_repaint = time.perf_counter() + HUD_REPAINT_S
+    next_redraw = time.perf_counter() + HUD_REDRAW_S
     while True:
         if menu is not None and menu.armed():
             return None, False
@@ -203,9 +203,9 @@ def _poll_keys_until(
                 latched_action = key_to_action[name]
         if time.perf_counter() >= deadline:
             return latched_action, False
-        if repaint is not None and time.perf_counter() >= next_repaint:
-            repaint()
-            next_repaint = time.perf_counter() + HUD_REPAINT_S
+        if redraw is not None and time.perf_counter() >= next_redraw:
+            redraw()
+            next_redraw = time.perf_counter() + HUD_REDRAW_S
         display.idle(deadline)
 
 
@@ -588,10 +588,10 @@ class Run:
 
         :param adapter: wrapped env for reset/step/render/sound/capture.
         :param game_phase: the phase's settings; read here are
-            ``is_turn_based`` (advance only on mapped keydowns),
-            ``has_latched_keys`` (real-time: let a fresh keydown win over held
-            keys), ``has_live_hud`` (turn-based: redraw the HUD through the
-            wait), ``frame_period``, ``state_stride``, ``has_audio`` (with the rig's) and
+            ``is_turn_based`` (advance only on mapped keydowns, redrawing the
+            HUD through the wait), ``has_latched_keys`` (real-time: let a fresh
+            keydown win over held keys), ``frame_period``, ``state_stride``,
+            ``has_audio`` (with the rig's) and
             ``show_outcome_duration``.
         :param seed: RNG seed for this episode's ``reset``.
         :param episode_id: index of this episode within the game block.
@@ -617,17 +617,12 @@ class Run:
         key_to_action = (adapter.keymap.turn_actions()
                          if game_phase.is_turn_based or game_phase.has_latched_keys else None)
 
+        # A turn-based wait ends only at a press, and the HUD is drawn only
+        # by _show: without this its clock would stop at the last press.
         def redraw() -> float:
             """Present the frame again, for its HUD. Never steps, logs or triggers."""
             return self._show(adapter, False, score, block_end)[0]
 
-        # A turn-based wait is unbounded -- it ends at a press -- and the HUD
-        # is drawn only by _show, so without this the block clock a subject
-        # reads is the one their last press left behind, while the clock the
-        # loop ends on runs on regardless. Off unless the phase asks: a game
-        # whose HUD says nothing about time has nothing to gain, and a
-        # real-time wait is one frame long and repaints anyway.
-        repaint = redraw if game_phase.is_turn_based and game_phase.has_live_hud else None
         # Set while the env is in a state it takes no action in, to the action
         # to step it with; see EnvAdapter.autoplay. Only a turn-based block
         # cares: a real-time one steps through such a stretch anyway.
@@ -664,7 +659,7 @@ class Run:
                 self.display, deadline, self.clock, self.logger,
                 key_to_action if waits_for_press else None, menu,
                 latch=game_phase.has_latched_keys and not game_phase.is_turn_based,
-                repaint=repaint if waits_for_press else None)
+                redraw=redraw if waits_for_press else None)
             if user_quit:
                 outcome = "quit"
                 break

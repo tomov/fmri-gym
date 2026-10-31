@@ -39,8 +39,6 @@ Sleep is where `is_turn_based` and stock crafter meet, and it is settled in the 
 
 ## HUD
 
-`has_live_hud` is true because a turn-based block draws a frame only when the subject presses while the block still ends on the wall clock: without it the seconds in the HUD strip stop at the last press. It redraws the standing frame every 0.2 s through the wait and does nothing else (no step, no log row, no trigger, no sound), so it changes only the pixels. The other turn-based curricula leave it off.
-
 `show_score` draws the achievement count in the HUD strip above the frame, which crafter's own HUD does not show. It covers no game pixel and reports only values already in `info['achievements']`, so the model harness can be given the same scalar; a model evaluated without it sees less than the subject did, and that should be said. The count is shown rather than the block's cumulative reward, which is the same quantity written less legibly: crafter pays +1 per first unlock and (health - last_health)/10 per step, and the health terms telescope to at most -0.9 over an episode.
 
 ## Cues
