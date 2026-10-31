@@ -1,6 +1,6 @@
 # AI GameStore curricula
 
-The `aigamestore` backend's curricula: the ten public [AI GameStore](https://aigamestore.org) games, one file per game in `games/` with one game phase per level, plus `games/all.json`, all ten for 15 s each. Every game has `common/<game>.json`, which its phases include (`../common/<game>.json` from `games/`), stating only the level and its title (README, "Shared phases").
+The `aigamestore` backend's curricula: the ten public [AI GameStore](https://aigamestore.org) games, one file per game with one game phase per level, plus `all.json`, all ten for 15 s each. Every game has `common/<game>.json`, which its phases include (`common/<game>.json`), stating only the level and its title (README, "Shared phases").
 
 ## Setup
 
@@ -8,7 +8,7 @@ The `aigamestore` backend's curricula: the ten public [AI GameStore](https://aig
 
 ## Keys
 
-The env's action is MultiBinary over the game's keys, in `aigamestore_gym.GAME_KEYS` order, so a phase's `keys` values are those indices (the JSON key is what the subject presses), and held keys combine. The env relabels the on-canvas hints to the pressed key; the instructions' Controls text is kept in sync with `keys` by hand. The games' keys are the standard rig's ten (README, "Rigs") but for game3 and game7, which have more actions than a controller's six buttons: they are played on a keyboard, and a rig with a controller refuses them (as it does `all.json`, which plays them). The `*-ABXY-nav` files (`common/` and `games/`, for game1, game4, game7 and game8) move on the face buttons instead of the stick and are written for `configs/examples/rigs/curdes-v1-ABXY-nav.json`, whose controls press `A` `B` `X` `Y` `L` `R`; they play on that rig and no other with a controller.
+The env's action is MultiBinary over the game's keys, in `aigamestore_gym.GAME_KEYS` order, so a phase's `keys` values are those indices (the JSON key is what the subject presses), and held keys combine. The env relabels the on-canvas hints to the pressed key; the instructions' Controls text is kept in sync with `keys` by hand. The games' keys are the standard rig's ten (README, "Rigs") but for game3 and game7, which have more actions than a controller's six buttons: they are played on a keyboard, and a rig with a controller refuses them (as it does `all.json`, which plays them). The `*-ABXY-nav` files (`common/` and the matching curricula, for game1, game4, game7 and game8) move on the face buttons instead of the stick and are written for `configs/examples/rigs/curdes-v1-ABXY-nav.json`, whose controls press `A` `B` `X` `Y` `L` `R`; they play on that rig and no other with a controller.
 
 | game | `GAME_KEYS` order | reference |
 |---|---|---|
@@ -35,15 +35,15 @@ An episode is one level: it ends on a win, a loss or a level clear, and `reset()
 
 | file | plays |
 |---|---|
-| `games/all.json` | the ten games, 15 s each (`mode` `duration`) |
-| `games/game1.json` | Water Sort, levels 1–9 |
-| `games/game2.json` | Angry-Birds-like, levels 1–9 |
-| `games/game3.json` | twin-stick / top-down shooter (Three.js + canvas HUD), levels 1–7 |
-| `games/game4.json` | jetpack runner, 10 runs |
-| `games/game5.json` | mouse / cheese platformer, levels 1–6 |
-| `games/game6.json` | shadow platformer, one long level |
-| `games/game7.json` | top-down extract shooter, levels 1–5 |
-| `games/game8.json` | bubble shooter, levels 1–9 |
-| `games/game9.json` | Mega Man-like action platformer, levels 1–7 |
-| `games/game10.json` | haunted mansion escape, levels 1–6 |
-| `games/game<N>-ABXY-nav.json` | game1, game4, game7 or game8 on the face buttons, for the `curdes-v1-ABXY-nav` rig |
+| `all.json` | the ten games, 15 s each (`mode` `duration`) |
+| `game1.json` | Water Sort, levels 1–9 |
+| `game2.json` | Angry-Birds-like, levels 1–9 |
+| `game3.json` | twin-stick / top-down shooter (Three.js + canvas HUD), levels 1–7 |
+| `game4.json` | jetpack runner, 10 runs |
+| `game5.json` | mouse / cheese platformer, levels 1–6 |
+| `game6.json` | shadow platformer, one long level |
+| `game7.json` | top-down extract shooter, levels 1–5 |
+| `game8.json` | bubble shooter, levels 1–9 |
+| `game9.json` | Mega Man-like action platformer, levels 1–7 |
+| `game10.json` | haunted mansion escape, levels 1–6 |
+| `game<N>-ABXY-nav.json` | game1, game4, game7 or game8 on the face buttons, for the `curdes-v1-ABXY-nav` rig |

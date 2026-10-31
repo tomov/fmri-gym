@@ -1,0 +1,10 @@
+{
+  "curriculum": [
+    {"__include": "common/game5.json", "game": "game5/level1", "instructions": {"title": "Cheese Run, level 1 of 6"}},
+    {"__include": "common/game5.json", "game": "game5/level2", "instructions": {"title": "Cheese Run, level 2 of 6"}},
+    {"__include": "common/game5.json", "game": "game5/level3", "instructions": {"title": "Cheese Run, level 3 of 6"}},
+    {"__include": "common/game5.json", "game": "game5/level4", "instructions": {"title": "Cheese Run, level 4 of 6"}},
+    {"__include": "common/game5.json", "game": "game5/level5", "instructions": {"title": "Cheese Run, level 5 of 6"}},
+    {"__include": "common/game5.json", "game": "game5/level6", "instructions": {"title": "Cheese Run, level 6 of 6"}}
+  ]
+}

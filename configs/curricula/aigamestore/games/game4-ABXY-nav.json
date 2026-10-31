@@ -1,5 +1,0 @@
-{
-  "curriculum": [
-    {"__include": "../common/game4-ABXY-nav.json", "game": "game4", "instructions": {"title": "Jetpack Run"}}
-  ]
-}

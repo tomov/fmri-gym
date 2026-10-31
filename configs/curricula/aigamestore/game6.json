@@ -1,0 +1,5 @@
+{
+  "curriculum": [
+    {"__include": "common/game6.json", "game": "game6/level1", "instructions": {"title": "Shadow Journey"}}
+  ]
+}
