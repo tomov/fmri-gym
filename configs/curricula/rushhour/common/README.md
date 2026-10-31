@@ -1,6 +1,6 @@
 # Rush Hour curricula
 
-The `rushhour` backend's curricula: slide cars to free the red one. Puzzles 2 to 49 of `complete.json` include `common/puzzle.json` (keys, rules text, settings) and state only their puzzle and title; puzzle 1, with its longer welcome text, and `easy.json` stand alone.
+The `rushhour` backend's curricula: slide cars to free the red one. The 49 puzzles of `complete.json` include `common/rushhour.json` (keys, rules text, settings) and state only their puzzle and title; `easy.json`, a different task, stands alone.
 
 ## Setup
 
@@ -23,6 +23,6 @@ White triangles on the selected car show which of its two slides are legal (from
 
 It ports the participant flow of https://github.com/chrplr/Rush-Hour `main.go`: one game phase per puzzle, each blocking (`advance_on` `["won"]`: a puzzle counts once solved, which is also the only way the engine ends one). The first 12 puzzles of the library come in its order (easiest first, what Rush-Hour's `-n` presents), then the other 37 (p13-p49) once each in a fixed shuffled order (`random.Random(20260913).shuffle`); `puzzle` names each.
 
-Each puzzle is preceded by a blank 0.8 s message (the ITI), opens on its instructions ("Starting Puzzle i of N", or "Resuming" in a run that carries it on, over the rules, until SPACE or a game key), and is followed by the block's own result screen ("Final score" and "Puzzle solved", for `show_outcome_duration` seconds, default 2; text on the plain background, not the solved board Rush-Hour holds). Each puzzle is its own block, with its own log and manifest entry; the puzzle number is the phase's place in the list, as the board carries no counter. The board is drawn like rushui (same layout, palette, white outline and arrows on the selected car), and the logged variables carry the columns of Rush-Hour's results file (`event`, `car`, `from_*` / `to_*`, `n_slides`, `solved`, `t_ms`, `trial_ms`).
+Each puzzle is preceded by a blank 0.8 s message (the ITI), opens on its instructions ("Starting Puzzle i of N", or "Resuming" in a run that carries it on, over the rules, until SPACE), and is followed by the block's own result screen ("Final score" and "Puzzle solved", for `show_outcome_duration` seconds, default 2; text on the plain background, not the solved board Rush-Hour holds). Each puzzle is its own block, with its own log and manifest entry; the puzzle number is the phase's place in the list, as the board carries no counter. The board is drawn like rushui (same layout, palette, white outline and arrows on the selected car), and the logged variables carry the columns of Rush-Hour's results file (`event`, `car`, `from_*` / `to_*`, `n_slides`, `solved`, `t_ms`, `trial_ms`).
 
 Rush-Hour stamps keypresses and flips on SDL's monotonic clock; here a key is timestamped when the loop processes it, within 1/`fps`, hence `fps` 60 (a turn-based block steps only on a keydown, so the rate costs nothing). `duration` is per puzzle and effectively unlimited; ESC is the experimenter's way out.

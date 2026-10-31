@@ -1,7 +1,7 @@
 {
   "type": "game", "backend": "rushhour", "game": "RushHourHuman-v0",
   "instructions": {
-    "align": "left", "keys_to_dismiss": ["1", "2", "3", "4", "Z", "S", "DOWN", "LEFT", "X", "RIGHT", "A", "SPACE", "UP"],
+    "align": "left", "keys_to_dismiss": ["SPACE"],
     "text": [
       "On each puzzle, get the RED car out through the opening",
       "on the right wall.",
