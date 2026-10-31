@@ -15,6 +15,6 @@
     ]
   },
   "keys": {"X": 0, "B": 1, "R": 2, "L": 3},
-  "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 120.0,
+  "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 600.0,
   "fps": 30, "frame_skip": 2
 }
