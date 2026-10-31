@@ -133,5 +133,5 @@ uv run rig-config                  # New rig... (team, rig name), fill in its si
                                    # then run its long rig check from the last step (once per rig)
 uv run pad-calibration             # a game controller: calibrate it (also from rig-config, step 3)
 uv run session-editor --session configs/examples/sessions/pilot.sh   # adapt the example session, save it under your team
-SUBJECT=sub-01 RIG=configs/<team>/rigs/<rig>.json sh configs/examples/sessions/pilot.sh  # play it: about an hour
+sh configs/examples/sessions/pilot.sh  # play it: about an hour (edit SUBJECT=, SES=, RUN_DURATION=, and RIG= at the top for your team)
 ```

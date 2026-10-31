@@ -449,11 +449,10 @@ A run whose folder already has data is **re-acquired, never overwritten**: it wr
 
 `set -e` stops the script at the first run that fails or is quit with ESC (`fmri-play` then exits with status 3). A line that is not an `fmri-play` run is any command of yours, as typed; a commented line is a skipped run, which is how a stopped session is resumed. Write it by hand, or in `session-editor`, which has two tabs. **Session**: who and on which rig, then the runs in order -- add an existing or a new curriculum, an external script; repeat, reorder, skip, "Start here" -- or the script itself. **Run** (double-click a run): how it is played (run length, start again, carry on), its phases with each game's keys, or its JSON. A drop-down on each tab lists what `configs/` holds: sessions on the Session tab, curricula on the Run tab (in a session, one picked there is added after the selected run); File > Open takes a `.sh` like a `.json` from anywhere. Save writes the script and the configs you edited. Run it from the repo root: `sh configs/<team>/subjects/sub-01/ses-001/<name>.sh`.
 
-**An example session to start from:** `configs/examples/sessions/pilot.sh` is about an hour: five games of ten minutes each -- Baba Is You, ViZDoom, MiniHack, SuperTuxKart, Crafter -- each played through its levels and started again if it ends early (`--duration 600 --loop`). Each run waits for the experimenter's SPACE, which paces the rest between games. It names no subject and no rig, so whoever starts it gives both:
+**An example session to start from:** `configs/examples/sessions/pilot.sh` is six ABXY-nav runs -- AI GameStore games 1, 4, 7, and 8, then Rush Hour, then Baba Is You -- each played for `RUN_DURATION` seconds with `--loop --resume`. Each run waits for the experimenter's SPACE, which paces the rest between games. It fixes `sub-01`, session `1`, and `configs/examples/rigs/curdes-v1-ABXY-nav.json` at the top; change `SUBJECT=`, `SES=`, `RUN_DURATION=`, or `RIG=` there for another run.
 
 ```bash
-SUBJECT=sub-01 RIG=configs/examples/rigs/laptop.json sh configs/examples/sessions/pilot.sh        # at the desk
-SUBJECT=sub-01 RIG=configs/MT/rigs/mgh-prisma.json sh configs/examples/sessions/pilot.sh 002     # a team's rig, into session 2
+sh configs/examples/sessions/pilot.sh
 ```
 
 Open it in `session-editor --session configs/examples/sessions/pilot.sh` to change the games or their length, and save it under your team (`configs/<team>/subjects/sub-<label>/ses-<NNN>/`).

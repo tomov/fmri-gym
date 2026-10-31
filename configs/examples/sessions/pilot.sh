@@ -1,18 +1,24 @@
 #!/bin/sh
 # fmri-gym session: one line per run, in order.
-set -e
-SUBJECT=${SUBJECT:?run as: SUBJECT=sub-01 RIG=configs/<team>/rigs/<rig>.json sh $0 [session]}
-RIG=${RIG:?run as: SUBJECT=sub-01 RIG=configs/<team>/rigs/<rig>.json sh $0 [session]}
-SES=${1:-$(uv run fmri-ses --subject "$SUBJECT" --rig "$RIG")}
 
-uv run fmri-play --curriculum configs/curricula/baba_auto/all.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 600 --loop
+set -e  # Exit on error
 
-#uv run fmri-tasks --config localizers/motor.json
+# Session Parameters
+SUBJECT=sub-01
+RIG=configs/examples/rigs/curdes-v1-ABXY-nav.json
+SES=1
+RUN_DURATION=30
 
-uv run fmri-play --curriculum configs/curricula/vizdoom/take_cover_defend_line.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 600 --loop
+# Runs, one per line
 
-uv run fmri-play --curriculum configs/curricula/minihack/all.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 600 --loop
+uv run fmri-play --curriculum configs/curricula/aigamestore/games/game1-ABXY-nav.json --subject $SUBJECT --ses $SES --run 1 --rig "$RIG" --duration $RUN_DURATION --loop --resume
 
-uv run fmri-play --curriculum configs/curricula/stk/all.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 600 --loop
+uv run fmri-play --curriculum configs/curricula/aigamestore/games/game4-ABXY-nav.json --subject $SUBJECT --ses $SES --run 2 --rig "$RIG" --duration $RUN_DURATION --loop --resume
 
-uv run fmri-play --curriculum configs/curricula/crafter/levels/L1.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG" --duration 600 --loop
+uv run fmri-play --curriculum configs/curricula/aigamestore/games/game7-ABXY-nav.json --subject $SUBJECT --ses $SES --run 3 --rig "$RIG" --duration $RUN_DURATION --loop --resume
+
+uv run fmri-play --curriculum configs/curricula/aigamestore/games/game8-ABXY-nav.json --subject $SUBJECT --ses $SES --run 4 --rig "$RIG" --duration $RUN_DURATION --loop --resume
+
+uv run fmri-play --curriculum configs/curricula/rushhour/all-ABXY-nav.json --subject $SUBJECT --ses $SES --run 5 --rig "$RIG" --duration $RUN_DURATION --loop --resume
+
+uv run fmri-play --curriculum configs/curricula/baba_auto/all-ABXY-nav.json --subject $SUBJECT --ses $SES --run 6 --rig "$RIG" --duration $RUN_DURATION --loop --resume
