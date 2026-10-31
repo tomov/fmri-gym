@@ -5,7 +5,8 @@ any rig, and a rig (:class:`~fmri_gym.config.rig.RigConfig`) nothing of any
 curriculum; a run is one of each, played for one subject, so what needs both
 -- a game key the rig's scanner types at every volume, or one its controller
 cannot press -- is checked here
-(:meth:`RunConfig.problems`). ``fmri_play`` owns the flags and their
+(:meth:`RunConfig.problems`), and so, on request, is whether each game starts on
+this machine. ``fmri_play`` owns the flags and their
 spellings; :meth:`RunConfig.from_args` is the one place the command line is read.
 """
 
@@ -13,7 +14,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
+import time
 from dataclasses import dataclass
+from importlib import metadata
 from typing import NamedTuple
 
 from ..menu import MenuSettings
@@ -83,7 +87,7 @@ class RunConfig:
         """Seconds of fixation the run closes on: the rig's; ``None`` as for the start."""
         return None if self.curriculum.has_checks else self.rig.end_fixation
 
-    def problems(self) -> list[str]:
+    def problems(self, *, load_games: bool = False) -> list[str]:
         """What keeps this curriculum from being played on this rig, which neither shows alone.
 
         A button box in a digit mode sends its trigger as a digit too (Current
@@ -93,11 +97,47 @@ class RunConfig:
         phase needing another would leave the participant a dead button. A
         ``duration`` must leave time for something besides the rig's fixations.
 
-        :return: one problem per clashing binding, per thing no control can do, and
-            a duration the fixations fill.
+        :param load_games: also build, reset and close each distinct game once, in
+            this process: what this machine has installed, and seconds per game.
+        :return: one problem per clashing binding, per thing no control can do, for
+            a duration the fixations fill, and, with ``load_games``, per game that
+            cannot start.
         """
         return (self._scanner_key_problems() + self._unpressable_problems()
-                + self._duration_problems())
+                + self._duration_problems() + (self._game_problems() if load_games else []))
+
+    def _game_problems(self) -> list[str]:
+        """Build, reset and close each distinct game once; the ones that cannot start.
+
+        Two game phases whose backend and spec differ only in their seed are one
+        game, reset with the first one's seed; a phase with no seed of its own is
+        reset with its index, since what is checked is that it starts, not which
+        episode. Each load is said on stderr.
+        """
+        from ..adapters import get_adapter  # imports no engine until a game is built
+        problems: list[str] = []
+        seen: set[str] = set()
+        seeded, _ = self.curriculum.with_seeds(lambda i: i)
+        for i, phase in enumerate(seeded.phases):
+            if not isinstance(phase, GamePhase):
+                continue
+            unseeded = {k: v for k, v in phase.spec.items() if k != "seed"}
+            key = json.dumps([phase.backend, unseeded], sort_keys=True, default=str)
+            if key in seen:
+                continue
+            seen.add(key)
+            start = time.perf_counter()
+            try:
+                adapter = get_adapter(phase.backend, phase.spec)
+                adapter.reset(phase.seed)
+                adapter.close()
+            except Exception as e:
+                problems.append(f"phase {i}: {phase.backend} game {phase.game!r} cannot start "
+                                f"({type(e).__name__}: {e}){_install_hint(e, phase.backend)}")
+                continue
+            print(f"games: phase {i}, {phase.backend} {phase.game}: built, reset and closed in "
+                  f"{time.perf_counter() - start:.1f} s", file=sys.stderr)
+        return problems
 
     def _duration_problems(self) -> list[str]:
         """A ``duration`` no longer than the rig's fixations together."""
@@ -129,6 +169,16 @@ class RunConfig:
                 for i, phase in enumerate(self.curriculum.phases)
                 for what, combos in key_needs(phase)
                 if not any(set(c) <= pressed for c in combos)]
+
+
+def _install_hint(error: Exception, backend: str) -> str:
+    """How to install what ``error`` found missing: an extra, by name when ``backend`` is one."""
+    if not isinstance(error, ModuleNotFoundError):
+        return ""
+    extras = metadata.metadata("fmri-gym").get_all("Provides-Extra")
+    extra = backend if backend in extras else f"<one of: {', '.join(extras)}>"
+    return (f". Sync its extra together with every other game's, since a sync uninstalls the "
+            f"extras it does not name: uv sync --extra {extra} --extra ...")
 
 
 def key_needs(phase: Phase) -> list[KeyNeed]:
