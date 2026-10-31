@@ -9,9 +9,10 @@
       "Controls:",
       "   [R] or [A]   thrust / fly",
       "",
-      "(press [A] to start)"
+      "Press [A] to start."
     ]
   },
   "keys": {"R": 0, "A": 1},
-  "mode": "episode", "n_episodes": 10, "duration": 3600.0, "fps": 10
+  "mode": "episode", "n_episodes": 10, "duration": 3600.0,
+  "fps": 30, "frame_skip": 2
 }

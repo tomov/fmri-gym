@@ -1,0 +1,20 @@
+{
+  "type": "game", "backend": "aigamestore",
+  "instructions": {
+    "align": "left", "keys_to_dismiss": ["A"],
+    "text": [
+      "Aim and fire colored bubbles. Match three",
+      "or more to clear the hanging cluster.",
+      "",
+      "Controls:",
+      "   [X] / [B]   aim",
+      "   [R]         fire",
+      "   [L]         swap current / next",
+      "",
+      "Press [A] to start."
+    ]
+  },
+  "keys": {"X": 0, "B": 1, "R": 2, "L": 3},
+  "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 120.0,
+  "fps": 30, "frame_skip": 2
+}

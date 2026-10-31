@@ -13,5 +13,6 @@
     ]
   },
   "keys": {"SPACE": 0, "UP": 1},
-  "mode": "episode", "n_episodes": 10, "duration": 300.0, "fps": 10
+  "mode": "episode", "n_episodes": 10, "duration": 300.0,
+  "fps": 30, "frame_skip": 2
 }
