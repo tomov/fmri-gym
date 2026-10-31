@@ -5,7 +5,7 @@ set -e  # Exit on error
 
 # Session Parameters
 SUBJECT=sub-01
-RIG=configs/examples/rigs/curdes-v1-ABXY-nav.json
+RIG=configs/examples/rigs/fmri-curdes-v1-ABXY-nav.json
 SES=1
 RUN_DURATION=30
 
