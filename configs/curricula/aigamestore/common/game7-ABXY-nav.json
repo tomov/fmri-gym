@@ -1,0 +1,22 @@
+{
+  "type": "game", "backend": "aigamestore",
+  "instructions": {
+    "align": "left", "keys_to_dismiss": ["A"],
+    "text": [
+      "Top-down shooter. Eliminate enough enemies,",
+      "then reach extraction before time runs out.",
+      "",
+      "Controls:",
+      "   [X]    left",
+      "   [B]    right",
+      "   [Y]    up",
+      "   [A]    down",
+      "   [R]    shoot",
+      "   [L]    next weapon",
+      "",
+      "Press [A] to start."
+    ]
+  },
+  "keys": {"X": 0, "B": 1, "Y": 2, "A": 3, "R": 4, "L": 12},
+  "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 120.0, "fps": 10
+}

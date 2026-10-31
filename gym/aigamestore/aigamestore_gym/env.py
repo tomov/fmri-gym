@@ -94,7 +94,7 @@ GAME_KEYS: dict[str, list[str]] = {
     "game4": ["SPACE", "UP"],
     "game5": ["LEFT", "RIGHT", "UP"],
     "game6": ["LEFT", "RIGHT", "UP", "SPACE", "Z"],
-    "game7": ["LEFT", "RIGHT", "UP", "DOWN", "Z", "SPACE", "LSHIFT", "1", "2", "3", "4", "5"],
+    "game7": ["LEFT", "RIGHT", "UP", "DOWN", "Z", "SPACE", "LSHIFT", "1", "2", "3", "4", "5", "X"],
     "game8": ["LEFT", "RIGHT", "SPACE", "Z"],
     "game9": ["LEFT", "RIGHT", "UP", "DOWN", "Z", "SPACE", "LSHIFT"],
     "game10": ["LEFT", "RIGHT", "UP", "DOWN", "LSHIFT", "SPACE", "Z"],

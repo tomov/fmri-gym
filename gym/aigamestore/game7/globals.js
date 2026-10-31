@@ -134,6 +134,7 @@ export const KEY = {
   SPACE: 32,
   SHIFT: 16,
   Z: 90,
+  X: 88,
   ENTER: 13,
   ESC: 27,
   R: 82,

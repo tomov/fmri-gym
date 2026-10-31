@@ -51,6 +51,14 @@ export class Player {
       this.updateCurrentWeaponStats();
     }
   }
+
+  // Next owned weapon in the 1-5 key order, wrapping around.
+  cycleWeapon() {
+    const order = Object.keys(this.weapons);
+    const owned = order.filter((type) => this.weapons[type]);
+    const next = owned[(owned.indexOf(this.currentWeapon) + 1) % owned.length];
+    this.switchWeapon(next);
+  }
   
   pickupWeapon(weaponType) {
     if (!this.weapons[weaponType]) {

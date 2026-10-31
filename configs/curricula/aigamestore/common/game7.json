@@ -12,10 +12,11 @@
       "   [SPACE]    sprint",
       "   [LSHIFT]    take cover",
       "   [1]–[5]  switch weapons",
+      "   [X]        next weapon",
       "",
       "(press [SPACE] to start)"
     ]
   },
-  "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "Z": 4, "SPACE": 5, "LSHIFT": 6, "1": 7, "2": 8, "3": 9, "4": 10, "5": 11},
+  "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "Z": 4, "SPACE": 5, "LSHIFT": 6, "1": 7, "2": 8, "3": 9, "4": 10, "5": 11, "X": 12},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 120.0, "fps": 10
 }

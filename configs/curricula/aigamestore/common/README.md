@@ -18,7 +18,7 @@ The env's action is MultiBinary over the game's keys, in `aigamestore_gym.GAME_K
 | game4 | 0=SPACE, 1=UP | [input.js](https://github.com/tomov/fmri-gym/blob/main/gym/aigamestore/game4/input.js) |
 | game5 | 0=LEFT, 1=RIGHT, 2=UP | [controls.js](https://github.com/tomov/fmri-gym/blob/main/gym/aigamestore/game5/controls.js) |
 | game6 | 0=LEFT, 1=RIGHT, 2=UP, 3=SPACE, 4=Z | [input.js](https://github.com/tomov/fmri-gym/blob/main/gym/aigamestore/game6/input.js) |
-| game7 | 0=LEFT, 1=RIGHT, 2=UP, 3=DOWN, 4=Z, 5=SPACE, 6=LSHIFT, 7=1, 8=2, 9=3, 10=4, 11=5 | [input.js](https://github.com/tomov/fmri-gym/blob/main/gym/aigamestore/game7/input.js) |
+| game7 | 0=LEFT, 1=RIGHT, 2=UP, 3=DOWN, 4=Z, 5=SPACE, 6=LSHIFT, 7=1, 8=2, 9=3, 10=4, 11=5, 12=X (next weapon) | [input.js](https://github.com/tomov/fmri-gym/blob/main/gym/aigamestore/game7/input.js) |
 | game8 | 0=LEFT, 1=RIGHT, 2=SPACE, 3=Z | [input.js](https://github.com/tomov/fmri-gym/blob/main/gym/aigamestore/game8/input.js) |
 | game9 | 0=LEFT, 1=RIGHT, 2=UP, 3=DOWN, 4=Z, 5=SPACE, 6=LSHIFT | [input.js](https://github.com/tomov/fmri-gym/blob/main/gym/aigamestore/game9/input.js) |
 | game10 | 0=LEFT, 1=RIGHT, 2=UP, 3=DOWN, 4=LSHIFT, 5=SPACE, 6=Z | [game.js](https://github.com/tomov/fmri-gym/blob/main/gym/aigamestore/game10/game.js) |

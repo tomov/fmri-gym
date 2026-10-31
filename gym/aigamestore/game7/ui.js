@@ -122,7 +122,7 @@ export function drawStartScreen(p) {
   const arrows = keysLabel("Arrow Keys", ["LEFT", "RIGHT", "UP", "DOWN"]);
   const weapons = keysLabel("1-5", ["1", "2", "3", "4", "5"]);
   p.text(`${arrows}: Move | ${keyLabel("Z")}: Shoot | ${keyLabel("SPACE")}: Sprint | ${keyLabel("LSHIFT", "SHIFT")}: Take Cover`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 70);
-  p.text(`${weapons}: Switch Weapons | ${keyLabel("ESCAPE", "ESC")}: Pause`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 90);
+  p.text(`${weapons}: Switch Weapons | ${keyLabel("X")}: Next Weapon | ${keyLabel("ESCAPE", "ESC")}: Pause`, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 + 90);
   
   p.pop();
 }

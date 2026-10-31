@@ -174,6 +174,12 @@ export function handleKeyPress(p, keyCode) {
       case KEY.KEY_4:
         if (gameState.player) gameState.player.switchWeapon("sniper");
         break;
+      case KEY.KEY_5:
+        if (gameState.player) gameState.player.switchWeapon("rocket_launcher");
+        break;
+      case KEY.X:
+        if (gameState.player) gameState.player.cycleWeapon();
+        break;
       case KEY.ENTER:
         if (gameState.gamePhase === "START") {
           startGame(p);
