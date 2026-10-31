@@ -70,16 +70,18 @@ uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/em
 
 ### Baba Is AI
 
+Not in `dbp`; sync the `baba` extra first.
+
 ```bash
+uv sync --extra baba
 uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/empty.json --curriculum configs/curricula/baba/levels/make_win.json
 ```
 
 ### Baba Is Auto
 
-On Linux, first run `sudo apt install build-essential python3-dev`; on a Mac, `xcode-select --install`.
+Included in `dbp`. On Linux, first run `sudo apt install build-essential python3-dev`; on a Mac, `xcode-select --install`.
 
 ```bash
-uv sync --extra dbp --extra baba_auto
 uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/empty.json --curriculum configs/curricula/baba_auto/levels/baba_is_you.json
 ```
 

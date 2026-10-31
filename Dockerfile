@@ -67,8 +67,8 @@ RUN virtualenv /venv \
     && CC=/usr/bin/gcc-12 pip install --no-cache-dir -e .[nethack]  \
 ## the gym/ wrappers by path first (pip has no [tool.uv.sources]); baba_auto compiles pyBaba (~30 s)
     && pip install --no-cache-dir -e gym/aigamestore -e gym/coom -e gym/crafter \
-                                  -e gym/baba -e gym/vgdl -e gym/baba_auto \
-    && pip install --no-cache-dir -e .[dbp,vgdl,baba_auto] \
+                                  -e gym/vgdl -e gym/baba_auto \
+    && pip install --no-cache-dir -e .[dbp,vgdl] \
 ## some of the deps above overwrite pygame-ce, not solved by pyproject.toml need to be reinstalled.
     && pip uninstall -y pygame \
     && pip install --no-cache-dir --force pygame-ce

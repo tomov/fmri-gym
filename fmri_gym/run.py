@@ -756,8 +756,7 @@ class Run:
     def _instructions(self, phase: GamePhase, resumed: bool) -> dict | None:
         """Show a game phase's ``instructions``, if any, as a message headed by its title.
 
-        :param resumed: whether the block carries on from an earlier run: the
-            heading says "Resuming <title>" rather than "Starting <title>".
+        :param resumed: whether the block carries on from an earlier run.
         :return: for the game's manifest entry, the ``text`` shown with its
             ``onset`` and ``offset``; ``None`` without instructions.
         :raises KeyboardInterrupt: on window close or ESC.

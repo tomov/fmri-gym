@@ -141,7 +141,7 @@ class Message(Phase):
 
 @dataclass(frozen=True, slots=True)
 class Instructions:
-    """The screen before a game block: "Starting <title>" over its text."""
+    """The screen before a game block: a heading with its title over its text."""
 
     title: str
     text: str
@@ -157,8 +157,8 @@ class Instructions:
                    keys_to_dismiss=None if keys is None else tuple(keys))
 
     def message(self, resumed: bool) -> Message:
-        """As the message shown, headed "Resuming <title>" for a block a run carries on."""
-        heading = f"{'Resuming' if resumed else 'Starting'} {self.title}"
+        """As the message shown, its heading marking a block a run carries on."""
+        heading = f"{'Resuming:' if resumed else 'Starting:'} {self.title}"
         return Message(spec={}, include_on_resume=False, text=f"{heading}\n\n{self.text}",
                        duration=self.duration, key=" ", keys_to_dismiss=self.keys_to_dismiss,
                        align=self.align)
@@ -173,8 +173,7 @@ class Instructions:
             out.append(f"instructions: unknown field(s) {sorted(unknown)}; the fields are title, "
                        "text, align, duration and keys_to_dismiss")
         if not isinstance(spec.get("title"), str) or not spec["title"]:
-            out.append('instructions: title: missing (the screen says "Starting <title>" or '
-                       '"Resuming <title>")')
+            out.append("instructions: title: missing (the screen's heading names the game)")
         if spec.get("align", "center") not in ("center", "left"):
             out.append(f"instructions: align: expected 'center' or 'left', got {spec['align']!r}")
         out += [f"instructions: {p}" for p in _positive_problems(spec, ("duration",))]

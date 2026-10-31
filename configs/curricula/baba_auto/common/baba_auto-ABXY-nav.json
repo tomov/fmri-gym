@@ -17,6 +17,6 @@
     ]
   },
   "keys": {"R": 0, "Y": 1, "A": 2, "X": 3, "B": 4},
-  "menu": {"key": "L", "hold": 3.0, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["X", "A"], "confirm": "R"},
+  "menu": {"key": "L", "hold": 3.0, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["Y", "A"], "confirm": "R"},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 300.0, "fps": 15, "is_turn_based": true
 }

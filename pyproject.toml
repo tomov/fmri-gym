@@ -83,10 +83,10 @@ gui = ["PySide6-Essentials>=6.6"]
 # therefore not listed: craftium (prebuilt wheel on its GitHub releases) and
 # the VGDL games (a repo checkout on PYTHONPATH; see README "Running VGDL games").
 dbp = [
-    "fmri-gym[vizdoom,coom,aigamestore,crafter,rushhour,baba,minihack,stk]",
+    "fmri-gym[vizdoom,coom,aigamestore,crafter,rushhour,baba_auto,minihack,stk]",
 ]
 all = [
-    "fmri-gym[dbp,ale,retro,nethack,vgdl,baba_auto,arc3,box2d,mujoco,shimmy,tilematch,triggers,gui]",
+    "fmri-gym[dbp,ale,retro,nethack,vgdl,arc3,box2d,mujoco,shimmy,tilematch,triggers,gui]",
 ]
 
 [project.scripts]

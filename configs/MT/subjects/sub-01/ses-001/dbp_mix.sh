@@ -8,7 +8,7 @@ uv run fmri-play --curriculum configs/curricula/crafter/levels/L4.json --subject
 uv run fmri-play --curriculum configs/curricula/coom/levels/pitfall.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG"
 uv run fmri-play --curriculum configs/curricula/minihack/levels/room5x5.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG"
 uv run fmri-play --curriculum configs/curricula/rushhour/levels/easy.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG"
-uv run fmri-play --curriculum configs/curricula/baba/levels/make_win.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG"
+uv run fmri-play --curriculum configs/curricula/baba_auto/levels/baba_is_you.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG"
 uv run fmri-play --curriculum configs/curricula/vizdoom/levels/defend_center.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG"
 uv run fmri-play --curriculum configs/curricula/aigamestore/games/game1.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG"
 uv run fmri-play --curriculum configs/curricula/coom/levels/run_and_gun.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG"

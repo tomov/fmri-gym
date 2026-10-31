@@ -766,7 +766,6 @@ all = [
     { name = "ale-py" },
     { name = "arc3-gym", marker = "python_full_version >= '3.12'" },
     { name = "baba-auto-gym" },
-    { name = "baba-gym" },
     { name = "box2d" },
     { name = "coom-gym" },
     { name = "crafter-gym" },
@@ -814,7 +813,7 @@ crafter = [
 ]
 dbp = [
     { name = "aigamestore-gym" },
-    { name = "baba-gym" },
+    { name = "baba-auto-gym" },
     { name = "coom-gym" },
     { name = "crafter-gym" },
     { name = "minihack" },
@@ -891,8 +890,8 @@ requires-dist = [
     { name = "box2d", marker = "extra == 'box2d'", specifier = ">=2.3.10" },
     { name = "coom-gym", marker = "extra == 'coom'", editable = "gym/coom" },
     { name = "crafter-gym", marker = "extra == 'crafter'", editable = "gym/crafter" },
-    { name = "fmri-gym", extras = ["dbp", "ale", "retro", "nethack", "vgdl", "baba-auto", "arc3", "box2d", "mujoco", "shimmy", "tilematch", "triggers", "gui"], marker = "extra == 'all'" },
-    { name = "fmri-gym", extras = ["vizdoom", "coom", "aigamestore", "crafter", "rushhour", "baba", "minihack", "stk"], marker = "extra == 'dbp'" },
+    { name = "fmri-gym", extras = ["dbp", "ale", "retro", "nethack", "vgdl", "arc3", "box2d", "mujoco", "shimmy", "tilematch", "triggers", "gui"], marker = "extra == 'all'" },
+    { name = "fmri-gym", extras = ["vizdoom", "coom", "aigamestore", "crafter", "rushhour", "baba-auto", "minihack", "stk"], marker = "extra == 'dbp'" },
     { name = "gymnasium" },
     { name = "gymnasium", extras = ["mujoco"], marker = "extra == 'mujoco'" },
     { name = "h5py" },

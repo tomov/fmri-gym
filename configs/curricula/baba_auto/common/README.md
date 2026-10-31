@@ -4,7 +4,7 @@ The `baba_auto` backend's curricula: twelve Baba Is You levels on the baba-is-au
 
 ## Setup
 
-Clone utilForever/baba-is-auto into `external/baba_auto` at the commit the README pins (README, "External checkouts"), then `uv sync --extra baba_auto`: baba-auto-gym (`gym/baba_auto/`) compiles the C++ engine from that checkout, which needs a C++17 compiler and python3-dev. A phase's `game` is a map name under the checkout's `Resources/Maps` (baba_is_you, out_of_reach, volcano, off_limits, grass_yard, pillar_yard, brick_wall, icy_waters, novice_locksmith, lock, affection, turns) or a map file path.
+Clone utilForever/baba-is-auto into `external/baba_auto` at the commit the README pins (README, "External checkouts"), then `uv sync --extra dbp` (or `--extra baba_auto`): baba-auto-gym (`gym/baba_auto/`) compiles the C++ engine from that checkout, which needs a C++17 compiler and python3-dev. A phase's `game` is a map name under the checkout's `Resources/Maps` (baba_is_you, out_of_reach, volcano, off_limits, grass_yard, pillar_yard, brick_wall, icy_waters, novice_locksmith, lock, affection, turns) or a map file path.
 
 ## Keys
 

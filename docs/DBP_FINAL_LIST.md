@@ -11,7 +11,7 @@ The games settled on for the DBP study, and how each runs in **fmri-gym**. All 8
 | Building/open-world | **Crafter** | `crafter` (crafter-gym, `gym/crafter/`, over crafter's old-gym env) | `curricula/crafter/levels/L4.json` | ✅ |
 | Building/open-world | **Craftium** | `gym` + `import_module` (Luanti voxel) | none (see README, "Games without a curriculum") | ✅ |
 | Puzzle | **Rush Hour** | `rushhour` (Go engine + colored board) | `curricula/rushhour/levels/easy.json` | ✅ |
-| Language | **Baba Is AI** (Baba Is You-style puzzles) | `baba` (baba-gym, `gym/baba/`, over baba-is-ai's old-gym env) | `curricula/baba/levels/make_win.json` | ✅ |
+| Language | **Baba Is Auto** (Baba Is You original levels) | `baba_auto` (baba-auto-gym, `gym/baba_auto/`, over baba-is-auto's C++ engine) | `curricula/baba_auto/levels/baba_is_you.json`, `all.json` | ✅ |
 | Adventure | **MiniHack** | `minihack` | `curricula/minihack/levels/room5x5.json` | ✅ |
 | Sports/racing | **SuperTuxKart** | `stk` (supertuxkart-gym's gym server, 3D) | `curricula/stk/levels/hacienda.json` (+ 4 more tracks) | ✅ |
 | Interactive fiction | Zork* | — (no Gymnasium) | — | ⏭️ skipped |
@@ -36,4 +36,4 @@ Each was verified to render a real frame (PNG spot-checks for the SuperTuxKart 3
 
 ## Dependency reality
 
-Everything above coexists in **one** `fmri-gym` env (gymnasium 1.2, numpy 1.26, setuptools<81; `vizdoom` brings pygame-ce). The only true conflicts were COOM (gymnasium 0.28) and, nominally, craftium (0.29 pin — but runs on 1.2). Non-PyPI installs: `baba` (GitHub, pulled by the `baba` extra) and `craftium` (release wheel). See the extras in `pyproject.toml` for the full list and the per-config `_note` fields for game-specific setup.
+Everything above coexists in **one** `fmri-gym` env (gymnasium 1.2, numpy 1.26, setuptools<81; `vizdoom` brings pygame-ce). The only true conflicts were COOM (gymnasium 0.28) and, nominally, craftium (0.29 pin — but runs on 1.2). Non-PyPI installs: `baba_auto` (C++ engine compiled from the pinned `external/baba_auto` checkout; the `dbp` extra) and `craftium` (release wheel). See the extras in `pyproject.toml` for the full list and the per-config `_note` fields for game-specific setup.
