@@ -1,0 +1,9 @@
+{
+  "curriculum": [
+    {"__include": "../common/game7-ABXY-nav.json", "game": "game7/level1", "instructions": {"title": "Extract, level 1 of 5"}},
+    {"__include": "../common/game7-ABXY-nav.json", "game": "game7/level2", "instructions": {"title": "Extract, level 2 of 5"}},
+    {"__include": "../common/game7-ABXY-nav.json", "game": "game7/level3", "instructions": {"title": "Extract, level 3 of 5"}},
+    {"__include": "../common/game7-ABXY-nav.json", "game": "game7/level4", "instructions": {"title": "Extract, level 4 of 5"}},
+    {"__include": "../common/game7-ABXY-nav.json", "game": "game7/level5", "instructions": {"title": "Extract, level 5 of 5"}}
+  ]
+}
