@@ -2,7 +2,6 @@
   "curriculum": [
     {"type": "message", "text": "VGDL: missile_command", "duration": 2.0},
     {"type": "fixation", "duration": 1.0},
-    {"__include": "../common/missile_command.json", "duration": 300.0},
-    {"type": "fixation", "duration": 2.0}
+    {"__include": "../common/missile_command.json", "duration": 300.0}
   ]
 }

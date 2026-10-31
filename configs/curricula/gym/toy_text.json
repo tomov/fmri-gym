@@ -14,7 +14,6 @@
     {"__include": "common/taxi.json", "mode": "episode", "n_episodes": 2, "duration": 15.0},
     {"type": "message", "text": "Blackjack ([LEFT]=stick, [RIGHT]=hit)", "duration": 2.0},
     {"type": "fixation", "duration": 1.0},
-    {"__include": "common/blackjack.json", "mode": "episode", "n_episodes": 2, "duration": 15.0},
-    {"type": "fixation", "duration": 3.0}
+    {"__include": "common/blackjack.json", "mode": "episode", "n_episodes": 2, "duration": 15.0}
   ]
 }

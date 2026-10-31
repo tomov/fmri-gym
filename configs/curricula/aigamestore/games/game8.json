@@ -1,6 +1,5 @@
 {
   "curriculum": [
-    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {
       "__include": "../common/game8.json",
       "game": "game8/level1",
@@ -45,7 +44,6 @@
       "__include": "../common/game8.json",
       "game": "game8/level9",
       "instructions": {"title": "Bubble Shooter, level 9 of 9"}
-    },
-    {"type": "fixation", "duration": 2.0}
+    }
   ]
 }

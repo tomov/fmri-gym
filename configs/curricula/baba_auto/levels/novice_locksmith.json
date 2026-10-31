@@ -1,6 +1,5 @@
 {
   "curriculum": [
-    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {
       "__include": "../common/baba_auto.json",
       "game": "novice_locksmith",
@@ -18,7 +17,6 @@
           "(press [SPACE] to start)"
         ]
       }
-    },
-    {"type": "fixation", "duration": 2.0}
+    }
   ]
 }

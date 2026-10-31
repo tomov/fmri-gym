@@ -260,7 +260,6 @@ def new_curriculum() -> dict:
             {"type": "fixation", "duration": 2.0},
             {"type": "game", "backend": "ale", "game": "ALE/Pong-v5", "mode": "duration",
              "duration": 60.0, "fps": 30, "keys": {"UP": 2, "DOWN": 3}},
-            {"type": "fixation", "duration": 2.0},
         ],
     }
 

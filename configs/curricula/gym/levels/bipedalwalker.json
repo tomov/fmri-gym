@@ -2,7 +2,6 @@
   "curriculum": [
     {"type": "message", "text": "Box2D: BipedalWalker-v3", "duration": 2.0},
     {"type": "fixation", "duration": 1.0},
-    {"__include": "../common/bipedalwalker.json", "mode": "duration", "duration": 300.0},
-    {"type": "fixation", "duration": 2.0}
+    {"__include": "../common/bipedalwalker.json", "mode": "duration", "duration": 300.0}
   ]
 }

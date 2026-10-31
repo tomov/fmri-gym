@@ -1,6 +1,5 @@
 {
   "curriculum": [
-    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {
       "__include": "../common/coom.json",
       "game": "hide_and_seek",
@@ -19,7 +18,6 @@
         ]
       },
       "keys": {"": 0, "LEFT": 8, "RIGHT": 4, "UP": 2, "LEFT+UP": 10, "RIGHT+UP": 6, "SPACE": 1, "UP+SPACE": 3}
-    },
-    {"type": "fixation", "duration": 2.0}
+    }
   ]
 }

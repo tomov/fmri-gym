@@ -1,7 +1,5 @@
 {
   "curriculum": [
-    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
-    {"__include": "../common/eat.json", "game": "MiniHack-Eat-v0"},
-    {"type": "fixation", "duration": 2.0}
+    {"__include": "../common/eat.json", "game": "MiniHack-Eat-v0"}
   ]
 }

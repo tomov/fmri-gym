@@ -1,6 +1,5 @@
 {
   "curriculum": [
-    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {
       "__include": "common/race.json",
       "instructions": {
@@ -119,7 +118,6 @@
         ]
       },
       "track": "snowmountain"
-    },
-    {"type": "fixation", "duration": 2.0}
+    }
   ]
 }

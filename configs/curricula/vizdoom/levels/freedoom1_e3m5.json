@@ -1,11 +1,9 @@
 {
   "curriculum": [
-    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {
       "__include": "../common/freedoom1.json",
       "game": "VizdoomFreedoom1E3M5-S2-v0",
       "instructions": {"title": "Freedoom: Infernal Hallows"}
-    },
-    {"type": "fixation", "duration": 2.0}
+    }
   ]
 }

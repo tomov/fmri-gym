@@ -4,7 +4,6 @@
     {"type": "fixation", "duration": 1.0},
     {"type": "game", "backend": "retro", "game": "Airstriker-Genesis-v0",
      "mode": "duration", "duration": 15.0, "fps": 59.92274340431231, "state_stride": 15,
-     "keys": {"LEFT": 6, "RIGHT": 7, "UP": 4, "DOWN": 5, "X": 0}},
-    {"type": "fixation", "duration": 1.0}
+     "keys": {"LEFT": 6, "RIGHT": 7, "UP": 4, "DOWN": 5, "X": 0}}
   ]
 }

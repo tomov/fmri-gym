@@ -29,7 +29,6 @@
     {"__include": "common/pushBoulders.json", "duration": 15.0},
     {"type": "message", "text": "relational", "duration": 1.5},
     {"type": "fixation", "duration": 1.0},
-    {"__include": "common/relational.json", "duration": 15.0},
-    {"type": "fixation", "duration": 3.0}
+    {"__include": "common/relational.json", "duration": 15.0}
   ]
 }

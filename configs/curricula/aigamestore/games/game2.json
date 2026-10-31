@@ -1,6 +1,5 @@
 {
   "curriculum": [
-    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {
       "__include": "../common/game2.json",
       "game": "game2/level1",
@@ -45,7 +44,6 @@
       "__include": "../common/game2.json",
       "game": "game2/level9",
       "instructions": {"title": "Slingshot Birds, level 9 of 9"}
-    },
-    {"type": "fixation", "duration": 2.0}
+    }
   ]
 }

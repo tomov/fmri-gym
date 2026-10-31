@@ -1,6 +1,5 @@
 {
   "curriculum": [
-    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {
       "__include": "../common/game10.json",
       "game": "game10/level1",
@@ -30,7 +29,6 @@
       "__include": "../common/game10.json",
       "game": "game10/level6",
       "instructions": {"title": "Haunted Mansion, level 6 of 6"}
-    },
-    {"type": "fixation", "duration": 2.0}
+    }
   ]
 }

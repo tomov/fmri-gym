@@ -68,7 +68,6 @@
       "type": "game", "backend": "aigamestore", "game": "game10",
       "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "X": 4, "SPACE": 5, "Z": 6},
       "mode": "duration", "duration": 15.0, "fps": 10
-    },
-    {"type": "fixation", "duration": 3.0}
+    }
   ]
 }

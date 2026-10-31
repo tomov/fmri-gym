@@ -1,11 +1,9 @@
 {
   "curriculum": [
-    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {
       "__include": "../common/freedoom1.json",
       "game": "VizdoomFreedoom1E4M8-S2-v0",
       "instructions": {"title": "Freedoom: Launch Bay"}
-    },
-    {"type": "fixation", "duration": 2.0}
+    }
   ]
 }

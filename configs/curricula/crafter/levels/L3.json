@@ -1,6 +1,5 @@
 {
   "curriculum": [
-    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {
       "__include": "../common/crafter.json",
       "instructions": {
@@ -37,7 +36,6 @@
         ]
       },
       "env_kwargs": {"level": "L3_predation"}
-    },
-    {"type": "fixation", "duration": 2.0}
+    }
   ]
 }

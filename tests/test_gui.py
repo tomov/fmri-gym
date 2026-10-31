@@ -159,7 +159,7 @@ def test_flags_fmri_play_would_refuse_are_problems(gui):
     from fmri_gym.gui.session_editor import _flag_problems
 
     assert _flag_problems({}) == [] and _flag_problems({"duration": 60.0, "loop": True}) == []
-    assert _flag_problems({"duration": 5.0})  # shorter than its closing fixation
+    assert _flag_problems({"duration": 0.0})  # no length at all
     assert _flag_problems({"loop": True})  # looping needs a length
 
 

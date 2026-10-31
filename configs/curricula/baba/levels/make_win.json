@@ -1,6 +1,5 @@
 {
   "curriculum": [
-    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {
       "type": "game", "backend": "baba", "game": "env/make_win",
       "instructions": {
@@ -21,7 +20,6 @@
                "options": ["reset", "forfeit", "resume"],
                "move": ["UP", "DOWN"], "confirm": "SPACE"},
       "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 300.0, "fps": 15, "is_turn_based": true
-    },
-    {"type": "fixation", "duration": 2.0}
+    }
   ]
 }

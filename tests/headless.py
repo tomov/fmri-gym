@@ -65,7 +65,7 @@ class KeyScript:
         self._names = names
         self._queue = list(dismiss) * 2          # instructions, and a message in front of them
         self._period = 1.0 / rate
-        self._next = time.perf_counter() + 1.0  # let the opening fixation show first
+        self._next = time.perf_counter() + 1.0  # let the first screen show first
         self._down: tuple[str, float] | None = None
         self.presses = 0
 

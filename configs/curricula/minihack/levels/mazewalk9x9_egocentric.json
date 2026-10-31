@@ -1,7 +1,5 @@
 {
   "curriculum": [
-    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
-    {"__include": "../common/mazewalk9x9.json", "game": "MiniHack-MazeWalk-9x9-v0"},
-    {"type": "fixation", "duration": 2.0}
+    {"__include": "../common/mazewalk9x9.json", "game": "MiniHack-MazeWalk-9x9-v0"}
   ]
 }

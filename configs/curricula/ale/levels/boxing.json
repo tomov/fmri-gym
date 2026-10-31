@@ -2,7 +2,6 @@
   "curriculum": [
     {"type": "message", "text": "Atari: Boxing", "duration": 2.0},
     {"type": "fixation", "duration": 1.0},
-    {"__include": "../common/boxing.json", "duration": 300.0},
-    {"type": "fixation", "duration": 2.0}
+    {"__include": "../common/boxing.json", "duration": 300.0}
   ]
 }

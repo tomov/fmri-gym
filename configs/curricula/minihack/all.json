@@ -1,6 +1,5 @@
 {
   "curriculum": [
-    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {"__include": "common/room5x5.json", "game": "minihack_levels:MiniHack-Room-5x5-Allocentric-v0"},
     {"type": "fixation", "duration": 1.0},
     {"__include": "common/room15x15.json", "game": "minihack_levels:MiniHack-Room-15x15-Allocentric-v0"},
@@ -11,7 +10,6 @@
     {"type": "fixation", "duration": 1.0},
     {"__include": "common/river.json", "game": "minihack_levels:MiniHack-River-Allocentric-v0"},
     {"type": "fixation", "duration": 1.0},
-    {"__include": "common/eat.json", "game": "minihack_levels:MiniHack-Eat-Allocentric-v0"},
-    {"type": "fixation", "duration": 2.0}
+    {"__include": "common/eat.json", "game": "minihack_levels:MiniHack-Eat-Allocentric-v0"}
   ]
 }

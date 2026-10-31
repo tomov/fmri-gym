@@ -1,6 +1,5 @@
 {
   "curriculum": [
-    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
     {
       "__include": "../common/crafter.json",
       "instructions": {
@@ -36,7 +35,6 @@
         ]
       },
       "env_kwargs": {"level": "L2_homeostasis"}
-    },
-    {"type": "fixation", "duration": 2.0}
+    }
   ]
 }

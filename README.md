@@ -130,7 +130,7 @@ A curriculum's path after `curricula/`, in camelCase (BIDS labels are letters an
 | `vgdl/` | 11 | `levels/`: aliens, avoidGeorge, beesAndBirds, jaws, missile_command, plaqueAttack, portals, preconditions, pushBoulders, relational (needs the VGDL checkout), and `all` |
 | `vizdoom/` | 78 | `levels/`: basic, deadly_corridor, defend_center, defend_line, health_gathering_supreme, my_way_home, predict_position, take_cover, deathmatch, freedoom1_e1m1 … freedoom1_e4m9 and freedoom2_map01 … freedoom2_map32 (every map of [Freedoom](https://freedoom.github.io/) Phase 1 and Phase 2, whose WADs ship with `vizdoom`; `VizdoomDoom*` plays the original WADs, given them); and `take_cover_defend_line`, two of them back to back |
 
-Each backend's `common/README.md` says what its curricula play, how to set them up and what the action indices in their `keys` mean. Most are a `fixation → game → fixation` run whose game phase opens on its own instructions screen.
+Each backend's `common/README.md` says what its curricula play, how to set them up and what the action indices in their `keys` mean. Most are a single game phase that opens on its own instructions screen; the fixation before and after a run is the rig's (`start_fixation`, `end_fixation`), not the curriculum's.
 
 #### Games without a curriculum
 

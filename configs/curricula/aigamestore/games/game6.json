@@ -1,7 +1,5 @@
 {
   "curriculum": [
-    {"type": "fixation", "duration": 1.0, "include_on_resume": true},
-    {"__include": "../common/game6.json", "game": "game6/level1", "instructions": {"title": "Shadow Journey"}},
-    {"type": "fixation", "duration": 2.0}
+    {"__include": "../common/game6.json", "game": "game6/level1", "instructions": {"title": "Shadow Journey"}}
   ]
 }
