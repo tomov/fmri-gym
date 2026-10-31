@@ -24,7 +24,7 @@
       "after that, easy and hard ones come in any order.",
       "Take all the time you need.",
       "",
-      "(press [A] to begin)"
+      "Press [A] to begin."
     ]
   },
   "keys": {"L": 4, "R": 5, "X": 8, "B": 9, "Y": 10, "A": 11},
