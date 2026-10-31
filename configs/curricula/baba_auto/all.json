@@ -1,27 +1,16 @@
 {
   "curriculum": [
     {"__include": "common/baba_auto.json", "game": "baba_is_you", "instructions": {"title": "Baba Is You"}},
-    {"type": "fixation", "duration": 1.0},
     {"__include": "common/baba_auto.json", "game": "out_of_reach", "instructions": {"title": "Baba Is You: Out of Reach"}},
-    {"type": "fixation", "duration": 1.0},
     {"__include": "common/baba_auto.json", "game": "volcano", "instructions": {"title": "Baba Is You: Volcano"}},
-    {"type": "fixation", "duration": 1.0},
     {"__include": "common/baba_auto.json", "game": "off_limits", "instructions": {"title": "Baba Is You: Off Limits"}},
-    {"type": "fixation", "duration": 1.0},
     {"__include": "common/baba_auto.json", "game": "grass_yard", "instructions": {"title": "Baba Is You: Grass Yard"}},
-    {"type": "fixation", "duration": 1.0},
-    {"__include": "common/baba_auto.json", "game": "pillar_yard", "instructions": {"title": "Baba Is You: Pillar Yard"}},
-    {"type": "fixation", "duration": 1.0},
-    {"__include": "common/baba_auto.json", "game": "brick_wall", "instructions": {"title": "Baba Is You: Brick Wall"}},
-    {"type": "fixation", "duration": 1.0},
     {"__include": "common/baba_auto.json", "game": "icy_waters", "instructions": {"title": "Baba Is You: Icy Waters"}},
-    {"type": "fixation", "duration": 1.0},
-    {"__include": "common/baba_auto.json", "game": "novice_locksmith", "instructions": {"title": "Baba Is You: Novice Locksmith"}},
-    {"type": "fixation", "duration": 1.0},
-    {"__include": "common/baba_auto.json", "game": "lock", "instructions": {"title": "Baba Is You: Lock"}},
-    {"type": "fixation", "duration": 1.0},
+    {"__include": "common/baba_auto.json", "game": "turns", "instructions": {"title": "Baba Is You: Turns"}},
     {"__include": "common/baba_auto.json", "game": "affection", "instructions": {"title": "Baba Is You: Affection"}},
-    {"type": "fixation", "duration": 1.0},
-    {"__include": "common/baba_auto.json", "game": "turns", "instructions": {"title": "Baba Is You: Turns"}}
+    {"__include": "common/baba_auto.json", "game": "pillar_yard", "instructions": {"title": "Baba Is You: Pillar Yard"}},
+    {"__include": "common/baba_auto.json", "game": "brick_wall", "instructions": {"title": "Baba Is You: Brick Wall"}},
+    {"__include": "common/baba_auto.json", "game": "lock", "instructions": {"title": "Baba Is You: Lock"}},
+    {"__include": "common/baba_auto.json", "game": "novice_locksmith", "instructions": {"title": "Baba Is You: Novice Locksmith"}}
   ]
 }

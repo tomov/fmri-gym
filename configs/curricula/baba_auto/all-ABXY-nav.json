@@ -1,0 +1,16 @@
+{
+  "curriculum": [
+    {"__include": "common/baba_auto-ABXY-nav.json", "game": "baba_is_you", "instructions": {"title": "Baba Is You"}},
+    {"__include": "common/baba_auto-ABXY-nav.json", "game": "out_of_reach", "instructions": {"title": "Baba Is You: Out of Reach"}},
+    {"__include": "common/baba_auto-ABXY-nav.json", "game": "volcano", "instructions": {"title": "Baba Is You: Volcano"}},
+    {"__include": "common/baba_auto-ABXY-nav.json", "game": "off_limits", "instructions": {"title": "Baba Is You: Off Limits"}},
+    {"__include": "common/baba_auto-ABXY-nav.json", "game": "grass_yard", "instructions": {"title": "Baba Is You: Grass Yard"}},
+    {"__include": "common/baba_auto-ABXY-nav.json", "game": "icy_waters", "instructions": {"title": "Baba Is You: Icy Waters"}},
+    {"__include": "common/baba_auto-ABXY-nav.json", "game": "turns", "instructions": {"title": "Baba Is You: Turns"}},
+    {"__include": "common/baba_auto-ABXY-nav.json", "game": "affection", "instructions": {"title": "Baba Is You: Affection"}},
+    {"__include": "common/baba_auto-ABXY-nav.json", "game": "pillar_yard", "instructions": {"title": "Baba Is You: Pillar Yard"}},
+    {"__include": "common/baba_auto-ABXY-nav.json", "game": "brick_wall", "instructions": {"title": "Baba Is You: Brick Wall"}},
+    {"__include": "common/baba_auto-ABXY-nav.json", "game": "lock", "instructions": {"title": "Baba Is You: Lock"}},
+    {"__include": "common/baba_auto-ABXY-nav.json", "game": "novice_locksmith", "instructions": {"title": "Baba Is You: Novice Locksmith"}}
+  ]
+}
