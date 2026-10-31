@@ -13,7 +13,7 @@ uv run pytest --backend none             # the engine-free tests only
 
 | file | needs | checks |
 |---|---|---|
-| `test_configs.py` | nothing | every config under `configs/` validates as `fmri-play` would; every `get_adapter` backend has a row in `backends.py` |
+| `test_configs.py` | nothing | every config under `configs/` validates as `fmri-play` would; each curriculum that fits six buttons plays on some controller rig here (a rig's bindings are written for its curricula, so not on every one); every `get_adapter` backend has a row in `backends.py` |
 | `test_core.py` | nothing | the logger's round trip (lines, pixels, savestates, sound), the keymaps, `validate_curriculum`, the change-to-backend map |
 | `test_rig.py` | nothing | the rig file: which rig is picked, the defaults it leaves out, and the files it refuses; the reports the `hid` trigger backend sends, on a fake hidapi |
 | `test_audio_stream.py` | nothing | the PortAudio callback splices queued chunks whole, once, in order, at the onset asked for |

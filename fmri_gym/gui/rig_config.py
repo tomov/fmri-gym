@@ -119,8 +119,8 @@ RIG_CHECK_FIELDS = [
               "commas (e.g. 35). Every check already tests 60 and 30 fps."),
 ]
 
-#: The map every curriculum here is written for: a six-button controller's buttons and
-#: stick on the ten keys the games use (README, "Rigs").
+#: The map most curricula here are written for: a six-button controller's buttons and
+#: stick on the ten keys those games use (README, "Rigs").
 STANDARD_BINDINGS = {"A": "SPACE", "X": "X", "B": "C", "Y": "Z", "LT": "A", "RT": "S",
                      "UP": "UP", "DOWN": "DOWN", "LEFT": "LEFT", "RIGHT": "RIGHT"}
 
@@ -830,7 +830,7 @@ class _RigWindow(QtWidgets.QDialog):
         self.bind_key.setToolTip("Select a control in the list, then press the keyboard key it "
                                  "should press.")
         self.standard = ui.button("Use the standard map", self._use_standard_bindings)
-        self.standard.setToolTip("The map every game here is written for: A SPACE, X X, B C, "
+        self.standard.setToolTip("The map most games here are written for: A SPACE, X X, B C, "
                                  "Y Z, LT A, RT S, and the stick on the arrows.")
         self.bindings_note = QtWidgets.QLabel()
         self.bindings_note.setObjectName("hint")
