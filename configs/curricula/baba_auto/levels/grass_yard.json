@@ -1,22 +1,5 @@
 {
   "curriculum": [
-    {
-      "__include": "../common/baba_auto.json",
-      "game": "grass_yard",
-      "instructions": {
-        "title": "Baba Is You: Grass Yard",
-        "text": [
-          "You are Baba. Push word blocks to rewrite the rules.",
-          "Push and align the words to make a winning rule.",
-          "",
-          "Controls:",
-          "   [ARROWS]   move",
-          "   [SPACE]    wait a turn",
-          "   hold [X]   pause menu (restart / give up / resume)",
-          "",
-          "(press [SPACE] to start)"
-        ]
-      }
-    }
+    {"__include": "../common/baba_auto.json", "game": "grass_yard", "instructions": {"title": "Baba Is You: Grass Yard"}}
   ]
 }

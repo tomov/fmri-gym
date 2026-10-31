@@ -1,6 +1,18 @@
 {
   "type": "game", "backend": "baba_auto",
-  "instructions": {"align": "left", "keys_to_dismiss": ["SPACE"]},
+  "instructions": {
+    "align": "left", "keys_to_dismiss": ["SPACE"],
+    "text": [
+      "You are Baba. Push word blocks to rewrite the rules.",
+      "",
+      "Controls:",
+      "   [ARROWS]   move",
+      "   [SPACE]    wait a turn",
+      "   hold [X]   pause menu (restart / give up / resume)",
+      "",
+      "(press [SPACE] to start)"
+    ]
+  },
   "keys": {"SPACE": 0, "UP": 1, "DOWN": 2, "LEFT": 3, "RIGHT": 4},
   "menu": {"key": "X", "hold": 3.0, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["UP", "DOWN"], "confirm": "SPACE"},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 300.0, "fps": 15, "is_turn_based": true

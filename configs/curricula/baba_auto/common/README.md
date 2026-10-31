@@ -1,6 +1,6 @@
 # Baba Is Auto curricula
 
-The `baba_auto` backend's curricula: twelve Baba Is You levels on the baba-is-auto engine (language / rule-manipulation puzzles: push word blocks to rewrite the rules), one file each. Every game phase includes `common/baba_auto.json` (keys, menu, blocking mode) and states its level and instructions (README, "Shared phases").
+The `baba_auto` backend's curricula: twelve Baba Is You levels on the baba-is-auto engine (language / rule-manipulation puzzles: push word blocks to rewrite the rules), one file each. Every game phase includes `common/baba_auto.json` (instructions, keys, menu, blocking mode) and states its level and the instructions' title (README, "Shared phases").
 
 ## Setup
 

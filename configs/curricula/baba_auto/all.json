@@ -1,231 +1,27 @@
 {
   "curriculum": [
-    {
-      "__include": "common/baba_auto.json",
-      "game": "baba_is_you",
-      "instructions": {
-        "title": "Baba Is You",
-        "text": [
-          "You are Baba. Push word blocks to rewrite the rules.",
-          "Whatever IS WIN, touch it to win.",
-          "",
-          "Controls:",
-          "   [ARROWS]   move",
-          "   [SPACE]    wait a turn",
-          "   hold [X]   pause menu (restart / give up / resume)",
-          "",
-          "(press [SPACE] to start)"
-        ]
-      }
-    },
+    {"__include": "common/baba_auto.json", "game": "baba_is_you", "instructions": {"title": "Baba Is You"}},
     {"type": "fixation", "duration": 1.0},
-    {
-      "__include": "common/baba_auto.json",
-      "game": "out_of_reach",
-      "instructions": {
-        "title": "Baba Is You: Out of Reach",
-        "text": [
-          "You are Baba. Push word blocks to rewrite the rules.",
-          "The rule you need is walled off. Make a way to it.",
-          "",
-          "Controls:",
-          "   [ARROWS]   move",
-          "   [SPACE]    wait a turn",
-          "   hold [X]   pause menu (restart / give up / resume)",
-          "",
-          "(press [SPACE] to start)"
-        ]
-      }
-    },
+    {"__include": "common/baba_auto.json", "game": "out_of_reach", "instructions": {"title": "Baba Is You: Out of Reach"}},
     {"type": "fixation", "duration": 1.0},
-    {
-      "__include": "common/baba_auto.json",
-      "game": "volcano",
-      "instructions": {
-        "title": "Baba Is You: Volcano",
-        "text": [
-          "You are Baba. Push word blocks to rewrite the rules.",
-          "Lava is hot and you melt. Change what is hot, or what melts.",
-          "",
-          "Controls:",
-          "   [ARROWS]   move",
-          "   [SPACE]    wait a turn",
-          "   hold [X]   pause menu (restart / give up / resume)",
-          "",
-          "(press [SPACE] to start)"
-        ]
-      }
-    },
+    {"__include": "common/baba_auto.json", "game": "volcano", "instructions": {"title": "Baba Is You: Volcano"}},
     {"type": "fixation", "duration": 1.0},
-    {
-      "__include": "common/baba_auto.json",
-      "game": "off_limits",
-      "instructions": {
-        "title": "Baba Is You: Off Limits",
-        "text": [
-          "You are Baba. Push word blocks to rewrite the rules.",
-          "Walls stop you, but rules can be pushed too.",
-          "",
-          "Controls:",
-          "   [ARROWS]   move",
-          "   [SPACE]    wait a turn",
-          "   hold [X]   pause menu (restart / give up / resume)",
-          "",
-          "(press [SPACE] to start)"
-        ]
-      }
-    },
+    {"__include": "common/baba_auto.json", "game": "off_limits", "instructions": {"title": "Baba Is You: Off Limits"}},
     {"type": "fixation", "duration": 1.0},
-    {
-      "__include": "common/baba_auto.json",
-      "game": "grass_yard",
-      "instructions": {
-        "title": "Baba Is You: Grass Yard",
-        "text": [
-          "You are Baba. Push word blocks to rewrite the rules.",
-          "Push and align the words to make a winning rule.",
-          "",
-          "Controls:",
-          "   [ARROWS]   move",
-          "   [SPACE]    wait a turn",
-          "   hold [X]   pause menu (restart / give up / resume)",
-          "",
-          "(press [SPACE] to start)"
-        ]
-      }
-    },
+    {"__include": "common/baba_auto.json", "game": "grass_yard", "instructions": {"title": "Baba Is You: Grass Yard"}},
     {"type": "fixation", "duration": 1.0},
-    {
-      "__include": "common/baba_auto.json",
-      "game": "pillar_yard",
-      "instructions": {
-        "title": "Baba Is You: Pillar Yard",
-        "text": [
-          "You are Baba. Push word blocks to rewrite the rules.",
-          "Water sinks whatever falls in. Rewrite what sinks.",
-          "",
-          "Controls:",
-          "   [ARROWS]   move",
-          "   [SPACE]    wait a turn",
-          "   hold [X]   pause menu (restart / give up / resume)",
-          "",
-          "(press [SPACE] to start)"
-        ]
-      }
-    },
+    {"__include": "common/baba_auto.json", "game": "pillar_yard", "instructions": {"title": "Baba Is You: Pillar Yard"}},
     {"type": "fixation", "duration": 1.0},
-    {
-      "__include": "common/baba_auto.json",
-      "game": "brick_wall",
-      "instructions": {
-        "title": "Baba Is You: Brick Wall",
-        "text": [
-          "You are Baba. Push word blocks to rewrite the rules.",
-          "Nothing IS WIN yet. Build the rule that lets you win.",
-          "",
-          "Controls:",
-          "   [ARROWS]   move",
-          "   [SPACE]    wait a turn",
-          "   hold [X]   pause menu (restart / give up / resume)",
-          "",
-          "(press [SPACE] to start)"
-        ]
-      }
-    },
+    {"__include": "common/baba_auto.json", "game": "brick_wall", "instructions": {"title": "Baba Is You: Brick Wall"}},
     {"type": "fixation", "duration": 1.0},
-    {
-      "__include": "common/baba_auto.json",
-      "game": "icy_waters",
-      "instructions": {
-        "title": "Baba Is You: Icy Waters",
-        "text": [
-          "You are Baba. Push word blocks to rewrite the rules.",
-          "Ice and water everywhere. Find a way across or change them.",
-          "",
-          "Controls:",
-          "   [ARROWS]   move",
-          "   [SPACE]    wait a turn",
-          "   hold [X]   pause menu (restart / give up / resume)",
-          "",
-          "(press [SPACE] to start)"
-        ]
-      }
-    },
+    {"__include": "common/baba_auto.json", "game": "icy_waters", "instructions": {"title": "Baba Is You: Icy Waters"}},
     {"type": "fixation", "duration": 1.0},
-    {
-      "__include": "common/baba_auto.json",
-      "game": "novice_locksmith",
-      "instructions": {
-        "title": "Baba Is You: Novice Locksmith",
-        "text": [
-          "You are Baba. Push word blocks to rewrite the rules.",
-          "Doors are shut; keys open them. Rules decide which is which.",
-          "",
-          "Controls:",
-          "   [ARROWS]   move",
-          "   [SPACE]    wait a turn",
-          "   hold [X]   pause menu (restart / give up / resume)",
-          "",
-          "(press [SPACE] to start)"
-        ]
-      }
-    },
+    {"__include": "common/baba_auto.json", "game": "novice_locksmith", "instructions": {"title": "Baba Is You: Novice Locksmith"}},
     {"type": "fixation", "duration": 1.0},
-    {
-      "__include": "common/baba_auto.json",
-      "game": "lock",
-      "instructions": {
-        "title": "Baba Is You: Lock",
-        "text": [
-          "You are Baba. Push word blocks to rewrite the rules.",
-          "Change what opens what, or what stops you.",
-          "",
-          "Controls:",
-          "   [ARROWS]   move",
-          "   [SPACE]    wait a turn",
-          "   hold [X]   pause menu (restart / give up / resume)",
-          "",
-          "(press [SPACE] to start)"
-        ]
-      }
-    },
+    {"__include": "common/baba_auto.json", "game": "lock", "instructions": {"title": "Baba Is You: Lock"}},
     {"type": "fixation", "duration": 1.0},
-    {
-      "__include": "common/baba_auto.json",
-      "game": "affection",
-      "instructions": {
-        "title": "Baba Is You: Affection",
-        "text": [
-          "You are Baba. Push word blocks to rewrite the rules.",
-          "Something moves on its own. Use it, or stop it.",
-          "",
-          "Controls:",
-          "   [ARROWS]   move",
-          "   [SPACE]    wait a turn",
-          "   hold [X]   pause menu (restart / give up / resume)",
-          "",
-          "(press [SPACE] to start)"
-        ]
-      }
-    },
+    {"__include": "common/baba_auto.json", "game": "affection", "instructions": {"title": "Baba Is You: Affection"}},
     {"type": "fixation", "duration": 1.0},
-    {
-      "__include": "common/baba_auto.json",
-      "game": "turns",
-      "instructions": {
-        "title": "Baba Is You: Turns",
-        "text": [
-          "You are Baba. Push word blocks to rewrite the rules.",
-          "Some things turn as they move. Steer the rules into place.",
-          "",
-          "Controls:",
-          "   [ARROWS]   move",
-          "   [SPACE]    wait a turn",
-          "   hold [X]   pause menu (restart / give up / resume)",
-          "",
-          "(press [SPACE] to start)"
-        ]
-      }
-    }
+    {"__include": "common/baba_auto.json", "game": "turns", "instructions": {"title": "Baba Is You: Turns"}}
   ]
 }
