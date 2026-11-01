@@ -1,0 +1,22 @@
+{
+  "type": "game", "backend": "baba_auto",
+  "instructions": {
+    "align": "left", "keys_to_dismiss": ["GMPD3_A"],
+    "text": [
+      "You are Baba. Push word blocks to rewrite the rules.",
+      "",
+      "Controls:",
+      "   X    left",
+      "   B    right",
+      "   Y    up",
+      "   A    down",
+      "   RT    wait a turn",
+      "   hold LT   pause menu (restart / give up / resume)",
+      "",
+      "Press A to start."
+    ]
+  },
+  "keys": {"GMPD3_RT": 0, "GMPD3_Y": 1, "GMPD3_A": 2, "GMPD3_X": 3, "GMPD3_B": 4},
+  "menu": {"key": "GMPD3_LT", "hold": 3.0, "after": 480.0, "options": ["reset", "forfeit", "resume"], "move": ["GMPD3_Y", "GMPD3_A"], "confirm": "GMPD3_RT"},
+  "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 900.0, "fps": 15, "is_turn_based": true
+}

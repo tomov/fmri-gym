@@ -8,7 +8,7 @@ The `aigamestore` backend's curricula: the ten public [AI GameStore](https://aig
 
 ## Keys
 
-The env's action is MultiBinary over the game's keys, in `aigamestore_gym.GAME_KEYS` order, so a phase's `keys` values are those indices (the JSON key is what the subject presses), and held keys combine. The env relabels the on-canvas hints to the pressed key; the instructions' Controls text is kept in sync with `keys` by hand. The games' keys are the standard rig's ten (README, "Rigs") but for game3 and game7, which have more actions than a controller's six buttons: they are played on a keyboard, and a rig with a controller refuses them (as it does `all.json`, which plays them). The `*-ABXY-nav` files (`common/` and the matching curricula, for game1, game4, game7 and game8) move on the face buttons instead of the stick and are written for `configs/examples/rigs/curdes-v1-ABXY-nav.json`, whose controls press `A` `B` `X` `Y` `L` `R`; they play on that rig and no other with a controller.
+The env's action is MultiBinary over the game's keys, in `aigamestore_gym.GAME_KEYS` order, so a phase's `keys` values are those indices (the JSON key is what the subject presses), and held keys combine. The env relabels the on-canvas hints to the pressed key; the instructions' Controls text is kept in sync with `keys` by hand. The curricula are keyboard curricula. Game1, game4, game7 and game8 also come in two for a Current Designs GMPD3 (README, "Rigs"), each a curriculum and its `common/` file: `*-GMPD3-ABXY-nav` moves on the face buttons, and `*-GMPD3-stick-nav` on the stick, with the face buttons for the rest (game7's take cover and weapon keys have no button there). They play on a rig whose `"inputs"` list the GMPD3.
 
 | game | `GAME_KEYS` order | reference |
 |---|---|---|
@@ -46,4 +46,5 @@ An episode is one level: it ends on a win, a loss or a level clear, and `reset()
 | `game8.json` | bubble shooter, levels 1–9 |
 | `game9.json` | Mega Man-like action platformer, levels 1–7 |
 | `game10.json` | haunted mansion escape, levels 1–6 |
-| `game<N>-ABXY-nav.json` | game1, game4, game7 or game8 on the face buttons, for the `curdes-v1-ABXY-nav` rig |
+| `game<N>-GMPD3-ABXY-nav.json` | game1, game4, game7 or game8 on a GMPD3's face buttons |
+| `game<N>-GMPD3-stick-nav.json` | game1, game4, game7 or game8 on a GMPD3's stick and buttons |

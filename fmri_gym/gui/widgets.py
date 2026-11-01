@@ -19,7 +19,7 @@ from PySide6.QtCore import Qt
 from . import Field, field_values, format_action, format_value, parse_action
 
 
-#: Qt keys -> the key NAMES used in ``keys`` (see fmri_gym/keys.py); letters
+#: Qt keys -> the key NAMES used in ``keys`` (see fmri_gym/inputs/keyboard.py); letters
 #: and digits are taken from the event's text.
 _QT_KEYS = {Qt.Key.Key_Up: "UP", Qt.Key.Key_Down: "DOWN", Qt.Key.Key_Left: "LEFT",
             Qt.Key.Key_Right: "RIGHT", Qt.Key.Key_Space: "SPACE", Qt.Key.Key_Return: "RETURN",

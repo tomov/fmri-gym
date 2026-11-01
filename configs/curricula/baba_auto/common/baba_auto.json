@@ -6,11 +6,11 @@
       "You are Baba. Push word blocks to rewrite the rules.",
       "",
       "Controls:",
-      "   [ARROWS]   move",
-      "   [SPACE]    wait a turn",
-      "   hold [X]   pause menu (restart / give up / resume)",
+      "   ARROWS   move",
+      "   SPACE    wait a turn",
+      "   hold X   pause menu (restart / give up / resume)",
       "",
-      "(press [SPACE] to start)"
+      "(press SPACE to start)"
     ]
   },
   "keys": {"SPACE": 0, "UP": 1, "DOWN": 2, "LEFT": 3, "RIGHT": 4},

@@ -7,8 +7,7 @@
   "trigger_hardware": "Example: none (no scanner)",
   "notes": "Example: an Xbox controller, at a desk; no scanner",
   "screen": {"size": "1024x768", "is_fullscreen": false, "monitor": 0, "has_vsync": true},
-  "has_pad": true,
-  "bindings": {"A": "SPACE", "X": "X", "B": "C", "Y": "Z", "LT": "A", "RT": "S", "UP": "UP", "DOWN": "DOWN", "LEFT": "LEFT", "RIGHT": "RIGHT"},
+  "inputs": ["gamepad"],
   "has_audio": true,
   "data_root": "data",
   "triggers": {"sync": {"mode": "none"}, "backend": "null"}

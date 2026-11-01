@@ -10,32 +10,17 @@ import re
 
 import pytest
 
-from fmri_gym.config import rig
 from fmri_gym.config.curriculum import Curriculum, load_curriculum, validate_curriculum
 from fmri_gym.config.phases import GamePhase, Message
 from fmri_gym.config.rig import RigConfig
-from fmri_gym.config.run import RunConfig, key_needs
+from fmri_gym.config.run import RunConfig
 from tests.backends import BACKENDS, REPO, all_configs, game_phases, phase_backend
 
 CONFIGS = all_configs()
-#: The repo's rig files that play with a controller and bind its controls.
-PAD_RIGS = [r for r in (RigConfig.open(str(p)) for p in rig.repo_rig_files())
-            if r.has_pad and r.bindings]
-#: The directions; every other key a game's action needs is a button.
-ARROWS = {"UP", "DOWN", "LEFT", "RIGHT"}
-#: A key name written bare in a screen's text, where ``[KEY]`` shows what the rig presses.
-BARE_KEY = re.compile(r"(?<![\[\w])(SPACE|RETURN|ENTER|LSHIFT|SHIFT|BACKSPACE|TAB|UP|DOWN|"
-                      r"LEFT|RIGHT|ARROWS|COMMA|PERIOD)(?![\]\w])")
-
-
-def _button_actions(game: GamePhase) -> int:
-    """How many of a game's actions take a button of their own: a key alone, not an arrow.
-
-    An action done by arrows, or by a combo of keys other actions already take, adds none.
-    """
-    return sum(any(len(c) == 1 and c[0] not in ARROWS for c in need.combos)
-               and not any(set(c) <= ARROWS for c in need.combos)
-               for need in key_needs(game) if need.what.startswith("action "))
+#: The example rigs each curriculum is written for: the GMPD3's, by the mark in its name,
+#: or the keyboard's.
+GMPD3_RIG, KEYBOARD_RIG = (RigConfig.open(str(REPO / "configs" / "examples" / "rigs" / f))
+                           for f in ("gmpd3.json", "laptop.json"))
 
 
 @pytest.mark.parametrize("path", CONFIGS, ids=[str(p.relative_to(REPO)) for p in CONFIGS])
@@ -45,35 +30,23 @@ def test_config_validates(path):
 
 
 @pytest.mark.parametrize("path", CONFIGS, ids=[str(p.relative_to(REPO)) for p in CONFIGS])
-def test_a_six_button_controller_plays_it(path):
-    """A curriculum whose games fit six buttons has a rig with a controller that plays it; one
-    with more has none. A rig's bindings are written for its curricula, so not every rig plays it.
-    """
-    curriculum = Curriculum.load(str(path))
-    problems = {pad.path: RunConfig(curriculum=curriculum, rig=pad, subject="sub-01", ses=1,
-                                    run=1, duration=None, resume=False, loop=False,
-                                    dummy_trigger=True).problems()
-                for pad in PAD_RIGS}
-    playing = [rig_path for rig_path, found in problems.items() if not found]
-    is_too_big = any(_button_actions(p) > 6 for p in curriculum.phases if isinstance(p, GamePhase))
-    if is_too_big:
-        assert not playing, f"plays on six buttons ({playing}), though a game in it has more actions"
-    else:
-        assert playing, "no rig with a controller plays it:\n" + "\n".join(
-            f"{rig_path}: {found[0]}" for rig_path, found in problems.items())
+def test_its_example_rig_plays_it(path):
+    """A ``-GMPD3-`` curriculum plays on the GMPD3 rig; every other one on the keyboard alone."""
+    on = GMPD3_RIG if "-GMPD3-" in path.name else KEYBOARD_RIG
+    problems = RunConfig(curriculum=Curriculum.load(str(path)), rig=on, subject="sub-01", ses=1,
+                         run=1, duration=None, resume=False, loop=False,
+                         dummy_trigger=True).problems()
+    assert not problems, f"{on.path}: " + "\n".join(problems)
 
 
 @pytest.mark.parametrize("path", CONFIGS, ids=[str(p.relative_to(REPO)) for p in CONFIGS])
-def test_screens_name_each_key_in_brackets(path):
-    """A screen names a key as ``[KEY]``, and only a key the curriculum asks for."""
+def test_screens_write_no_key_in_brackets(path):
+    """A screen's text is shown as written, so a ``[KEY]`` tag would reach the participant."""
     phases = Curriculum.load(str(path)).phases
-    keys = {"ARROWS"} | {k for p in phases for need in key_needs(p) for c in need.combos for k in c}
     texts = [p.text for p in phases if isinstance(p, Message)] + [
         p.instructions.text for p in phases if isinstance(p, GamePhase) and p.instructions]
     for text in texts:
-        assert not BARE_KEY.search(text), f"write it [{BARE_KEY.search(text)[1]}]: {text!r}"
-        unused = set(re.findall(r"\[([A-Z0-9_]+)\]", text)) - keys
-        assert not unused, f"{sorted(unused)}: no phase asks for it: {text!r}"
+        assert not re.search(r"\[[A-Z0-9_]+\]", text), text
 
 
 @pytest.mark.parametrize("path", CONFIGS, ids=[str(p.relative_to(REPO)) for p in CONFIGS])

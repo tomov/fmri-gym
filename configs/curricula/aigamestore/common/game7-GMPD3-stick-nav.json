@@ -1,23 +1,21 @@
 {
   "type": "game", "backend": "aigamestore",
   "instructions": {
-    "align": "left", "keys_to_dismiss": ["A"],
+    "align": "left", "keys_to_dismiss": ["GMPD3_A"],
     "text": [
       "Top-down shooter. Eliminate enough enemies,",
       "then reach extraction before time runs out.",
       "",
       "Controls:",
-      "   [X]    left",
-      "   [B]    right",
-      "   [Y]    up",
-      "   [A]    down",
-      "   [R]    shoot",
-      "   [L]    next weapon",
+      "   stick   move",
+      "   Y       shoot",
+      "   A       sprint",
+      "   X       next weapon",
       "",
-      "Press [A] to start."
+      "Press A to start."
     ]
   },
-  "keys": {"X": 0, "B": 1, "Y": 2, "A": 3, "R": 4, "L": 12},
+  "keys": {"GMPD3_STICK_LEFT": 0, "GMPD3_STICK_RIGHT": 1, "GMPD3_STICK_UP": 2, "GMPD3_STICK_DOWN": 3, "GMPD3_Y": 4, "GMPD3_A": 5, "GMPD3_X": 12},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 900.0,
   "fps": 30, "frame_skip": 2
 }

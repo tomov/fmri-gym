@@ -7,11 +7,11 @@
       "or more to clear the hanging cluster.",
       "",
       "Controls:",
-      "   [LEFT] / [RIGHT]   aim",
-      "   [SPACE]          fire",
-      "   [Z]              swap current / next",
+      "   LEFT / RIGHT   aim",
+      "   SPACE          fire",
+      "   Z              swap current / next",
       "",
-      "(press [SPACE] to start)"
+      "(press SPACE to start)"
     ]
   },
   "keys": {"LEFT": 0, "RIGHT": 1, "SPACE": 2, "Z": 3},

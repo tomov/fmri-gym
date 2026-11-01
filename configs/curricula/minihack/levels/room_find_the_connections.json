@@ -9,9 +9,9 @@
           "Only nearby terrain is revealed.",
           "Remember the connections you discover.",
           "",
-          "[ARROWS]: move; hold [X]: restart / give up",
+          "ARROWS: move; hold X: restart / give up",
           "",
-          "Press [SPACE] to start."
+          "Press SPACE to start."
         ]
       },
       "keys": {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3},

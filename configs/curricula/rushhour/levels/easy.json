@@ -9,14 +9,14 @@
           "the exit on the right.",
           "",
           "Controls:",
-          "   [A] / [S]  or  [3] / [4]          previous / next car",
-          "   [LEFT] / [RIGHT]              slide a horizontal car",
-          "   [UP] / [DOWN]                 slide a vertical car",
-          "   [1] or [Z]   /   [2] or [X]       slide it left or up / right or down",
+          "   A / S  or  3 / 4          previous / next car",
+          "   LEFT / RIGHT              slide a horizontal car",
+          "   UP / DOWN                 slide a vertical car",
+          "   1 or Z   /   2 or X       slide it left or up / right or down",
           "",
           "White triangles mark the moves a car can make.",
           "",
-          "(press [SPACE] to start)"
+          "(press SPACE to start)"
         ]
       },
       "keys": {"A": 4, "S": 5, "3": 4, "4": 5, "LEFT": 8, "RIGHT": 9, "UP": 10, "DOWN": 11, "1": 6, "2": 7, "Z": 6, "X": 7},

@@ -27,8 +27,7 @@ from PySide6.QtCore import Qt
 
 from ..config import rig as rig_file
 from ..display import list_monitors, monitor_label
-from ..keys import KEY_NAMES
-from ..pad import CONTROL_LABELS, CONTROLS
+from ..inputs import LISTED
 from ..triggers import (HID_DEVICES, SYNC_MODES, TRIGGER_BACKENDS, Codes, SyncSettings,
                         TriggerError, Triggers, TriggerSettings)
 from . import Field
@@ -118,11 +117,6 @@ RIG_CHECK_FIELDS = [
           tip="Frame rates your games play at that the check should also test, separated by "
               "commas (e.g. 35). Every check already tests 60 and 30 fps."),
 ]
-
-#: The map most curricula here are written for: a six-button controller's buttons and
-#: stick on the ten keys those games use (README, "Rigs").
-STANDARD_BINDINGS = {"A": "SPACE", "X": "X", "B": "C", "Y": "Z", "LT": "A", "RT": "S",
-                     "UP": "UP", "DOWN": "DOWN", "LEFT": "LEFT", "RIGHT": "RIGHT"}
 
 #: Window sizes offered when not fullscreen (those that fit the monitor).
 WINDOW_SIZES = ((800, 600), (1024, 768), (1280, 720), (1280, 1024), (1600, 900), (1920, 1080))
@@ -216,9 +210,6 @@ def _describe(rig: rig_file.RigConfig, triggers: dict | None) -> str:
     screen = rig.screen
     window = ("fullscreen" if screen.is_fullscreen
               else f"a {screen.size[0]}x{screen.size[1]} window")
-    controller = ("not used" if not rig.has_pad
-                  else f"{len(rig.bindings)} control(s) bound to keys" if rig.bindings
-                  else "used, but no control is bound to a key: it presses nothing")
     responses = (f"; response keys {', '.join(rig.response_keys)}" if rig.response_keys
                  else "")
     ends = [f"{s:g} s at the {end}" for end, s in (("start", rig.start_fixation),
@@ -227,7 +218,7 @@ def _describe(rig: rig_file.RigConfig, triggers: dict | None) -> str:
         f".   WARNING: {rig.fixation_warning}" if rig.fixation_warning else "")
     return "\n".join([
         f"Screen: {window} on monitor {screen.monitor}, vsync {'on' if screen.has_vsync else 'off'}",
-        f"Game controller: {controller}{responses}",
+        f"Inputs: {', '.join(('keyboard', *rig.inputs))}{responses}",
         f"Game sound: {'on' if rig.has_audio else 'off'}.   Data saved in: {rig.data_root}",
         fixation,
         describe_triggers(triggers) if triggers else
@@ -261,11 +252,11 @@ def check_plan(rig: rig_file.RigConfig) -> str:
     lines.append(f"• Triggers: {'; '.join(w for w in (sent, pulses) if w)}." if sent or pulses
                  else "• Triggers: not tested -- this rig sends no codes and waits for no "
                       "scanner.")
-    keys = [f"{CONTROL_LABELS.get(k, k)} ({v})" for k, v in rig.bindings.items()
-            if rig.has_pad] + [f"{k} ({v or 'response key'})" for k, v in rig.response_keys.items()]
+    keys = ([f"each button and stick direction of the {n}" for n in rig.inputs]
+            + [f"{k} ({v or 'response key'})" for k, v in rig.response_keys.items()])
     lines.append(f"• Responses: the participant presses each when asked -- {', '.join(keys)}."
-                 if keys else "• Responses: not tested -- no controller bound and no response "
-                              "keys.")
+                 if keys else "• Responses: not tested -- no input device listed and no "
+                              "response keys.")
     lines.append({"none": "• Photodiode: not tested -- this rig has none.",
                   "soundcard": f"• Photodiode: the delay before each image appears, measured "
                                f"on the {c.input_device or 'default'} input (corner {c.corner}).",
@@ -321,51 +312,57 @@ def _sound_inputs() -> list[str]:
         return []
 
 
-#: Asks, in a process of its own, which controller is plugged in and its newest calibration:
-#: finding a controller starts SDL's display, which must not run inside this window.
+#: Asks, in a process of its own, which controllers are plugged in and their newest
+#: calibrations: finding one starts SDL's display, which must not run inside this window.
 _CONTROLLER_PROBE = """
-import json
-from fmri_gym import pad
-found = pad.find()
-out = {"name": found.name if found else None, "calibrated": None, "error": None}
-if found:
-    try:
-        newest = pad.newest(found.name)
-    except pad.CalibrationError as exc:
-        out["error"] = str(exc)
-    else:
-        out["calibrated"] = newest[0].stat().st_mtime if newest else None
-print(json.dumps(out))
+import json, os
+from fmri_gym.inputs import CalibrationError, detect
+try:
+    found = detect()
+except CalibrationError as exc:
+    print(json.dumps({"devices": [], "error": str(exc)}))
+else:
+    for d in found:
+        d["calibrated"] = d["calibration"] and os.path.getmtime(d["calibration"])
+    print(json.dumps({"devices": found, "error": None}))
 """
 
 
 def controller_status() -> dict[str, Any]:
-    """The controller plugged in now and when it was last calibrated on this computer.
+    """The controllers plugged in now, and when each was last calibrated on this computer.
 
-    :return: ``name`` (``None``: none plugged in), ``calibrated`` (a time, or ``None``:
-        never), ``error`` (why its calibration cannot be read, or ``None``).
+    :return: ``devices`` (:func:`fmri_gym.inputs.detect`'s, each with ``calibrated``: a
+        time, or ``None``: never) and ``error`` (why a calibration cannot be read, or
+        ``None``).
     """
     try:
         done = subprocess.run([sys.executable, "-c", _CONTROLLER_PROBE], capture_output=True,
                               text=True, timeout=15)
         return json.loads(done.stdout.strip().splitlines()[-1])
     except (subprocess.TimeoutExpired, ValueError, IndexError) as exc:
-        return {"name": None, "calibrated": None, "error": f"could not look: {exc}"}
+        return {"devices": [], "error": f"could not look: {exc}"}
 
 
 def _controller_line(status: dict[str, Any]) -> str:
-    """The controller plugged in, in words, and what to do about its calibration."""
+    """The controllers plugged in, in words, and what to do about their calibration."""
     if status["error"]:
         return f"Game controller: {status['error']}"
-    if status["name"] is None:
+    if not status["devices"]:
         return ("No game controller is plugged in now. Plug in the participant's controller "
                 "to calibrate it, then press Look again.")
-    if status["calibrated"] is None:
-        return (f"Plugged in now: {status['name']}. It has never been calibrated on this "
-                "computer: calibrate it before a session.")
-    when = time.strftime("%d %b %Y, %H:%M", time.localtime(status["calibrated"]))
-    return (f"Plugged in now: {status['name']}, last calibrated on this computer on {when}. "
-            "Calibrate it again if its sticks feel wrong.")
+    return " ".join(_device_line(d) for d in status["devices"])
+
+
+def _device_line(d: dict[str, Any]) -> str:
+    """One controller plugged in: what it is read as, and when it was last calibrated."""
+    kind = (f'read as "{d["input"]}"' if d["input"] else
+            "not a kind of device fmri-gym reads")
+    if d["calibrated"] is None:
+        return (f"Plugged in now: {d['device_name']}, {kind}. It has never been calibrated on "
+                "this computer: calibrate it before a session.")
+    when = time.strftime("%d %b %Y, %H:%M", time.localtime(d["calibrated"]))
+    return (f"Plugged in now: {d['device_name']}, {kind}, last calibrated on this computer on "
+            f"{when}. Calibrate it again if its sticks feel wrong.")
 
 
 def _trigger_ports() -> list[str]:
@@ -428,10 +425,10 @@ _STEPS = [
      "is played, how long the fixation cross at the start and end of every run lasts, and "
      "where the data of every run on this rig is saved."),
     ("Response devices",
-     "How the participant answers. Games are played with keyboard keys. A game controller "
-     "(Xbox, Current Designs gamepad) sends no keys by itself: choose the keyboard key each of "
-     "its buttons presses. A button box that types keys by itself needs no binding: list its "
-     "keys under Response keys. A keyboard alone needs nothing here."),
+     "How the participant answers. Games are played with the keyboard and the input devices "
+     "ticked here; a curriculum names their controls. A button box that types keys by itself "
+     "is the keyboard: list its keys under Response keys. A keyboard alone needs nothing "
+     "here."),
     ("Triggers",
      "How a run starts with your scanner or recording, and which codes it sends to the "
      "recording. Pick the preset that matches your setup and press Apply, then adjust: only the "
@@ -548,10 +545,7 @@ class _RigWindow(QtWidgets.QDialog):
     def _show_applicable(self) -> None:
         """Hide, or turn off, what the choices made so far make irrelevant."""
         self.size_pick.setEnabled(not self.switches["is_fullscreen"].isChecked())
-        has_pad = self.switches["has_pad"].isChecked()
-        for widget in (self.bindings, self.bind_key, self.standard):
-            widget.setEnabled(has_pad)
-        self.calibrate.setEnabled(has_pad and (self.controller or {}).get("name") is not None)
+        self.calibrate.setEnabled(bool((self.controller or {}).get("devices")))
         self.sync_form.show_rows(["mode", *SYNC_ROWS.get(self._value(self.sync_form, "mode"),
                                                          [f.key for f in SYNC_FIELDS])])
         backend = self._value(self.trigger_form, "backend")
@@ -816,27 +810,24 @@ class _RigWindow(QtWidgets.QDialog):
         look.setToolTip("Look again for a controller plugged in, and its calibration.")
         layout.addWidget(ui.group("Controller plugged in", self._column(
             self.controller_text, ui.row(self.calibrate, look))))
-        form = QtWidgets.QFormLayout()
-        # A new rig starts without one: a map on a rig answered with a button box would have
-        # its runs and its rig check expect controller buttons nobody has.
-        form.addRow("the participant uses a game controller", self._switch(
-            "has_pad", values.get("has_pad", rig_file.DEFAULTS["has_pad"] if values else False),
-            "On for an Xbox controller or a Current Designs gamepad: its buttons then press "
-            "the keys below. Off for a keyboard or a button box that types keys."))
-        self.switches["has_pad"].toggled.connect(self._controller_turned)
-        layout.addLayout(form)
-        layout.addWidget(self._bindings_table(values.get("bindings", {})), 1)
-        self.bind_key = ui.button("Press a key...", self._capture_binding)
-        self.bind_key.setToolTip("Select a control in the list, then press the keyboard key it "
-                                 "should press.")
-        self.standard = ui.button("Use the standard map", self._use_standard_bindings)
-        self.standard.setToolTip("The map most games here are written for: A SPACE, X X, B C, "
-                                 "Y Z, LT A, RT S, and the stick on the arrows.")
-        self.bindings_note = QtWidgets.QLabel()
-        self.bindings_note.setObjectName("hint")
-        layout.addLayout(ui.row(self.standard, self.bind_key, self.bindings_note))
+        layout.addWidget(self._inputs_box(values.get("inputs", [])))
         layout.addWidget(self._response_keys_box(values.get("response_keys", {})))
+        layout.addStretch(1)
         return page
+
+    def _inputs_box(self, given: Any) -> QtWidgets.QGroupBox:
+        """One checkbox per kind of input device a rig can list; the keyboard is always on."""
+        box = QtWidgets.QGroupBox("Input devices besides the keyboard")
+        column = QtWidgets.QVBoxLayout(box)
+        given = given if isinstance(given, list) else []
+        self.input_boxes: dict[str, QtWidgets.QCheckBox] = {}
+        for name, cls in LISTED.items():
+            check = QtWidgets.QCheckBox(f"{name}: {(cls.__doc__ or '').splitlines()[0]}")
+            check.setChecked(name in given)
+            check.toggled.connect(lambda _on: self._check())
+            self.input_boxes[name] = check
+            column.addWidget(check)
+        return box
 
     @staticmethod
     def _column(*parts: Any) -> QtWidgets.QWidget:
@@ -858,7 +849,7 @@ class _RigWindow(QtWidgets.QDialog):
         self._check()
 
     def _calibrate(self) -> None:
-        """Run pad-calibration in its own window, with this rig's bindings shown; then look
+        """Run pad-calibration in its own window, on this rig's input devices; then look
         again, so the new calibration shows here."""
         command = [sys.executable, "-m", "fmri_gym.pad_scope"]
         if os.path.isfile(self.path) and self.saved is not None:
@@ -869,33 +860,6 @@ class _RigWindow(QtWidgets.QDialog):
         finally:
             self.show()
         self._look_for_controller()
-
-    def _bindings_table(self, given: Any) -> QtWidgets.QTableWidget:
-        given = given if isinstance(given, dict) else {}
-        controls = [*CONTROLS, *(c for c in given if c not in CONTROLS)]  # a wrong one, shown
-        self.bindings = QtWidgets.QTableWidget(len(controls), 2)
-        self.bindings.setHorizontalHeaderLabels(["controller button", "presses the key"])
-        self.bindings.horizontalHeader().setSectionResizeMode(
-            QtWidgets.QHeaderView.ResizeMode.Stretch)
-        self.bindings.verticalHeader().hide()
-        self.bindings.setSelectionBehavior(
-            QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
-        self.bindings.setMinimumHeight(260)
-        self.bindings.setToolTip("The keyboard key each button of the controller presses, for "
-                                 "every game on this rig. Blank: the button does nothing. Most "
-                                 "games here use the arrows, SPACE, X, C, Z, A and S.")
-        for row, control in enumerate(controls):
-            name = QtWidgets.QTableWidgetItem(CONTROL_LABELS.get(control, control))
-            name.setData(Qt.ItemDataRole.UserRole, control)
-            name.setFlags(name.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            self.bindings.setItem(row, 0, name)
-            key = QtWidgets.QComboBox()
-            bound = str(given.get(control, ""))
-            key.addItems(["", *sorted(KEY_NAMES | ({bound} - {""}))])
-            key.setCurrentText(bound)
-            key.currentTextChanged.connect(lambda _text: self._check())
-            self.bindings.setCellWidget(row, 1, key)
-        return self.bindings
 
     def _response_keys_box(self, given: Any) -> QtWidgets.QGroupBox:
         box = QtWidgets.QGroupBox("Response keys: a button box that types keys by itself")
@@ -952,35 +916,6 @@ class _RigWindow(QtWidgets.QDialog):
         elif dialog.refused is not None:
             self.problems.setText(f"{dialog.refused!r} is not a key the games can read")
 
-    def _controller_turned(self, on: bool) -> None:
-        """A controller turned on with nothing bound gets the standard map, and says so."""
-        if on and not self._bindings():
-            self._use_standard_bindings()
-
-    def _use_standard_bindings(self) -> None:
-        for row in range(self.bindings.rowCount()):
-            control = self.bindings.item(row, 0).data(Qt.ItemDataRole.UserRole)
-            self.bindings.cellWidget(row, 1).setCurrentText(STANDARD_BINDINGS.get(control, ""))
-        self.bindings_note.setText("The standard map: change any button you need to.")
-
-    def _capture_binding(self) -> None:
-        row = self.bindings.currentRow()
-        if row < 0:
-            self.problems.setText("select a controller button in the list first")
-            return
-        dialog = ui.KeyCapture(self)
-        dialog.exec()
-        if dialog.name is not None:
-            self.bindings.cellWidget(row, 1).setCurrentText(dialog.name)
-
-    def _bindings(self) -> dict[str, str]:
-        out = {}
-        for row in range(self.bindings.rowCount()):
-            key = self.bindings.cellWidget(row, 1).currentText()
-            if key:
-                out[self.bindings.item(row, 0).data(Qt.ItemDataRole.UserRole)] = key
-        return out
-
     def _response_keys(self) -> dict[str, str]:
         out = {}
         for row in range(self.response_keys.rowCount()):
@@ -990,9 +925,8 @@ class _RigWindow(QtWidgets.QDialog):
         return out
 
     def _responses(self) -> dict[str, Any]:
-        has_pad = self.switches["has_pad"].isChecked()
-        out: dict[str, Any] = {"has_pad": has_pad}
-        for key, value in (("bindings", self._bindings() if has_pad else {}),
+        out: dict[str, Any] = {}
+        for key, value in (("inputs", [n for n, b in self.input_boxes.items() if b.isChecked()]),
                            ("response_keys", self._response_keys())):
             if value:
                 out[key] = value

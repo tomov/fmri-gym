@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, ClassVar
 
-from ..keys import KEY_NAMES
+from ..inputs import ESCAPE, is_control
 from ..menu import menu_problems
 
 #: An episode's possible outcomes: EnvAdapter.outcome's names, and the subject's own endings.
@@ -186,23 +186,31 @@ class Instructions:
 
 @dataclass(frozen=True, slots=True)
 class Survey(Phase):
-    """Likert questions, each rated on ``n_points`` and confirmed with ENTER."""
+    """Likert questions, each answered with one press of the control of a point."""
 
     type: ClassVar[str] = "survey"
     questions: tuple[str, ...]
-    n_points: int
+    #: one control per point of the scale, from its lowest
+    keys: tuple[str, ...]
 
     @classmethod
     def from_dict(cls, d: dict, index: int) -> Survey:
         return cls(**cls._shared(d), questions=tuple(d.get("questions", ())),
-                   n_points=d.get("n_points", 7))
+                   keys=tuple(d.get("keys", [str(i) for i in range(1, 8)])))
 
     @staticmethod
     def problems(d: dict) -> list[str]:
         questions = d.get("questions", [])
         out = [] if isinstance(questions, list) and all(isinstance(q, str) for q in questions) \
             else [f"questions: expected a list of questions, got {questions!r}"]
-        return out + _positive_problems(d, ("n_points",))
+        if "n_points" in d:
+            out.append('"n_points" is gone: list one control per point under "keys"')
+        keys = d.get("keys", ["1", "2"])
+        if not (isinstance(keys, list) and len(keys) >= 2 and len(set(map(str, keys))) == len(keys)
+                and all(_is_pressable(k) for k in keys)):
+            out.append(f"keys: expected a list of two or more distinct control names, one per "
+                       f"point from the lowest (names {_NAMES_ARE}), got {keys!r}")
+        return out
 
 
 @dataclass(frozen=True, slots=True)
@@ -395,24 +403,24 @@ class CheckTriggers(CheckPhase):
 
 @dataclass(frozen=True, slots=True)
 class CheckControls(CheckPhase):
-    """A rig check: each key the rig's response devices press, asked for on screen and
-    pressed on the device -- the rig's controller ``"bindings"`` and its
-    ``"response_keys"`` (:mod:`fmri_gym.config.rig`)."""
+    """A rig check: each control of the rig's ``"inputs"`` and each of its
+    ``"response_keys"`` (:mod:`fmri_gym.config.rig`), asked for on screen and
+    pressed on the device."""
 
     type: ClassVar[str] = "check_controls"
     #: seconds to press each key
     timeout_s: float
-    #: calibrate a plugged-in controller first
-    has_pad: bool
+    #: calibrate the sticks of the rig's input devices first
+    calibrates: bool
 
     @classmethod
     def from_dict(cls, d: dict, index: int) -> CheckControls:
         return cls(**cls._shared(d), timeout_s=d.get("timeout_s", 10.0),
-                   has_pad=d.get("has_pad", True))
+                   calibrates=d.get("calibrates", True))
 
     @staticmethod
     def problems(d: dict) -> list[str]:
-        out = _positive_problems(d, ("timeout_s",)) + _bool_problems(d, ("has_pad",))
+        out = _positive_problems(d, ("timeout_s",)) + _bool_problems(d, ("calibrates",))
         if "pad_reps" in d:
             out.append("pad_reps: the calibration asks for each control until it comes twice "
                        "in a row, with no count to set; remove it")
@@ -501,31 +509,41 @@ def _bool_problems(d: dict, keys: tuple[str, ...]) -> list[str]:
             for k in keys if k in d and not isinstance(d[k], bool)]
 
 
+#: Where a curriculum's control names are listed, for its messages.
+_NAMES_ARE = ("as the keyboard's in fmri_gym/inputs/keyboard.py and each device's in "
+              "fmri_gym/inputs/<device>.py; ESCAPE quits the run")
+
+
+def _is_pressable(name: Any) -> bool:
+    """Whether a curriculum may map ``name``: a control of some device, not the run's quit."""
+    return isinstance(name, str) and is_control(name) and name != ESCAPE
+
+
 def _dismiss_problems(where: str, keys: Any) -> list[str]:
-    """``keys_to_dismiss``, if given: a list of key names (:data:`~fmri_gym.keys.KEY_NAMES`)."""
-    if keys is None or (isinstance(keys, list) and keys and not set(keys) - KEY_NAMES):
+    """``keys_to_dismiss``, if given: a non-empty list of control names."""
+    if keys is None or (isinstance(keys, list) and keys and all(map(_is_pressable, keys))):
         return []
-    return [f"{where}: expected a list of key names (as in fmri_gym/keys.py), got {keys!r}"]
+    return [f"{where}: expected a list of control names ({_NAMES_ARE}), got {keys!r}"]
 
 
 def _keys_problems(d: dict) -> list[str]:
-    """``keys`` is required, and each name in it must be a key that can be pressed.
+    """``keys`` is required, and each name in it must be a control that can be pressed.
 
-    There is no default map, so the file states it in full. A name outside
-    :data:`~fmri_gym.keys.KEY_NAMES` can never be pressed, and the binding
-    would be dead without a word; ``""`` is the no-key action. Whether the
-    values fit the env's action space is checked when the env is built
-    (:mod:`fmri_gym.adapters.keymap`).
+    There is no default map, so the file states it in full. A name that is no
+    control of any device can never be pressed, and the binding would be dead
+    without a word; ``""`` is the no-key action. Whether the rig has the device
+    is the run's check (:mod:`fmri_gym.config.run`); whether the values fit the
+    env's action space is checked when the env is built (:mod:`fmri_gym.adapters.keymap`).
     """
     keys = d.get("keys")
     if not isinstance(keys, dict) or not keys:
-        return ['keys: missing; map each key to the env action it sends, e.g. {"": 0, "LEFT": 3, '
-                '"RIGHT": 2, "UP+SPACE": 5} ("" is no key held; names as in fmri_gym/keys.py; '
-                "there is no default map)"]
-    unknown = sorted({k for combo in keys if combo for k in combo.split("+")} - KEY_NAMES)
+        return ['keys: missing; map each control to the env action it sends, e.g. {"": 0, '
+                '"LEFT": 3, "RIGHT": 2, "UP+SPACE": 5} ("" is nothing held; names '
+                f"{_NAMES_ARE}; there is no default map)"]
+    unknown = sorted({k for combo in keys if combo for k in combo.split("+")
+                      if not _is_pressable(k)})
     if unknown:
-        return [f"keys: {unknown} are not key names; use those in fmri_gym/keys.py (UP, SPACE, "
-                "RETURN, LSHIFT, A-Z, 0-9, F1-F12, KP0-KP9, ...)"]
+        return [f"keys: {unknown} are not control names; use those {_NAMES_ARE}"]
     return []
 
 

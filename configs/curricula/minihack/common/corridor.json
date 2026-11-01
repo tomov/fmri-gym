@@ -8,14 +8,14 @@
       "doors, and search walls for hidden passages.",
       "",
       "Controls:",
-      "   [ARROWS]       move  N / S / W / E",
-      "   [Y] / [U]        move diagonally  NW / NE",
-      "   [B] / [N]        move diagonally  SW / SE",
-      "   [O]            open a door",
-      "   [K]            kick (a stuck door)",
-      "   [S]            search for hidden passages",
+      "   ARROWS       move  N / S / W / E",
+      "   Y / U        move diagonally  NW / NE",
+      "   B / N        move diagonally  SW / SE",
+      "   O            open a door",
+      "   K            kick (a stuck door)",
+      "   S            search for hidden passages",
       "",
-      "(press [SPACE] to start)"
+      "(press SPACE to start)"
     ]
   },
   "keys": {"UP": 0, "DOWN": 2, "LEFT": 3, "RIGHT": 1, "Y": 7, "U": 4, "B": 6, "N": 5, "O": 8, "K": 9, "S": 10},

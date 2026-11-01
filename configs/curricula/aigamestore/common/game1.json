@@ -7,11 +7,11 @@
       "Pour until every tube is uniform (or empty).",
       "",
       "Controls:",
-      "   [LEFT] / [RIGHT]   highlight a tube",
-      "   [SPACE]            select / pour",
-      "   [Z]                undo",
+      "   LEFT / RIGHT   highlight a tube",
+      "   SPACE            select / pour",
+      "   Z                undo",
       "",
-      "(press [SPACE] to start)"
+      "(press SPACE to start)"
     ]
   },
   "keys": {"LEFT": 0, "RIGHT": 1, "SPACE": 2, "Z": 3},

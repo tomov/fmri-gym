@@ -13,7 +13,9 @@ and never touches env.unwrapped.
 
 Recording-device concerns (waiting for or sending the scanner start, trigger
 codes for MEG/EEG) go through :mod:`fmri_gym.triggers`; with no ``triggers``
-config the loop behaves as the fMRI default and sends nothing.
+config the loop behaves as the fMRI default and sends nothing. What the
+participant presses comes through the run's :class:`~fmri_gym.inputs.Inputs`,
+the one reader of pygame's event queue, as named controls.
 
 A rig may give every run a fixation cross after the trigger and one at its end
 (its ``start_fixation`` and ``end_fixation``), the modality's baseline: for
@@ -37,7 +39,7 @@ from typing import TYPE_CHECKING, Any
 
 import pygame
 
-from . import bids, pad
+from . import bids
 from .adapters import get_adapter
 from .audio import Audio
 from .bids import BlockProgress, RunProgress
@@ -46,7 +48,7 @@ from .config.phases import (CHECK_PHASES, BlockMode, CheckControls, Fixation, Ga
                              Phase, Survey)
 from .config.run import RunConfig
 from .display import Display, check_monitor
-from .keys import get_events, held_key_names, key_name
+from .inputs import ESCAPE, QUIT, Inputs, Press, open_inputs
 from .menu import Menu
 from .logging import Logger
 from .triggers import Triggers
@@ -125,20 +127,21 @@ class Clock:
         return time.time()
 
 
-def _check_quit() -> bool:
-    """Drain pygame events and report whether the user requested quit.
+def _is_quit(press: Press) -> bool:
+    """Whether ``press`` asks to stop the run: the window closing, or ESC."""
+    return press.down and press.name in (QUIT, ESCAPE)
+
+
+def _check_quit(inputs: Inputs) -> bool:
+    """Read the presses waiting and report whether the user requested quit.
 
     :return: ``True`` if the window was closed or ESC was pressed.
     """
-    for event in get_events():
-        if event.type == pygame.QUIT:
-            return True
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            return True
-    return False
+    return any(_is_quit(press) for press in inputs.poll())
 
 
 def _poll_keys_until(
+    inputs: Inputs,
     display: Display,
     deadline: float,
     clock: Clock,
@@ -148,7 +151,7 @@ def _poll_keys_until(
     latch: bool = False,
     redraw: Callable[[], float] | None = None,
 ) -> tuple[object | None, bool]:
-    """Poll the keyboard until ``deadline``, logging every press/release.
+    """Poll the inputs until ``deadline``, logging every press/release.
 
     Replaces a plain sleep between frames: events are time-stamped on arrival
     -- to about a millisecond, or to one refresh when the display is
@@ -160,11 +163,12 @@ def _poll_keys_until(
     The wait also ends the moment the block's menu is armed (its key held long
     enough), which the caller reads off ``menu.pending``.
 
+    :param inputs: the run's input devices.
     :param display: the display, idled between polls.
     :param deadline: ``perf_counter`` at which to stop waiting.
     :param clock: the run's clock, for the log.
     :param logger: the run's logger.
-    :param key_to_action: turn-based or latched: map of single key NAMES to
+    :param key_to_action: turn-based or latched: map of single control names to
         env actions.
     :param menu: the block's :class:`~.menu.Menu`, if the phase has one.
     :param latch: keep waiting after a mapped keydown and return the last one
@@ -180,17 +184,11 @@ def _poll_keys_until(
     while True:
         if menu is not None and menu.armed():
             return None, False
-        for event in get_events():
-            if event.type == pygame.QUIT:
-                return None, True
-            if event.type not in (pygame.KEYDOWN, pygame.KEYUP):
+        for name, down, _ in inputs.poll():
+            if name in (QUIT, ESCAPE):
+                if down:
+                    return None, True
                 continue
-            if event.key == pygame.K_ESCAPE:
-                return None, True
-            name = key_name(event.key)
-            if name is None:
-                continue
-            down = event.type == pygame.KEYDOWN
             logger.log(type="input_event", run_time=clock.run_time(), name=name, down=down)
             if down and key_to_action and name in key_to_action:
                 if not latch:
@@ -210,10 +208,12 @@ def _poll_keys_until(
 
 
 def _wait_for_char(
-    display: Display, char: str, dummy_trigger: bool = False, until: float = math.inf
+    inputs: Inputs, display: Display, char: str, dummy_trigger: bool = False,
+    until: float = math.inf
 ) -> None:
     """Block until ``char`` is typed (or briefly sleep in dummy mode).
 
+    :param inputs: the run's input devices.
     :param display: the display, idled between polls (see :meth:`Display.idle`).
     :param char: the unicode character that unblocks the wait, or ``"any"``
         to accept every key (a self-paced "press any key" screen).
@@ -225,20 +225,19 @@ def _wait_for_char(
         time.sleep(0.05)
         return
     while time.perf_counter() < until:
-        for event in get_events():
-            if event.type == pygame.QUIT:
+        for press in inputs.poll():
+            if _is_quit(press):
                 raise KeyboardInterrupt
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    raise KeyboardInterrupt
-                if char == "any" or event.unicode == char:
-                    return
+            if press.down and (char == "any" or press.char == char):
+                return
         display.idle(time.perf_counter() + 0.005, poll=0.005)
 
 
-def _wait_for_duration(display: Display, duration: float, until: float = math.inf) -> None:
+def _wait_for_duration(inputs: Inputs, display: Display, duration: float,
+                       until: float = math.inf) -> None:
     """Block for ``duration`` seconds.
 
+    :param inputs: the run's input devices.
     :param display: the display, idled between polls (see :meth:`Display.idle`).
     :param duration: seconds to wait.
     :param until: ``perf_counter`` at which to stop waiting regardless.
@@ -246,30 +245,28 @@ def _wait_for_duration(display: Display, duration: float, until: float = math.in
     """
     end = min(time.perf_counter() + duration, until)
     while time.perf_counter() < end:
-        if _check_quit():
+        if _check_quit(inputs):
             raise KeyboardInterrupt
         display.idle(end, poll=0.005)
 
 
-def _wait_for_keys(display: Display, names: list[str], deadline: float) -> str | None:
-    """Block until one of the keys ``names`` is pressed, or ``deadline``.
+def _wait_for_keys(inputs: Inputs, display: Display, names: list[str],
+                   deadline: float) -> str | None:
+    """Block until one of the controls ``names`` is pressed, or ``deadline``.
 
+    :param inputs: the run's input devices.
     :param display: the display, idled between polls (see :meth:`Display.idle`).
-    :param names: key NAMES (:mod:`fmri_gym.keys`) that end the wait.
+    :param names: control names (:mod:`fmri_gym.inputs`) that end the wait.
     :param deadline: ``perf_counter`` at which to stop waiting.
-    :return: the key that ended the wait, or ``None`` at the deadline.
+    :return: the control that ended the wait, or ``None`` at the deadline.
     :raises KeyboardInterrupt: on window close or ESC.
     """
     while time.perf_counter() < deadline:
-        for event in get_events():
-            if event.type == pygame.QUIT:
+        for press in inputs.poll():
+            if _is_quit(press):
                 raise KeyboardInterrupt
-            if event.type != pygame.KEYDOWN:
-                continue
-            if event.key == pygame.K_ESCAPE:
-                raise KeyboardInterrupt
-            if key_name(event.key) in names:
-                return key_name(event.key)
+            if press.down and press.name in names:
+                return press.name
         display.idle(min(deadline, time.perf_counter() + 0.005), poll=0.005)
     return None
 
@@ -357,6 +354,7 @@ class Run:
         outdir: str,
         audio: Audio,
         triggers: Triggers,
+        inputs: Inputs,
         resume_from: RunProgress | None = None,
     ) -> None:
         """Set up clock, logger, and phase dispatch for one subject.
@@ -368,6 +366,7 @@ class Run:
         :param audio: shared audio output used by all phases.
         :param triggers: shared trigger output (start sync + codes; see
             :mod:`fmri_gym.triggers`), opened on the rig's line.
+        :param inputs: the input devices every phase reads, the rig's.
         :param resume_from: where to start in the curriculum, and what the block
             there has left (:func:`~fmri_gym.bids.last_position`); ``None``
             starts at its beginning.
@@ -384,10 +383,8 @@ class Run:
         self.outdir = outdir
         self.triggers = triggers
         self.sync = self.triggers.sync
+        self.inputs = inputs
         self.resume_from = resume_from
-        #: names each ``[KEY]`` of a screen's text as the participant presses it on this rig
-        self._label = partial(pad.label_keys,
-                              bindings=config.rig.bindings if config.rig.has_pad else None)
         #: ``perf_counter`` at which the phases stop for the closing fixation.
         self._run_end = math.inf
         self.logger.set_extra("duration", config.duration)
@@ -436,27 +433,28 @@ class Run:
                   "this is a test run, not a session", file=sys.stderr)
         audio = Audio(enabled=config.rig.has_audio)
         print(f"audio: {audio.status()}", file=sys.stderr)
-        makes_calibration = any(isinstance(p, CheckControls) and p.has_pad
+        makes_calibration = any(isinstance(p, CheckControls) and p.calibrates
                                 for p in config.curriculum.phases)
-        pad_status = pad.init(config.rig.has_pad, config.rig.bindings,
-                              is_calibration_required=not makes_calibration)
-        print(f"pad: {pad_status}", file=sys.stderr)
+        inputs = open_inputs(config.rig.inputs, needed=frozenset() if makes_calibration
+                             else config.needed_controls())
+        print(f"inputs: {inputs.status()}", file=sys.stderr)
         screen = config.rig.screen
         display = Display(size=screen.size, fullscreen=screen.is_fullscreen,
                           vsync=screen.has_vsync, monitor=screen.monitor)
-        run = cls(config, display, out.folder, audio, triggers, resume_from)
+        run = cls(config, display, out.folder, audio, triggers, inputs, resume_from)
         run.logger.set_extra("run", {"label": out.label, "attempt": out.attempt})
         run.logger.set_extra("seeds", {"derived_from": out.label, "phases": how})
-        run.logger.set_extra("pad", pad_status)   # which controller answered, and as what
+        run.logger.set_extra("inputs", inputs.status())   # which devices answered, and how
         run.logger.set_extra("versions", {  # the banner fmri_gym hides said these
             "pygame": pygame.version.ver, "sdl": ".".join(map(str, pygame.get_sdl_version()))})
         return run
 
     def close(self) -> None:
-        """Close the window, the audio output, the trigger line and the logger."""
+        """Close the window, the audio output, the trigger line, the inputs and the logger."""
         self.display.close()
         self.audio.close()
         self.triggers.close()
+        self.inputs.close()
         self.logger.close()
 
     def _trigger(self) -> None:
@@ -473,15 +471,17 @@ class Run:
             "(experimenter: press SPACE when ready)\n\n"
             f"triggers: {self.triggers.status()}\n"
             f"audio: {self.audio.status()}")
-        _wait_for_char(self.display, EXPERIMENTER_KEY, dummy_trigger=self.config.dummy_trigger)
+        _wait_for_char(self.inputs, self.display, EXPERIMENTER_KEY,
+                       dummy_trigger=self.config.dummy_trigger)
         if self.sync.mode == "wait":
             self.display.draw_text(f"Waiting for the scanner...\n\n(its trigger key: "
                                    f"{self.sync.key!r})")
-            _wait_for_char(self.display, self.sync.key, dummy_trigger=self.config.dummy_trigger)
+            _wait_for_char(self.inputs, self.display, self.sync.key,
+                           dummy_trigger=self.config.dummy_trigger)
         elif self.sync.mode == "send":
             self.display.draw_text("Starting the recording...")
             self.triggers.lifecycle("scanner_start")
-            _wait_for_duration(self.display, self.sync.delay)
+            _wait_for_duration(self.inputs, self.display, self.sync.delay)
 
         self.clock.trigger()
         self.logger.set_trigger_time()
@@ -493,7 +493,7 @@ class Run:
         :param index: phase index in the curriculum (for the manifest).
         """
         onset = self.clock.from_perf(self.display.draw_fixation())
-        _wait_for_duration(self.display, phase.duration, until=self._run_end)
+        _wait_for_duration(self.inputs, self.display, phase.duration, until=self._run_end)
 
         self.logger.log_phase({"index": index, "type": "fixation",
                                "onset": onset, "offset": self.clock.run_time()})
@@ -512,19 +512,19 @@ class Run:
         :raises KeyboardInterrupt: on window close or ESC.
         """
         duration = message.duration
-        text = self._label(message.text)
+        text = message.text
         onset = self.clock.from_perf(self.display.draw_text(text, align=message.align))
         if message.keys_to_dismiss is not None:
             deadline = time.perf_counter() + (math.inf if duration is None else duration)
             if self.config.dummy_trigger:      # a test run skips the waits for a key
                 deadline = min(deadline, time.perf_counter() + 0.05)
-            _wait_for_keys(self.display, list(message.keys_to_dismiss),
+            _wait_for_keys(self.inputs, self.display, list(message.keys_to_dismiss),
                            min(deadline, self._run_end))
         elif duration is None:
-            _wait_for_char(self.display, message.key,
+            _wait_for_char(self.inputs, self.display, message.key,
                            dummy_trigger=self.config.dummy_trigger, until=self._run_end)
         else:
-            _wait_for_duration(self.display, duration, until=self._run_end)
+            _wait_for_duration(self.inputs, self.display, duration, until=self._run_end)
         return {"text": text, "onset": onset, "offset": self.clock.run_time()}
 
     def _survey(self, phase: Survey, index: int) -> None:
@@ -536,40 +536,27 @@ class Run:
         onset = self.clock.run_time()
         responses: list[dict] = []
         try:
-            self._ask(list(phase.questions), phase.n_points, responses)
-        finally:  # a quit mid-survey keeps the answers already confirmed
+            self._ask(phase, responses)
+        finally:  # a quit mid-survey keeps the answers already given
             self.logger.log_phase({"index": index, "type": "survey",
                                    "onset": onset, "offset": self.clock.run_time(),
                                    "responses": responses})
 
-    def _ask(self, questions: list[str], n_points: int, responses: list[dict]) -> None:
-        """Append each confirmed Likert answer to ``responses``.
+    def _ask(self, phase: Survey, responses: list[dict]) -> None:
+        """Append each Likert answer to ``responses``: one press of a point's control.
 
         :raises KeyboardInterrupt: on window close or ESC.
         """
-        for q in questions:
-            value = (n_points + 1) // 2
-            confirmed = False
-            while not confirmed:
-                scale = "  ".join((f"[{i}]" if i == value else f" {i} ")
-                                  for i in range(1, n_points + 1))
-                self.display.draw_text(
-                    f"{q}\n\nDisagree      Agree\n{scale}\n\n"
-                    + self._label("([LEFT]/[RIGHT] to rate, [RETURN] to confirm)"))
-                for event in get_events():
-                    if event.type == pygame.QUIT:
-                        raise KeyboardInterrupt
-                    if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_ESCAPE:
-                            raise KeyboardInterrupt
-                        elif event.key == pygame.K_LEFT:
-                            value = max(1, value - 1)
-                        elif event.key == pygame.K_RIGHT:
-                            value = min(n_points, value + 1)
-                        elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
-                            confirmed = True
-                time.sleep(0.005)
-            responses.append({"question": q, "value": value,
+        keys = list(phase.keys)
+        width = max(len(str(len(keys))), *map(len, keys))
+        points = "  ".join(f"{i:^{width}}" for i in range(1, len(keys) + 1))
+        controls = "  ".join(f"{k:^{width}}" for k in keys)
+        is_digits = keys == [str(i) for i in range(1, len(keys) + 1)]
+        scale = points if is_digits else f"{points}\n{controls}"
+        for q in phase.questions:
+            self.display.draw_text(f"{q}\n\nDisagree      Agree\n{scale}")
+            key = _wait_for_keys(self.inputs, self.display, keys, math.inf)
+            responses.append({"question": q, "value": keys.index(key) + 1, "key": key,
                               "run_time": self.clock.run_time()})
 
     def _episode(
@@ -656,7 +643,7 @@ class Run:
             waits_for_press = game_phase.is_turn_based and auto is None
             deadline = block_end if waits_for_press else next_t
             action, user_quit = _poll_keys_until(
-                self.display, deadline, self.clock, self.logger,
+                self.inputs, self.display, deadline, self.clock, self.logger,
                 key_to_action if waits_for_press else None, menu,
                 latch=game_phase.has_latched_keys and not game_phase.is_turn_based,
                 redraw=redraw if waits_for_press else None)
@@ -664,7 +651,7 @@ class Run:
                 outcome = "quit"
                 break
             if menu is not None and menu.pending:
-                choice = menu.run(self.display, self.clock.run_time, self.logger)
+                choice = menu.run(self.display, self.clock.run_time, self.logger, self.inputs)
                 if choice != "resume":
                     outcome = choice
                     break
@@ -679,7 +666,7 @@ class Run:
             elif not game_phase.is_turn_based and action is None:
                 # No latched press this frame (or the phase never asked for
                 # one): the action is whatever is held down at the tick.
-                action = adapter.keymap.resolve(held_key_names())
+                action = adapter.keymap.resolve(self.inputs.held())
 
             observation, reward, terminated, truncated, info = adapter.step(action)
             auto = adapter.autoplay(info) if game_phase.is_turn_based else None
@@ -744,7 +731,7 @@ class Run:
         if message and game_phase.show_outcome_duration > 0 and not self._time_up():
             self.audio.stop()               # the episode's last sounds, still queued
             self.display.draw_text(f"Final score: {score:g}\n{message}")
-            _wait_for_duration(self.display, game_phase.show_outcome_duration,
+            _wait_for_duration(self.inputs, self.display, game_phase.show_outcome_duration,
                                until=self._run_end)
         return result
 
@@ -831,7 +818,7 @@ class Run:
         own_end = block_start + game_phase.duration - block_time_elapsed
         block_end = min(own_end, self._run_end)
         # The hold-a-key pause menu (reset / forfeit / resume), if the phase has one.
-        menu = Menu(spec["menu"], block_start, self._label) if "menu" in spec else None
+        menu = Menu(spec["menu"], block_start, self.inputs.held) if "menu" in spec else None
         episodes: list[EpisodeResult] = []
         outcome = ""
 
@@ -1015,6 +1002,6 @@ class Run:
         :param until: the ``perf_counter`` it is cut short at.
         """
         onset = self.clock.from_perf(self.display.draw_fixation())
-        _wait_for_duration(self.display, seconds, until=until)
+        _wait_for_duration(self.inputs, self.display, seconds, until=until)
         self.logger.log_phase({"index": None, "type": "fixation", which: True,
                                "onset": onset, "offset": self.clock.run_time()})

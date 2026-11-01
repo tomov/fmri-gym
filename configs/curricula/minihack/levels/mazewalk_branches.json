@@ -8,10 +8,10 @@
           "Explore the maze and find the staircase.",
           "The view follows you. Remember paths you have tried.",
           "",
-          "[ARROWS]: move (no diagonal movement)",
-          "Hold [X]: restart / give up",
+          "ARROWS: move (no diagonal movement)",
+          "Hold X: restart / give up",
           "",
-          "Press [SPACE] to start."
+          "Press SPACE to start."
         ]
       },
       "keys": {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3},

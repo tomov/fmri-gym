@@ -7,9 +7,9 @@
       "dodge zappers and missiles, grab coins.",
       "",
       "Controls:",
-      "   [SPACE] or [UP]   thrust / fly",
+      "   SPACE or UP   thrust / fly",
       "",
-      "(press [SPACE] to start)"
+      "(press SPACE to start)"
     ]
   },
   "keys": {"SPACE": 0, "UP": 1},

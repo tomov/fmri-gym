@@ -15,7 +15,8 @@ Phase field::
              "options": ["reset", "forfeit", "resume"],
              "move": ["UP", "DOWN"], "confirm": "RETURN"}
 
-``key`` is required; the rest default to the values shown. ``reset`` starts
+``key`` is required; the rest default to the values shown. The keys are
+control names (:mod:`fmri_gym.inputs`), as a game phase's ``keys`` are. ``reset`` starts
 the episode over (a new ``reset`` of the env with the same seed: the very
 instance the subject gave up on), ``forfeit`` ends the block and moves on to
 the next phase, ``resume`` goes on where the game paused. Options are shown in
@@ -29,12 +30,11 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING
 
-import pygame
-
-from .keys import get_events, held_key_names, key_name
+from .inputs import ESCAPE, QUIT, is_control
 
 if TYPE_CHECKING:
     from .display import Display
+    from .inputs import Inputs
     from .logging import Logger
 
 OPTIONS = ("reset", "forfeit", "resume")
@@ -81,6 +81,14 @@ def menu_problems(spec: object) -> list[str]:
     out = []
     if not isinstance(spec.get("key"), str):
         out.append("menu.key: the key to hold is required, e.g. \"X\"")
+    for field, names in (("key", [spec.get("key")]), ("move", spec.get("move", [])),
+                         ("confirm", [spec.get("confirm", _DEFAULTS["confirm"])])):
+        wrong = [n for n in (names if isinstance(names, list) else []) if isinstance(n, str)
+                 and (not is_control(n.upper()) or n.upper() == ESCAPE)]
+        if wrong:
+            out.append(f"menu.{field}: {wrong} is no control name (ESCAPE quits the run): "
+                       "the keyboard's (fmri_gym/inputs/keyboard.py) or a device's "
+                       "(fmri_gym/inputs/<device>.py)")
     for field in ("hold", "after"):
         value = spec.get(field, _DEFAULTS[field])
         if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
@@ -104,14 +112,12 @@ class Menu:
 
     :param spec: the phase's ``"menu"`` dict (already validated).
     :param block_start: ``perf_counter`` at which the block began.
-    :param label: names each ``[KEY]`` of the pop-up's hint as the participant presses it.
-    :param held: returns the names of the keys held now (a test can fake it).
+    :param held: returns the names of the controls held now (:meth:`Inputs.held`).
     """
 
-    def __init__(self, spec: dict, block_start: float, label: Callable[[str], str],
-                 held: Callable[[], frozenset[str]] = held_key_names) -> None:
+    def __init__(self, spec: dict, block_start: float,
+                 held: Callable[[], frozenset[str]]) -> None:
         self.settings = MenuSettings.from_dict(spec)
-        self._label = label
         self.available_from = block_start + self.settings.after
         self._held = held
         self._held_since: float | None = None
@@ -139,13 +145,15 @@ class Menu:
         self.pending = True
         return True
 
-    def run(self, display: Display, run_time: Callable[[], float], logger: "Logger") -> str:
+    def run(self, display: Display, run_time: Callable[[], float], logger: Logger,
+            inputs: Inputs) -> str:
         """Show the pop-up until an option is confirmed, and return it.
 
         :param display: the display to draw on.
         :param run_time: the run clock, for the log.
         :param logger: the run's logger; the menu's own presses are
             logged like any other.
+        :param inputs: the run's input devices.
         :return: the chosen option, or ``"quit"`` on window close / ESC.
         """
         self.pending, self._held_since = False, None
@@ -154,19 +162,13 @@ class Menu:
         choice = 0
         while True:
             self._draw(display, choice)
-            for event in get_events():
-                if event.type == pygame.QUIT:
-                    return "quit"
-                if event.type not in (pygame.KEYDOWN, pygame.KEYUP):
+            for name, down, _ in inputs.poll():
+                if name in (QUIT, ESCAPE):
+                    if down:
+                        return "quit"
                     continue
-                if event.key == pygame.K_ESCAPE:
-                    return "quit"
-                name = key_name(event.key)
-                if name is None:
-                    continue
-                logger.log(type="input_event", run_time=run_time(), name=name,
-                             down=event.type == pygame.KEYDOWN)
-                if event.type != pygame.KEYDOWN:
+                logger.log(type="input_event", run_time=run_time(), name=name, down=down)
+                if not down:
                     continue
                 if name == s.move[0]:
                     choice = (choice - 1) % len(s.options)
@@ -182,6 +184,5 @@ class Menu:
         """Render the option list with ``choice`` marked."""
         s = self.settings
         rows = [f"{'>' if i == choice else ' '}  {_LABELS[o]}" for i, o in enumerate(s.options)]
-        hint = f"([{s.move[0]}]/[{s.move[1]}] to choose, [{s.confirm}] to select)"
-        display.draw_text("Paused\n\n" + "\n".join(rows) + "\n\n" + self._label(hint),
-                          align="left")
+        hint = f"({s.move[0]}/{s.move[1]} to choose, {s.confirm} to select)"
+        display.draw_text("Paused\n\n" + "\n".join(rows) + "\n\n" + hint, align="left")

@@ -7,13 +7,13 @@
       "defeat bosses, and unlock their weapons.",
       "",
       "Controls:",
-      "   [LEFT] / [RIGHT]   move",
-      "   [UP] / [DOWN]      aim",
-      "   [Z]              jump",
-      "   [SPACE]          shoot",
-      "   [X]          cycle weapons",
+      "   LEFT / RIGHT   move",
+      "   UP / DOWN      aim",
+      "   Z              jump",
+      "   SPACE          shoot",
+      "   X          cycle weapons",
       "",
-      "(press [SPACE] to start)"
+      "(press SPACE to start)"
     ]
   },
   "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "Z": 4, "SPACE": 5, "X": 6},

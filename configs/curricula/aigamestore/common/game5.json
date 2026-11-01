@@ -7,10 +7,10 @@
       "hole, then escape before the cats catch you.",
       "",
       "Controls:",
-      "   [LEFT] / [RIGHT]   move",
-      "   [UP]             jump",
+      "   LEFT / RIGHT   move",
+      "   UP             jump",
       "",
-      "(press [SPACE] to start)"
+      "(press SPACE to start)"
     ]
   },
   "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2},

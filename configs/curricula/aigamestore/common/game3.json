@@ -8,12 +8,12 @@
       "",
       "Controls:",
       "   WASD           move",
-      "   [ARROWS]         aim / shoot",
-      "   [SPACE]          dash",
-      "   [Z]              swap weapon",
-      "   [LSHIFT]          walk (slow)",
+      "   ARROWS         aim / shoot",
+      "   SPACE          dash",
+      "   Z              swap weapon",
+      "   LSHIFT          walk (slow)",
       "",
-      "(press [SPACE] to start)"
+      "(press SPACE to start)"
     ]
   },
   "keys": {"W": 0, "A": 1, "S": 2, "D": 3, "LEFT": 4, "RIGHT": 5, "UP": 6, "DOWN": 7, "SPACE": 8, "Z": 9, "LSHIFT": 10},

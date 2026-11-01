@@ -17,7 +17,8 @@ White triangles on the selected car show which of its two slides are legal (from
 | file | plays |
 |---|---|
 | `all.json` | the complete session of Rush-Hour's own program: all 49 puzzles of the library |
-| `all-ABXY-nav.json` | the same 49 puzzles on an ABXY gamepad rig, from `common/rushhour-ABXY-nav.json`: L/R choose the car, X/B/Y/A slide it, hold L for the pause menu |
+| `all-GMPD3-ABXY-nav.json` | the same 49 puzzles on a GMPD3, from `common/rushhour-GMPD3-ABXY-nav.json`: LT/RT choose the car, X/B/Y/A slide it, hold LT for the pause menu |
+| `all-GMPD3-stick-nav.json` | the same on a GMPD3's stick, from `common/rushhour-GMPD3-stick-nav.json`: LT/RT choose the car, the stick slides it, Y/X slide it either way, hold LT for the pause menu |
 | `easy.json` | 5 min of random easy puzzles (`min_moves_range` 0-12), one after another |
 
 ## `all.json`

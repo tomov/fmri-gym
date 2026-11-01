@@ -9,14 +9,14 @@
           "up what you find and kill as many as you can.",
           "",
           "Controls:",
-          "   [UP] / [DOWN]      move forward / back",
-          "   [LEFT] / [RIGHT]   turn left / right",
-          "   [Z] / [X]          move left / right",
-          "   [SPACE]          shoot",
-          "   [A] / [C]          previous / next weapon",
-          "   [S]              run",
+          "   UP / DOWN      move forward / back",
+          "   LEFT / RIGHT   turn left / right",
+          "   Z / X          move left / right",
+          "   SPACE          shoot",
+          "   A / C          previous / next weapon",
+          "   S              run",
           "",
-          "(press [SPACE] to start)"
+          "(press SPACE to start)"
         ]
       },
       "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},

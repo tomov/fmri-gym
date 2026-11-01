@@ -3,8 +3,8 @@
 A curriculum (:class:`~fmri_gym.config.curriculum.Curriculum`) knows nothing of
 any rig, and a rig (:class:`~fmri_gym.config.rig.RigConfig`) nothing of any
 curriculum; a run is one of each, played for one subject, so what needs both
--- a game key the rig's scanner types at every volume, or one its controller
-cannot press -- is checked here
+-- a game key the rig's scanner types at every volume, or a control none of
+its input devices has -- is checked here
 (:meth:`RunConfig.problems`), and so, on request, is whether each game starts on
 this machine. ``fmri_play`` owns the flags and their
 spellings; :meth:`RunConfig.from_args` is the one place the command line is read.
@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from importlib import metadata
 from typing import NamedTuple
 
+from ..inputs import controls_of
 from ..menu import MenuSettings
 from .curriculum import Curriculum
 from .phases import GamePhase, Message, Phase, Survey
@@ -45,7 +46,7 @@ class RunConfig:
 
     #: what is played
     curriculum: Curriculum
-    #: where: window, pad, audio, triggers, data root
+    #: where: window, input devices, audio, triggers, data root
     rig: RigConfig
     #: ``sub-<label>``: the BIDS subject.
     subject: str
@@ -92,9 +93,9 @@ class RunConfig:
 
         A button box in a digit mode sends its trigger as a digit too (Current
         Designs: ``5``). With the rig waiting for that key (``sync.mode``
-        ``wait``), a game bound to it would act at every volume. A rig played
-        with a controller presses only the keys its ``"bindings"`` name, so a
-        phase needing another would leave the participant a dead button. A
+        ``wait``), a game bound to it would act at every volume. A rig provides
+        the controls of the keyboard and of its ``"inputs"``, so a phase needing
+        another would leave the participant a dead button. A
         ``duration`` must leave time for something besides the rig's fixations.
 
         :param load_games: also build, reset and close each distinct game once, in
@@ -159,16 +160,20 @@ class RunConfig:
                 for combo in phase.spec["keys"] if name in combo.upper().split("+")]
 
     def _unpressable_problems(self) -> list[str]:
-        """What a phase asks of the participant that no control of the rig's controller presses."""
-        if not (self.rig.has_pad and self.rig.bindings):
-            return []  # a keyboard, or a controller that types its keys itself
-        pressed = set(self.rig.bindings.values())
-        return [f"phase {i}: {what} needs {' or '.join('+'.join(c) for c in combos)}, which no "
-                f'control of {self.rig.path}\'s controller presses: bind one in its "bindings", '
-                "or play this curriculum on a rig without a controller"
+        """What a phase asks of the participant that none of the rig's input devices has."""
+        provided = controls_of(self.rig.inputs)
+        devices = ", ".join(("keyboard", *self.rig.inputs))
+        return [f"phase {i}: {what} needs {' or '.join('+'.join(c) for c in combos)}, which "
+                f"none of {self.rig.path}'s inputs provides ({devices}): add the device to its "
+                '"inputs", or play this curriculum on a rig that has it'
                 for i, phase in enumerate(self.curriculum.phases)
                 for what, combos in key_needs(phase)
-                if not any(set(c) <= pressed for c in combos)]
+                if not any(set(c) <= provided for c in combos)]
+
+    def needed_controls(self) -> frozenset[str]:
+        """Every control a phase of the curriculum names, in any of its combos."""
+        return frozenset(name for phase in self.curriculum.phases
+                         for _, combos in key_needs(phase) for combo in combos for name in combo)
 
 
 def _install_hint(error: Exception, backend: str) -> str:
@@ -190,7 +195,8 @@ def key_needs(phase: Phase) -> list[KeyNeed]:
         by itself), each key of the menu, and dismissing a screen.
     """
     if isinstance(phase, Survey):
-        return [KeyNeed(f"the survey's {k}", ((k,),)) for k in ("LEFT", "RIGHT", "RETURN")]
+        return [KeyNeed(f"the survey's point {i}", ((k,),))
+                for i, k in enumerate(phase.keys, start=1)]
     if isinstance(phase, Message):
         return _message_needs(phase)
     if isinstance(phase, GamePhase):

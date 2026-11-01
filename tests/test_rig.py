@@ -38,18 +38,18 @@ def test_defaults_fill_what_the_file_leaves_out():
     screen = desk.screen
     assert (screen.size, screen.is_fullscreen, screen.monitor, screen.has_vsync) == (
         (1024, 768), False, 0, True)
-    assert (desk.has_pad, desk.has_audio, desk.data_root) == (True, True, "data")
+    assert (desk.inputs, desk.has_audio, desk.data_root) == ((), True, "data")
     assert desk.record()["screen"] == rig.DEFAULTS["screen"]
 
 
 def test_settings_are_read():
     scan = RigConfig.open(write("scan", screen={"size": "800x600", "is_fullscreen": True,
                                                 "monitor": 1, "has_vsync": False},
-                                has_pad=False, has_audio=False, data_root="/data"))
+                                inputs=["gmpd3"], has_audio=False, data_root="/data"))
     screen = scan.screen
     assert (screen.size, screen.is_fullscreen, screen.monitor, screen.has_vsync) == (
         (800, 600), True, 1, False)
-    assert (scan.has_pad, scan.has_audio, scan.data_root) == (False, False, "/data")
+    assert (scan.inputs, scan.has_audio, scan.data_root) == (("gmpd3",), False, "/data")
 
 
 def test_a_missing_file_says_how_to_make_one():
@@ -65,6 +65,7 @@ def test_a_missing_file_says_how_to_make_one():
     ({"audio": False}, "unknown key 'audio'"),
     ({"data_root": ""}, '"data_root"'),
     ({"bogus": 1}, "unknown key 'bogus'"),
+    ({"bindings": {"A": "SPACE"}}, "unknown key 'bindings'.*list the controller under"),
     ({"rig": "other"}, "the site is its team.s folder, the rig its name"),
 ])
 def test_a_wrong_file_is_refused(change, problem):
@@ -144,36 +145,38 @@ def test_a_game_key_the_scanner_types_is_refused_on_that_rig():
     assert run_of({"": 0, "5": 1}).problems() and not run_of({"": 0, "LEFT": 1}).problems()
 
 
-def test_what_the_controller_cannot_press_is_refused_on_that_rig():
+def test_a_control_none_of_the_rigs_inputs_has_is_refused_on_that_rig():
     from fmri_gym.config.curriculum import Curriculum
     from fmri_gym.config.run import RunConfig
-    pad = RigConfig.open(write("pad", bindings={"A": "SPACE", "UP": "UP", "DOWN": "DOWN"}))
-    keyboard = RigConfig.open(write("kb", has_pad=False, bindings={"A": "SPACE"}))
+    pad = RigConfig.open(write("pad", inputs=["gmpd3"]))
+    keyboard = RigConfig.open(write("kb"))
 
-    def problems(phase: dict, on: RigConfig = pad) -> list[str]:
+    def run(phase: dict, on: RigConfig) -> RunConfig:
         curriculum = Curriculum.from_dict({"curriculum": [phase]}, "c.json")
         return RunConfig(curriculum=curriculum, rig=on, subject="sub-01", ses=1, run=1,
-                         duration=None, resume=False, loop=False,
-                         dummy_trigger=True).problems()
+                         duration=None, resume=False, loop=False, dummy_trigger=True)
 
     def game(keys: dict, **more) -> dict:
         return {"type": "game", "game": "CartPole-v1", "fps": 30, "keys": keys, **more}
 
-    assert problems(game({"": 0, "UP": 1, "W": 1, "SPACE": 2})) == []  # W only doubles UP
-    assert "action 3 needs W" in problems(game({"": 0, "SPACE": 2, "W": 3}))[0]
-    assert problems(game({"": 0, "W": 3}), on=keyboard) == []
-    menu = {"key": "X", "move": ["UP", "DOWN"], "confirm": "SPACE"}
-    assert "its menu's X" in problems(game({"": 0, "UP": 1}, menu=menu))[0]
-    assert problems({"type": "message", "text": "hi", "keys_to_dismiss": ["Q", "SPACE"]}) == []
-    assert "dismissing it needs Q" in problems({"type": "message", "text": "hi", "key": "q"})[0]
-    assert problems({"type": "message", "text": "hi", "duration": 2.0, "key": "q"}) == []
+    stick = game({"": 0, "GMPD3_STICK_UP": 1, "UP": 1, "GMPD3_A": 2})
+    assert run(stick, pad).problems() == []
+    assert "action 2 needs GMPD3_A, which none of" in run(stick, keyboard).problems()[0]
+    assert run(game({"": 0, "UP": 1}), keyboard).problems() == []   # the keyboard is always on
+    assert run(stick, pad).needed_controls() == {"GMPD3_STICK_UP", "UP", "GMPD3_A"}
+    menu = {"key": "GMPD3_X", "move": ["UP", "DOWN"], "confirm": "SPACE"}
+    assert "its menu's GMPD3_X" in run(game({"": 0, "UP": 1}, menu=menu), keyboard).problems()[0]
+    survey = {"type": "survey", "questions": ["ok?"], "keys": ["GMPD3_Y", "GMPD3_A"]}
+    assert "the survey's point 1 needs GMPD3_Y" in run(survey, keyboard).problems()[0]
 
 
-def test_bindings_map_the_controllers_controls_to_keys():
-    pad = RigConfig.open(write("pad", bindings={"A": "SPACE", "UP": "UP"}))
-    assert pad.bindings == {"A": "SPACE", "UP": "UP"}
-    with pytest.raises(ValueError, match="'Q' is not a control.*'NOPE' is not a key name"):
-        RigConfig.open(write("pad", bindings={"Q": "SPACE", "B": "NOPE"}))
+def test_inputs_name_the_rigs_devices():
+    assert RigConfig.open(write("pad", inputs=["gmpd3", "gamepad"])).inputs == ("gmpd3",
+                                                                                "gamepad")
+    for wrong in (["keyboard"], ["gmpd3", "gmpd3"], ["joystick"], "gmpd3"):
+        with pytest.raises(ValueError, match=r'"inputs": expected a list of distinct names '
+                                             r"from \['gamepad', 'gmpd3'\]"):
+            RigConfig.open(write("pad", inputs=wrong))
 
 
 def test_every_key_is_optional_and_site_and_rig_are_the_files_place(tmp_path):
@@ -204,7 +207,7 @@ def test_a_check_curriculum_cannot_set_what_is_the_rigs(phase):
 
 
 @pytest.mark.parametrize("values, problem", [
-    ({"response_keys": {"NOSUCHKEY": "index"}}, "not a key name"),
+    ({"response_keys": {"NOSUCHKEY": "index"}}, "not a keyboard key name"),
     ({"rig_check": {"photodiode": "eyes"}}, '"photodiode"'),
     ({"rig_check": {"has_mic": True}}, '"has_mic" needs'),
     ({"rig_check": {"frame_rates": [0]}}, '"frame_rates"'),

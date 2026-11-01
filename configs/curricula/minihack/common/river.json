@@ -8,11 +8,11 @@
       "bridge to step across.",
       "",
       "Controls:",
-      "   [ARROWS]       move  N / S / W / E",
-      "   [A] / [S]        move diagonally  NW / NE",
-      "   [Z] / [C]        move diagonally  SW / SE",
+      "   ARROWS       move  N / S / W / E",
+      "   A / S        move diagonally  NW / NE",
+      "   Z / C        move diagonally  SW / SE",
       "",
-      "(press [SPACE] to start)"
+      "(press SPACE to start)"
     ]
   },
   "keys": {"UP": 0, "DOWN": 2, "LEFT": 3, "RIGHT": 1, "A": 7, "S": 4, "Z": 6, "C": 5},

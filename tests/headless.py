@@ -3,14 +3,12 @@
 ``fmri_play.main()`` runs in this process, so the trigger wait, the
 instructions screen, the window, the key queue, the pacing and the logger are
 the ones a subject gets. Three things stand in for the rig: a rig file of
-its own (:mod:`fmri_gym.config.rig`, in a temporary folder: a small window, no
-pad, vsync off), SDL's dummy video driver (a window that is never
-shown; ``--window`` opens a real one) and a key script registered with
-:mod:`fmri_gym.keys` the way the gamepad is (:func:`~fmri_gym.keys
-.register_event_source` for the presses, :func:`~fmri_gym.keys
-.register_held_source` for what counts as held), so every press travels the
-route a real key does. The script presses the phase's own keys at random,
-after first dismissing the instructions with the key they ask for.
+its own (:mod:`fmri_gym.config.rig`, in a temporary folder: a small window, the
+keyboard alone, vsync off), SDL's dummy video driver (a window that is never
+shown; ``--window`` opens a real one) and a key script that posts key events
+on pygame's queue from a thread of its own, so every press travels the route a
+real key does. The script presses the phases' own keys at random, after first
+dismissing the instructions with the key they ask for.
 
 Audio is the one thing a script cannot fake: the run opens the machine's
 output unless ``--no-audio`` is passed, which is what a machine without one
@@ -33,6 +31,7 @@ import os
 import random
 import sys
 import tempfile
+import threading
 import time
 
 # Before pygame is imported anywhere: the driver is read when the display opens.
@@ -42,9 +41,9 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame  # noqa: E402
 
-from fmri_gym import keys  # noqa: E402
 from fmri_gym.config import rig  # noqa: E402
 from fmri_gym.config.curriculum import load_curriculum  # noqa: E402
+from fmri_gym.inputs.keyboard import KEYCODES  # noqa: E402
 
 #: Seconds a scripted press is held: long enough for a real-time poll to see it,
 #: short enough never to open a hold-to-pause menu.
@@ -67,11 +66,24 @@ class KeyScript:
         self._period = 1.0 / rate
         self._next = time.perf_counter() + 1.0  # let the first screen show first
         self._down: tuple[str, float] | None = None
+        self._stop = threading.Event()
         self.presses = 0
 
-    def held(self) -> frozenset[str]:
-        """The key held right now, for the real-time poll."""
-        return frozenset([self._down[0]] if self._down else [])
+    def start(self) -> None:
+        """Post the presses from a daemon thread until :meth:`stop`, once the window is up."""
+        threading.Thread(target=self._run, daemon=True).start()
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def _run(self) -> None:
+        while not self._stop.wait(0.002):
+            if not pygame.display.get_init():
+                continue
+            try:
+                self.pump()
+            except pygame.error:            # the display went down between the check and the post
+                continue
 
     def pump(self) -> None:
         """Post the press or release that is due."""
@@ -89,15 +101,18 @@ class KeyScript:
 
     @staticmethod
     def _post(kind: int, name: str) -> None:
-        code = keys.KEYCODE_BY_NAME[name]
+        code = KEYCODES[name]
         unicode = " " if name == "SPACE" else (name.lower() if len(name) == 1 else "")
         pygame.event.post(pygame.event.Event(kind, key=code, mod=0, unicode=unicode, scancode=0))
 
 
 def script_for(curriculum_path: str, rate: float, seed: int) -> KeyScript:
-    """A :class:`KeyScript` over the keys of the config's game phases."""
-    phases = [p for p in load_curriculum(curriculum_path)["curriculum"] if p["type"] == "game"]
-    names = sorted({k for p in phases for combo in p["keys"] for k in combo.split("+") if k})
+    """A :class:`KeyScript` over the keys of the config's game phases and surveys."""
+    every = load_curriculum(curriculum_path)["curriculum"]
+    phases = [p for p in every if p["type"] == "game"]
+    names = sorted({k for p in phases for combo in p["keys"] for k in combo.split("+") if k}
+                   | {k for p in every if p["type"] == "survey"
+                      for k in p.get("keys", [str(i) for i in range(1, 8)])})
     dismiss = sorted({k for p in phases
                       for k in (p.get("instructions") or {}).get("keys_to_dismiss", [])})
     return KeyScript(names, dismiss or ["SPACE"], rate, seed)
@@ -113,7 +128,7 @@ def use_rig(data_root: str, has_audio: bool, end_fixation: float) -> str:
               "pi": "TT", "modality": "behav", "notes": "",
               "screen": {"size": "640x480", "is_fullscreen": False, "monitor": 0,
                          "has_vsync": False},
-              "has_pad": False, "has_audio": has_audio, "data_root": data_root,
+              "inputs": [], "has_audio": has_audio, "data_root": data_root,
               "end_fixation": end_fixation}, path)
     return path
 
@@ -152,8 +167,7 @@ def main() -> None:
         tap = Tap()
         tap.install()
     script = script_for(args.curriculum, args.rate, args.seed)
-    keys.register_event_source(script.pump)
-    keys.register_held_source(script.held)
+    script.start()
     name = use_rig(args.data_root, has_audio=not args.no_audio, end_fixation=args.end_fixation)
     sys.argv = ["fmri-play", "--curriculum", args.curriculum, "--subject", "sub-test",
                 "--ses", "1", "--run", str(args.run), "--rig", name, "--dummy-trigger",
@@ -162,6 +176,7 @@ def main() -> None:
     try:
         fmri_play.main()
     finally:
+        script.stop()
         print(f"headless: {script.presses} presses scripted", file=sys.stderr)
         if tap is not None:
             tap.save(args.tap)

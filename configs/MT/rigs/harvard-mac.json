@@ -13,19 +13,7 @@
   },
   "has_audio": true,
   "data_root": "data",
-  "has_pad": true,
-  "bindings": {
-    "UP": "UP",
-    "DOWN": "DOWN",
-    "LEFT": "LEFT",
-    "RIGHT": "RIGHT",
-    "Y": "Z",
-    "B": "C",
-    "X": "X",
-    "LT": "A",
-    "A": "SPACE",
-    "RT": "S"
-  },
+  "inputs": ["gmpd3"],
   "triggers": {
     "sync": {
       "mode": "none"

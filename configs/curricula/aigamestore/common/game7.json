@@ -7,14 +7,14 @@
       "then reach extraction before time runs out.",
       "",
       "Controls:",
-      "   [ARROWS]   move",
-      "   [Z]        shoot",
-      "   [SPACE]    sprint",
-      "   [LSHIFT]    take cover",
-      "   [1]–[5]  switch weapons",
-      "   [X]        next weapon",
+      "   ARROWS   move",
+      "   Z        shoot",
+      "   SPACE    sprint",
+      "   LSHIFT    take cover",
+      "   1–5  switch weapons",
+      "   X        next weapon",
       "",
-      "(press [SPACE] to start)"
+      "(press SPACE to start)"
     ]
   },
   "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "Z": 4, "SPACE": 5, "LSHIFT": 6, "1": 7, "2": 8, "3": 9, "4": 10, "5": 11, "X": 12},

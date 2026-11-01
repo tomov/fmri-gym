@@ -7,12 +7,12 @@
       "unlock doors, and hide when the monster sees you.",
       "",
       "Controls:",
-      "   [ARROWS]   move",
-      "   [X]    sprint",
-      "   [SPACE]    interact (doors / items / hide)",
-      "   [Z]        toggle flashlight",
+      "   ARROWS   move",
+      "   X    sprint",
+      "   SPACE    interact (doors / items / hide)",
+      "   Z        toggle flashlight",
       "",
-      "(press [SPACE] to start)"
+      "(press SPACE to start)"
     ]
   },
   "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "X": 4, "SPACE": 5, "Z": 6},

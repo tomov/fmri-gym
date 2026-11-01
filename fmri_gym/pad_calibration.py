@@ -3,8 +3,8 @@
 A stick rests off centre, travels further one way than the other, and moves its
 centre between sessions, so each is measured on the rig it is used on.
 :func:`calibrate` measures it, waiting on the controller at every step, never on
-a clock, and writes it as a new file (:func:`fmri_gym.pad.write`), the
-calibration a run then reads.
+a clock, and writes it as a new file (:func:`fmri_gym.inputs.calibration.write`),
+the calibration a run then reads.
 """
 
 from __future__ import annotations
@@ -20,8 +20,9 @@ from typing import Any, Callable, NamedTuple
 
 import pygame
 
-from .pad import (DPAD, PAD_EVENTS, STICK, UNCALIBRATED, AxisCalibration, Calibration, Pad,
-                  Stick, StickCalibration, newest, write)
+from .inputs.calibration import (UNCALIBRATED, AxisCalibration, Calibration, Side,
+                                 StickCalibration, newest, write)
+from .inputs.joystick import Joystick
 
 #: The procedure's colours: the face buttons in the colour they are printed in,
 #: so a cue can be matched by colour without reading it.
@@ -31,14 +32,25 @@ LIVE, WARN = (63, 185, 80), (210, 153, 34)
 FACE: dict[str, tuple[int, int, int]] = {
     "Y": (226, 192, 68), "B": (230, 86, 86), "X": (79, 143, 247), "A": (63, 185, 80),
 }
-#: Each stick direction as (its axis, the sign a push gives it).
+#: Each direction of a stick as (its axis, 0 for x and 1 for y; the sign a push gives it).
 DIRECTIONS: dict[str, tuple[int, int]] = {
-    d: (s.axes[i], sign) for s in Stick
-    for d, i, sign in zip(s.directions, (1, 1, 0, 0), (-1, 1, -1, 1))}
-#: The order the procedure asks for the buttons: round the face the way they
-#: sit under a thumb, then the rest; and for each stick's directions.
-CUE_BUTTONS = ("A", "X", "Y", "B", "LT", "RT", "LB", "RB", "START", "BACK", *DPAD)
+    "UP": (1, -1), "DOWN": (1, 1), "LEFT": (0, -1), "RIGHT": (0, 1)}
+#: The order the procedure asks for the face buttons, by the letter that ends
+#: their names: round the face the way they sit under a thumb; the rest follow.
+CUE_FACE = ("A", "X", "Y", "B")
 CUE_DIRECTIONS = ("DOWN", "LEFT", "UP", "RIGHT")
+
+
+def face(name: str) -> str:
+    """The letter or word a control's name ends with (``GMPD3_A``: ``A``)."""
+    return name.rsplit("_", 1)[-1]
+
+
+def cue_order(buttons: tuple[str, ...]) -> list[str]:
+    """``buttons`` in the order the procedure asks for them: the face first."""
+    def rank(name: str) -> int:
+        return CUE_FACE.index(face(name)) if face(name) in CUE_FACE else len(CUE_FACE)
+    return sorted(buttons, key=rank)
 #: Each control is asked for this many times in a row, so one slip is caught.
 TWICE = 2
 #: A stick is at rest once each axis has stayed within this, raw, for this long.
@@ -123,9 +135,10 @@ class _Task:
     window position -> ``screen``'s), it draws a Cancel button that clicks stop it.
     """
 
-    def __init__(self, pad: Pad, screen: pygame.Surface, present: Callable[[], None],
+    def __init__(self, device: Joystick, screen: pygame.Surface, present: Callable[[], None],
                  to_canvas: Callable[[tuple[int, int]], tuple[int, int]] | None) -> None:
-        self.pad, self.screen, self.present, self.to_canvas = pad, screen, present, to_canvas
+        self.device, self.screen, self.present = device, screen, present
+        self.to_canvas = to_canvas
         w, self.h = screen.get_size()
         self.mx, scale = w // 2, min(2.0, max(0.8, self.h / 600))
         font = "Menlo,Monaco,monospace"
@@ -133,30 +146,33 @@ class _Task:
                                         for n in (62, 25, 15))
         self.cancel = None if to_canvas is None else pygame.Rect(w - 150, self.h - 60, 130, 40)
         self.clock = _FrameClock()
-        self.buttons = [c for c in CUE_BUTTONS if c in pad.controls()]
+        self.buttons = cue_order(device.buttons())
         self.samples: list[dict] = []
         self.t0 = self.now = self.clock.tick()
 
     def frame(self, phase: str, cue: str) -> tuple[dict[int, float], set[str]]:
         """Wait for the next frame and record the pad's reading.
 
+        The device sees the frame's events, so what it holds stays true after;
+        the reading itself is off its handle.
+
         :raises _Quit: on ESC, a click on Cancel, or the window closing (which is
             left on the queue for the window's owner, when it has a Cancel).
         """
         self.now = self.clock.tick()
-        for e in pygame.event.get((pygame.QUIT, pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN)):
+        events = pygame.event.get()
+        self.device.poll(events, self.now)
+        for e in events:
             if e.type == pygame.QUIT:
                 if self.cancel:
                     pygame.event.post(pygame.event.Event(pygame.QUIT))
                 raise _Quit
-            if e.type == pygame.KEYDOWN and not getattr(e, "pad", False) \
-                    and e.key == pygame.K_ESCAPE:
+            if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
                 raise _Quit
             if e.type == pygame.MOUSEBUTTONDOWN and self.cancel \
                     and self.cancel.collidepoint(self.to_canvas(e.pos)):
                 raise _Quit
-        pygame.event.clear(PAD_EVENTS)         # read by polling here, not queued for a run
-        ax, bt = self.pad.read()
+        ax, bt = self.device.read()
         row = {"t": round(self.now - self.t0, 4), "phase": phase, "cue": cue}
         row.update({f"ax{i}": round(v, 5) for i, v in sorted(ax.items())})
         row.update({f"b_{c}": int(c in bt) for c in self.buttons})
@@ -257,17 +273,17 @@ def _ask(task: _Task, cue: str, words: str, colour, arrow: str | None, answer, i
     return wrong
 
 
-def _calibrate_stick(task: _Task, stick: Stick, which: str) -> int:
+def _calibrate_stick(task: _Task, side: Side, which: str) -> int:
     """Rest, travel and directions of one stick. Returns the wrong answers."""
-    axes = stick.axes
-    cold = _hold_still(task, axes, "cold", stick.value, ["hands off"])
-    travel = _roll(task, axes, stick.value, cold, which)
-    rest = _hold_still(task, axes, "rest", stick.value, ["let go", "hands off"])
+    axes = side.axes
+    cold = _hold_still(task, axes, "cold", side.value, ["hands off"])
+    travel = _roll(task, axes, side.value, cold, which)
+    rest = _hold_still(task, axes, "rest", side.value, ["let go", "hands off"])
 
     def pushes(ax: dict[int, float]) -> dict[str, float]:
-        return {d: _fraction(ax[DIRECTIONS[d][0]], rest[DIRECTIONS[d][0]],
-                             *travel[DIRECTIONS[d][0]]) * DIRECTIONS[d][1]
-                for d in stick.directions}
+        return {d: _fraction(ax[axes[DIRECTIONS[b][0]]], rest[axes[DIRECTIONS[b][0]]],
+                             *travel[axes[DIRECTIONS[b][0]]]) * DIRECTIONS[b][1]
+                for d, b in task.device.sticks[side].base.items()}
 
     def answer(ax: dict[int, float], _bt: set[str]) -> str | None:
         best = max(pushes(ax).items(), key=lambda kv: kv[1])
@@ -276,24 +292,24 @@ def _calibrate_stick(task: _Task, stick: Stick, which: str) -> int:
     def idle(ax: dict[int, float], _bt: set[str]) -> bool:
         return all(abs(v) < RELEASE for v in pushes(ax).values())
 
-    names = dict(zip(STICK, stick.directions))
-    return sum(_ask(task, names[d], f"push {which}", INK, d, answer, idle)
-               for d in CUE_DIRECTIONS)
+    names = {b: d for d, b in task.device.sticks[side].base.items()}
+    return sum(_ask(task, names[b], f"push {which}", INK, b, answer, idle)
+               for b in CUE_DIRECTIONS)
 
 
 def _ask_buttons(task: _Task) -> int:
     """Each button the pad has, asked for twice in a row. Returns the wrong answers."""
-    return sum(_ask(task, name, f"press  {name}", FACE.get(name, INK), None,
+    return sum(_ask(task, name, f"press  {name}", FACE.get(face(name), INK), None,
                     lambda _ax, bt: min(bt) if bt else None, lambda _ax, bt: not bt)
                for name in task.buttons)
 
 
-def _measure(task: _Task, sticks: tuple[Stick, ...], has_buttons: bool) -> tuple[int, int]:
+def _measure(task: _Task, sticks: tuple[Side, ...], has_buttons: bool) -> tuple[int, int]:
     """Each of ``sticks``, then each button if ``has_buttons``. Returns (confirmed, wrong)."""
     confirmed = wrong = 0
-    for stick in sticks:
-        which = f"the {stick.value} stick" if len(task.pad.sticks()) > 1 else "the stick"
-        wrong += _calibrate_stick(task, stick, which)
+    for side in sticks:
+        which = f"the {side.value} stick" if len(task.device.sticks) > 1 else "the stick"
+        wrong += _calibrate_stick(task, side, which)
         confirmed += len(CUE_DIRECTIONS)
     if has_buttons:
         wrong += _ask_buttons(task)
@@ -302,11 +318,11 @@ def _measure(task: _Task, sticks: tuple[Stick, ...], has_buttons: bool) -> tuple
     return confirmed, wrong
 
 
-def calibrate(pad: Pad, screen: pygame.Surface, present: Callable[[], None],
-              sticks: tuple[Stick, ...],
+def calibrate(device: Joystick, screen: pygame.Surface, present: Callable[[], None],
+              sticks: tuple[Side, ...],
               to_canvas: Callable[[tuple[int, int]], tuple[int, int]] | None = None,
               ) -> CalibrationResult | None:
-    """Measure ``sticks`` of ``pad`` on ``screen``, and write a new calibration of it.
+    """Measure ``sticks`` of ``device`` on ``screen``, and write a new calibration of it.
 
     Per stick: hands off until still, roll it round its edge until each direction
     has reached its stop, let go until still; then each of its directions asked
@@ -321,19 +337,19 @@ def calibrate(pad: Pad, screen: pygame.Surface, present: Callable[[], None],
     :raises ValueError: for a stick the pad does not have.
     :raises CalibrationError: when the pad's newest calibration is malformed.
     """
-    unknown = [s.value for s in sticks if s not in pad.sticks()]
+    unknown = [s.value for s in sticks if s not in device.sticks]
     if unknown:
-        raise ValueError(f"{pad.name!r} has no {' or '.join(unknown)} stick")
-    base = newest(pad.name)
-    task = _Task(pad, screen, present, to_canvas)
+        raise ValueError(f"{device.device_name!r} has no {' or '.join(unknown)} stick")
+    base = newest(device.device_name)
+    task = _Task(device, screen, present, to_canvas)
     try:
-        confirmed, wrong = _measure(task, sticks, set(sticks) == set(pad.sticks()))
+        confirmed, wrong = _measure(task, sticks, set(sticks) == set(device.sticks))
     except _Quit:
         return None
     merged = {**({} if base is None else base[1].sticks),
               **fit(task.samples, datetime.now(timezone.utc).replace(microsecond=0))}
-    calibration = Calibration(pad.name, None,
-                              {s: merged[s] for s in pad.sticks() if s in merged})
+    calibration = Calibration(device.device_name, None,
+                              {s: merged[s] for s in device.sticks if s in merged})
     return CalibrationResult(write(calibration, task.samples), calibration, confirmed, wrong)
 
 
@@ -346,7 +362,7 @@ def _still_at(rows: list[dict], i: int) -> tuple[float, float]:
     return statistics.median(vals), (max(vals) - min(vals)) / 2
 
 
-def fit(samples: list[dict], made: datetime) -> dict[Stick, StickCalibration]:
+def fit(samples: list[dict], made: datetime) -> dict[Side, StickCalibration]:
     """Each stick the recording measured: its axes' rest, stops and drift, and its thresholds.
 
     It presses at :data:`CAL_ON` of travel and releases under :data:`CAL_OFF`,
@@ -356,12 +372,12 @@ def fit(samples: list[dict], made: datetime) -> dict[Stick, StickCalibration]:
     :param made: when the measurement was made.
     """
     out = {}
-    for stick in Stick:
-        rows = [s for s in samples if s["cue"] == stick.value]
+    for side in Side:
+        rows = [s for s in samples if s["cue"] == side.value]
         if not rows:
             continue
         axes, dither = [], 0.0
-        for i in stick.axes:
+        for i in side.axes:
             cold, _ = _still_at([r for r in rows if r["phase"] == "cold"], i)
             rest, noise = _still_at([r for r in rows if r["phase"] == "rest"], i)
             col = [r[f"ax{i}"] for r in rows]
@@ -372,5 +388,5 @@ def fit(samples: list[dict], made: datetime) -> dict[Stick, StickCalibration]:
         on = round(min(max(CAL_ON, 10 * dither), 0.65), 3)
         tuning = replace(UNCALIBRATED, on=on,
                          off=CAL_OFF if on == CAL_ON else round(0.6 * on, 3))
-        out[stick] = StickCalibration(made, axes[0], axes[1], tuning)
+        out[side] = StickCalibration(made, axes[0], axes[1], tuning)
     return out

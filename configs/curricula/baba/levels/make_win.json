@@ -9,10 +9,10 @@
           "Form \"X IS WIN\", then touch X to win.",
           "",
           "Controls:",
-          "   [ARROWS]   move",
-          "   hold [X]   pause menu (restart / give up / resume)",
+          "   ARROWS   move",
+          "   hold X   pause menu (restart / give up / resume)",
           "",
-          "(press [SPACE] to start)"
+          "(press SPACE to start)"
         ]
       },
       "keys": {"UP": 1, "RIGHT": 2, "DOWN": 3, "LEFT": 4},

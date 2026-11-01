@@ -11,11 +11,11 @@
           "you can.",
           "",
           "Controls:",
-          "   [UP]           move forward",
-          "   [LEFT] / [RIGHT] turn left / right",
-          "   [SPACE]       run",
+          "   UP           move forward",
+          "   LEFT / RIGHT turn left / right",
+          "   SPACE       run",
           "",
-          "(press [SPACE] to start)"
+          "(press SPACE to start)"
         ]
       },
       "keys": {"": 0, "LEFT": 8, "RIGHT": 4, "UP": 2, "LEFT+UP": 10, "RIGHT+UP": 6, "SPACE": 1, "UP+SPACE": 3}

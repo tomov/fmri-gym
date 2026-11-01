@@ -7,11 +7,11 @@
       "shadows. Reach checkpoints and find your way.",
       "",
       "Controls:",
-      "   [LEFT] / [RIGHT]        move",
-      "   [UP] or [SPACE]         jump",
-      "   [Z]                   interact",
+      "   LEFT / RIGHT        move",
+      "   UP or SPACE         jump",
+      "   Z                   interact",
       "",
-      "(press [SPACE] to start)"
+      "(press SPACE to start)"
     ]
   },
   "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "SPACE": 3, "Z": 4},

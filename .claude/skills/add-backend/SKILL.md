@@ -30,7 +30,7 @@ The suite's four checks (playable, recorded, replays, runs) are the acceptance t
 
 ## Things that are easy to get wrong
 
-- **Key names are pygame names, upper-cased, without `K_`** (`"LEFT"`, `"SPACE"`, `"Z"`). Add unlisted keys to `_PYGAME_KEY_NAMES` in `keys.py` rather than mapping keycodes yourself; `validate_curriculum` refuses a config that names a key outside that table.
+- **Key names are pygame names, upper-cased, without `K_`** (`"LEFT"`, `"SPACE"`, `"Z"`). Add unlisted keys to `NAMES` in `fmri_gym/inputs/keyboard.py` rather than mapping keycodes yourself; `validate_curriculum` refuses a config that names a key outside that table.
 - **Every game phase writes its whole `keys` map; there is no default.** A `MultiBinary` env takes button indices (held keys combine), anything else takes the action itself and a real-time phase also needs the `""` entry, the action for no key held. One class per action space in `adapters/keymap.py`. Don't add a per-backend default or a merge step: the map depends on the site's input device, not on the engine.
 - **`env_kwargs` is where constructor options live.** Do not teach a new backend to read puzzle ids, scenario flags, or other `gym.make` kwargs off the top level of `spec`; put them in `env_kwargs` and document them in the adapter docstring. Older backends (`vgdl`, `arc3`) still expose a few top-level fields; new work should not copy that pattern.
 - **Copy observations you keep.** Several envs reuse their observation buffers, so `capture` must `.copy()` anything it stores (see `minihack.py`). The replay check is what found nethack logging each frame's variables one frame late: a view of a reused buffer, pickled after the loop had moved on.

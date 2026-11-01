@@ -7,11 +7,11 @@
       "to topple structures and clear the pigs.",
       "",
       "Controls:",
-      "   [ARROWS]   hold to aim / pull",
-      "   [SPACE]    start aim / launch",
-      "   [Z]        bird special ability",
+      "   ARROWS   hold to aim / pull",
+      "   SPACE    start aim / launch",
+      "   Z        bird special ability",
       "",
-      "(press [SPACE] to start)"
+      "(press SPACE to start)"
     ]
   },
   "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
