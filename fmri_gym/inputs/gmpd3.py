@@ -56,8 +56,3 @@ class Gmpd3(Joystick):
         j = self.joystick
         return ({axis: j.get_axis(axis) for axis in AXES},
                 {name for b, name in BUTTONS.items() if j.get_button(b)})
-
-    def source(self, control: str) -> str:
-        """Which of its raw buttons a control is, as SDL numbers them ("b4"); "" for none."""
-        number = {name: b for b, name in BUTTONS.items()}.get(control)
-        return "" if number is None else f"b{number}"

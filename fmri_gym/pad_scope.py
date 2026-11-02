@@ -171,10 +171,9 @@ def _qpos(vx: float, vz: float, mid: tuple[int, int], q: int) -> tuple[int, int]
             int(mid[1] + max(-1, min(1, vz)) * q // 2))
 
 
-def _draw_tiles(screen: pygame.Surface, fonts, device: Joystick | None, down: set[str],
-                by: int) -> None:
-    """One tile per button the device has: the end of its name, and where it comes from."""
-    f_big, f_sm = fonts
+def _draw_tiles(screen: pygame.Surface, font: pygame.font.Font, device: Joystick | None,
+                down: set[str], by: int) -> None:
+    """One tile per button the device has: the end of its name."""
     names = device.buttons() if device else ()
     cols, bx, gap = 7, 20, 4
     bw = (W - 2 * bx - (cols - 1) * gap) // cols
@@ -183,9 +182,7 @@ def _draw_tiles(screen: pygame.Surface, fonts, device: Joystick | None, down: se
         is_down, hue = name in down, FACE.get(face(name), INK2)
         pygame.draw.rect(screen, hue if is_down else PANEL, (x, y, bw, 62), border_radius=4)
         pygame.draw.rect(screen, hue if is_down else GRID, (x, y, bw, 62), 1, border_radius=4)
-        ink = SURFACE if is_down else INK2
-        screen.blit(f_big.render(face(name), True, SURFACE if is_down else hue), (x + 8, y + 6))
-        screen.blit(f_sm.render(device.source(name), True, ink), (x + 8, y + 42))
+        screen.blit(font.render(face(name), True, SURFACE if is_down else hue), (x + 8, y + 6))
 
 
 def _draw_rule(screen: pygame.Surface, stick: Stick, controls: frozenset,
@@ -421,7 +418,7 @@ class _Scope:
         screen.fill(SURFACE)
         self.draw_toolbar(screen)
         self.draw_status(screen, now)
-        _draw_tiles(screen, (self.f_big, self.f_sm), device, down, 136)
+        _draw_tiles(screen, self.f_big, device, down, 136)
         lanes = self.draw_plot(screen, controls, now)
         trail = [h for h in self.hist if now - h[0] < TRAIL_S]
         if self._shown() is not None:

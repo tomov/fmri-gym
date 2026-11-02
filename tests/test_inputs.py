@@ -160,9 +160,6 @@ class _ScriptedDevice(Joystick):
     def buttons(self) -> tuple[str, ...]:
         return ("S_A", "S_B")
 
-    def source(self, control: str) -> str:
-        return f"b{control}"
-
     def read(self):
         frame = next(self.frames, None)
         if frame is None:

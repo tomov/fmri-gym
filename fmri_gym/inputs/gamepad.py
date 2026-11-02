@@ -3,7 +3,6 @@
 Read through SDL's game-controller layer, whose numbers are the same for every
 such pad, OS and connection; the raw joystick events SDL sends beside them are
 ignored. Each analog trigger is also a button, pressed past half its travel.
-A pad has the controls its mapping lists (:meth:`Gamepad.controls`).
 """
 
 from __future__ import annotations
@@ -55,30 +54,6 @@ TRIGGERS = {
 }
 #: How far a trigger is pulled to press, and let go to release, of its travel.
 _TRIGGER_ON, _TRIGGER_OFF = 0.5, 0.3
-#: The controls behind each name of SDL's mapping string.
-_MAPPED: dict[str, tuple[str, ...]] = {
-    "a": (BUTTONS[pygame.CONTROLLER_BUTTON_A],), "b": (BUTTONS[pygame.CONTROLLER_BUTTON_B],),
-    "x": (BUTTONS[pygame.CONTROLLER_BUTTON_X],), "y": (BUTTONS[pygame.CONTROLLER_BUTTON_Y],),
-    "back": (BUTTONS[pygame.CONTROLLER_BUTTON_BACK],),
-    "guide": (BUTTONS[pygame.CONTROLLER_BUTTON_GUIDE],),
-    "start": (BUTTONS[pygame.CONTROLLER_BUTTON_START],),
-    "leftstick": (BUTTONS[pygame.CONTROLLER_BUTTON_LEFTSTICK],),
-    "rightstick": (BUTTONS[pygame.CONTROLLER_BUTTON_RIGHTSTICK],),
-    "leftshoulder": (BUTTONS[pygame.CONTROLLER_BUTTON_LEFTSHOULDER],),
-    "rightshoulder": (BUTTONS[pygame.CONTROLLER_BUTTON_RIGHTSHOULDER],),
-    "dpup": (BUTTONS[pygame.CONTROLLER_BUTTON_DPAD_UP],),
-    "dpdown": (BUTTONS[pygame.CONTROLLER_BUTTON_DPAD_DOWN],),
-    "dpleft": (BUTTONS[pygame.CONTROLLER_BUTTON_DPAD_LEFT],),
-    "dpright": (BUTTONS[pygame.CONTROLLER_BUTTON_DPAD_RIGHT],),
-    "leftx": (AXES[pygame.CONTROLLER_AXIS_LEFTX], *directions_of(LEFTSTICK)[2:]),
-    "lefty": (AXES[pygame.CONTROLLER_AXIS_LEFTY], *directions_of(LEFTSTICK)[:2]),
-    "rightx": (AXES[pygame.CONTROLLER_AXIS_RIGHTX], *directions_of(RIGHTSTICK)[2:]),
-    "righty": (AXES[pygame.CONTROLLER_AXIS_RIGHTY], *directions_of(RIGHTSTICK)[:2]),
-    "lefttrigger": (AXES[pygame.CONTROLLER_AXIS_TRIGGERLEFT],
-                    TRIGGERS[pygame.CONTROLLER_AXIS_TRIGGERLEFT]),
-    "righttrigger": (AXES[pygame.CONTROLLER_AXIS_TRIGGERRIGHT],
-                     TRIGGERS[pygame.CONTROLLER_AXIS_TRIGGERRIGHT]),
-}
 
 
 def _scaled(value: float) -> float:
@@ -101,9 +76,6 @@ class Gamepad(Joystick):
     def _open(self, index: int) -> None:
         super()._open(index)
         self.gamepad = controller.Controller(index)
-
-    def controls(self) -> frozenset[str]:
-        return frozenset(c for key in self.gamepad.get_mapping() for c in _MAPPED.get(key, ()))
 
     def _event(self, event: pygame.event.Event, moved: set[Side]) -> list[Press]:
         if event.type in (pygame.CONTROLLERBUTTONDOWN, pygame.CONTROLLERBUTTONUP):
@@ -134,8 +106,7 @@ class Gamepad(Joystick):
         return {name: _scaled(self.gamepad.get_axis(a)) for a, name in AXES.items()}
 
     def buttons(self) -> tuple[str, ...]:
-        have = self.controls()
-        return tuple(c for c in (*BUTTONS.values(), *TRIGGERS.values()) if c in have)
+        return (*BUTTONS.values(), *TRIGGERS.values())
 
     def read(self) -> tuple[dict[int, float], set[str]]:
         g = self.gamepad
@@ -143,8 +114,3 @@ class Gamepad(Joystick):
         held = {name for b, name in BUTTONS.items() if g.get_button(b)}
         return axes, held | {name for a, name in TRIGGERS.items()
                              if _scaled(g.get_axis(a)) >= _TRIGGER_ON}
-
-    def source(self, control: str) -> str:
-        """Which raw button or axis a control is, as SDL's mapping of the pad says ("b6")."""
-        key = next((k for k, cs in _MAPPED.items() if control in cs), "")
-        return self.gamepad.get_mapping().get(key, "")
