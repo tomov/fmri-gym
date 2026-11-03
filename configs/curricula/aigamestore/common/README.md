@@ -47,3 +47,4 @@ An episode is one level: it ends on a win, a loss or a level clear, and `reset()
 | `game9.json` | Mega Man-like action platformer, levels 1–7 |
 | `game10.json` | haunted mansion escape, levels 1–6 |
 | `game<N>-ABXY-nav.json` | game1, game4, game7 or game8 on the face buttons, for the `curdes-v1-ABXY-nav` rig |
+| `game<N>-stick-nav.json` | game1, game4, game7 or game8 from `common/game<N>-stick-nav.json`, moving on the stick |
