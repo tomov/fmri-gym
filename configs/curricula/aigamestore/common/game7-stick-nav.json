@@ -8,15 +8,15 @@
       "",
       "Controls:",
       "   [ARROWS]   move",
-      "   [Z]        shoot",
-      "   [SPACE]    sprint",
-      "   [C]        take cover",
-      "   [X]        next weapon",
+      "   [S]      shoot",
+      "   [SPACE]       sprint",
+      "   [C]       take cover",
+      "   [A]      next weapon",
       "",
       "Press [SPACE] to start."
     ]
   },
-  "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "Z": 4, "SPACE": 5, "C": 6, "X": 12},
+  "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "S": 4, "SPACE": 5, "C": 6, "A": 12},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 600.0,
   "fps": 30, "frame_skip": 2
 }

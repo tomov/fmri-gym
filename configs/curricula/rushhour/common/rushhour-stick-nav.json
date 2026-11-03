@@ -24,7 +24,7 @@
       "after that, easy and hard ones come in any order.",
       "Take all the time you need.",
       "",
-      "(press [SPACE] to begin)"
+      "Press [SPACE] to begin."
     ]
   },
   "keys": {"A": 4, "S": 5, "LEFT": 8, "RIGHT": 9, "UP": 10, "DOWN": 11},

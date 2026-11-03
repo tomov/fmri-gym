@@ -11,7 +11,7 @@
       "   [SPACE]          fire",
       "   [Z]              swap current / next",
       "",
-      "(press [SPACE] to start)"
+      "Press [SPACE] to start."
     ]
   },
   "keys": {"LEFT": 0, "RIGHT": 1, "SPACE": 2, "Z": 3},

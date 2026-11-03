@@ -10,7 +10,7 @@
       "   [SPACE]    wait a turn",
       "   hold [X]   pause menu (restart / give up / resume)",
       "",
-      "(press [SPACE] to start)"
+      "Press [SPACE] to start."
     ]
   },
   "keys": {"SPACE": 0, "UP": 1, "DOWN": 2, "LEFT": 3, "RIGHT": 4},

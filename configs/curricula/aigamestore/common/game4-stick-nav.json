@@ -9,7 +9,7 @@
       "Controls:",
       "   [SPACE] or [UP]   thrust / fly",
       "",
-      "(press [SPACE] to start)"
+      "Press [SPACE] to start."
     ]
   },
   "keys": {"SPACE": 0, "UP": 1},
