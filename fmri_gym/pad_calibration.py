@@ -161,7 +161,7 @@ class _Task:
         """
         self.now = self.clock.tick()
         events = pygame.event.get()
-        self.device.poll(events, self.now)
+        self.device.handle(events, self.now)
         for e in events:
             if e.type == pygame.QUIT:
                 if self.cancel:

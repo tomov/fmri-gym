@@ -110,15 +110,15 @@ class Fixation(Phase):
 class Message(Phase):
     """Text on screen until its ``duration``, a key, or whichever comes first.
 
-    ``keys_to_dismiss`` (key names) ends it at a press of one of them, and with
-    a ``duration`` at whichever comes first; without them an untimed message
-    waits for the character ``key`` (``"any"``: any key).
+    ``keys_to_dismiss`` (control names) ends it at a press of one of them, and
+    with a ``duration`` at whichever comes first; without them an untimed
+    message waits for the control ``key`` (``"any"``: any control).
     """
 
     type: ClassVar[str] = "message"
     text: str
     duration: float | None
-    #: the character that dismisses an untimed message without ``keys_to_dismiss``
+    #: the control that dismisses an untimed message without ``keys_to_dismiss``
     key: str
     keys_to_dismiss: tuple[str, ...] | None
     align: str
@@ -127,13 +127,16 @@ class Message(Phase):
     def from_dict(cls, d: dict, index: int) -> Message:
         keys = d.get("keys_to_dismiss")
         return cls(**cls._shared(d), text=join_text(d.get("text", "")),
-                   duration=d.get("duration"), key=d.get("key", " "),
+                   duration=d.get("duration"), key=d.get("key", "SPACE"),
                    keys_to_dismiss=None if keys is None else tuple(keys),
                    align=d.get("align", "center"))
 
     @staticmethod
     def problems(d: dict) -> list[str]:
         out = _dismiss_problems("keys_to_dismiss", d.get("keys_to_dismiss"))
+        key = d.get("key", "SPACE")
+        if key != "any" and not _is_pressable(key):
+            out.append(f'key: expected a control name ({_NAMES_ARE}) or "any", got {key!r}')
         if d.get("align", "center") not in ("center", "left"):
             out.append(f"align: expected 'center' or 'left', got {d['align']!r}")
         return out + _positive_problems(d, ("duration",))
@@ -160,7 +163,7 @@ class Instructions:
         """As the message shown, its heading marking a block a run carries on."""
         heading = f"{'Resuming:' if resumed else 'Starting:'} {self.title}"
         return Message(spec={}, include_on_resume=False, text=f"{heading}\n\n{self.text}",
-                       duration=self.duration, key=" ", keys_to_dismiss=self.keys_to_dismiss,
+                       duration=self.duration, key="SPACE", keys_to_dismiss=self.keys_to_dismiss,
                        align=self.align)
 
     @staticmethod

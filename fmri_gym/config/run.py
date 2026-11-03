@@ -151,13 +151,12 @@ class RunConfig:
     def _scanner_key_problems(self) -> list[str]:
         """The game keys the rig's scanner types at every volume."""
         sync = self.rig.triggers.sync
-        name = sync.key.upper()
-        if sync.mode != "wait" or not (len(name) == 1 and name.isalnum()):
-            return []  # "=" is no game key: nothing can clash
+        if sync.mode != "wait":
+            return []
         return [f"phase {i}: keys: {combo} uses {sync.key!r}, the key {self.rig.path}'s scanner "
                 "types at every volume (its triggers.sync.key): bind another key"
                 for i, phase in enumerate(self.curriculum.phases) if isinstance(phase, GamePhase)
-                for combo in phase.spec["keys"] if name in combo.upper().split("+")]
+                for combo in phase.spec["keys"] if sync.key in combo.split("+")]
 
     def _unpressable_problems(self) -> list[str]:
         """What a phase asks of the participant that none of the rig's input devices has."""
@@ -210,7 +209,7 @@ def _message_needs(message: Message) -> list[KeyNeed]:
         return [KeyNeed("dismissing it", tuple((k,) for k in message.keys_to_dismiss))]
     if message.duration is not None or message.key == "any":
         return []
-    return [KeyNeed("dismissing it", (({" ": "SPACE"}.get(message.key, message.key.upper()),),))]
+    return [KeyNeed("dismissing it", ((message.key,),))]
 
 
 def _game_needs(game: GamePhase) -> list[KeyNeed]:

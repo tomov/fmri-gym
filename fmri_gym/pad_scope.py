@@ -24,7 +24,7 @@ import pygame
 
 from . import pad_calibration as calibration
 from .config.rig import RigConfig
-from .inputs import LISTED, CalibrationError, Joystick, find_device
+from .inputs import OPTIONAL_INPUT_DEVICE_NAMES, CalibrationError, Joystick, find_device
 from .inputs.calibration import (MAX_DWELL_S, UNCALIBRATED, Side, StickTuning,
                                  calibrations_dir, newest, write)
 from .inputs.stick import DIRECTIONS, Stick
@@ -268,7 +268,8 @@ class _Scope:
     def __init__(self, kinds: tuple[str, ...]) -> None:
         """Open the window, and the first controller plugged in of ``kinds``.
 
-        :param kinds: the kinds of device to look for (:data:`fmri_gym.inputs.LISTED`).
+        :param kinds: the kinds of device to look for
+            (:data:`fmri_gym.inputs.OPTIONAL_INPUT_DEVICE_NAMES`).
         """
         self.canvas = _Canvas("pad-calibration")
         font = "Menlo,Monaco,monospace"
@@ -364,7 +365,7 @@ class _Scope:
         rest."""
         events = pygame.event.get()
         if self.device is not None:
-            self.device.poll(events, time.perf_counter())
+            self.device.handle(events, time.perf_counter())
         for e in events:
             if e.type == pygame.QUIT:
                 self.running = False
@@ -411,7 +412,7 @@ class _Scope:
 
     def draw(self) -> None:
         now, device = self.now(), self.device
-        controls = device.held() if device else frozenset()
+        controls = device.last_held() if device else frozenset()
         raw, down = device.read() if device else ({}, set())
         self.record(now, controls, raw)
         screen = self.canvas.surface
@@ -546,4 +547,4 @@ def main() -> None:
     p.add_argument("--rig", default=None, metavar="RIG.json",
                    help='the rig file whose "inputs" to look for (default: any controller)')
     rig = p.parse_args().rig
-    _Scope(RigConfig.open(rig).inputs if rig else tuple(LISTED)).loop()
+    _Scope(RigConfig.open(rig).inputs if rig else tuple(OPTIONAL_INPUT_DEVICE_NAMES)).loop()

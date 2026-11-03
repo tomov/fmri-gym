@@ -10,7 +10,7 @@ from __future__ import annotations
 import pygame
 from pygame._sdl2 import controller
 
-from .base import Press
+from .base import Edge, InputEvent
 from .calibration import Side
 from .joystick import Joystick
 from .stick import directions_of
@@ -77,7 +77,7 @@ class Gamepad(Joystick):
         super()._open(index)
         self.gamepad = controller.Controller(index)
 
-    def _event(self, event: pygame.event.Event, moved: set[Side]) -> list[Press]:
+    def _event(self, event: pygame.event.Event, moved: set[Side]) -> list[InputEvent]:
         if event.type in (pygame.CONTROLLERBUTTONDOWN, pygame.CONTROLLERBUTTONUP):
             return self._button(BUTTONS.get(event.button), event.button,
                                 event.type == pygame.CONTROLLERBUTTONDOWN)
@@ -92,14 +92,14 @@ class Gamepad(Joystick):
             moved.add(side)
         return []
 
-    def _trigger(self, name: str, value: float) -> list[Press]:
+    def _trigger(self, name: str, value: float) -> list[InputEvent]:
         """Press a trigger's button past :data:`_TRIGGER_ON`, release it under the off."""
         if name not in self._buttons and value >= _TRIGGER_ON:
             self._buttons.add(name)
-            return [Press(name, True)]
+            return [InputEvent(name, Edge.DOWN)]
         if name in self._buttons and value < _TRIGGER_OFF:
             self._buttons.discard(name)
-            return [Press(name, False)]
+            return [InputEvent(name, Edge.UP)]
         return []
 
     def axes(self) -> dict[str, float]:

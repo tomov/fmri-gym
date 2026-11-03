@@ -17,12 +17,12 @@ from typing import ClassVar
 import pygame
 from pygame._sdl2 import controller
 
-from .base import Input, Press
+from .base import Edge, InputDevice, InputEvent
 from .calibration import HOW_TO_CALIBRATE, Calibration, CalibrationError, Side, calibrations_dir
 from .stick import Stick
 
 
-class Joystick(Input):
+class Joystick(InputDevice):
     """A controller SDL opened as joystick ``index``, read through its newest calibration."""
 
     #: its sticks, by the prefix of their controls' names, and each one's side in a calibration
@@ -77,10 +77,10 @@ class Joystick(Input):
         self.sticks: dict[Side, Stick] = {side: Stick(name, side, sticks.get(side))
                                           for name, side in self.STICKS.items()}
 
-    def poll(self, events: list[pygame.event.Event], now: float) -> list[Press]:
+    def handle(self, events: list[pygame.event.Event], now: float) -> list[InputEvent]:
         if not self.joystick.get_init():
             self._reopen()
-        out: list[Press] = []
+        out: list[InputEvent] = []
         moved: set[Side] = set()
         for event in events:
             if getattr(event, "instance_id", None) == self.instance_id:
@@ -90,10 +90,10 @@ class Joystick(Input):
         return out
 
     @abstractmethod
-    def _event(self, event: pygame.event.Event, moved: set[Side]) -> list[Press]:
-        """The presses one of the device's events makes; a stick's axis it adds to ``moved``."""
+    def _event(self, event: pygame.event.Event, moved: set[Side]) -> list[InputEvent]:
+        """The edges one of the device's events makes; a stick's axis it adds to ``moved``."""
 
-    def _button(self, name: str | None, number: int, down: bool) -> list[Press]:
+    def _button(self, name: str | None, number: int, down: bool) -> list[InputEvent]:
         """A button's press or release; one that is no control is said once on stderr."""
         if name is None:
             if down and number not in self._warned:
@@ -105,10 +105,10 @@ class Joystick(Input):
             self._buttons.add(name)
         else:
             self._buttons.discard(name)
-        return [Press(name, down)]
+        return [InputEvent(name, Edge.DOWN if down else Edge.UP)]
 
-    def held(self) -> frozenset[str]:
-        return frozenset(self._buttons).union(*(s.held() for s in self.sticks.values()))
+    def last_held(self) -> frozenset[str]:
+        return frozenset(self._buttons).union(*(s.last_held() for s in self.sticks.values()))
 
     @abstractmethod
     def buttons(self) -> tuple[str, ...]:

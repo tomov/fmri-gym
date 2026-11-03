@@ -25,8 +25,8 @@ say the same thing:
   "has_vsync": true}``, the monitor by index (0: the first); fullscreen scales
   ``size`` to the monitor, aspect kept, at the monitor's own resolution;
 - ``"inputs"``: the input devices of the rig besides the keyboard, which is
-  always on, by the names of :data:`fmri_gym.inputs.INPUTS` (``["gmpd3"]``);
-  each must be plugged in when a run starts;
+  always on, by the names of :data:`fmri_gym.inputs.OPTIONAL_INPUT_DEVICE_NAMES`
+  (``["gmpd3"]``); each must be plugged in when a run starts;
 - ``"response_keys"``: the keys a response device types by itself (a button
   box, a fORP in a key mode), each with what it stands for, ``{"1": "index
   finger", ...}``: the rig check asks for each;
@@ -62,7 +62,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from ..inputs import LISTED, Keyboard
+from ..inputs import OPTIONAL_INPUT_DEVICE_NAMES, Keyboard
 from ..triggers import TriggerError, TriggerSettings
 
 MODALITIES = ("fmri", "meg", "eeg", "behav")
@@ -114,8 +114,8 @@ RIG_CHECK_DEFAULTS: dict[str, Any] = {
 #: and ``backend`` outright: a section that leaves them out runs, but is
 #: reported as NOT SET.
 TRIGGER_PRESETS: dict[str, dict] = {
-    "fMRI (wait for '=', no codes)": {
-        "sync": {"mode": "wait", "key": "="}, "backend": "null"},
+    "fMRI (wait for EQUALS, no codes)": {
+        "sync": {"mode": "wait", "key": "EQUALS"}, "backend": "null"},
     # MEG and EEG alike: the stimulus PC starts the recording and marks it, over serial.
     "MEG (start from the trigger line, serial codes)": {
         "sync": {"mode": "send", "delay": 0.0}, "backend": "serial", "port": "/dev/ttyUSB0"},
@@ -215,7 +215,8 @@ class RigConfig:
     fields: dict[str, str]
     #: the window.
     screen: ScreenConfig
-    #: the input devices besides the keyboard, by :data:`fmri_gym.inputs.INPUTS` name.
+    #: the input devices besides the keyboard, by
+    #: :data:`fmri_gym.inputs.OPTIONAL_INPUT_DEVICE_NAMES` name.
     inputs: tuple[str, ...]
     #: the keys a response device types itself -> what each stands for
     response_keys: dict[str, str]
@@ -443,10 +444,11 @@ def _setting_problems(rig: dict) -> list[str]:
 def _input_problems(rig: dict) -> list[str]:
     """``inputs``: distinct names of the kinds of device a rig lists, the keyboard not among them."""
     names = rig.get("inputs", [])
-    if (isinstance(names, list) and all(isinstance(n, str) and n in LISTED for n in names)
+    listed = OPTIONAL_INPUT_DEVICE_NAMES
+    if (isinstance(names, list) and all(isinstance(n, str) and n in listed for n in names)
             and len(set(names)) == len(names)):
         return []
-    return [f'"inputs": expected a list of distinct names from {sorted(LISTED)} (the keyboard '
+    return [f'"inputs": expected a list of distinct names from {sorted(listed)} (the keyboard '
             f"is always on), got {names!r}"]
 
 
@@ -504,8 +506,9 @@ def _is_seconds(v: Any) -> bool:
 def trigger_problems(section: Any) -> list[str]:
     """What :class:`~fmri_gym.triggers.TriggerSettings` refuses in a ``triggers`` section, as text.
 
-    The port is the one check added here: the settings accept a missing port
-    and the backend refuses it on opening, which a check before the run never does.
+    Two checks are added here: the settings accept a missing port, which the
+    backend refuses only on opening, and a scanner key that is no keyboard key,
+    which a run would wait for forever.
 
     :return: at most one problem (the first the settings raise).
     """
@@ -517,4 +520,7 @@ def trigger_problems(section: Any) -> list[str]:
         return [str(exc)]
     if s.backend in ("serial", "parallel", "hid") and not s.port:
         return [f"triggers: backend {s.backend!r} needs a port"]
+    if s.sync.mode == "wait" and s.sync.key not in Keyboard.CONTROLS:
+        return [f"triggers: sync.key {s.sync.key!r} is not a keyboard key name (as in "
+                "fmri_gym/inputs/keyboard.py): name the key the trigger box types"]
     return []

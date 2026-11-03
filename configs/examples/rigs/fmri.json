@@ -12,5 +12,5 @@
   "data_root": "data",
   "start_fixation": 10,
   "end_fixation": 10,
-  "triggers": {"sync": {"mode": "wait", "key": "="}, "backend": "null"}
+  "triggers": {"sync": {"mode": "wait", "key": "EQUALS"}, "backend": "null"}
 }

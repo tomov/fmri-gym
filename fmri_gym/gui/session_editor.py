@@ -163,7 +163,7 @@ PHASE_FIELDS: dict[str, list[Field]] = {
         Field("text", "text", "text", tip="The message. Lines are kept as typed."),
         Field("duration", "duration (s)", "float",
               tip="Seconds shown. Blank = stay until the participant presses 'key'."),
-        Field("key", "key", tip="Key that dismisses an untimed message (default: space)."),
+        Field("key", "key", tip="Control that dismisses an untimed message (default: SPACE)."),
         Field("align", "align", "choice", ("center", "left"), tip="Text alignment."),
     ],
     "survey": [

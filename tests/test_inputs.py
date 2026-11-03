@@ -20,7 +20,8 @@ import pytest
 
 import fmri_gym.inputs as inputs
 from fmri_gym import pad_calibration as cal
-from fmri_gym.inputs import QUIT, CalibrationError, Inputs, Joystick, Keyboard, Press
+from fmri_gym.inputs import (QUIT, CalibrationError, Edge, InputDevices, InputEvent, Joystick,
+                             Keyboard)
 from fmri_gym.inputs import calibration as files
 from fmri_gym.inputs.calibration import Side, StickTuning, UNCALIBRATED
 from fmri_gym.inputs.gamepad import Gamepad
@@ -280,10 +281,10 @@ def test_each_stick_reads_its_own_tuning():
     for stick in (left, right):
         stick.move(0, 0.55)                       # past the left's 0.5, not the right's 0.6
         stick.move(1, 0.0)
-    assert left.resolve(1.0) == [Press("L_RIGHT", True)] and right.resolve(1.0) == []
+    assert left.resolve(1.0) == [_down("L_RIGHT")] and right.resolve(1.0) == []
     right.move(0, 0.65)
-    assert right.resolve(1.1) == [Press("R_RIGHT", True)]
-    assert left.held() == {"L_RIGHT"} and right.held() == {"R_RIGHT"}
+    assert right.resolve(1.1) == [_down("R_RIGHT")]
+    assert left.last_held() == {"L_RIGHT"} and right.last_held() == {"R_RIGHT"}
 
 
 def test_a_device_refuses_a_stick_the_curriculum_names_with_no_calibration(config_home):
@@ -302,6 +303,14 @@ def test_a_device_refuses_a_stick_the_curriculum_names_with_no_calibration(confi
     assert str(path) in pad.status()
 
 
+def _down(name: str) -> InputEvent:
+    return InputEvent(name, Edge.DOWN)
+
+
+def _up(name: str) -> InputEvent:
+    return InputEvent(name, Edge.UP)
+
+
 def _joy(type_: int, **fields) -> pygame.event.Event:
     return pygame.event.Event(type_, instance_id=7, **fields)
 
@@ -313,10 +322,10 @@ def test_the_gmpd3_names_its_buttons_and_reads_its_stick(capsys):
               pygame.event.Event(pygame.JOYBUTTONDOWN, instance_id=8, button=0),  # another's
               _joy(pygame.JOYAXISMOTION, axis=1, value=-0.9),
               _joy(pygame.JOYAXISMOTION, axis=3, value=-1.0)]            # pinned: no control
-    assert pad.poll(events, 1.0) == [Press("GMPD3_A", True), Press("GMPD3_STICK_UP", True)]
-    assert pad.held() == {"GMPD3_A", "GMPD3_STICK_UP"}
+    assert pad.handle(events, 1.0) == [_down("GMPD3_A"), _down("GMPD3_STICK_UP")]
+    assert pad.last_held() == {"GMPD3_A", "GMPD3_STICK_UP"}
     assert "button 9 pressed" in capsys.readouterr().err
-    assert pad.poll([_joy(pygame.JOYBUTTONUP, button=4)], 1.1) == [Press("GMPD3_A", False)]
+    assert pad.handle([_joy(pygame.JOYBUTTONUP, button=4)], 1.1) == [_up("GMPD3_A")]
 
 
 def test_a_gamepad_reads_its_mapping_and_not_the_joystick_twin():
@@ -324,38 +333,38 @@ def test_a_gamepad_reads_its_mapping_and_not_the_joystick_twin():
     a, trigger = pygame.CONTROLLER_BUTTON_A, pygame.CONTROLLER_AXIS_TRIGGERLEFT
     events = [_joy(pygame.CONTROLLERBUTTONDOWN, button=a), _joy(pygame.JOYBUTTONDOWN, button=0),
               _joy(pygame.CONTROLLERAXISMOTION, axis=trigger, value=12000)]   # under half
-    assert pad.poll(events, 1.0) == [Press("CONTROLLER_BUTTON_A", True)]
+    assert pad.handle(events, 1.0) == [_down("CONTROLLER_BUTTON_A")]
     pull = [_joy(pygame.CONTROLLERAXISMOTION, axis=trigger, value=20000)]
-    assert pad.poll(pull, 1.1) == [Press("CONTROLLER_TRIGGERLEFT", True)]
+    assert pad.handle(pull, 1.1) == [_down("CONTROLLER_TRIGGERLEFT")]
     ease = [_joy(pygame.CONTROLLERAXISMOTION, axis=trigger, value=12000)]   # still past off
-    assert pad.poll(ease, 1.2) == []
+    assert pad.handle(ease, 1.2) == []
     let_go = [_joy(pygame.CONTROLLERAXISMOTION, axis=trigger, value=0)]
-    assert pad.poll(let_go, 1.3) == [Press("CONTROLLER_TRIGGERLEFT", False)]
+    assert pad.handle(let_go, 1.3) == [_up("CONTROLLER_TRIGGERLEFT")]
 
 
 # -- the keyboard and the run's inputs ---------------------------------------------------------
 
 
-def _key(type_: int, key: int, char: str = "") -> pygame.event.Event:
-    return pygame.event.Event(type_, key=key, mod=0, unicode=char)
+def _key(type_: int, key: int) -> pygame.event.Event:
+    return pygame.event.Event(type_, key=key, mod=0, unicode="")
 
 
 def test_the_keyboard_holds_what_its_events_press_until_the_window_loses_focus():
     keys = Keyboard()
-    assert keys.poll([_key(pygame.KEYDOWN, pygame.K_EQUALS, "="),
-                      _key(pygame.KEYDOWN, pygame.K_LEFT)], 1.0) == [
-        Press("EQUALS", True, "="), Press("LEFT", True)]
-    assert keys.held() == {"EQUALS", "LEFT"}
-    keys.poll([_key(pygame.KEYUP, pygame.K_EQUALS)], 1.1)
-    assert keys.held() == {"LEFT"}
-    keys.poll([pygame.event.Event(pygame.WINDOWFOCUSLOST)], 1.2)
-    assert keys.held() == frozenset()
+    assert keys.handle([_key(pygame.KEYDOWN, pygame.K_EQUALS),
+                        _key(pygame.KEYDOWN, pygame.K_LEFT)], 1.0) == [
+        _down("EQUALS"), _down("LEFT")]
+    assert keys.last_held() == {"EQUALS", "LEFT"}
+    keys.handle([_key(pygame.KEYUP, pygame.K_EQUALS)], 1.1)
+    assert keys.last_held() == {"LEFT"}
+    keys.handle([pygame.event.Event(pygame.WINDOWFOCUSLOST)], 1.2)
+    assert keys.last_held() == frozenset()
 
 
 def test_the_runs_inputs_take_the_queue_and_name_the_windows_close(screen):
-    pygame.event.post(_key(pygame.KEYDOWN, pygame.K_SPACE, " "))
+    pygame.event.post(_key(pygame.KEYDOWN, pygame.K_SPACE))
     pygame.event.post(pygame.event.Event(pygame.QUIT))
-    assert Inputs([Keyboard()]).poll() == [Press(QUIT, True), Press("SPACE", True, " ")]
+    assert InputDevices([Keyboard()]).poll() == [_down(QUIT), _down("SPACE")]
     assert pygame.event.peek() is False
 
 
@@ -386,7 +395,7 @@ def test_a_rigs_inputs_that_cannot_be_opened_stop_the_run(plugged, names, says):
 
 def test_a_rigs_inputs_open_its_devices_and_say_which_joysticks_they_ignore(plugged):
     opened = inputs.open_inputs(["gmpd3"], needed=frozenset({"GMPD3_A", "SPACE"}))
-    assert [d.name for d in opened.devices] == ["keyboard", "gmpd3"]
+    assert [d.name for d in opened.devices()] == ["keyboard", "gmpd3"]
     assert "IGNORED \"Joystick Of Nobody's\"" in opened.status()
     assert opened.controls() == Keyboard.CONTROLS | Gmpd3.CONTROLS
     with pytest.raises(CalibrationError, match="GMPD3_STICK"):

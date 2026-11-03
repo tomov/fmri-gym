@@ -101,9 +101,8 @@ class KeyScript:
 
     @staticmethod
     def _post(kind: int, name: str) -> None:
-        code = KEYCODES[name]
-        unicode = " " if name == "SPACE" else (name.lower() if len(name) == 1 else "")
-        pygame.event.post(pygame.event.Event(kind, key=code, mod=0, unicode=unicode, scancode=0))
+        pygame.event.post(pygame.event.Event(kind, key=KEYCODES[name], mod=0, unicode="",
+                                             scancode=0))
 
 
 def script_for(curriculum_path: str, rate: float, seed: int) -> KeyScript:

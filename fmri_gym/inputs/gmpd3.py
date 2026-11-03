@@ -12,7 +12,7 @@ from __future__ import annotations
 import pygame
 from pygame._sdl2 import controller
 
-from .base import Press
+from .base import InputEvent
 from .calibration import Side
 from .joystick import Joystick
 from .stick import directions_of
@@ -37,7 +37,7 @@ class Gmpd3(Joystick):
                 and joystick.get_numbuttons() >= len(BUTTONS)
                 and joystick.get_numaxes() >= len(AXES))
 
-    def _event(self, event: pygame.event.Event, moved: set[Side]) -> list[Press]:
+    def _event(self, event: pygame.event.Event, moved: set[Side]) -> list[InputEvent]:
         if event.type == pygame.JOYAXISMOTION and event.axis in AXES:
             self.sticks[Side.LEFT].move(event.axis, event.value)
             moved.add(Side.LEFT)

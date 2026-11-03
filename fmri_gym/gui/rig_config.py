@@ -27,7 +27,7 @@ from PySide6.QtCore import Qt
 
 from ..config import rig as rig_file
 from ..display import list_monitors, monitor_label
-from ..inputs import LISTED
+from ..inputs import OPTIONAL_INPUT_DEVICE_NAMES
 from ..triggers import (HID_DEVICES, SYNC_MODES, TRIGGER_BACKENDS, Codes, SyncSettings,
                         TriggerError, Triggers, TriggerSettings)
 from . import Field
@@ -39,8 +39,9 @@ SYNC_FIELDS = [
               "key your scanner's trigger box types at each volume (fMRI). send: the run sends "
               "a start code on the trigger line, which starts your recording (MEG, EEG). none: "
               "the run starts at once (no scanner)."),
-    Field("key", "trigger key", tip="The key your trigger box types at each volume, usually = "
-                                    "or 5. The run starts at the first one."),
+    Field("key", "trigger key", tip="The name of the key your trigger box types at each "
+                                    "volume, usually EQUALS or 5. The run starts at the first "
+                                    "one."),
     Field("scanner_start", "start code", "int",
           tip="The code sent on the trigger line to start the recording. It must share no bit "
               "with the other codes."),
@@ -222,7 +223,7 @@ def _describe(rig: rig_file.RigConfig, triggers: dict | None) -> str:
         f"Game sound: {'on' if rig.has_audio else 'off'}.   Data saved in: {rig.data_root}",
         fixation,
         describe_triggers(triggers) if triggers else
-        "Triggers: NOT SET -- a run waits for '=' and sends no codes."])
+        f"Triggers: NOT SET -- a run waits for {SyncSettings().key!r} and sends no codes."])
 
 
 def check_plan(rig: rig_file.RigConfig) -> str:
@@ -821,7 +822,7 @@ class _RigWindow(QtWidgets.QDialog):
         column = QtWidgets.QVBoxLayout(box)
         given = given if isinstance(given, list) else []
         self.input_boxes: dict[str, QtWidgets.QCheckBox] = {}
-        for name, cls in LISTED.items():
+        for name, cls in OPTIONAL_INPUT_DEVICE_NAMES.items():
             check = QtWidgets.QCheckBox(f"{name}: {(cls.__doc__ or '').splitlines()[0]}")
             check.setChecked(name in given)
             check.toggled.connect(lambda _on: self._check())

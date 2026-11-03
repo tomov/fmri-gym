@@ -14,4 +14,4 @@ The rig's `"triggers"` say how a run starts and what the recording gets (README,
 
 On a PC with no parallel port (a Mac), the trigger input can be wired to a USB DAQ's digital port instead; for a Measurement Computing USB-1208FS on its port A, `"backend": "hid", "hid_device": "mcc-1208fs", "port": "A"`.
 
-An fMRI rig whose trigger box types `=` at every volume needs only `"triggers": {"sync": {"mode": "wait", "key": "="}, "backend": "null"}`.
+An fMRI rig whose trigger box types `=` at every volume needs only `"triggers": {"sync": {"mode": "wait", "key": "EQUALS"}, "backend": "null"}` (`key` is the key's name, as a curriculum writes it).

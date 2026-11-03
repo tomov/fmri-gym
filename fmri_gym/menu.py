@@ -30,11 +30,11 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING
 
-from .inputs import ESCAPE, QUIT, is_control
+from .inputs import ESCAPE, QUIT, Edge, is_control
 
 if TYPE_CHECKING:
     from .display import Display
-    from .inputs import Inputs
+    from .inputs import InputDevice
     from .logging import Logger
 
 OPTIONS = ("reset", "forfeit", "resume")
@@ -112,7 +112,7 @@ class Menu:
 
     :param spec: the phase's ``"menu"`` dict (already validated).
     :param block_start: ``perf_counter`` at which the block began.
-    :param held: returns the names of the controls held now (:meth:`Inputs.held`).
+    :param held: returns the names of the controls held now (:meth:`InputDevice.last_held`).
     """
 
     def __init__(self, spec: dict, block_start: float,
@@ -146,7 +146,7 @@ class Menu:
         return True
 
     def run(self, display: Display, run_time: Callable[[], float], logger: Logger,
-            inputs: Inputs) -> str:
+            inputs: InputDevice) -> str:
         """Show the pop-up until an option is confirmed, and return it.
 
         :param display: the display to draw on.
@@ -162,7 +162,8 @@ class Menu:
         choice = 0
         while True:
             self._draw(display, choice)
-            for name, down, _ in inputs.poll():
+            for name, edge in inputs.poll():
+                down = edge is Edge.DOWN
                 if name in (QUIT, ESCAPE):
                     if down:
                         return "quit"

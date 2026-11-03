@@ -100,7 +100,7 @@ from .config import rig as rig_file
 from .config.phases import (CHECK_PHASES, CheckControls, CheckDisplay, CheckFrames, CheckPhase,
                             CheckPhotodiode, CheckTriggers, GamePhase)
 from .display import Display, is_locked
-from .inputs import ESCAPE, QUIT, Inputs
+from .inputs import ESCAPE, QUIT, Edge, InputDevice
 from .inputs.joystick import Joystick
 from .inputs.keyboard import KEYCODES
 from .pad_calibration import calibrate, cue_order
@@ -405,21 +405,21 @@ def input_devices() -> list[str]:
     return names
 
 
-def _round_trip(inputs: Inputs, name: str) -> bool:
+def _round_trip(inputs: InputDevice, name: str) -> bool:
     """A synthetic press of the keyboard key ``name`` comes back from ``inputs`` as ``name``."""
     inputs.poll()
     for kind in (pygame.KEYDOWN, pygame.KEYUP):
         pygame.event.post(pygame.event.Event(kind, key=KEYCODES[name], mod=0, unicode="",
                                              scancode=0))
-    return (name, True) in [(p.name, p.down) for p in inputs.poll()]
+    return (name, Edge.DOWN) in inputs.poll()
 
 
-def _controllers(inputs: Inputs) -> list[Joystick]:
+def _controllers(inputs: InputDevice) -> list[Joystick]:
     """The devices of ``inputs`` that are controllers, which have buttons and sticks."""
-    return [d for d in inputs.devices if isinstance(d, Joystick)]
+    return [d for d in inputs.devices() if isinstance(d, Joystick)]
 
 
-def _controls_to_ask(inputs: Inputs) -> dict[str, str]:
+def _controls_to_ask(inputs: InputDevice) -> dict[str, str]:
     """Each control of the controllers to press, buttons then stick directions: what it is on."""
     return {c: f"on the {d.name}" for d in _controllers(inputs)
             for c in (*cue_order(d.buttons()), *(n for s in d.sticks.values()
@@ -518,23 +518,23 @@ def _prompt(run: Run, name: str, label: str, keys: dict, done: dict, timeout: fl
     return {"pressed": False, "strays": strays}
 
 
-def _key_events(inputs: Inputs, ignore: str | None) -> list[tuple[bool, str]]:
+def _key_events(inputs: InputDevice, ignore: str | None) -> list[tuple[bool, str]]:
     """Presses and releases since the last call, in order: ``(down, name)``; the
     scanner's key left out.
 
     :raises _Skipped: on ESC or window close.
     """
     out = []
-    for name, down, char in inputs.poll():
-        if name in (QUIT, ESCAPE) and down:
+    for name, edge in inputs.poll():
+        if name in (QUIT, ESCAPE) and edge is Edge.DOWN:
             raise _Skipped
-        if ignore and char == ignore:
+        if name == ignore:
             continue
-        out.append((down, name))
+        out.append((edge is Edge.DOWN, name))
     return out
 
 
-def _held(inputs: Inputs, name: str, pressed: float, pending: list[tuple[bool, str]],
+def _held(inputs: InputDevice, name: str, pressed: float, pending: list[tuple[bool, str]],
           limit: float = 2.0) -> float:
     """Seconds until ``name`` is released (``nan`` if not within ``limit``).
 
@@ -907,7 +907,7 @@ def _pulses(key: str) -> list[float]:
         if event.type == pygame.QUIT or (
                 event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
             raise KeyboardInterrupt
-        if event.type == pygame.KEYDOWN and event.unicode == key:
+        if event.type == pygame.KEYDOWN and event.key == KEYCODES[key]:
             times.append(now)
     return times
 

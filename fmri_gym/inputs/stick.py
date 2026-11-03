@@ -12,7 +12,7 @@ from __future__ import annotations
 import math
 import sys
 
-from .base import Press
+from .base import Edge, InputEvent
 from .calibration import UNCALIBRATED, AxisCalibration, Side, StickCalibration, StickTuning
 
 #: A stick's directions, in the order of its controls' names.
@@ -71,8 +71,8 @@ class Stick:
     def is_calibrated(self) -> bool:
         return self.calibration is not None
 
-    def held(self) -> frozenset[str]:
-        """The directions it holds down now."""
+    def last_held(self) -> frozenset[str]:
+        """The directions down as of the last :meth:`resolve`."""
         return frozenset(self._held)
 
     def move(self, axis: int, value: float) -> None:
@@ -100,7 +100,7 @@ class Stick:
             return 0.0
         return max(-1.0, min(1.0, (value - rest) / span))
 
-    def resolve(self, now: float) -> list[Press]:
+    def resolve(self, now: float) -> list[InputEvent]:
         """Press what the stick's position now means, and release what it does not.
 
         :param now: the time, in seconds, on the clock every call uses.
@@ -111,8 +111,8 @@ class Stick:
         tuning = self.tuning
         wanted = self._classified() if tuning.diagonal >= 1.0 else self._independent()
         names = self._dwelt(wanted, tuning.dwell_s, now) if tuning.dwell_s > 0 else wanted
-        out = [Press(name, False) for name in sorted(self._held - names)]
-        out += [Press(name, True) for name in sorted(names - self._held)]
+        out = [InputEvent(name, Edge.UP) for name in sorted(self._held - names)]
+        out += [InputEvent(name, Edge.DOWN) for name in sorted(names - self._held)]
         self._warmed |= bool(names - self._held)
         self._held = set(names)
         return out

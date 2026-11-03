@@ -1,7 +1,7 @@
 """The keyboard: every key a curriculum may name, by pygame's constant without its ``K_``.
 
 Always on, whatever the rig lists. ``ESCAPE`` is a control but no curriculum's:
-it ends a run. What it holds is read from the key events it polls, so a press
+it ends a run. What it holds is read from the key events it handles, so a press
 posted to the queue (a test, the rig check) is held like a typed one.
 """
 
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pygame
 
-from .base import Input, Press
+from .base import Edge, InputDevice, InputEvent
 
 # pygame constants: single letters are lowercase (K_a), everything else is
 # uppercase (K_UP, K_SPACE, K_RETURN, K_0). Getting this wrong makes a key
@@ -118,7 +118,7 @@ KEYCODES: dict[str, int] = {name: code for code, name in NAMES.items()}
 ESCAPE = NAMES[pygame.K_ESCAPE]
 
 
-class Keyboard(Input):
+class Keyboard(InputDevice):
     """The keyboard, and anything that types keys: a button box in a key mode, a scanner."""
 
     name = "keyboard"
@@ -127,7 +127,7 @@ class Keyboard(Input):
     def __init__(self) -> None:
         self._held: set[str] = set()
 
-    def poll(self, events: list[pygame.event.Event], now: float) -> list[Press]:
+    def handle(self, events: list[pygame.event.Event], now: float) -> list[InputEvent]:
         out = []
         for event in events:
             if event.type == pygame.WINDOWFOCUSLOST:
@@ -135,15 +135,16 @@ class Keyboard(Input):
                 continue
             if event.type not in (pygame.KEYDOWN, pygame.KEYUP) or event.key not in NAMES:
                 continue
-            name, down = NAMES[event.key], event.type == pygame.KEYDOWN
-            if down:
+            name = NAMES[event.key]
+            if event.type == pygame.KEYDOWN:
                 self._held.add(name)
+                out.append(InputEvent(name, Edge.DOWN))
             else:
                 self._held.discard(name)
-            out.append(Press(name, down, getattr(event, "unicode", "") if down else ""))
+                out.append(InputEvent(name, Edge.UP))
         return out
 
-    def held(self) -> frozenset[str]:
+    def last_held(self) -> frozenset[str]:
         return frozenset(self._held)
 
     def status(self) -> str:
