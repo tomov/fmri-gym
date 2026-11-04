@@ -6,6 +6,8 @@
       "Sort fluids into matching tubes.",
       "Pour until every tube is uniform (or empty).",
       "",
+      "![controls](images/controls/aigamestore/game1-GMPD3-ABXY-nav.png)",
+      "",
       "Controls:",
       "   X / B         highlight a tube",
       "   RT              select / pour",

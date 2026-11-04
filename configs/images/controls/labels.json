@@ -1,0 +1,78 @@
+{
+  "## what": "each game's controls image, by its path from here: a control's name to the lines beside it, drawn over the underlay; redraw them with `uv run python tools/controls_images.py configs/images/controls/labels.json`",
+  "underlay": "../controllers/xbox-controller.png",
+  "images": {
+    "aigamestore/game1-GMPD3-ABXY-nav.png": {
+      "BUTTON_X": ["highlight", "tube left"],
+      "BUTTON_B": ["highlight", "tube right"],
+      "RIGHT_TRIGGER": ["select / pour"],
+      "LEFT_TRIGGER": ["undo"]
+    },
+    "aigamestore/game1-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["left / right:", "highlight a tube"],
+      "BUTTON_A": ["select / pour"],
+      "BUTTON_Y": ["undo"]
+    },
+    "aigamestore/game4-GMPD3-ABXY-nav.png": {
+      "RIGHT_TRIGGER": ["thrust / fly"],
+      "BUTTON_A": ["thrust / fly"]
+    },
+    "aigamestore/game4-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["up:", "thrust / fly"],
+      "BUTTON_A": ["thrust / fly"]
+    },
+    "aigamestore/game7-GMPD3-ABXY-nav.png": {
+      "BUTTON_X": ["move left"],
+      "BUTTON_B": ["move right"],
+      "BUTTON_Y": ["move up"],
+      "BUTTON_A": ["move down"],
+      "RIGHT_TRIGGER": ["shoot"],
+      "LEFT_TRIGGER": ["next weapon"]
+    },
+    "aigamestore/game7-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["move"],
+      "RIGHT_TRIGGER": ["shoot"],
+      "BUTTON_A": ["sprint"],
+      "BUTTON_B": ["take cover"],
+      "LEFT_TRIGGER": ["next weapon"]
+    },
+    "aigamestore/game8-GMPD3-ABXY-nav.png": {
+      "BUTTON_X": ["aim left"],
+      "BUTTON_B": ["aim right"],
+      "RIGHT_TRIGGER": ["fire"],
+      "LEFT_TRIGGER": ["swap current", "/ next"]
+    },
+    "aigamestore/game8-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["left / right:", "aim"],
+      "BUTTON_A": ["fire"],
+      "BUTTON_Y": ["swap current", "/ next"]
+    },
+    "baba_auto/baba_auto-GMPD3-ABXY-nav.png": {
+      "BUTTON_X": ["move left"],
+      "BUTTON_B": ["move right"],
+      "BUTTON_Y": ["move up"],
+      "BUTTON_A": ["move down"],
+      "RIGHT_TRIGGER": ["wait a turn"],
+      "LEFT_TRIGGER": ["hold:", "pause menu"]
+    },
+    "baba_auto/baba_auto-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["move"],
+      "BUTTON_A": ["wait a turn"],
+      "BUTTON_X": ["hold: pause menu"]
+    },
+    "rushhour/rushhour-GMPD3-ABXY-nav.png": {
+      "LEFT_TRIGGER": ["previous car", "hold: pause menu"],
+      "RIGHT_TRIGGER": ["next car"],
+      "BUTTON_X": ["move car left"],
+      "BUTTON_B": ["move car right"],
+      "BUTTON_Y": ["move car up"],
+      "BUTTON_A": ["move car down"]
+    },
+    "rushhour/rushhour-GMPD3-stick-nav.png": {
+      "LEFT_TRIGGER": ["previous car"],
+      "RIGHT_TRIGGER": ["next car"],
+      "LEFT_STICK": ["left / right: slide", "a horizontal car", "up / down: slide", "a vertical car"],
+      "BUTTON_X": ["hold: pause menu"]
+    }
+  }
+}

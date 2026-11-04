@@ -15,6 +15,8 @@
       "Cars that cannot move at all are skipped: choosing only ever",
       "lands on a car with at least one arrow.",
       "",
+      "![controls](images/controls/rushhour/rushhour-GMPD3-ABXY-nav.png)",
+      "",
       "   LT / RT     previous / next car",
       "   X / B     move car left / right",
       "   Y / A     move car up / down",

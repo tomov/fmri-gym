@@ -38,4 +38,4 @@ Read the summary. A skip says what this machine lacks and how to get it (`uv syn
 
 ## When you add a backend or a config
 
-A new backend needs a `Backend` row in `tests/backends.py` (`test_configs` fails until it has one) and a line in the workflow's matrix unless it has a `ci` reason. A new config is picked up on its own: `test_configs` validates every file under `configs/`, and `--thorough` plays it.
+A new backend needs a `Backend` row in `tests/backends.py` (`test_configs` fails until it has one) and a line in the workflow's matrix unless it has a `ci` reason. A new config is picked up on its own: `test_configs` validates every file under `configs/`, and `--thorough` plays it. That check finds an image line whose file is missing, but not a controls image that no longer matches the curriculum's bindings: after touching a curriculum that shows one, follow the `controls-images` skill's "Check they are up to date".
