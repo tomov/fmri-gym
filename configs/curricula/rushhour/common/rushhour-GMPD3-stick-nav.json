@@ -18,8 +18,7 @@
       "   LT / RT                choose the previous / next car",
       "   stick left / right     slide a horizontal car left / right",
       "   stick up / down        slide a vertical car up / down",
-      "   Y / X                  slide it left or up / right or down",
-      "   hold LT                pause menu (restart / give up / resume)",
+      "   hold X                 pause menu (restart / give up / resume)",
       "",
       "There are 49 puzzles. The first 12 get harder one by one;",
       "after that, easy and hard ones come in any order.",
@@ -28,9 +27,9 @@
       "Press A to begin."
     ]
   },
-  "controls": {"LEFT_TRIGGER": 4, "RIGHT_TRIGGER": 5, "LEFT_STICK_LEFT": 8, "LEFT_STICK_RIGHT": 9, "LEFT_STICK_UP": 10, "LEFT_STICK_DOWN": 11, "BUTTON_Y": 6, "BUTTON_X": 7},
-  "menu": {"control": "LEFT_TRIGGER", "hold": 3.0, "after": 300.0, "options": ["reset", "forfeit", "resume"], "move": ["LEFT_STICK_UP", "LEFT_STICK_DOWN"], "confirm": "BUTTON_A"},
-  "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 480.0,
+  "controls": {"LEFT_TRIGGER": 4, "RIGHT_TRIGGER": 5, "LEFT_STICK_LEFT": 8, "LEFT_STICK_RIGHT": 9, "LEFT_STICK_UP": 10, "LEFT_STICK_DOWN": 11},
+  "menu": {"control": "BUTTON_X", "hold": 3.0, "after": 300.0, "options": ["reset", "forfeit", "resume"], "move": ["LEFT_STICK_UP", "LEFT_STICK_DOWN"], "confirm": "BUTTON_A"},
+  "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 1800.0,
   "env_kwargs": {"movable_only": true}, "fps": 60,
   "is_turn_based": true
 }

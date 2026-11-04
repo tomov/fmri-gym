@@ -15,6 +15,6 @@
     ]
   },
   "controls": {"LEFT_STICK_LEFT": 0, "LEFT_STICK_RIGHT": 1, "BUTTON_A": 2, "BUTTON_Y": 3},
-  "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 600.0,
+  "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 120.0,
   "fps": 30, "frame_skip": 2
 }

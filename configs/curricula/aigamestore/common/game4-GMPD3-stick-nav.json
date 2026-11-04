@@ -13,6 +13,6 @@
     ]
   },
   "controls": {"BUTTON_A": 0, "LEFT_STICK_UP": 1},
-  "mode": "episode", "n_episodes": 10, "duration": 3600.0,
+  "mode": "episode", "n_episodes": 10, "duration": 300.0,
   "fps": 30, "frame_skip": 2
 }

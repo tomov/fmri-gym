@@ -46,5 +46,5 @@ An episode is one level: it ends on a win, a loss or a level clear, and `reset()
 | `game8.json` | bubble shooter, levels 1–9 |
 | `game9.json` | Mega Man-like action platformer, levels 1–7 |
 | `game10.json` | haunted mansion escape, levels 1–6 |
-| `game<N>-GMPD3-ABXY-nav.json` | game1, game4, game7 or game8 on a GMPD3's face buttons |
-| `game<N>-GMPD3-stick-nav.json` | game1, game4, game7 or game8 on a GMPD3's stick and buttons |
+| `game<N>-GMPD3-ABXY-nav.json` | game1, game4, game7 or game8 on a controller's face buttons |
+| `game<N>-GMPD3-stick-nav.json` | game1, game4, game7 or game8 from `common/game<N>-GMPD3-stick-nav.json`, moving on a controller's left stick |
