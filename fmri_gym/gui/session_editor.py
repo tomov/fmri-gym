@@ -1728,7 +1728,7 @@ class _Editor(QtWidgets.QMainWindow):
             run = RunConfig(curriculum=played, rig=rig, subject="sub-check", ses=1, run=1,
                             duration=flags.get("duration"),
                             resume=flags.get("resume", False), loop=flags.get("loop", False),
-                            dummy_trigger=False)
+                            dummy_trigger=False, skip_load_games=False)
             label = f"run {i}: " if self._is_session() else ""
             problems += [f"{label}on {rig.path}: {p}" for p in run.problems()]
         return problems

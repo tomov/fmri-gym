@@ -35,7 +35,7 @@ def test_its_example_rig_plays_it(path):
     on = GMPD3_RIG if "-GMPD3-" in path.name else KEYBOARD_RIG
     problems = RunConfig(curriculum=Curriculum.load(str(path)), rig=on, subject="sub-01", ses=1,
                          run=1, duration=None, resume=False, loop=False,
-                         dummy_trigger=True).problems()
+                         dummy_trigger=True, skip_load_games=False).problems()
     assert not problems, f"{on.path}: " + "\n".join(problems)
 
 

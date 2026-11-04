@@ -18,6 +18,7 @@ script passes the same --ses to all of its runs, each with its own --run):
     python fmri_play.py --subject sub-01 --ses 1 --run 1 \
         --rig configs/examples/rigs/laptop.json --curriculum my.json
     python fmri_play.py ... --dummy-trigger    # testing: no experimenter/scanner wait
+    python fmri_play.py ... --skip-load-games   # do not build each game before the window
     python fmri_play.py ... --duration 600 --resume  # a 10-min run of a longer curriculum
 
 See configs/curricula/demos/mixed.json for a curriculum that mixes all three backends,
@@ -77,6 +78,9 @@ def _parser() -> argparse.ArgumentParser:
                    help="the rig file it is played on, e.g. configs/examples/rigs/laptop.json: "
                    "it says the window, input devices, audio and data root. A rig check makes "
                    "one when the file is missing")
+    p.add_argument("--skip-load-games", action="store_true",
+                   help="do not build, reset and close each game once before the window. "
+                   "Default: do, so a game that cannot start fails before the participant screen")
     p.add_argument("--dummy-trigger", action="store_true")
     return p
 
@@ -95,7 +99,10 @@ def main() -> None:
     if rig.fixation_warning and not do_rig_check:
         print(f"rig: WARNING: {rig.fixation_warning}", file=sys.stderr)
     run_config = RunConfig.from_args(args, curriculum, rig)
-    problems = run_config.problems(load_games=True)  # each game built once, before the window
+    if run_config.skip_load_games:
+        print("--skip-load-games: the games are not built before the window; one that cannot "
+              "start fails when its block begins", file=sys.stderr)
+    problems = run_config.problems(load_games=not run_config.skip_load_games)
     if problems:
         raise ValueError(f"{args.curriculum} on {rig.path}: " + "; ".join(problems))
     if not do_rig_check:
