@@ -9,7 +9,7 @@ export class Shooter {
     this.x = x;
     this.y = y;
     this.angle = -Math.PI / 2;
-    this.rotationSpeed = 0.05;
+    this.rotationSpeed = 0.025;
   }
 
   rotateLeft() {
