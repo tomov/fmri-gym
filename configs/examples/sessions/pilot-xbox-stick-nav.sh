@@ -5,9 +5,9 @@ set -e  # Exit on error
 
 # Session parameters
 SUBJECT=sub-01
-RIG=configs/examples/rigs/fmri.json
+RIG=configs/examples/rigs/xbox.json
 SES=1
-RUN_DURATION=600 # seconds
+RUN_DURATION=600
 
 # Runs, one per line
 
