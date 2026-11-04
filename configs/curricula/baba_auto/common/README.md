@@ -8,7 +8,7 @@ Clone utilForever/baba-is-auto into `external/baba_auto` at the commit the READM
 
 ## Keys
 
-`baba_auto_gym` is Discrete(5): 0=wait, 1=up, 2=down, 3=left, 4=right (`gym/baba_auto/baba_auto_gym/env.py`); the shared phase maps SPACE to wait and the arrows to the moves. The instructions' Controls text is kept in sync with `keys` by hand.
+`baba_auto_gym` is Discrete(5): 0=wait, 1=up, 2=down, 3=left, 4=right (`gym/baba_auto/baba_auto_gym/env.py`); the shared phase maps SPACE to wait and the arrows to the moves. The instructions' Controls text is kept in sync with `controls` by hand.
 
 ## Blocking and the menu
 

@@ -10,14 +10,14 @@
           "the maze. You have unlimited ammunition.",
           "",
           "Controls:",
-          "   [UP]           move forward",
-          "   [LEFT] / [RIGHT] turn left / right",
-          "   [SPACE]        shoot",
+          "   UP           move forward",
+          "   LEFT / RIGHT turn left / right",
+          "   SPACE        shoot",
           "",
-          "(press [SPACE] to start)"
+          "(press SPACE to start)"
         ]
       },
-      "keys": {"": 0, "LEFT": 8, "RIGHT": 4, "UP": 2, "LEFT+UP": 10, "RIGHT+UP": 6, "SPACE": 1, "UP+SPACE": 3}
+      "controls": {"": 0, "LEFT": 8, "RIGHT": 4, "UP": 2, "LEFT+UP": 10, "RIGHT+UP": 6, "SPACE": 1, "UP+SPACE": 3}
     }
   ]
 }

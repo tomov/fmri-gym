@@ -6,7 +6,7 @@ store the seed and per-frame actions, and the observation itself as the
 analysis "state" (for many envs, e.g. CartPole, the observation IS the full
 state). The same assumption is the savestate a block ends on, so a run that
 stops mid-episode can be resumed: ``replay_state_gym.ReplayState``'s seed and
-actions, replayed on restore. No frame carries one, so the log stays small. A phase's "keys" are written as the env's action space takes them: an
+actions, replayed on restore. No frame carries one, so the log stays small. A phase's "controls" are written as the env's action space takes them: an
 index for Discrete, a list for Box.
 
 For old-`gym` (pre-Gymnasium) envs, pass them through shimmy -- see

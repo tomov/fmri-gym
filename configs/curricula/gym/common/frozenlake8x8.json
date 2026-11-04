@@ -1,5 +1,5 @@
 {
   "type": "game", "backend": "gym", "game": "FrozenLake8x8-v1",
-  "keys": {"LEFT": 0, "DOWN": 1, "RIGHT": 2, "UP": 3},
+  "controls": {"LEFT": 0, "DOWN": 1, "RIGHT": 2, "UP": 3},
   "fps": 5, "is_turn_based": true, "env_kwargs": {"is_slippery": false}
 }

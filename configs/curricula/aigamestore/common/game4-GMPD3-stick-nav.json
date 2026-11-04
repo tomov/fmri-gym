@@ -1,0 +1,18 @@
+{
+  "type": "game", "backend": "aigamestore",
+  "instructions": {
+    "align": "left", "controls_to_dismiss": ["BUTTON_A"],
+    "text": [
+      "Auto-scroll runner. Hold thrust to fly,",
+      "dodge zappers and missiles, grab coins.",
+      "",
+      "Controls:",
+      "   A or stick up   thrust / fly",
+      "",
+      "Press A to start."
+    ]
+  },
+  "controls": {"BUTTON_A": 0, "LEFT_STICK_UP": 1},
+  "mode": "episode", "n_episodes": 10, "duration": 300.0,
+  "fps": 30, "frame_skip": 2
+}

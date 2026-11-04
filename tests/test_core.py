@@ -29,7 +29,7 @@ from fmri_gym.run import Clock
 from tests.changed import select
 
 PHASE = {"type": "game", "backend": "gym", "game": "CartPole-v1", "fps": 30,
-         "keys": {"": 0, "LEFT": 0, "RIGHT": 1}, "mode": "episode", "n_episodes": 1}
+         "controls": {"": 0, "LEFT": 0, "RIGHT": 1}, "mode": "episode", "n_episodes": 1}
 
 
 def test_logger_round_trip(tmp_path):
@@ -100,7 +100,7 @@ def test_logger_writes_no_audio_file_for_a_silent_block(tmp_path):
 
 
 def test_discrete_keymap_longest_combo_wins():
-    km = make_keymap({"keys": {"": 0, "LEFT": 1, "LEFT+SPACE": 2}}, spaces.Discrete(3))
+    km = make_keymap({"controls": {"": 0, "LEFT": 1, "LEFT+SPACE": 2}}, spaces.Discrete(3))
     assert km.resolve(frozenset()) == 0
     assert km.resolve(frozenset({"LEFT"})) == 1
     assert km.resolve(frozenset({"LEFT", "SPACE"})) == 2
@@ -109,24 +109,24 @@ def test_discrete_keymap_longest_combo_wins():
 
 
 def test_multibinary_keymap_combines_held_keys():
-    km = make_keymap({"keys": {"LEFT": 0, "RIGHT": 1, "SPACE": 2}}, spaces.MultiBinary(3))
+    km = make_keymap({"controls": {"LEFT": 0, "RIGHT": 1, "SPACE": 2}}, spaces.MultiBinary(3))
     assert list(km.resolve(frozenset({"LEFT", "SPACE"}))) == [1, 0, 1]
     assert list(km.resolve(frozenset())) == [0, 0, 0]
 
 
 def test_box_keymap_takes_lists():
-    km = make_keymap({"keys": {"": [0.0], "RIGHT": [1.0]}}, spaces.Box(-1.0, 1.0, (1,)))
+    km = make_keymap({"controls": {"": [0.0], "RIGHT": [1.0]}}, spaces.Box(-1.0, 1.0, (1,)))
     assert np.array_equal(km.resolve(frozenset({"RIGHT"})), np.array([1.0], dtype=np.float32))
 
 
 def test_keymap_refuses_an_action_outside_the_space():
     with pytest.raises(ValueError):
-        make_keymap({"keys": {"": 0, "LEFT": 5}}, spaces.Discrete(3))
+        make_keymap({"controls": {"": 0, "LEFT": 5}}, spaces.Discrete(3))
 
 
 @pytest.mark.parametrize("phase, problem", [
-    ({**PHASE, "keys": {"": 0, "NOSUCHKEY": 1}}, "NOSUCHKEY"),
-    ({k: v for k, v in PHASE.items() if k != "keys"}, "keys"),
+    ({**PHASE, "controls": {"": 0, "NOSUCHKEY": 1}}, "NOSUCHKEY"),
+    ({k: v for k, v in PHASE.items() if k != "controls"}, "controls"),
     ({**PHASE, "fps": 0}, "fps"),
 ])
 def test_validate_config_refuses(phase, problem):
@@ -156,7 +156,7 @@ def _write(path: Path, content: dict) -> Path:
 
 def test_include_lays_the_phase_over_its_shared_one(tmp_path):
     shared = {**PHASE, "instructions": {"title": "CartPole", "text": ["a", "b"],
-                                 "keys_to_dismiss": ["SPACE"]},
+                                 "controls_to_dismiss": ["SPACE"]},
               "env_kwargs": {"x": 1, "y": 2}}
     _write(tmp_path / "common" / "cartpole.json", shared)
     path = _write(tmp_path / "level.json", {"curriculum": [
@@ -166,9 +166,9 @@ def test_include_lays_the_phase_over_its_shared_one(tmp_path):
     ]})
     game = load_curriculum(str(path))["curriculum"][1]
     assert "__include" not in game
-    assert game["fps"] == 15 and game["keys"] == PHASE["keys"]
+    assert game["fps"] == 15 and game["controls"] == PHASE["controls"]
     assert game["instructions"] == {"title": "Level 2", "text": ["a", "b"],
-                                    "keys_to_dismiss": ["SPACE"]}
+                                    "controls_to_dismiss": ["SPACE"]}
     assert game["env_kwargs"] == {"x": 1, "y": 3}
     assert validate_curriculum({"curriculum": [game]}) == []
     assert is_common_file(str(tmp_path / "common" / "cartpole.json"))
@@ -195,7 +195,7 @@ def _level(tmp_path, monkeypatch) -> Path:
     monkeypatch.chdir(tmp_path)
     shared = {k: v for k, v in PHASE.items() if k != "game"}
     _write(tmp_path / "common" / "game.json",
-           {**shared, "instructions": {"text": ["a"], "keys_to_dismiss": ["SPACE"]}})
+           {**shared, "instructions": {"text": ["a"], "controls_to_dismiss": ["SPACE"]}})
     return _write(tmp_path / "levels" / "one.json", {"curriculum": [
         {"type": "fixation", "duration": 1.0},
         {"__include": "../common/game.json", "game": "CartPole-v0",
@@ -291,7 +291,7 @@ def test_a_curriculum_loads_once_into_typed_phases(tmp_path):
     from fmri_gym.config.curriculum import Curriculum
     from fmri_gym.config.phases import Fixation, GamePhase, Message
     path = _write(tmp_path / "run.json", {"curriculum": [
-        {"type": "message", "text": ["a", "b"], "key": "any"},
+        {"type": "message", "text": ["a", "b"], "control": "any"},
         {"type": "fixation", "duration": 1.5},
         {**PHASE, "seed": 7}, PHASE]})
     loaded = Curriculum.load(str(path))
@@ -310,74 +310,6 @@ def test_every_phase_type_is_a_phase():
     assert set(CHECK_PHASES) == {c for c in PHASE_CLASSES.values() if issubclass(c, CheckPhase)}
     with pytest.raises(TypeError):
         Phase(spec={}, include_on_resume=False)  # abstract: only a phase type is read
-
-
-def test_the_pad_presses_the_key_each_control_is_bound_to(monkeypatch):
-    import pygame
-
-    from fmri_gym import pad
-    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
-    pygame.display.init()          # the event queue needs it
-    pad._held.clear()
-    pad._bindings = {"A": "SPACE", "UP": "UP"}
-    pygame.event.clear()
-    pad._press("A", True)
-    pad._press("B", True)          # unbound: held, but presses nothing
-    assert pad.held() == frozenset({"SPACE"})
-    events = pygame.event.get(pygame.KEYDOWN)
-    assert [(e.key, e.unicode) for e in events] == [(pygame.K_SPACE, " ")]
-    pad._held.clear()
-    pad._bindings = {}
-
-
-def test_a_screen_names_each_key_as_the_participant_presses_it():
-    from fmri_gym.pad import label_keys
-    text = "[SPACE] fire, [UP] jump, [Q] quit, [1] of [3]? [hi]"
-    pad = {"A": "SPACE", "UP": "UP", "DPAD_UP": "UP", "X": "X"}
-    assert label_keys(text, None) == "SPACE fire, UP jump, Q quit, 1 of 3? [hi]"
-    assert label_keys(text, pad) == "A fire, stick up jump, Q quit, 1 of 3? [hi]"
-    assert label_keys("[UP]", {"DPAD_UP": "UP"}) == "D-pad up"
-    assert [label_keys("[ARROWS] move", b) for b in (None, pad, {"DPAD_UP": "UP"})] == [
-        "ARROWS move", "stick move", "D-pad move"]
-
-
-def test_each_pad_is_read_by_its_layout(monkeypatch):
-    import types
-
-    import pygame
-
-    from fmri_gym import pad
-    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
-    pygame.display.init()
-    gamepad = types.SimpleNamespace(gamepad=object(), layout=pad.GAMEPAD, name="Xbox", id=1)
-    curdes = types.SimpleNamespace(gamepad=None, layout=pad.CURRENT_DESIGNS, name="932", id=2)
-    monkeypatch.setattr(pad, "_enabled", True)
-    monkeypatch.setattr(pad, "_open", lambda: True)
-    monkeypatch.setattr(pad, "_pads", {1: gamepad, 2: curdes})
-    monkeypatch.setattr(pad, "_bindings", {"A": "SPACE", "Y": "W", "LT": "Q", "DPAD_UP": "I"})
-    pad._held.clear()
-    pygame.event.clear()
-
-    def keys(iid, kind, **fields):
-        pygame.event.post(pygame.event.Event(kind, instance_id=iid, **fields))
-        pad.pump()
-        return [(e.type == pygame.KEYDOWN, e.key) for e in pygame.event.get((pygame.KEYDOWN,
-                                                                             pygame.KEYUP))]
-
-    # The gamepad by SDL's names; its raw joystick twin (button 0, the 932's Y) is not read
-    assert keys(1, pygame.CONTROLLERBUTTONDOWN, button=pygame.CONTROLLER_BUTTON_A) \
-        == [(True, pygame.K_SPACE)]
-    assert keys(1, pygame.JOYBUTTONDOWN, button=0) == []
-    assert keys(1, pygame.CONTROLLERBUTTONDOWN, button=pygame.CONTROLLER_BUTTON_DPAD_UP) \
-        == [(True, pygame.K_i)]
-    lt = pygame.CONTROLLER_AXIS_TRIGGERLEFT
-    assert keys(1, pygame.CONTROLLERAXISMOTION, axis=lt, value=20000) == [(True, pygame.K_q)]
-    assert keys(1, pygame.CONTROLLERAXISMOTION, axis=lt, value=12000) == []  # still held
-    assert keys(1, pygame.CONTROLLERAXISMOTION, axis=lt, value=0) == [(False, pygame.K_q)]
-    # The Current Designs pad by its button numbers, as before
-    assert keys(2, pygame.JOYBUTTONDOWN, button=0) == [(True, pygame.K_w)]
-    assert keys(2, pygame.JOYBUTTONDOWN, button=4) == [(True, pygame.K_SPACE)]
-    pad._held.clear()
 
 
 def test_a_check_that_broke_part_way_is_reported_not_crashed_on():

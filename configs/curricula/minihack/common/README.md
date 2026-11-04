@@ -15,7 +15,7 @@ Each standard task has two curricula on the same level:
 
 ## Keys
 
-Every phase is `is_turn_based`: action 0 (move N) is also the noop, so a real-time loop would walk the agent north on its own. Arrows map to the cardinals; the instructions' Controls text is kept in sync with `keys` by hand.
+Every phase is `is_turn_based`: action 0 (move N) is also the noop, so a real-time loop would walk the agent north on its own. Arrows map to the cardinals; the instructions' Controls text is kept in sync with `controls` by hand.
 
 | shared phase | action space | keys |
 |---|---|---|

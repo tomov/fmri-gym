@@ -1,5 +1,5 @@
 {
   "type": "game", "backend": "vgdl", "game": "aliens",
-  "keys": {"": 4, "UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3, "SPACE": 5},
+  "controls": {"": 4, "UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3, "SPACE": 5},
   "level": 0, "block_size": 25, "fps": 15, "mode": "duration"
 }

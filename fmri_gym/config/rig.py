@@ -24,11 +24,9 @@ say the same thing:
 - ``"screen"``: ``{"size": "1024x768", "is_fullscreen": false, "monitor": 0,
   "has_vsync": true}``, the monitor by index (0: the first); fullscreen scales
   ``size`` to the monitor, aspect kept, at the monitor's own resolution;
-- ``"has_pad"``: read a plugged-in game controller (:mod:`fmri_gym.pad`);
-- ``"bindings"``: which keyboard key each of the controller's controls presses
-  (:data:`fmri_gym.pad.CONTROLS` -> a key name), ``{"A": "SPACE", "B": "Z",
-  "UP": "UP", ...}``, for a controller that sends no keys of its own (a
-  gamepad); a control left out presses nothing;
+- ``"inputs"``: the rig's input devices, the keyboard among them, by the names of
+  :data:`fmri_gym.inputs.INPUT_DEVICE_CLASSES_BY_NAME` (``["keyboard",
+  "current_designs_gamepad3"]``); each controller must be plugged in when a run starts;
 - ``"response_keys"``: the keys a response device types by itself (a button
   box, a fORP in a key mode), each with what it stands for, ``{"1": "index
   finger", ...}``: the rig check asks for each;
@@ -44,12 +42,12 @@ say the same thing:
 - ``"rig_check"``: what the rig check measures with (:class:`RigCheckConfig`):
   the photodiode, a microphone, the recording's rate, more frame rates.
 
-**Three kinds of keys**, never mixed. A curriculum's **game keys** (a game
-phase's ``"keys"``) are keyboard key names, mapped to the game's actions; they
-are the same on every rig. A rig's **bindings** make a controller press game
-keys. Its **response keys** are keys a device types itself; a curriculum
-binds them like any key. What the rig check asks to press is the bindings'
-keys and the response keys: what this rig's participant can press.
+**Controls and response keys**, never mixed. A curriculum's **controls** (a game
+phase's ``"controls"``) are control names of the rig's input devices
+(:mod:`fmri_gym.inputs`), mapped to the game's actions. A rig's **response
+keys** are keyboard keys a device types itself; a curriculum binds them like
+any key. What the rig check asks to press is each control of the rig's
+controllers and the response keys: what this rig's participant can press.
 
 It is written by hand or in the rig form (``rig-config --rig <file>``), which a
 rig check also opens when its rig has no valid file.
@@ -64,8 +62,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from ..keys import KEY_NAMES
-from ..pad import CONTROLS
+from ..inputs import INPUT_DEVICE_CLASSES_BY_NAME, Keyboard
 from ..triggers import TriggerError, TriggerSettings
 
 MODALITIES = ("fmri", "meg", "eeg", "behav")
@@ -95,12 +92,14 @@ EXAMPLES = {
     "trigger_hardware": "fORP 932 USB, '=' at each volume",
 }
 #: How a run is played where the rig file says nothing: a window at the desk,
-#: the pad and the audio on, no fixation at either end.
+#: the keyboard alone, the audio on, no fixation at either end.
 DEFAULTS: dict[str, Any] = {
     "screen": {"size": "1024x768", "is_fullscreen": False, "monitor": 0, "has_vsync": True},
-    "has_pad": True, "has_audio": True, "data_root": "data", "start_fixation": None,
-    "end_fixation": None, "triggers": {}, "bindings": {}, "response_keys": {}, "rig_check": {},
+    "inputs": ["keyboard"], "has_audio": True, "data_root": "data", "start_fixation": None,
+    "end_fixation": None, "triggers": {}, "response_keys": {}, "rig_check": {},
 }
+#: Keys refused with a pointer to ``"inputs"``, which says what they would mean.
+_GONE = {"has_pad", "bindings"}
 #: How a rig check can read its photodiode: not at all, on this PC's sound card
 #: (input 0), or in the MEG/EEG recording (matched offline).
 PHOTODIODE_READOUTS = ("none", "soundcard", "recording")
@@ -115,8 +114,8 @@ RIG_CHECK_DEFAULTS: dict[str, Any] = {
 #: and ``backend`` outright: a section that leaves them out runs, but is
 #: reported as NOT SET.
 TRIGGER_PRESETS: dict[str, dict] = {
-    "fMRI (wait for '=', no codes)": {
-        "sync": {"mode": "wait", "key": "="}, "backend": "null"},
+    "fMRI (wait for EQUALS, no codes)": {
+        "sync": {"mode": "wait", "key": "EQUALS"}, "backend": "null"},
     # MEG and EEG alike: the stimulus PC starts the recording and marks it, over serial.
     "MEG (start from the trigger line, serial codes)": {
         "sync": {"mode": "send", "delay": 0.0}, "backend": "serial", "port": "/dev/ttyUSB0"},
@@ -216,10 +215,9 @@ class RigConfig:
     fields: dict[str, str]
     #: the window.
     screen: ScreenConfig
-    #: read a plugged-in game controller as key presses.
-    has_pad: bool
-    #: the controller's control -> the key it presses
-    bindings: dict[str, str]
+    #: the input devices, the keyboard among them, by
+    #: :data:`fmri_gym.inputs.INPUT_DEVICE_CLASSES_BY_NAME` name.
+    inputs: tuple[str, ...]
     #: the keys a response device types itself -> what each stands for
     response_keys: dict[str, str]
     #: play game audio; ``False`` mutes every block and opens no output.
@@ -257,7 +255,7 @@ class RigConfig:
                   **{k: rig[k] for k in FIELDS if k in rig and k not in ("site", "rig")}}
         return cls(path=path, fields=fields,
                    screen=ScreenConfig.from_dict(rig.get("screen", {})),
-                   has_pad=settings["has_pad"], bindings=dict(settings["bindings"]),
+                   inputs=tuple(settings["inputs"]),
                    response_keys=dict(settings["response_keys"]),
                    has_audio=settings["has_audio"],
                    data_root=settings["data_root"],
@@ -293,8 +291,8 @@ class RigConfig:
 
     def record(self) -> dict[str, Any]:
         """The rig file as the run played it, every default written out: the manifest's."""
-        return {"path": self.path, **self.fields, "screen": self.screen.record(), "has_pad": self.has_pad,
-                "bindings": self.bindings, "response_keys": self.response_keys,
+        return {"path": self.path, **self.fields, "screen": self.screen.record(),
+                "inputs": list(self.inputs), "response_keys": self.response_keys,
                 "has_audio": self.has_audio, "data_root": self.data_root,
                 "start_fixation": self.start_fixation, "end_fixation": self.end_fixation,
                 "triggers": asdict(self.triggers), "rig_check": self.rig_check.record()}
@@ -308,7 +306,8 @@ class RigConfig:
                             (("start", self.start_fixation), ("end", self.end_fixation))
                             if s is not None)
         return (f"{self.path} | {window} on monitor {screen.monitor}, vsync "
-                f"{'on' if screen.has_vsync else 'off'} | pad {'on' if self.has_pad else 'off'}"
+                f"{'on' if screen.has_vsync else 'off'} | inputs "
+                f"{', '.join(self.inputs)}"
                 f" | audio {'on' if self.has_audio else 'off'} | data in {self.data_root}"
                 f"{fixations}"
                 f" | triggers {self.triggers.sync.mode}, codes over {self.triggers.backend}")
@@ -396,7 +395,10 @@ def problems(rig: dict) -> list[str]:
 
     :return: one line per problem; empty when it is valid.
     """
-    out = [f"unknown key {k!r}" for k in rig if k not in FIELDS and k not in DEFAULTS]
+    out = [f"unknown key {k!r}" + (': "bindings" and "has_pad" are gone: list the controller '
+                                   'under "inputs" and name its controls in the curriculum'
+                                   if k in _GONE else "")
+           for k in rig if k not in FIELDS and k not in DEFAULTS]
     fields = {k: v for k, v in rig.items() if k in FIELDS}
     out += [f"{k!r} must be a string" for k, v in fields.items() if not isinstance(v, str)]
     out += [f"{k!r} is empty" for k, v in fields.items() if k != "notes" and v == ""]
@@ -411,8 +413,8 @@ def problems(rig: dict) -> list[str]:
 
 
 def _setting_problems(rig: dict) -> list[str]:
-    """What is wrong with the file's ``screen``, ``has_pad``, ``has_audio``, ``data_root``,
-    fixations, triggers, bindings, response keys and ``rig_check``."""
+    """What is wrong with the file's ``screen``, ``inputs``, ``has_audio``, ``data_root``,
+    fixations, triggers, response keys and ``rig_check``."""
     screen = rig.get("screen", {})
     if not isinstance(screen, dict):
         return [f'"screen": expected {{"size", "is_fullscreen", "monitor", "has_vsync"}}, '
@@ -427,7 +429,7 @@ def _setting_problems(rig: dict) -> list[str]:
                    f"got {monitor!r}")
     flags = (("screen.is_fullscreen", screen.get("is_fullscreen", False)),
              ("screen.has_vsync", screen.get("has_vsync", True)),
-             ("has_pad", rig.get("has_pad", True)), ("has_audio", rig.get("has_audio", True)))
+             ("has_audio", rig.get("has_audio", True)))
     out += [f'"{k}" must be true or false, got {v!r}' for k, v in flags if not isinstance(v, bool)]
     root = rig.get("data_root", DEFAULTS["data_root"])
     if not isinstance(root, str) or not root:
@@ -435,19 +437,18 @@ def _setting_problems(rig: dict) -> list[str]:
     out += [f'"{k}" must be seconds, 0 or more, or null for none, got {rig[k]!r}'
             for k in ("start_fixation", "end_fixation")
             if rig.get(k) is not None and not _is_seconds(rig[k])]
-    return (out + trigger_problems(rig.get("triggers", {})) + _binding_problems(rig)
+    return (out + trigger_problems(rig.get("triggers", {})) + _input_device_problems(rig)
             + _response_key_problems(rig) + _rig_check_problems(rig.get("rig_check", {})))
 
 
-def _binding_problems(rig: dict) -> list[str]:
-    """``bindings``: the controller's controls, each to a key name a curriculum can bind."""
-    bindings = rig.get("bindings", {})
-    if not isinstance(bindings, dict):
-        return [f'"bindings": expected {{control: key}}, got {bindings!r}']
-    return ([f'"bindings": {c!r} is not a control of the controller ({", ".join(CONTROLS)})'
-             for c in bindings if c not in CONTROLS]
-            + [f'"bindings": {c!r}: {k!r} is not a key name (as in fmri_gym/keys.py)'
-               for c, k in bindings.items() if k not in KEY_NAMES])
+def _input_device_problems(rig: dict) -> list[str]:
+    """``inputs``: distinct names of the kinds of input device the rig has."""
+    names = rig.get("inputs", DEFAULTS["inputs"])
+    known = INPUT_DEVICE_CLASSES_BY_NAME
+    if (isinstance(names, list) and all(isinstance(n, str) and n in known for n in names)
+            and len(set(names)) == len(names)):
+        return []
+    return [f'"inputs": expected a list of distinct names from {sorted(known)}, got {names!r}']
 
 
 def _response_key_problems(rig: dict) -> list[str]:
@@ -455,8 +456,8 @@ def _response_key_problems(rig: dict) -> list[str]:
     keys = rig.get("response_keys", {})
     if not isinstance(keys, dict):
         return [f'"response_keys": expected {{key: what it stands for}}, got {keys!r}']
-    return ([f'"response_keys": {k!r} is not a key name (as in fmri_gym/keys.py)'
-             for k in keys if k not in KEY_NAMES]
+    return ([f'"response_keys": {k!r} is not a keyboard key name (as in '
+             "fmri_gym/inputs/keyboard.py)" for k in keys if k not in Keyboard.CONTROLS]
             + [f'"response_keys": {k!r}: say what it stands for, as text' for k, v in keys.items()
                if not isinstance(v, str)])
 
@@ -504,8 +505,9 @@ def _is_seconds(v: Any) -> bool:
 def trigger_problems(section: Any) -> list[str]:
     """What :class:`~fmri_gym.triggers.TriggerSettings` refuses in a ``triggers`` section, as text.
 
-    The port is the one check added here: the settings accept a missing port
-    and the backend refuses it on opening, which a check before the run never does.
+    Two checks are added here: the settings accept a missing port, which the
+    backend refuses only on opening, and a scanner key that is no keyboard key,
+    which a run would wait for forever.
 
     :return: at most one problem (the first the settings raise).
     """
@@ -517,4 +519,7 @@ def trigger_problems(section: Any) -> list[str]:
         return [str(exc)]
     if s.backend in ("serial", "parallel", "hid") and not s.port:
         return [f"triggers: backend {s.backend!r} needs a port"]
+    if s.sync.mode == "wait" and s.sync.key not in Keyboard.CONTROLS:
+        return [f"triggers: sync.key {s.sync.key!r} is not a keyboard key name (as in "
+                "fmri_gym/inputs/keyboard.py): name the key the trigger box types"]
     return []

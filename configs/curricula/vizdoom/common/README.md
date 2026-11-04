@@ -8,7 +8,7 @@ The `vizdoom` backend's curricula: ViZDoom's stock scenarios, one each, and ever
 
 ## Keys
 
-The env's action is MultiBinary over the scenario's buttons (`env_kwargs.max_buttons_pressed` 0), so `keys` values are button indices in the scenario's `available_buttons` order, and held keys combine (turn while shooting). The controls the subject sees are the phase's `instructions`; keep their text in sync with `keys` by hand. The keys are the rig's ten (README, "Rigs") but for the Freedoom maps, whose seven button actions are more than a controller's six: they are played on a keyboard, and a rig with a controller refuses them.
+The env's action is MultiBinary over the scenario's buttons (`env_kwargs.max_buttons_pressed` 0), so `controls` values are button indices in the scenario's `available_buttons` order, and held keys combine (turn while shooting). The controls the subject sees are the phase's `instructions`; keep their text in sync with `controls` by hand. The keys are the rig's ten (README, "Rigs") but for the Freedoom maps, whose seven button actions are more than a controller's six: they are played on a keyboard, and a rig with a controller refuses them.
 
 | scenario | buttons, by index | reference |
 |---|---|---|

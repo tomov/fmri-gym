@@ -1,21 +1,21 @@
 {
   "type": "game", "backend": "aigamestore",
   "instructions": {
-    "align": "left", "keys_to_dismiss": ["SPACE"],
+    "align": "left", "controls_to_dismiss": ["SPACE"],
     "text": [
       "Action platformer. Fight through stages,",
       "defeat bosses, and unlock their weapons.",
       "",
       "Controls:",
-      "   [LEFT] / [RIGHT]   move",
-      "   [UP] / [DOWN]      aim",
-      "   [Z]              jump",
-      "   [SPACE]          shoot",
-      "   [X]          cycle weapons",
+      "   LEFT / RIGHT   move",
+      "   UP / DOWN      aim",
+      "   Z              jump",
+      "   SPACE          shoot",
+      "   X          cycle weapons",
       "",
-      "(press [SPACE] to start)"
+      "(press SPACE to start)"
     ]
   },
-  "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "Z": 4, "SPACE": 5, "X": 6},
+  "controls": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "Z": 4, "SPACE": 5, "X": 6},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 120.0, "fps": 10
 }

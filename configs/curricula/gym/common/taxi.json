@@ -1,5 +1,5 @@
 {
   "type": "game", "backend": "gym", "game": "Taxi-v3",
-  "keys": {"DOWN": 0, "UP": 1, "RIGHT": 2, "LEFT": 3, "SPACE": 4, "X": 5},
+  "controls": {"DOWN": 0, "UP": 1, "RIGHT": 2, "LEFT": 3, "SPACE": 4, "X": 5},
   "fps": 5, "is_turn_based": true
 }

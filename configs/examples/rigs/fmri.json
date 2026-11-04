@@ -7,11 +7,10 @@
   "trigger_hardware": "Example: the 932 interface types '=' at each volume",
   "notes": "Example: an MRI scanner, the participant on a Current Designs controller (one stick, six buttons)",
   "screen": {"size": "1024x768", "is_fullscreen": true, "monitor": 0, "has_vsync": true},
-  "has_pad": true,
-  "bindings": {"A": "SPACE", "X": "X", "B": "C", "Y": "Z", "LT": "A", "RT": "S", "UP": "UP", "DOWN": "DOWN", "LEFT": "LEFT", "RIGHT": "RIGHT"},
+  "inputs": ["keyboard", "current_designs_gamepad3"],
   "has_audio": true,
   "data_root": "data",
   "start_fixation": 10,
   "end_fixation": 10,
-  "triggers": {"sync": {"mode": "wait", "key": "="}, "backend": "null"}
+  "triggers": {"sync": {"mode": "wait", "key": "EQUALS"}, "backend": "null"}
 }

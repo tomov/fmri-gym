@@ -61,7 +61,7 @@ ENV_KWARGS = {"size": (64, 64), "length": 0}
 # What the base adapter needs to build a keymap. No key is pressed here: the
 # sweep steps the adapter with action ids directly.
 SPEC = {"backend": "crafter", "game": "Crafter-v0", "env_kwargs": ENV_KWARGS,
-        "keys": {"": 0, "SPACE": 5}}
+        "controls": {"": 0, "SPACE": 5}}
 
 
 def signature(env):

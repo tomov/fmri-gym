@@ -3,21 +3,21 @@
     {
       "type": "game", "backend": "vizdoom", "game": "VizdoomHealthGatheringSupreme-v1",
       "instructions": {
-        "title": "Health Gathering", "align": "left", "keys_to_dismiss": ["SPACE"],
+        "title": "Health Gathering", "align": "left", "controls_to_dismiss": ["SPACE"],
         "text": [
           "The floor is acid and your health drops all the",
           "time. Explore the maze and walk over medikits to",
           "top up. Avoid the green vials -- they hurt you.",
           "",
           "Controls:",
-          "   [UP]             move forward",
-          "   [LEFT] / [RIGHT]   turn left / right",
+          "   UP             move forward",
+          "   LEFT / RIGHT   turn left / right",
           "",
-          "(press [SPACE] to start)"
+          "(press SPACE to start)"
         ]
       },
       "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
-      "keys": {"UP": 2, "LEFT": 0, "RIGHT": 1},
+      "controls": {"UP": 2, "LEFT": 0, "RIGHT": 1},
       "mode": "duration", "duration": 300.0, "fps": 35
     }
   ]

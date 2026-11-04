@@ -3,23 +3,23 @@
     {
       "type": "game", "backend": "rushhour", "game": "RushHourHuman-v0",
       "instructions": {
-        "title": "Rush Hour (Easy)", "align": "left", "keys_to_dismiss": ["SPACE"],
+        "title": "Rush Hour (Easy)", "align": "left", "controls_to_dismiss": ["SPACE"],
         "text": [
           "Slide cars to free the RED car through",
           "the exit on the right.",
           "",
           "Controls:",
-          "   [A] / [S]  or  [3] / [4]          previous / next car",
-          "   [LEFT] / [RIGHT]              slide a horizontal car",
-          "   [UP] / [DOWN]                 slide a vertical car",
-          "   [1] or [Z]   /   [2] or [X]       slide it left or up / right or down",
+          "   A / S  or  3 / 4          previous / next car",
+          "   LEFT / RIGHT              slide a horizontal car",
+          "   UP / DOWN                 slide a vertical car",
+          "   1 or Z   /   2 or X       slide it left or up / right or down",
           "",
           "White triangles mark the moves a car can make.",
           "",
-          "(press [SPACE] to start)"
+          "(press SPACE to start)"
         ]
       },
-      "keys": {"A": 4, "S": 5, "3": 4, "4": 5, "LEFT": 8, "RIGHT": 9, "UP": 10, "DOWN": 11, "1": 6, "2": 7, "Z": 6, "X": 7},
+      "controls": {"A": 4, "S": 5, "3": 4, "4": 5, "LEFT": 8, "RIGHT": 9, "UP": 10, "DOWN": 11, "1": 6, "2": 7, "Z": 6, "X": 7},
       "env_kwargs": {"min_moves_range": [0, 12], "movable_only": true},
       "mode": "duration", "duration": 300.0, "fps": 5, "is_turn_based": true
     }

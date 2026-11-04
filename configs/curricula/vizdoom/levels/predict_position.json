@@ -3,22 +3,22 @@
     {
       "type": "game", "backend": "vizdoom", "game": "VizdoomPredictPosition-v1",
       "instructions": {
-        "title": "Predict Position", "align": "left", "keys_to_dismiss": ["SPACE"],
+        "title": "Predict Position", "align": "left", "controls_to_dismiss": ["SPACE"],
         "text": [
           "You have a rocket launcher and one monster is",
           "pacing across the hall. Rockets fly slowly, so aim",
           "AHEAD of the monster and fire where it will be.",
           "",
           "Controls:",
-          "   [LEFT]    turn left",
-          "   [RIGHT]   turn right",
-          "   [SPACE]   fire rocket",
+          "   LEFT    turn left",
+          "   RIGHT   turn right",
+          "   SPACE   fire rocket",
           "",
-          "(press [SPACE] to start)"
+          "(press SPACE to start)"
         ]
       },
       "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
-      "keys": {"LEFT": 0, "RIGHT": 1, "SPACE": 2},
+      "controls": {"LEFT": 0, "RIGHT": 1, "SPACE": 2},
       "mode": "duration", "duration": 300.0, "fps": 35
     }
   ]

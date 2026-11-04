@@ -9,14 +9,14 @@
           "Each move counts: the game can end before the puzzle is solved.",
           "",
           "Controls:",
-          "   [UP]/[DOWN]   change the symbol",
-          "   [LEFT]/[RIGHT]   move the highlight",
-          "   hold [X]   pause menu (restart / give up / resume)",
+          "   UP/DOWN   change the symbol",
+          "   LEFT/RIGHT   move the highlight",
+          "   hold X   pause menu (restart / give up / resume)",
           "",
-          "(press [SPACE] to start)"
+          "(press SPACE to start)"
         ]
       },
-      "keys": {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3}
+      "controls": {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3}
     }
   ]
 }

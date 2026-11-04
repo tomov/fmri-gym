@@ -1,6 +1,6 @@
 {
   "type": "game", "backend": "arc3",
-  "instructions": {"title": "Puzzle game", "align": "left", "keys_to_dismiss": ["SPACE"]},
-  "menu": {"key": "X", "hold": 5.0, "after": 15.0, "options": ["reset", "forfeit", "resume"], "move": ["UP", "DOWN"], "confirm": "SPACE"},
+  "instructions": {"title": "Puzzle game", "align": "left", "controls_to_dismiss": ["SPACE"]},
+  "menu": {"control": "X", "hold": 5.0, "after": 15.0, "options": ["reset", "forfeit", "resume"], "move": ["UP", "DOWN"], "confirm": "SPACE"},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 600.0, "fps": 15, "is_turn_based": true
 }

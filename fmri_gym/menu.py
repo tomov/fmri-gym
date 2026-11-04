@@ -1,21 +1,22 @@
-"""The in-game menu: hold a key to pause and choose reset / forfeit / resume.
+"""The in-game menu: hold a control to pause and choose reset / forfeit / resume.
 
 A subject can get stuck (a Baba Is You puzzle with the rules pushed into a
 corner) or want out of a level, and the button box has few buttons, so the
-menu is opened by HOLDING one key for several seconds -- a key that may well
-do something in the game meanwhile -- and then choosing with two more keys and
-confirming with a fourth, which is very hard to do by accident. It is not
+menu is opened by HOLDING one control for several seconds -- one that may well
+do something in the game meanwhile -- and then choosing with two more controls
+and confirming with a fourth, which is very hard to do by accident. It is not
 meant to be used lightly, so it is unavailable for the first ``after`` seconds
 of a block. Optional and default-off: a game phase opts in with a ``"menu"``
 dict, and the loop in :mod:`fmri_gym.run` never knows which game it is for.
 
 Phase field::
 
-    "menu": {"key": "X", "hold": 5.0, "after": 15.0,
+    "menu": {"control": "X", "hold": 5.0, "after": 15.0,
              "options": ["reset", "forfeit", "resume"],
              "move": ["UP", "DOWN"], "confirm": "RETURN"}
 
-``key`` is required; the rest default to the values shown. ``reset`` starts
+``control`` is required; the rest default to the values shown. Each is a
+control name (:mod:`fmri_gym.inputs`), as a game phase's ``controls`` are. ``reset`` starts
 the episode over (a new ``reset`` of the env with the same seed: the very
 instance the subject gave up on), ``forfeit`` ends the block and moves on to
 the next phase, ``resume`` goes on where the game paused. Options are shown in
@@ -29,9 +30,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING
 
-import pygame
-
-from .keys import get_events, held_key_names, key_name
+from .inputs import ESCAPE, QUIT, Edge, InputEvent, is_control_of_any_input_device
 
 if TYPE_CHECKING:
     from .display import Display
@@ -45,28 +44,29 @@ _DEFAULTS = {"hold": 5.0, "after": 15.0, "options": list(OPTIONS),
 
 @dataclass(frozen=True, slots=True)
 class MenuSettings:
-    """A phase's ``menu`` field with its defaults filled in and its key names upper-cased."""
+    """A phase's ``menu`` field with its defaults filled in and its control names upper-cased."""
 
-    #: the key held to open the menu
-    key: str
+    #: the control held to open the menu
+    control: str
     #: seconds it has to be held
     hold: float
     #: seconds into the block before the menu is available
     after: float
     #: the options offered, in the order shown
     options: tuple[str, ...]
-    #: the keys that move the choice: to the previous option, to the next
+    #: the controls that move the choice: to the previous option, to the next
     move: tuple[str, str]
-    #: the key that confirms the choice
+    #: the control that confirms the choice
     confirm: str
 
     @classmethod
     def from_dict(cls, spec: dict) -> MenuSettings:
         """Read a phase's ``menu`` dict (already validated by :func:`menu_problems`)."""
         cfg = {**_DEFAULTS, **spec}
-        prev_key, next_key = cfg["move"]
-        return cls(key=cfg["key"].upper(), hold=float(cfg["hold"]), after=float(cfg["after"]),
-                   options=tuple(cfg["options"]), move=(prev_key.upper(), next_key.upper()),
+        previous, following = cfg["move"]
+        return cls(control=cfg["control"].upper(), hold=float(cfg["hold"]),
+                   after=float(cfg["after"]), options=tuple(cfg["options"]),
+                   move=(previous.upper(), following.upper()),
                    confirm=cfg["confirm"].upper())
 
 
@@ -77,10 +77,18 @@ def menu_problems(spec: object) -> list[str]:
     :return: human-readable problems, empty when the menu is usable.
     """
     if not isinstance(spec, dict):
-        return [f"menu: expected a dict with at least 'key', got {spec!r}"]
+        return [f"menu: expected a dict with at least 'control', got {spec!r}"]
     out = []
-    if not isinstance(spec.get("key"), str):
-        out.append("menu.key: the key to hold is required, e.g. \"X\"")
+    if not isinstance(spec.get("control"), str):
+        out.append("menu.control: the control to hold is required, e.g. \"X\"")
+    for field, names in (("control", [spec.get("control")]), ("move", spec.get("move", [])),
+                         ("confirm", [spec.get("confirm", _DEFAULTS["confirm"])])):
+        wrong = [n for n in (names if isinstance(names, list) else []) if isinstance(n, str)
+                 and (not is_control_of_any_input_device(n.upper()) or n.upper() == ESCAPE)]
+        if wrong:
+            out.append(f"menu.{field}: {wrong} is no control name (ESCAPE quits the run): "
+                       "the keyboard's (fmri_gym/inputs/keyboard.py) or a device's "
+                       "(fmri_gym/inputs/<device>.py)")
     for field in ("hold", "after"):
         value = spec.get(field, _DEFAULTS[field])
         if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
@@ -90,10 +98,10 @@ def menu_problems(spec: object) -> list[str]:
         out.append(f"menu.options: expected a non-empty list from {list(OPTIONS)}, got {options!r}")
     move = spec.get("move", _DEFAULTS["move"])
     if not (isinstance(move, list) and len(move) == 2 and all(isinstance(k, str) for k in move)):
-        out.append(f"menu.move: expected two key names [previous, next], got {move!r}")
+        out.append(f"menu.move: expected two control names [previous, next], got {move!r}")
     if not isinstance(spec.get("confirm", _DEFAULTS["confirm"]), str):
-        out.append(f"menu.confirm: expected a key name, got {spec.get('confirm')!r}")
-    unknown = set(spec) - {"key"} - set(_DEFAULTS)
+        out.append(f"menu.confirm: expected a control name, got {spec.get('confirm')!r}")
+    unknown = set(spec) - {"control"} - set(_DEFAULTS)
     if unknown:
         out.append(f"menu: unknown fields {sorted(unknown)}")
     return out
@@ -104,14 +112,12 @@ class Menu:
 
     :param spec: the phase's ``"menu"`` dict (already validated).
     :param block_start: ``perf_counter`` at which the block began.
-    :param label: names each ``[KEY]`` of the pop-up's hint as the participant presses it.
-    :param held: returns the names of the keys held now (a test can fake it).
+    :param held: returns the names of the controls held now (:meth:`InputDevice.held`).
     """
 
-    def __init__(self, spec: dict, block_start: float, label: Callable[[str], str],
-                 held: Callable[[], frozenset[str]] = held_key_names) -> None:
+    def __init__(self, spec: dict, block_start: float,
+                 held: Callable[[], frozenset[str]]) -> None:
         self.settings = MenuSettings.from_dict(spec)
-        self._label = label
         self.available_from = block_start + self.settings.after
         self._held = held
         self._held_since: float | None = None
@@ -129,7 +135,7 @@ class Menu:
         available, and starts over on every release.
         """
         now = time.perf_counter()
-        if self.settings.key not in self._held() or now < self.available_from:
+        if self.settings.control not in self._held() or now < self.available_from:
             self._held_since = None
             return False
         if self._held_since is None:
@@ -139,13 +145,15 @@ class Menu:
         self.pending = True
         return True
 
-    def run(self, display: Display, run_time: Callable[[], float], logger: "Logger") -> str:
+    def run(self, display: Display, run_time: Callable[[], float], logger: Logger,
+            read_input_events: Callable[[], list[InputEvent]]) -> str:
         """Show the pop-up until an option is confirmed, and return it.
 
         :param display: the display to draw on.
         :param run_time: the run clock, for the log.
         :param logger: the run's logger; the menu's own presses are
             logged like any other.
+        :param read_input_events: the edges since it was last called (the run's).
         :return: the chosen option, or ``"quit"`` on window close / ESC.
         """
         self.pending, self._held_since = False, None
@@ -154,19 +162,14 @@ class Menu:
         choice = 0
         while True:
             self._draw(display, choice)
-            for event in get_events():
-                if event.type == pygame.QUIT:
-                    return "quit"
-                if event.type not in (pygame.KEYDOWN, pygame.KEYUP):
+            for name, edge in read_input_events():
+                down = edge is Edge.DOWN
+                if name in (QUIT, ESCAPE):
+                    if down:
+                        return "quit"
                     continue
-                if event.key == pygame.K_ESCAPE:
-                    return "quit"
-                name = key_name(event.key)
-                if name is None:
-                    continue
-                logger.log(type="input_event", run_time=run_time(), name=name,
-                             down=event.type == pygame.KEYDOWN)
-                if event.type != pygame.KEYDOWN:
+                logger.log(type="input_event", run_time=run_time(), name=name, down=down)
+                if not down:
                     continue
                 if name == s.move[0]:
                     choice = (choice - 1) % len(s.options)
@@ -182,6 +185,5 @@ class Menu:
         """Render the option list with ``choice`` marked."""
         s = self.settings
         rows = [f"{'>' if i == choice else ' '}  {_LABELS[o]}" for i, o in enumerate(s.options)]
-        hint = f"([{s.move[0]}]/[{s.move[1]}] to choose, [{s.confirm}] to select)"
-        display.draw_text("Paused\n\n" + "\n".join(rows) + "\n\n" + self._label(hint),
-                          align="left")
+        hint = f"({s.move[0]}/{s.move[1]} to choose, {s.confirm} to select)"
+        display.draw_text("Paused\n\n" + "\n".join(rows) + "\n\n" + hint, align="left")

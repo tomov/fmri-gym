@@ -9,7 +9,7 @@ opens an editor or writes a config. A session of several runs is a shell
 script with one of these commands per line (README, "Runs and sessions"),
 which ``session-editor`` writes and any shell plays.
 
-How it is played -- the window, the controller, the audio, where the data
+How it is played -- the window, the input devices, the audio, where the data
 goes -- is the rig's, not the command's: each rig has a file
 (:mod:`fmri_gym.config.rig`), and ``--rig`` names it.
 
@@ -75,7 +75,7 @@ def _parser() -> argparse.ArgumentParser:
                    "first phase, until --duration (which it needs)")
     p.add_argument("--rig", required=True,
                    help="the rig file it is played on, e.g. configs/examples/rigs/laptop.json: "
-                   "it says the window, controller, audio and data root. A rig check makes "
+                   "it says the window, input devices, audio and data root. A rig check makes "
                    "one when the file is missing")
     p.add_argument("--dummy-trigger", action="store_true")
     return p

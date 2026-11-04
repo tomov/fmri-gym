@@ -23,7 +23,7 @@ pytestmark = pytest.mark.backend("gym")
 RUN_S = 12.0
 CURRICULUM = [
     {"type": "fixation", "duration": 0.5, "include_on_resume": True},
-    {"type": "game", "game": "CartPole-v1", "keys": {"": 0, "LEFT": 0, "RIGHT": 1}, "fps": 50,
+    {"type": "game", "game": "CartPole-v1", "controls": {"": 0, "LEFT": 0, "RIGHT": 1}, "fps": 50,
      "mode": "duration", "duration": 2.0, "show_outcome_duration": 0},
     {"type": "fixation", "duration": 0.5},
 ]

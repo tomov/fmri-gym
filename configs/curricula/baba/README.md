@@ -4,7 +4,7 @@
 
 **Setup.** `uv sync --extra baba` installs `baba-gym` (`gym/baba/`), which pulls baba-is-ai from GitHub.
 
-**Keys.** `BabaIsYouEnv.Actions` ([baba/grid.py](https://github.com/nacloos/baba-is-ai/blob/main/baba/grid.py)): 0 = idle, 1 = up, 2 = right, 3 = down, 4 = left. The instructions' Controls text is kept in sync with `keys` by hand.
+**Keys.** `BabaIsYouEnv.Actions` ([baba/grid.py](https://github.com/nacloos/baba-is-ai/blob/main/baba/grid.py)): 0 = idle, 1 = up, 2 = right, 3 = down, 4 = left. The instructions' Controls text is kept in sync with `controls` by hand.
 
 **Blocking, as Baba Is You is.** The block is the level played until won (`mode` `episode`, `n_episodes` 1, `advance_on` `["won"]`); a loss (YOU destroyed, or no YOU left) restarts the same level, as the game itself does, and `duration` 300 s is the cap.
 

@@ -66,7 +66,7 @@ class EnvAdapter:
 
     :ivar spec: the game-phase config dict this env was built from.
     :ivar env: the underlying ``gymnasium.Env``.
-    :ivar keymap: the phase's ``keys`` as a :class:`~.keymap.Keymap`.
+    :ivar keymap: the phase's ``controls`` as a :class:`~.keymap.Keymap`.
     """
 
     env: gym.Env
@@ -79,7 +79,7 @@ class EnvAdapter:
 
         :param spec: game-phase config dict from the curriculum (already
             validated for the keys this backend cares about).
-        :raises ValueError: ``keys`` that do not fit the env's action space
+        :raises ValueError: ``controls`` that do not fit the env's action space
             (see :func:`~.keymap.make_keymap`).
         """
         self.spec = spec

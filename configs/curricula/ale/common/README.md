@@ -8,7 +8,7 @@ The `ale` backend's curricula: ten Atari 2600 games, one file each (300 s of pla
 
 ## Keys
 
-A phase's `keys` values are indices into the game's own action set, which differs per game. Read it with `gym.make("ALE/Pong-v5").unwrapped.get_action_meanings()` (README, "Keys"): for Pong, `['NOOP', 'FIRE', 'RIGHT', 'LEFT', 'RIGHTFIRE', 'LEFTFIRE']`, so RIGHT=2, LEFT=3, and `""` (no key held) is 0.
+A phase's `controls` values are indices into the game's own action set, which differs per game. Read it with `gym.make("ALE/Pong-v5").unwrapped.get_action_meanings()` (README, "Keys"): for Pong, `['NOOP', 'FIRE', 'RIGHT', 'LEFT', 'RIGHTFIRE', 'LEFTFIRE']`, so RIGHT=2, LEFT=3, and `""` (no key held) is 0.
 
 ## Curricula
 

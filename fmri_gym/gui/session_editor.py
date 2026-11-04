@@ -60,15 +60,15 @@ _LIST, _SCRIPT = 0, 1
 _PHASES, _JSON = 0, 1
 
 
-_GAME_KEYS_HINT = (
-    "Game keys: which keyboard key does what in this game -- the same on every rig. Write "
-    "keyboard keys only (UP, DOWN, LEFT, RIGHT, SPACE, RETURN, A-Z, 0-9, ..., joined with + "
-    "for a combo), never a controller's buttons: a rig with a controller makes its buttons "
-    "press these keys (its bindings, set in rig-config), and a button box types its keys "
+_GAME_CONTROLS_HINT = (
+    "Controls: which control does what in this game. Write control names, joined with + "
+    "for a combo: the keyboard's (UP, DOWN, LEFT, RIGHT, SPACE, RETURN, A-Z, 0-9, ...) or an "
+    "input device's (fmri_gym/inputs/<device>.py); a rig plays the curriculum only if its "
+    "inputs (set in rig-config) have every control named, and a button box types its keys "
     "itself (its response keys). There is no default map. The action is what the game takes: "
-    "a Discrete index, or for a MultiBinary game the index of the button the key holds down. "
-    "A real-time Discrete game also needs a row with a blank key: the action sent while no "
-    "key is held.")
+    "a Discrete index, or for a MultiBinary game the index of the button the control holds "
+    "down. A real-time Discrete game also needs a row with a blank control: the action sent "
+    "while none is held.")
 
 _GUIDE = ("A session is a script that plays its runs in order; a run plays one curriculum. "
           "1) Say who and on which rig (or leave them to whoever starts it). 2) List the runs. "
@@ -108,7 +108,7 @@ RUN_FLAG_FIELDS = [
 PHASE_ROWS: dict[str, Callable[[dict], list[str]]] = {
     "game": lambda v: [f.key for f in _GAME_FIELDS
                        if v.get("mode") == "episode" or f.key not in ("n_episodes", "advance_on")],
-    "message": lambda v: ["text", "duration", "align"] + ["key"] * (not v.get("duration")),
+    "message": lambda v: ["text", "duration", "align"] + ["control"] * (not v.get("duration")),
     "check_display": lambda v: ["seconds"] + ["n"] * (not v.get("seconds")),
 }
 
@@ -163,12 +163,14 @@ PHASE_FIELDS: dict[str, list[Field]] = {
         Field("text", "text", "text", tip="The message. Lines are kept as typed."),
         Field("duration", "duration (s)", "float",
               tip="Seconds shown. Blank = stay until the participant presses 'key'."),
-        Field("key", "key", tip="Key that dismisses an untimed message (default: space)."),
+        Field("control", "control",
+              tip="Control that dismisses an untimed message (default: SPACE)."),
         Field("align", "align", "choice", ("center", "left"), tip="Text alignment."),
     ],
     "survey": [
         Field("questions", "questions", "lines", tip="One question per line."),
-        Field("n_points", "n_points", "int", tip="Likert scale points (default 7)."),
+        Field("controls", "controls", "list",
+              tip="One control per point of the scale, in order (default 1-7)."),
     ],
     "game": _GAME_FIELDS,
     # The rig check's phases (fmri_gym/checks.py): blank = the quick check's value.
@@ -202,8 +204,8 @@ PHASE_FIELDS: dict[str, list[Field]] = {
     "check_controls": [
         Field("timeout_s", "timeout (s)", "float",
               tip="Seconds to press each key when asked (default 10). The keys asked for are "
-                  "the rig's: its controller bindings and its response keys (rig-config, "
-                  "Response devices step)."),
+                  "the rig's: each control of its input devices and its response keys "
+                  "(rig-config, Response devices step)."),
     ],
     "check_photodiode": [
         Field("n", "flashes", "int", tip="Flashes (default 10; the long check 850)."),
@@ -310,9 +312,9 @@ def split_phase(phase: dict, fields: Sequence[Field]) -> tuple[dict, dict]:
     """Split a phase into (form values, extra keys not on the form).
 
     ``type`` and ``keys`` belong to neither: the first is fixed, the second
-    is edited in the phase's Keys table.
+    is edited in the phase's Controls table.
     """
-    known = {f.key for f in fields} | {"type", "keys"}
+    known = {f.key for f in fields} | {"type", "controls"}
     form = {k: v for k, v in phase.items() if k in known}
     extra = {k: v for k, v in phase.items() if k not in known}
     return form, extra
@@ -1366,20 +1368,20 @@ class _Editor(QtWidgets.QMainWindow):
             self.phase_form.write("seed", str(self._derived_seed))
 
     def _add_game_keys(self, body: QtWidgets.QVBoxLayout, phase: dict) -> None:
-        """Under a game phase's form: its keys, which keyboard key does what in it."""
-        box = QtWidgets.QGroupBox("Keys")
+        """Under a game phase's form: its controls, which does what in it."""
+        box = QtWidgets.QGroupBox("Controls")
         layout = QtWidgets.QVBoxLayout(box)
-        hint = QtWidgets.QLabel(_GAME_KEYS_HINT)
+        hint = QtWidgets.QLabel(_GAME_CONTROLS_HINT)
         hint.setObjectName("hint")
         hint.setWordWrap(True)
         layout.addWidget(hint)
         self.key_table = ui.KeyTable()
-        self.key_table.set(phase.get("keys", {}))
+        self.key_table.set(phase.get("controls", {}))
         self.key_table.setMinimumHeight(180)
         layout.addWidget(self.key_table)
-        buttons = [ui.button("Add key", self.key_table.add_row),
+        buttons = [ui.button("Add control", self.key_table.add_row),
                    ui.button("Press a key...", self._capture_key),
-                   ui.button("Remove key", self.key_table.remove_selected),
+                   ui.button("Remove control", self.key_table.remove_selected),
                    ui.button("Check with the engine", self._check_keys)]
         for b, tip in zip(buttons, (
                 "A blank row: type the key (or combo) and the action it sends.",
@@ -1417,9 +1419,9 @@ class _Editor(QtWidgets.QMainWindow):
         shown = self._phase_rows()
         new = {"type": old["type"],
                **{k: v for k, v in self.phase_form.get().items() if k in shown}}
-        keys = self.key_table.get() if self.key_table is not None else old.get("keys")
-        if keys:
-            new["keys"] = keys
+        controls = self.key_table.get() if self.key_table is not None else old.get("controls")
+        if controls:
+            new["controls"] = controls
         if self.extra_text is None and curriculum.INCLUDE_KEY in old:  # else it is in extra
             new[curriculum.INCLUDE_KEY] = old[curriculum.INCLUDE_KEY]
         if self.extra_text is not None:
@@ -1438,7 +1440,7 @@ class _Editor(QtWidgets.QMainWindow):
     def _add_phase(self, kind: str) -> None:
         templates = {"fixation": {"type": "fixation", "duration": 2.0},
                      "message": {"type": "message", "text": "", "duration": 2.0},
-                     "survey": {"type": "survey", "n_points": 7, "questions": []},
+                     "survey": {"type": "survey", "questions": []},
                      # No fps: Check names it, as it does the empty game id -- the rate
                      # belongs to the game about to be picked, not to this template.
                      "game": {"type": "game", "backend": "gym", "game": "", "mode": "duration",
@@ -1492,7 +1494,7 @@ class _Editor(QtWidgets.QMainWindow):
         if self.key_table is None or self.edit_index is None:
             return
         try:
-            phase = {**self.phases[self.edit_index], "keys": self.key_table.get()}
+            phase = {**self.phases[self.edit_index], "controls": self.key_table.get()}
         except ValueError as exc:
             self._error(str(exc))
             return

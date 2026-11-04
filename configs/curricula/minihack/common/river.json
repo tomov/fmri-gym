@@ -1,20 +1,20 @@
 {
   "type": "game", "backend": "minihack",
   "instructions": {
-    "title": "MiniHack: River", "align": "left", "keys_to_dismiss": ["SPACE"],
+    "title": "MiniHack: River", "align": "left", "controls_to_dismiss": ["SPACE"],
     "text": [
       "Cross the river to reach the goal. Walk into a",
       "boulder to push it into the water and build a",
       "bridge to step across.",
       "",
       "Controls:",
-      "   [ARROWS]       move  N / S / W / E",
-      "   [A] / [S]        move diagonally  NW / NE",
-      "   [Z] / [C]        move diagonally  SW / SE",
+      "   ARROWS       move  N / S / W / E",
+      "   A / S        move diagonally  NW / NE",
+      "   Z / C        move diagonally  SW / SE",
       "",
-      "(press [SPACE] to start)"
+      "(press SPACE to start)"
     ]
   },
-  "keys": {"UP": 0, "DOWN": 2, "LEFT": 3, "RIGHT": 1, "A": 7, "S": 4, "Z": 6, "C": 5},
+  "controls": {"UP": 0, "DOWN": 2, "LEFT": 3, "RIGHT": 1, "A": 7, "S": 4, "Z": 6, "C": 5},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 300.0, "fps": 15, "is_turn_based": true
 }

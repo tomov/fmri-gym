@@ -1,0 +1,22 @@
+{
+  "type": "game", "backend": "aigamestore",
+  "instructions": {
+    "align": "left", "controls_to_dismiss": ["BUTTON_A"],
+    "text": [
+      "Top-down shooter. Eliminate enough enemies,",
+      "then reach extraction before time runs out.",
+      "",
+      "Controls:",
+      "   stick   move",
+      "   RT      shoot",
+      "   A       sprint",
+      "   B       take cover",
+      "   LT      next weapon",
+      "",
+      "Press A to start."
+    ]
+  },
+  "controls": {"LEFT_STICK_LEFT": 0, "LEFT_STICK_RIGHT": 1, "LEFT_STICK_UP": 2, "LEFT_STICK_DOWN": 3, "RIGHT_TRIGGER": 4, "BUTTON_A": 5, "BUTTON_B": 6, "LEFT_TRIGGER": 12},
+  "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 600.0,
+  "fps": 30, "frame_skip": 2
+}

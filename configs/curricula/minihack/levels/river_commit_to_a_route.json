@@ -3,19 +3,19 @@
     {
       "type": "game", "backend": "minihack", "game": "minihack_levels:MiniHack-River-CommitToARoute-v0",
       "instructions": {
-        "title": "River: Commit to a Route", "align": "left", "keys_to_dismiss": ["SPACE"],
+        "title": "River: Commit to a Route", "align": "left", "controls_to_dismiss": ["SPACE"],
         "text": [
           "Four stones. Compare both routes before committing them.",
           "Reach the staircase. Unbridged water cannot be entered.",
           "Boulders can sink; restart if a crossing becomes impossible.",
           "",
-          "[ARROWS]: move; hold [X]: restart / give up",
+          "ARROWS: move; hold X: restart / give up",
           "",
-          "Press [SPACE] to start."
+          "Press SPACE to start."
         ]
       },
-      "keys": {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3},
-      "menu": {"key": "X", "hold": 1.5, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["UP", "DOWN"], "confirm": "SPACE"},
+      "controls": {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3},
+      "menu": {"control": "X", "hold": 1.5, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["UP", "DOWN"], "confirm": "SPACE"},
       "seed": 3, "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 900, "fps": 15, "is_turn_based": true
     }
   ]

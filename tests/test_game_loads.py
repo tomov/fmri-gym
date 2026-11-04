@@ -18,7 +18,7 @@ from tests.conftest import write_curriculum
 pytestmark = pytest.mark.backend("gym")
 
 RUN_S = 12.0
-CARTPOLE = {"type": "game", "game": "CartPole-v1", "keys": {"": 0, "LEFT": 0, "RIGHT": 1},
+CARTPOLE = {"type": "game", "game": "CartPole-v1", "controls": {"": 0, "LEFT": 0, "RIGHT": 1},
             "fps": 50, "mode": "duration", "duration": 1.0, "show_outcome_duration": 0}
 
 

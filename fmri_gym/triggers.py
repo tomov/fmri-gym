@@ -1,7 +1,7 @@
 """Recording-device triggers: run-start sync and per-event trigger codes.
 
 fMRI needs one thing from the stimulus PC: to *wait* for the scanner's first
-volume (the ``=`` key from the trigger box) and anchor the session clock on
+volume (a key the trigger box types, ``EQUALS``) and anchor the session clock on
 it. MEG/EEG need the opposite direction: the stimulus PC *sends* trigger codes
 onto a trigger line -- often also to start the acquisition -- and the analyst
 realigns the recording to the frame log by those codes. Both live under one
@@ -159,7 +159,8 @@ class SyncSettings:
     #: code over the trigger backend (MEG started from the trigger line), or
     #: ``none`` (start on the experimenter's key alone).
     mode: str = "wait"
-    key: str = "="
+    #: the name of the keyboard key the trigger box types at every volume
+    key: str = "EQUALS"
     #: ``send`` only: seconds between the start code and the clock anchor,
     #: for acquisitions that need a moment to come up.
     delay: float = 0.0
@@ -517,7 +518,7 @@ class Triggers:
         setting the config left to its default -- the run should never end
         with someone discovering the recording got no triggers.
 
-        :return: e.g. ``"wait for scanner key '=' | no trigger codes sent
+        :return: e.g. ``"wait for scanner key 'EQUALS' | no trigger codes sent
             (backend null) | NOT SET in the rig file: sync.mode, backend"``.
         """
         sync = self.sync

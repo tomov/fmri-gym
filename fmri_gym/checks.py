@@ -23,12 +23,12 @@ A test the rig gives no reason to run is recorded as "not run", with why:
   run waits for the scanner. Only the configured port is written to: another
   may be wired to a response box or an eye tracker, and a write that succeeds
   says nothing of where it went.
-* ``check_controls`` -- the response devices: each key the rig's participant
-  can press, i.e. each control of its ``"bindings"`` (expected as the key it is
-  bound to) and each of its ``"response_keys"``. Every key is first checked
-  automatically -- one that comes back through the event queue as itself --
-  and the input devices plugged in are listed; then each key is asked for on
-  screen and pressed on the real device.
+* ``check_controls`` -- the response devices: what the rig's participant can
+  press, i.e. each control of the devices its ``"inputs"`` list (each stick
+  calibrated first) and each of its ``"response_keys"``. Every response key is
+  first checked automatically -- one that comes back through the event queue
+  as itself -- and the input devices plugged in are listed; then each control
+  is asked for on screen and pressed on the real device.
 * ``check_photodiode`` -- the flip-to-photon offset, read as the rig's
   ``rig_check.photodiode`` says, and on the same flashes the audio test when the
   rig plays audio: a tone burst on every other flash, timed at the DAC, and at
@@ -95,17 +95,18 @@ import numpy as np
 import pygame
 from gymnasium import spaces
 
-from . import pad, pad_calibration
 from .bids import has_session, next_session
 from .config import rig as rig_file
 from .config.phases import (CHECK_PHASES, CheckControls, CheckDisplay, CheckFrames, CheckPhase,
                             CheckPhotodiode, CheckTriggers, GamePhase)
 from .display import Display, is_locked
-from .keys import _PYGAME_KEY_NAMES, get_events, key_name
+from .inputs import ESCAPE, QUIT, Edge, Controller, InputDevice, InputDevices
+from .inputs.keyboard import KEYCODES
+from .pad_calibration import calibrate, cue_order
 from .photodiode import (AudioRecorder, Verdict, _clicker, _light_verdict,
                          _log_clicks, _readout, _sound_verdict, run_flashes)
 from .replay import frame_arrays
-from .run import _wait_for_duration
+from .run import _wait_for_duration, read_input_events
 from .triggers import HID_DEVICES, LIFECYCLE_EVENTS, Codes, TriggerError, Triggers
 
 if TYPE_CHECKING:
@@ -276,7 +277,7 @@ def run_check(run: Run, phase: CheckPhase, index: int) -> None:
     lines = [f"{t}: {v.status.upper()}" + (f"\n  {v.why[:160]}" if v.why else "")
              for t, v in tests.items()]
     run.display.draw_text("Rig check\n\n" + "\n".join(lines))
-    _wait_for_duration(run.display, _VERDICT_S)
+    _wait_for_duration(run.inputs, run.display, _VERDICT_S)
     if index == max(i for i, p in enumerate(run.config.curriculum.phases)
                     if isinstance(p, CheckPhase)):
         _summary_screen(run)
@@ -292,7 +293,7 @@ def _summary_screen(run: Run) -> None:
     head = (f"Rig check done: {len(failed)} test(s) failed, listed in the report"
             if failed else "Rig check done: every test passed")
     run.display.draw_text(head + "\n\n" + "\n".join(lines))
-    _wait_for_duration(run.display, _SUMMARY_S)
+    _wait_for_duration(run.inputs, run.display, _SUMMARY_S)
 
 
 def _title(run: Run, text: str) -> None:
@@ -308,7 +309,7 @@ def _check_display(run: Run, phase: CheckDisplay, summary: dict, arrays: dict, t
     _title(run, f"display\n\n{info['refresh_rate']} Hz, vsync {info['vsync']}: timing {n} "
                 f"flips (about {n / (info['refresh_rate'] or 60):.0f} s)\nthe screen flickers "
                 "grey meanwhile")
-    _wait_for_duration(run.display, _VERDICT_S)
+    _wait_for_duration(run.inputs, run.display, _VERDICT_S)
     stats = run.display.measure_flips(n)
     arrays["intervals_ms"] = np.asarray(stats.pop("intervals_ms"))
     locked = is_locked(info, stats)
@@ -344,7 +345,7 @@ def _check_triggers(run: Run, phase: CheckTriggers, summary: dict, arrays: dict,
         _title(run, f"triggers\n\nsent {summary['sent']['n']} codes on {t.active}\n"
                     + ("all read back from the network" if readback
                        else "check each in the recording: every line alone, then every code"))
-        _wait_for_duration(run.display, _VERDICT_S)
+        _wait_for_duration(run.inputs, run.display, _VERDICT_S)
     if pulses:
         _count_pulses(run, phase, summary, arrays)
     tests["triggers"] = _PASS
@@ -403,30 +404,39 @@ def input_devices() -> list[str]:
     return names
 
 
-def _round_trip(name: str) -> bool:
-    """A synthetic press of ``name`` comes back through the event queue as ``name``."""
-    code = {v: k for k, v in _PYGAME_KEY_NAMES.items()}.get(name)
-    if code is None:
-        return False
-    pygame.event.clear(pygame.KEYDOWN)
-    pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=code, mod=0, unicode="",
-                                         scancode=0))
-    return any(key_name(e.key) == name for e in pygame.event.get(pygame.KEYDOWN))
+def _round_trip(inputs: InputDevice, name: str) -> bool:
+    """A synthetic press of the keyboard key ``name`` comes back from ``inputs`` as ``name``."""
+    read_input_events(inputs)
+    for kind in (pygame.KEYDOWN, pygame.KEYUP):
+        pygame.event.post(pygame.event.Event(kind, key=KEYCODES[name], mod=0, unicode="",
+                                             scancode=0))
+    return (name, Edge.DOWN) in read_input_events(inputs)
+
+
+def _controllers(inputs: InputDevices) -> list[Controller]:
+    return [d for d in inputs.devices if isinstance(d, Controller)]
+
+
+def _controls_to_ask(inputs: InputDevices) -> dict[str, str]:
+    """Each control of the controllers to press, buttons then stick directions: what it is on."""
+    return {c: f"on the {d.name}" for d in _controllers(inputs)
+            for c in (*cue_order(d.BUTTON_NAMES),
+                      *(n for stick in d.sticks for n in stick.directions()))}
 
 
 def _check_controls(run: Run, phase: CheckControls, summary: dict, arrays: dict, tests: dict,
                     index: int) -> None:
     rig = run.config.rig
-    keys = {**{key: f"the controller's {pad.CONTROL_LABELS.get(control, control)}"
-               for control, key in rig.bindings.items() if rig.has_pad},
-            **rig.response_keys}
+    keys = {**_controls_to_ask(run.inputs), **rig.response_keys}
     if not keys:
-        tests["controls"] = Verdict("not run", "this rig binds no controller and types no "
+        tests["controls"] = Verdict("not run", "this rig lists no controller and types no "
                                                "response keys (rig-config, Response devices step)")
         return
     summary["devices"] = input_devices()
-    summary["pad"] = _check_pad(run, phase)
-    summary["automatic"] = {name: _round_trip(name) for name in keys}
+    summary["inputs"] = run.inputs.status()
+    calibrations = [_calibrate(run, phase, d) for d in _controllers(run.inputs)]
+    summary["pad"] = calibrations[0] if calibrations else {"present": False}
+    summary["automatic"] = {name: _round_trip(run.inputs, name) for name in rig.response_keys}
     ignore = run.triggers.sync.key if run.triggers.sync.mode == "wait" else None
     results: dict[str, dict] = {}
     try:
@@ -442,41 +452,33 @@ def _check_controls(run: Run, phase: CheckControls, summary: dict, arrays: dict,
     arrays["held_s"] = np.array([results.get(k, {}).get("held_s", np.nan) for k in keys])
     problems = [f"{k}: not read back as itself" for k, ok in summary["automatic"].items()
                 if not ok]
-    if summary["pad"].get("why"):
-        problems.append(f"pad: {summary['pad']['why']}")
+    problems += [f"{c['device']}: {c['why']}" for c in calibrations if c.get("why")]
     problems += [_key_problem(k, results.get(k)) for k in keys
                  if not results.get(k, {}).get("pressed")]
     tests["controls"] = Verdict("fail", "; ".join(problems)) if problems else _PASS
 
 
-def _check_pad(run: Run, phase: CheckControls) -> dict[str, Any]:
-    """Calibrate the controller, if there is one, before asking for any keys.
+def _calibrate(run: Run, phase: CheckControls, device: Controller) -> dict[str, Any]:
+    """Calibrate ``device``'s sticks before asking for any control, and read it through that.
 
-    A pad on an fMRI interface sends joystick buttons, not keystrokes, and each of
-    its sticks has to be measured on the rig before a threshold means anything (see
-    :mod:`fmri_gym.pad_calibration`). So when one is plugged in the calibration runs
-    here, and writes a calibration of that pad, which every later run on this rig
-    with it reads. With no pad there is nothing to measure: whatever device is
-    plugged in is expected to send the keys itself, which the prompts below test.
-    ``"has_pad": false`` in the phase skips the measurement and leaves any existing
-    calibration alone.
+    Each stick has to be measured on the rig before a threshold means anything
+    (see :mod:`fmri_gym.pad_calibration`), so the calibration runs here and is
+    written for the device, which every later run on this rig with it reads.
+    ``"calibrates": false`` in the phase skips it and leaves any calibration alone.
     """
-    found = pad.find()
-    if found is None:
-        return {"present": False}
-    if not run.config.rig.has_pad:
-        return {"present": True, "device": found.name, "measured": False, "why": "",
-                "note": 'skipped: the rig reads no controller ("has_pad": false)'}
-    if not phase.has_pad:
-        return {"present": True, "device": found.name, "measured": False, "why": "",
-                "note": 'skipped ("has_pad": false)'}
-    result = pad_calibration.calibrate(found, run.display.screen, pygame.display.flip,
-                                       found.sticks())
+    if not device.sticks:
+        return {"present": True, "device": device.device_name, "measured": False, "why": "",
+                "note": "it has no stick"}
+    if not phase.calibrates:
+        return {"present": True, "device": device.device_name, "measured": False, "why": "",
+                "note": 'skipped ("calibrates": false)'}
+    result = calibrate(device, run.display.screen, pygame.display.flip, tuple(device.sticks))
     if result is None:
-        return {"present": True, "device": found.name, "measured": False,
+        return {"present": True, "device": device.device_name, "measured": False,
                 "why": "stopped before it finished; nothing written"}
-    pad.use((result.path, result.calibration))      # the keys below are read through it
-    return {"present": True, "why": "", **result.record()}
+    for stick_name, calibration_file in result.written.items():
+        device.set_stick_calibration(device.stick(stick_name), calibration_file)
+    return {"present": True, "device": device.device_name, "why": "", **result.record()}
 
 
 def _key_problem(name: str, result: dict | None) -> str:
@@ -493,14 +495,14 @@ def _prompt(run: Run, name: str, label: str, keys: dict, done: dict, timeout: fl
     :raises _Skipped: on ESC.
     """
     marks = "   ".join(f"{k}{' ok' if done.get(k, {}).get('pressed') else ''}" for k in keys)
-    run.display.draw_text(f"Rig check: controls\n\nPress  [ {name} ]"
+    run.display.draw_text(f"Rig check: controls\n\nPress  {name}"
                           f"{f'  ({label})' if label and label != name else ''}\n\n{marks}"
                           "\n\n(ESC: skip the rest; they fail)")
-    pygame.event.clear((pygame.KEYDOWN, pygame.KEYUP))  # what was pressed before the prompt
+    read_input_events(run.inputs)           # what was pressed before the prompt
     start = time.perf_counter()
     strays: list[str] = []
     while time.perf_counter() - start < timeout:
-        events = _key_events(ignore)
+        events = _key_events(run.inputs, ignore)
         for i, (down, got) in enumerate(events):
             if not down:
                 continue
@@ -509,28 +511,29 @@ def _prompt(run: Run, name: str, label: str, keys: dict, done: dict, timeout: fl
                 continue
             pressed = time.perf_counter()
             return {"pressed": True, "latency_s": pressed - start,
-                    "held_s": _held(name, pressed, events[i + 1:]), "strays": strays}
+                    "held_s": _held(run.inputs, name, pressed, events[i + 1:]),
+                    "strays": strays}
         run.display.idle(time.perf_counter() + 0.002, poll=0.001)
     return {"pressed": False, "strays": strays}
 
 
-def _key_events(ignore: str | None) -> list[tuple[bool, str]]:
-    """Key presses and releases since the last call, in order: ``(down, name)``; the
+def _key_events(inputs: InputDevice, ignore: str | None) -> list[tuple[bool, str]]:
+    """Presses and releases since the last call, in order: ``(down, name)``; the
     scanner's key left out.
 
     :raises _Skipped: on ESC or window close.
     """
     out = []
-    for e in get_events(pygame.QUIT, pygame.KEYDOWN, pygame.KEYUP):
-        if e.type == pygame.QUIT or (e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE):
+    for name, edge in read_input_events(inputs):
+        if name in (QUIT, ESCAPE) and edge is Edge.DOWN:
             raise _Skipped
-        if ignore and getattr(e, "unicode", None) == ignore:
+        if name == ignore:
             continue
-        out.append((e.type == pygame.KEYDOWN, key_name(e.key) or f"keycode {e.key}"))
+        out.append((edge is Edge.DOWN, name))
     return out
 
 
-def _held(name: str, pressed: float, pending: list[tuple[bool, str]],
+def _held(inputs: InputDevice, name: str, pressed: float, pending: list[tuple[bool, str]],
           limit: float = 2.0) -> float:
     """Seconds until ``name`` is released (``nan`` if not within ``limit``).
 
@@ -539,7 +542,7 @@ def _held(name: str, pressed: float, pending: list[tuple[bool, str]],
     while time.perf_counter() - pressed < limit:
         if (False, name) in pending:
             return time.perf_counter() - pressed
-        pending = _key_events(None)
+        pending = _key_events(inputs, None)
         time.sleep(0.001)
     return float("nan")
 
@@ -649,10 +652,10 @@ def _play_pattern(run: Run, fps: float, load: str, phase: CheckFrames,
     rate = f"{fps:g}".replace(".", "p")
     env_id = _register_pattern(f"Frames{rate}fps{'' if load == 'none' else load.upper()}")
     caption = f"Rig check: frames at {fps:g} fps" + ("" if load == "none" else f", {load} load")
-    # keys: the pattern takes no input; its one action is what a frame with no key sends.
+    # controls: the pattern takes no input; its one action is what a frame with none sends.
     game = {"type": "game", "backend": "gym", "game": env_id, "mode": "duration",
             "duration": phase.seconds, "fps": fps, "has_audio": False, "seed": 1000 + index,
-            "keys": {"": 0}, "env_kwargs": {"caption": caption}}
+            "controls": {"": 0}, "env_kwargs": {"caption": caption}}
     # The run's own game loop, not a copy: its pacing and triggers are what is measured.
     run._game(GamePhase.from_dict(game, index), index)
     entry = run.logger.manifest["phases"][-1]
@@ -903,7 +906,7 @@ def _pulses(key: str) -> list[float]:
         if event.type == pygame.QUIT or (
                 event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
             raise KeyboardInterrupt
-        if event.type == pygame.KEYDOWN and event.unicode == key:
+        if event.type == pygame.KEYDOWN and event.key == KEYCODES[key]:
             times.append(now)
     return times
 
@@ -1140,7 +1143,7 @@ COLUMNS: list[tuple[str, tuple[str, ...], str, str | None]] = [
      "Median time from the prompt to the press (a person's, not the device's)", "ms"),
     ("pad_device", ("rig_check", "controls", "pad", "device"),
      "The controller found, whose buttons are read as keys", None),
-    ("pad_axis_on", ("rig_check", "controls", "pad", "sticks", "left", "on"),
+    ("pad_axis_on", ("rig_check", "controls", "pad", "sticks", "LEFT_STICK", "on"),
      "Fraction of the left stick's travel that counts as pushed", None),
     ("pad_corrections", ("rig_check", "controls", "pad", "corrections"),
      "Wrong controls pressed, and asked again, while the calibration confirmed each", None),
@@ -2164,15 +2167,15 @@ def _html_controls(m: dict, folder: str) -> str:
 def _pad_line(pad_out: dict) -> str:
     """One line on what the controller check found, for either report."""
     if not pad_out.get("present"):
-        return "No controller plugged in; the device in use must send the keys below itself."
+        return "The rig lists no controller; the device in use must send the keys below itself."
     device = pad_out.get("device", "a controller")
     if not pad_out.get("measured"):
         return f"{device} plugged in, not measured: {pad_out.get('note') or pad_out.get('why')}."
-    sticks = "; ".join(f"{name} stick on past {s['on']:.2f} of its travel and off under "
-                       f"{s['off']:.2f}" for name, s in pad_out["sticks"].items())
+    sticks = "; ".join(f"{name} on past {s['on']:.2f} of its travel and off under {s['off']:.2f}"
+                       f" (written to {s['config']})" for name, s in pad_out["sticks"].items())
     return (f"{device} measured: {sticks or 'no stick'}; {pad_out['confirmed']} controls "
-            f"confirmed, {pad_out['corrections']} wrong presses asked again. Written to "
-            f"{pad_out['config']}, and every run on this rig with it reads it.")
+            f"confirmed, {pad_out['corrections']} wrong presses asked again. Every run on this "
+            "rig with it reads what was written.")
 
 
 def _html_photodiode(m: dict, folder: str) -> str:

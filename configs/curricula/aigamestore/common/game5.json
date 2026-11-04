@@ -1,18 +1,18 @@
 {
   "type": "game", "backend": "aigamestore",
   "instructions": {
-    "align": "left", "keys_to_dismiss": ["SPACE"],
+    "align": "left", "controls_to_dismiss": ["SPACE"],
     "text": [
       "Collect all the cheese to open the mouse",
       "hole, then escape before the cats catch you.",
       "",
       "Controls:",
-      "   [LEFT] / [RIGHT]   move",
-      "   [UP]             jump",
+      "   LEFT / RIGHT   move",
+      "   UP             jump",
       "",
-      "(press [SPACE] to start)"
+      "(press SPACE to start)"
     ]
   },
-  "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2},
+  "controls": {"LEFT": 0, "RIGHT": 1, "UP": 2},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 120.0, "fps": 10
 }
