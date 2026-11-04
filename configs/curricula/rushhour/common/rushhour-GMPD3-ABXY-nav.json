@@ -1,7 +1,7 @@
 {
   "type": "game", "backend": "rushhour", "game": "RushHourHuman-v0",
   "instructions": {
-    "align": "left", "keys_to_dismiss": ["GMPD3_A"],
+    "align": "left", "controls_to_dismiss": ["BUTTON_A"],
     "text": [
       "On each puzzle, get the RED car out through the opening",
       "on the right wall.",
@@ -27,8 +27,8 @@
       "Press A to begin."
     ]
   },
-  "keys": {"GMPD3_LT": 4, "GMPD3_RT": 5, "GMPD3_X": 8, "GMPD3_B": 9, "GMPD3_Y": 10, "GMPD3_A": 11},
-  "menu": {"key": "GMPD3_LT", "hold": 3.0, "after": 300.0, "options": ["reset", "forfeit", "resume"], "move": ["GMPD3_Y", "GMPD3_A"], "confirm": "GMPD3_RT"},
+  "controls": {"LEFT_TRIGGER": 4, "RIGHT_TRIGGER": 5, "BUTTON_X": 8, "BUTTON_B": 9, "BUTTON_Y": 10, "BUTTON_A": 11},
+  "menu": {"control": "LEFT_TRIGGER", "hold": 3.0, "after": 300.0, "options": ["reset", "forfeit", "resume"], "move": ["BUTTON_Y", "BUTTON_A"], "confirm": "RIGHT_TRIGGER"},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 480.0,
   "env_kwargs": {"movable_only": true}, "fps": 60,
   "is_turn_based": true

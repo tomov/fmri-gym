@@ -7,7 +7,7 @@
   "trigger_hardware": "Example: none (no scanner)",
   "notes": "Example: a Current Designs GMPD3 (one stick, six buttons) on its 932 interface in joystick mode, at a desk; no scanner",
   "screen": {"size": "1024x768", "is_fullscreen": false, "monitor": 0, "has_vsync": true},
-  "inputs": ["gmpd3"],
+  "inputs": ["keyboard", "current_designs_gamepad3"],
   "has_audio": true,
   "data_root": "data",
   "triggers": {"sync": {"mode": "none"}, "backend": "null"}

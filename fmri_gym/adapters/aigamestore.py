@@ -15,7 +15,7 @@ or a level clear (the env's rule; see its docstring). A curriculum therefore
 lists one game phase per level it wants played. ``"game": "game6"`` is level 1;
 game4 has no levels and takes no ``/level``.
 
-Keys: a phase's ``keys`` values are indices into the game's key list
+Controls: a phase's ``controls`` values are indices into the game's key list
 (``aigamestore_gym.GAME_KEYS``; game1: LEFT, RIGHT, SPACE, Z), the order of the
 MultiBinary action. The games paint control hints on the canvas; the env
 relabels them from the same map, so a hint names the key the subject presses
@@ -56,7 +56,7 @@ class AIGameStoreAdapter(EnvAdapter):
         game_keys = spec.get("game_keys", GAME_KEYS.get(game, []))
         # Hints name the pressed key where it differs from the game's own; an
         # index the game has no key for is left to the Keymap to refuse.
-        labels = {game_keys[i]: pressed for pressed, i in spec["keys"].items()
+        labels = {game_keys[i]: pressed for pressed, i in spec["controls"].items()
                   if isinstance(i, int) and 0 <= i < len(game_keys) and game_keys[i] != pressed}
         env = AIGameStoreEnv(
             game,

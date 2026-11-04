@@ -1,7 +1,7 @@
 {
   "type": "game", "backend": "aigamestore",
   "instructions": {
-    "align": "left", "keys_to_dismiss": ["SPACE"],
+    "align": "left", "controls_to_dismiss": ["SPACE"],
     "text": [
       "Pull back the slingshot and launch birds",
       "to topple structures and clear the pigs.",
@@ -14,6 +14,6 @@
       "(press SPACE to start)"
     ]
   },
-  "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
+  "controls": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "SPACE": 4, "Z": 5},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 120.0, "fps": 10
 }

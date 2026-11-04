@@ -18,22 +18,12 @@ import sys
 import time
 from dataclasses import dataclass
 from importlib import metadata
-from typing import NamedTuple
 
-from ..inputs import controls_of
+from ..inputs import controls_of_input_devices
 from ..menu import MenuSettings
 from .curriculum import Curriculum
 from .phases import GamePhase, Message, Phase, Survey
 from .rig import RigConfig
-
-
-class KeyNeed(NamedTuple):
-    """One thing a phase asks of the participant, and the key combos that do it."""
-
-    #: what it is, as a problem names it: "action 3", "its menu's X", "dismissing it"
-    what: str
-    #: the combos that do it, each the key names held together; any one will do
-    combos: tuple[tuple[str, ...], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,7 +94,7 @@ class RunConfig:
             a duration the fixations fill, and, with ``load_games``, per game that
             cannot start.
         """
-        return (self._scanner_key_problems() + self._unpressable_problems()
+        return (self._scanner_key_problems() + self._curriculum_requires_controls_missing_from_rig()
                 + self._duration_problems() + (self._game_problems() if load_games else []))
 
     def _game_problems(self) -> list[str]:
@@ -153,26 +143,24 @@ class RunConfig:
         sync = self.rig.triggers.sync
         if sync.mode != "wait":
             return []
-        return [f"phase {i}: keys: {combo} uses {sync.key!r}, the key {self.rig.path}'s scanner "
-                "types at every volume (its triggers.sync.key): bind another key"
+        return [f"phase {i}: controls: {combo} uses {sync.key!r}, the key {self.rig.path}'s "
+                "scanner types at every volume (its triggers.sync.key): bind another control"
                 for i, phase in enumerate(self.curriculum.phases) if isinstance(phase, GamePhase)
-                for combo in phase.spec["keys"] if sync.key in combo.split("+")]
+                for combo in phase.spec["controls"] if sync.key in combo.split("+")]
 
-    def _unpressable_problems(self) -> list[str]:
-        """What a phase asks of the participant that none of the rig's input devices has."""
-        provided = controls_of(self.rig.inputs)
-        devices = ", ".join(("keyboard", *self.rig.inputs))
-        return [f"phase {i}: {what} needs {' or '.join('+'.join(c) for c in combos)}, which "
-                f"none of {self.rig.path}'s inputs provides ({devices}): add the device to its "
-                '"inputs", or play this curriculum on a rig that has it'
+    def _curriculum_requires_controls_missing_from_rig(self) -> list[str]:
+        """The controls a phase names that none of the rig's input devices has."""
+        provided = controls_of_input_devices(self.rig.inputs)
+        return [f"phase {i}: needs {sorted(missing)}, which none of {self.rig.path}'s inputs "
+                f"has ({', '.join(self.rig.inputs)}): add the device to its \"inputs\", or play "
+                "this curriculum on a rig that has it"
                 for i, phase in enumerate(self.curriculum.phases)
-                for what, combos in key_needs(phase)
-                if not any(set(c) <= provided for c in combos)]
+                if (missing := get_all_required_controls_for(phase) - provided)]
 
-    def needed_controls(self) -> frozenset[str]:
-        """Every control a phase of the curriculum names, in any of its combos."""
-        return frozenset(name for phase in self.curriculum.phases
-                         for _, combos in key_needs(phase) for combo in combos for name in combo)
+    def required_controls(self) -> frozenset[str]:
+        """Every control a phase of the curriculum names."""
+        return frozenset().union(*(get_all_required_controls_for(p)
+                                   for p in self.curriculum.phases))
 
 
 def _install_hint(error: Exception, backend: str) -> str:
@@ -185,44 +173,37 @@ def _install_hint(error: Exception, backend: str) -> str:
             f"extras it does not name: uv sync --extra {extra} --extra ...")
 
 
-def key_needs(phase: Phase) -> list[KeyNeed]:
-    """What the participant must be able to do in ``phase``, by key.
+def get_all_required_controls_for(phase: Phase) -> frozenset[str]:
+    """Every control the participant must be able to press in ``phase``.
 
-    :param phase: any phase; one that takes no key needs nothing.
-    :return: one :class:`KeyNeed` per thing to do: each game action (any combo
-        bound to it does it, so a key that only doubles another is never needed
-        by itself), each key of the menu, and dismissing a screen.
+    :param phase: any phase; one that takes no control needs none.
+    :return: a game's bound controls, its menu's and its instructions'; a
+        message's dismissing controls; a survey's points.
     """
     if isinstance(phase, Survey):
-        return [KeyNeed(f"the survey's point {i}", ((k,),))
-                for i, k in enumerate(phase.keys, start=1)]
+        return frozenset(phase.controls)
     if isinstance(phase, Message):
-        return _message_needs(phase)
+        return _controls_that_dismiss(phase)
     if isinstance(phase, GamePhase):
-        return _game_needs(phase)
-    return []
+        return _controls_of_game(phase)
+    return frozenset()
 
 
-def _message_needs(message: Message) -> list[KeyNeed]:
-    """Dismissing a message: one of its ``keys_to_dismiss``, or its ``key`` when it is untimed."""
-    if message.keys_to_dismiss is not None:
-        return [KeyNeed("dismissing it", tuple((k,) for k in message.keys_to_dismiss))]
-    if message.duration is not None or message.key == "any":
-        return []
-    return [KeyNeed("dismissing it", ((message.key,),))]
+def _controls_that_dismiss(message: Message) -> frozenset[str]:
+    """One of its ``controls_to_dismiss``, or its ``control`` when it is untimed."""
+    if message.controls_to_dismiss is not None:
+        return frozenset(message.controls_to_dismiss)
+    if message.duration is not None or message.control == "any":
+        return frozenset()
+    return frozenset({message.control})
 
 
-def _game_needs(game: GamePhase) -> list[KeyNeed]:
-    """A game's actions, the keys of its menu, and dismissing its instructions."""
-    combos_by_action: dict[str, list[tuple[str, ...]]] = {}
-    for combo, action in game.spec["keys"].items():
-        if combo:
-            combos_by_action.setdefault(json.dumps(action), []).append(tuple(combo.split("+")))
-    needs = [KeyNeed(f"action {a}", tuple(c)) for a, c in combos_by_action.items()]
-    if game.instructions is not None and game.instructions.keys_to_dismiss is not None:
-        dismiss = tuple((k,) for k in game.instructions.keys_to_dismiss)
-        needs.append(KeyNeed("its instructions", dismiss))
+def _controls_of_game(game: GamePhase) -> frozenset[str]:
+    """Every control in its ``controls`` combos, its menu's, and its instructions'."""
+    out = {name for combo in game.spec["controls"] for name in combo.split("+") if name}
+    if game.instructions is not None and game.instructions.controls_to_dismiss is not None:
+        out |= set(game.instructions.controls_to_dismiss)
     if "menu" in game.spec:
         menu = MenuSettings.from_dict(game.spec["menu"])
-        needs += [KeyNeed(f"its menu's {k}", ((k,),)) for k in (menu.key, *menu.move, menu.confirm)]
-    return needs
+        out |= {menu.control, *menu.move, menu.confirm}
+    return frozenset(out)

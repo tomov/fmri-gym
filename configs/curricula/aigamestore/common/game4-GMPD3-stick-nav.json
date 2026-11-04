@@ -1,7 +1,7 @@
 {
   "type": "game", "backend": "aigamestore",
   "instructions": {
-    "align": "left", "keys_to_dismiss": ["GMPD3_A"],
+    "align": "left", "controls_to_dismiss": ["BUTTON_A"],
     "text": [
       "Auto-scroll runner. Hold thrust to fly,",
       "dodge zappers and missiles, grab coins.",
@@ -12,7 +12,7 @@
       "Press A to start."
     ]
   },
-  "keys": {"GMPD3_A": 0, "GMPD3_STICK_UP": 1},
+  "controls": {"BUTTON_A": 0, "LEFT_STICK_UP": 1},
   "mode": "episode", "n_episodes": 10, "duration": 3600.0,
   "fps": 30, "frame_skip": 2
 }

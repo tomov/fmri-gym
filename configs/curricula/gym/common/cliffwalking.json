@@ -1,5 +1,5 @@
 {
   "type": "game", "backend": "gym", "game": "CliffWalking-v1",
-  "keys": {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3},
+  "controls": {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3},
   "fps": 5, "is_turn_based": true
 }

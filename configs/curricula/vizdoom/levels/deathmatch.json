@@ -3,7 +3,7 @@
     {
       "type": "game", "backend": "vizdoom", "game": "VizdoomDeathmatch-v1",
       "instructions": {
-        "title": "Deathmatch", "align": "left", "keys_to_dismiss": ["SPACE"],
+        "title": "Deathmatch", "align": "left", "controls_to_dismiss": ["SPACE"],
         "text": [
           "An arena full of monsters, weapons and ammo. Pick",
           "up what you find and kill as many as you can.",
@@ -20,7 +20,7 @@
         ]
       },
       "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
-      "keys": {"UP": 6, "DOWN": 5, "LEFT": 8, "RIGHT": 7, "Z": 4, "X": 3, "SPACE": 0, "A": 16, "C": 15, "S": 1},
+      "controls": {"UP": 6, "DOWN": 5, "LEFT": 8, "RIGHT": 7, "Z": 4, "X": 3, "SPACE": 0, "A": 16, "C": 15, "S": 1},
       "mode": "duration", "duration": 300.0, "fps": 35
     }
   ]

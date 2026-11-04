@@ -8,7 +8,7 @@ Needs TTomilin/COOM cloned into `external/coom` at the commit the README pins (R
 
 ## Keys
 
-COOM's action is Discrete(12), a table of turn x move x execute: 0=noop, 1=execute, 2=forward, 3=forward+execute, 4=turn right, 6=turn right+forward, 8=turn left, 10=turn left+forward. Every curriculum maps UP, LEFT, RIGHT and their combinations the same way, with "" (no key) as 0; the scenario decides what the execute button is, and which key carries it (table below). Keep each curriculum's Controls text in sync with its `keys` by hand.
+COOM's action is Discrete(12), a table of turn x move x execute: 0=noop, 1=execute, 2=forward, 3=forward+execute, 4=turn right, 6=turn right+forward, 8=turn left, 10=turn left+forward. Every curriculum maps UP, LEFT, RIGHT and their combinations the same way, with "" (no key) as 0; the scenario decides what the execute button is, and which key carries it (table below). Keep each curriculum's Controls text in sync with its `controls` by hand.
 
 ## Audio
 

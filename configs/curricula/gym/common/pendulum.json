@@ -1,5 +1,5 @@
 {
   "type": "game", "backend": "gym", "game": "Pendulum-v1",
-  "keys": {"": [0.0], "RIGHT": [2.0], "LEFT": [-2.0]},
+  "controls": {"": [0.0], "RIGHT": [2.0], "LEFT": [-2.0]},
   "fps": 30
 }

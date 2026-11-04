@@ -1,5 +1,5 @@
 {
   "type": "game", "backend": "ale", "game": "ALE/SpaceInvaders-v5",
-  "keys": {"": 0, "SPACE": 1, "RIGHT": 2, "LEFT": 3, "RIGHT+SPACE": 4, "LEFT+SPACE": 5},
+  "controls": {"": 0, "SPACE": 1, "RIGHT": 2, "LEFT": 3, "RIGHT+SPACE": 4, "LEFT+SPACE": 5},
   "mode": "duration", "fps": 30
 }

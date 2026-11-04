@@ -218,11 +218,11 @@ class Form(QtWidgets.QWidget):
 
 
 class KeyTable(QtWidgets.QTableWidget):
-    """Editable rows of ``key combo -> action`` for one game phase."""
+    """Editable rows of ``control combo -> action`` for one game phase."""
 
     def __init__(self) -> None:
         super().__init__(0, 2)
-        self.setHorizontalHeaderLabels(["key(s)   e.g. UP or LEFT+SPACE; blank = no key held",
+        self.setHorizontalHeaderLabels(["control(s)   e.g. UP or LEFT+SPACE; blank = none held",
                                         "action   e.g. 2 or [1,0,0]"])
         self.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
         self.verticalHeader().hide()

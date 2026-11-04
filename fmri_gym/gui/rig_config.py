@@ -27,7 +27,7 @@ from PySide6.QtCore import Qt
 
 from ..config import rig as rig_file
 from ..display import list_monitors, monitor_label
-from ..inputs import OPTIONAL_INPUT_DEVICE_NAMES
+from ..inputs import CONTROLLER_CLASSES_BY_NAME, INPUT_DEVICE_CLASSES_BY_NAME
 from ..triggers import (HID_DEVICES, SYNC_MODES, TRIGGER_BACKENDS, Codes, SyncSettings,
                         TriggerError, Triggers, TriggerSettings)
 from . import Field
@@ -253,10 +253,11 @@ def check_plan(rig: rig_file.RigConfig) -> str:
     lines.append(f"• Triggers: {'; '.join(w for w in (sent, pulses) if w)}." if sent or pulses
                  else "• Triggers: not tested -- this rig sends no codes and waits for no "
                       "scanner.")
-    keys = ([f"each button and stick direction of the {n}" for n in rig.inputs]
+    keys = ([f"each button and stick direction of the {n}" for n in rig.inputs
+             if n in CONTROLLER_CLASSES_BY_NAME]
             + [f"{k} ({v or 'response key'})" for k, v in rig.response_keys.items()])
     lines.append(f"• Responses: the participant presses each when asked -- {', '.join(keys)}."
-                 if keys else "• Responses: not tested -- no input device listed and no "
+                 if keys else "• Responses: not tested -- no controller listed and no "
                               "response keys.")
     lines.append({"none": "• Photodiode: not tested -- this rig has none.",
                   "soundcard": f"• Photodiode: the delay before each image appears, measured "
@@ -317,9 +318,9 @@ def _sound_inputs() -> list[str]:
 #: calibrations: finding one starts SDL's display, which must not run inside this window.
 _CONTROLLER_PROBE = """
 import json, os
-from fmri_gym.inputs import CalibrationError, detect
+from fmri_gym.inputs import CalibrationError, detect_controllers
 try:
-    found = detect()
+    found = detect_controllers()
 except CalibrationError as exc:
     print(json.dumps({"devices": [], "error": str(exc)}))
 else:
@@ -332,7 +333,7 @@ else:
 def controller_status() -> dict[str, Any]:
     """The controllers plugged in now, and when each was last calibrated on this computer.
 
-    :return: ``devices`` (:func:`fmri_gym.inputs.detect`'s, each with ``calibrated``: a
+    :return: ``devices`` (:func:`fmri_gym.inputs.detect_controllers`'s, each with ``calibrated``: a
         time, or ``None``: never) and ``error`` (why a calibration cannot be read, or
         ``None``).
     """
@@ -811,18 +812,18 @@ class _RigWindow(QtWidgets.QDialog):
         look.setToolTip("Look again for a controller plugged in, and its calibration.")
         layout.addWidget(ui.group("Controller plugged in", self._column(
             self.controller_text, ui.row(self.calibrate, look))))
-        layout.addWidget(self._inputs_box(values.get("inputs", [])))
+        layout.addWidget(self._inputs_box(values.get("inputs", rig_file.DEFAULTS["inputs"])))
         layout.addWidget(self._response_keys_box(values.get("response_keys", {})))
         layout.addStretch(1)
         return page
 
     def _inputs_box(self, given: Any) -> QtWidgets.QGroupBox:
-        """One checkbox per kind of input device a rig can list; the keyboard is always on."""
-        box = QtWidgets.QGroupBox("Input devices besides the keyboard")
+        """One checkbox per kind of input device a rig can list; the keyboard on by default."""
+        box = QtWidgets.QGroupBox("Input devices")
         column = QtWidgets.QVBoxLayout(box)
         given = given if isinstance(given, list) else []
         self.input_boxes: dict[str, QtWidgets.QCheckBox] = {}
-        for name, cls in OPTIONAL_INPUT_DEVICE_NAMES.items():
+        for name, cls in INPUT_DEVICE_CLASSES_BY_NAME.items():
             check = QtWidgets.QCheckBox(f"{name}: {(cls.__doc__ or '').splitlines()[0]}")
             check.setChecked(name in given)
             check.toggled.connect(lambda _on: self._check())
@@ -926,11 +927,10 @@ class _RigWindow(QtWidgets.QDialog):
         return out
 
     def _responses(self) -> dict[str, Any]:
-        out: dict[str, Any] = {}
-        for key, value in (("inputs", [n for n, b in self.input_boxes.items() if b.isChecked()]),
-                           ("response_keys", self._response_keys())):
-            if value:
-                out[key] = value
+        out: dict[str, Any] = {
+            "inputs": [n for n, b in self.input_boxes.items() if b.isChecked()]}
+        if self._response_keys():
+            out["response_keys"] = self._response_keys()
         return out
 
     def _responses_problems(self) -> list[str]:

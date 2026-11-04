@@ -7,7 +7,7 @@
   "trigger_hardware": "Example: a serial port into the MEG's trigger channel",
   "notes": "Example: a MEG, the participant on a Current Designs controller (one stick, six buttons); the run starts the recording and codes its events",
   "screen": {"size": "1024x768", "is_fullscreen": true, "monitor": 0, "has_vsync": true},
-  "inputs": ["gmpd3"],
+  "inputs": ["keyboard", "current_designs_gamepad3"],
   "has_audio": true,
   "data_root": "data",
   "start_fixation": 2,

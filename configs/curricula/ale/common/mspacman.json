@@ -1,5 +1,5 @@
 {
   "type": "game", "backend": "ale", "game": "ALE/MsPacman-v5",
-  "keys": {"": 0, "UP": 1, "RIGHT": 2, "LEFT": 3, "DOWN": 4, "UP+RIGHT": 5, "UP+LEFT": 6, "DOWN+RIGHT": 7, "DOWN+LEFT": 8},
+  "controls": {"": 0, "UP": 1, "RIGHT": 2, "LEFT": 3, "DOWN": 4, "UP+RIGHT": 5, "UP+LEFT": 6, "DOWN+RIGHT": 7, "DOWN+LEFT": 8},
   "mode": "duration", "fps": 30
 }

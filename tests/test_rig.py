@@ -38,18 +38,20 @@ def test_defaults_fill_what_the_file_leaves_out():
     screen = desk.screen
     assert (screen.size, screen.is_fullscreen, screen.monitor, screen.has_vsync) == (
         (1024, 768), False, 0, True)
-    assert (desk.inputs, desk.has_audio, desk.data_root) == ((), True, "data")
+    assert (desk.inputs, desk.has_audio, desk.data_root) == (("keyboard",), True, "data")
     assert desk.record()["screen"] == rig.DEFAULTS["screen"]
 
 
 def test_settings_are_read():
     scan = RigConfig.open(write("scan", screen={"size": "800x600", "is_fullscreen": True,
                                                 "monitor": 1, "has_vsync": False},
-                                inputs=["gmpd3"], has_audio=False, data_root="/data"))
+                                inputs=["current_designs_gamepad3"], has_audio=False,
+                                data_root="/data"))
     screen = scan.screen
     assert (screen.size, screen.is_fullscreen, screen.monitor, screen.has_vsync) == (
         (800, 600), True, 1, False)
-    assert (scan.inputs, scan.has_audio, scan.data_root) == (("gmpd3",), False, "/data")
+    assert (scan.inputs, scan.has_audio, scan.data_root) == (("current_designs_gamepad3",),
+                                                             False, "/data")
 
 
 def test_a_missing_file_says_how_to_make_one():
@@ -136,7 +138,7 @@ def test_a_game_key_the_scanner_types_is_refused_on_that_rig():
     box = RigConfig.open(write("box", triggers={"sync": {"mode": "wait", "key": "5"}}))
 
     def run_of(keys: dict) -> RunConfig:
-        game = {"type": "game", "game": "CartPole-v1", "fps": 30, "keys": keys}
+        game = {"type": "game", "game": "CartPole-v1", "fps": 30, "controls": keys}
         curriculum = Curriculum.from_dict({"curriculum": [game]}, "cartpole.json")
         return RunConfig(curriculum=curriculum, rig=box, subject="sub-01", ses=1, run=1,
                          duration=None, resume=False, loop=False,
@@ -148,8 +150,9 @@ def test_a_game_key_the_scanner_types_is_refused_on_that_rig():
 def test_a_control_none_of_the_rigs_inputs_has_is_refused_on_that_rig():
     from fmri_gym.config.curriculum import Curriculum
     from fmri_gym.config.run import RunConfig
-    pad = RigConfig.open(write("pad", inputs=["gmpd3"]))
+    pad = RigConfig.open(write("pad", inputs=["keyboard", "current_designs_gamepad3"]))
     keyboard = RigConfig.open(write("kb"))
+    nothing = RigConfig.open(write("none", inputs=[]))
 
     def run(phase: dict, on: RigConfig) -> RunConfig:
         curriculum = Curriculum.from_dict({"curriculum": [phase]}, "c.json")
@@ -157,25 +160,29 @@ def test_a_control_none_of_the_rigs_inputs_has_is_refused_on_that_rig():
                          duration=None, resume=False, loop=False, dummy_trigger=True)
 
     def game(keys: dict, **more) -> dict:
-        return {"type": "game", "game": "CartPole-v1", "fps": 30, "keys": keys, **more}
+        return {"type": "game", "game": "CartPole-v1", "fps": 30, "controls": keys, **more}
 
-    stick = game({"": 0, "GMPD3_STICK_UP": 1, "UP": 1, "GMPD3_A": 2})
+    stick = game({"": 0, "LEFT_STICK_UP": 1, "UP": 1, "BUTTON_A": 2})
     assert run(stick, pad).problems() == []
-    assert "action 2 needs GMPD3_A, which none of" in run(stick, keyboard).problems()[0]
-    assert run(game({"": 0, "UP": 1}), keyboard).problems() == []   # the keyboard is always on
-    assert run(stick, pad).needed_controls() == {"GMPD3_STICK_UP", "UP", "GMPD3_A"}
-    menu = {"key": "GMPD3_X", "move": ["UP", "DOWN"], "confirm": "SPACE"}
-    assert "its menu's GMPD3_X" in run(game({"": 0, "UP": 1}, menu=menu), keyboard).problems()[0]
-    survey = {"type": "survey", "questions": ["ok?"], "keys": ["GMPD3_Y", "GMPD3_A"]}
-    assert "the survey's point 1 needs GMPD3_Y" in run(survey, keyboard).problems()[0]
+    assert "needs ['BUTTON_A', 'LEFT_STICK_UP'], which none of" in run(stick, keyboard).problems()[0]
+    assert run(game({"": 0, "UP": 1}), keyboard).problems() == []
+    assert "needs ['UP'], which none of" in run(game({"": 0, "UP": 1}), nothing).problems()[0]
+    assert run(stick, pad).required_controls() == {"LEFT_STICK_UP", "UP", "BUTTON_A"}
+    menu = {"control": "BUTTON_X", "move": ["UP", "DOWN"], "confirm": "SPACE"}
+    assert "needs ['BUTTON_X']" in run(game({"": 0, "UP": 1}, menu=menu), keyboard).problems()[0]
+    survey = {"type": "survey", "questions": ["ok?"], "controls": ["BUTTON_Y", "BUTTON_A"]}
+    assert "needs ['BUTTON_A', 'BUTTON_Y']" in run(survey, keyboard).problems()[0]
+    xbox = RigConfig.open(write("xbox", inputs=["keyboard", "xbox_controller"]))
+    assert run(stick, xbox).problems() == []       # the GMPD3's controls are the Xbox's too
 
 
 def test_inputs_name_the_rigs_devices():
-    assert RigConfig.open(write("pad", inputs=["gmpd3", "gamepad"])).inputs == ("gmpd3",
-                                                                                "gamepad")
-    for wrong in (["keyboard"], ["gmpd3", "gmpd3"], ["joystick"], "gmpd3"):
+    both = ["current_designs_gamepad3", "xbox_controller"]
+    assert RigConfig.open(write("pad", inputs=both)).inputs == tuple(both)
+    for wrong in (["keyboard", "keyboard"], ["gmpd3"], ["joystick"], "keyboard"):
         with pytest.raises(ValueError, match=r'"inputs": expected a list of distinct names '
-                                             r"from \['gamepad', 'gmpd3'\]"):
+                                             r"from \['current_designs_gamepad3', 'keyboard', "
+                                             r"'xbox_controller'\]"):
             RigConfig.open(write("pad", inputs=wrong))
 
 
@@ -200,7 +207,7 @@ def test_a_teams_rig_is_filed_under_the_team(tmp_path):
     {"type": "check_photodiode", "readout": "soundcard"},
     {"type": "check_photodiode", "corner": "br"},
     {"type": "check_frames", "recording_hz": 1000},
-    {"type": "check_controls", "keys": {"1": "index"}},
+    {"type": "check_controls", "controls": {"1": "index"}},
 ])
 def test_a_check_curriculum_cannot_set_what_is_the_rigs(phase):
     assert any("rig-config" in p for p in phase_problems(phase))
@@ -220,6 +227,6 @@ def test_a_wrong_rig_check_section_is_refused(values, problem):
 
 def test_a_message_is_dismissed_by_a_control_name_not_a_character():
     message = {"type": "message", "text": "hi"}
-    assert not phase_problems(message) and not phase_problems({**message, "key": "any"})
-    assert not phase_problems({**message, "key": "GMPD3_A"})
-    assert any("control name" in p for p in phase_problems({**message, "key": " "}))
+    assert not phase_problems(message) and not phase_problems({**message, "control": "any"})
+    assert not phase_problems({**message, "control": "BUTTON_A"})
+    assert any("control name" in p for p in phase_problems({**message, "control": " "}))

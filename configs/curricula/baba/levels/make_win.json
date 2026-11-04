@@ -3,7 +3,7 @@
     {
       "type": "game", "backend": "baba", "game": "env/make_win",
       "instructions": {
-        "title": "Baba Is You: make_win", "align": "left", "keys_to_dismiss": ["SPACE"],
+        "title": "Baba Is You: make_win", "align": "left", "controls_to_dismiss": ["SPACE"],
         "text": [
           "Push word blocks to rewrite the rules.",
           "Form \"X IS WIN\", then touch X to win.",
@@ -15,8 +15,8 @@
           "(press SPACE to start)"
         ]
       },
-      "keys": {"UP": 1, "RIGHT": 2, "DOWN": 3, "LEFT": 4},
-      "menu": {"key": "X", "hold": 3.0, "after": 0.0,
+      "controls": {"UP": 1, "RIGHT": 2, "DOWN": 3, "LEFT": 4},
+      "menu": {"control": "X", "hold": 3.0, "after": 0.0,
                "options": ["reset", "forfeit", "resume"],
                "move": ["UP", "DOWN"], "confirm": "SPACE"},
       "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 300.0, "fps": 15, "is_turn_based": true

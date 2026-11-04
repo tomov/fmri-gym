@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, ClassVar
 
-from ..inputs import ESCAPE, is_control
+from ..inputs import ESCAPE, is_control_of_any_input_device
 from ..menu import menu_problems
 
 #: An episode's possible outcomes: EnvAdapter.outcome's names, and the subject's own endings.
@@ -108,35 +108,36 @@ class Fixation(Phase):
 
 @dataclass(frozen=True, slots=True)
 class Message(Phase):
-    """Text on screen until its ``duration``, a key, or whichever comes first.
+    """Text on screen until its ``duration``, a press, or whichever comes first.
 
-    ``keys_to_dismiss`` (control names) ends it at a press of one of them, and
-    with a ``duration`` at whichever comes first; without them an untimed
-    message waits for the control ``key`` (``"any"``: any control).
+    ``controls_to_dismiss`` ends it at a press of one of them, and with a
+    ``duration`` at whichever comes first; without them an untimed message
+    waits for the control ``control`` (``"any"``: any control).
     """
 
     type: ClassVar[str] = "message"
     text: str
     duration: float | None
-    #: the control that dismisses an untimed message without ``keys_to_dismiss``
-    key: str
-    keys_to_dismiss: tuple[str, ...] | None
+    #: the control that dismisses an untimed message without ``controls_to_dismiss``
+    control: str
+    controls_to_dismiss: tuple[str, ...] | None
     align: str
 
     @classmethod
     def from_dict(cls, d: dict, index: int) -> Message:
-        keys = d.get("keys_to_dismiss")
+        dismiss = d.get("controls_to_dismiss")
         return cls(**cls._shared(d), text=join_text(d.get("text", "")),
-                   duration=d.get("duration"), key=d.get("key", "SPACE"),
-                   keys_to_dismiss=None if keys is None else tuple(keys),
+                   duration=d.get("duration"), control=d.get("control", "SPACE"),
+                   controls_to_dismiss=None if dismiss is None else tuple(dismiss),
                    align=d.get("align", "center"))
 
     @staticmethod
     def problems(d: dict) -> list[str]:
-        out = _dismiss_problems("keys_to_dismiss", d.get("keys_to_dismiss"))
-        key = d.get("key", "SPACE")
-        if key != "any" and not _is_pressable(key):
-            out.append(f'key: expected a control name ({_NAMES_ARE}) or "any", got {key!r}')
+        out = _dismiss_problems("controls_to_dismiss", d.get("controls_to_dismiss"))
+        control = d.get("control", "SPACE")
+        if control != "any" and not _is_possible_on_any_input_device(control):
+            out.append(f'control: expected a control name ({_NAMES_ARE}) or "any", '
+                       f"got {control!r}")
         if d.get("align", "center") not in ("center", "left"):
             out.append(f"align: expected 'center' or 'left', got {d['align']!r}")
         return out + _positive_problems(d, ("duration",))
@@ -150,40 +151,40 @@ class Instructions:
     text: str
     align: str
     duration: float | None
-    keys_to_dismiss: tuple[str, ...] | None
+    controls_to_dismiss: tuple[str, ...] | None
 
     @classmethod
     def from_dict(cls, d: dict) -> Instructions:
-        keys = d.get("keys_to_dismiss")
+        dismiss = d.get("controls_to_dismiss")
         return cls(title=d["title"], text=join_text(d.get("text", "")),
                    align=d.get("align", "center"), duration=d.get("duration"),
-                   keys_to_dismiss=None if keys is None else tuple(keys))
+                   controls_to_dismiss=None if dismiss is None else tuple(dismiss))
 
     def message(self, resumed: bool) -> Message:
         """As the message shown, its heading marking a block a run carries on."""
         heading = f"{'Resuming:' if resumed else 'Starting:'} {self.title}"
         return Message(spec={}, include_on_resume=False, text=f"{heading}\n\n{self.text}",
-                       duration=self.duration, key="SPACE", keys_to_dismiss=self.keys_to_dismiss,
-                       align=self.align)
+                       duration=self.duration, control="SPACE",
+                       controls_to_dismiss=self.controls_to_dismiss, align=self.align)
 
     @staticmethod
     def problems(spec: Any) -> list[str]:
         if not isinstance(spec, dict):
             return [f"instructions: expected an object, got {spec!r}"]
         out = []
-        unknown = set(spec) - {"title", "text", "align", "duration", "keys_to_dismiss"}
+        unknown = set(spec) - {"title", "text", "align", "duration", "controls_to_dismiss"}
         if unknown:
             out.append(f"instructions: unknown field(s) {sorted(unknown)}; the fields are title, "
-                       "text, align, duration and keys_to_dismiss")
+                       "text, align, duration and controls_to_dismiss")
         if not isinstance(spec.get("title"), str) or not spec["title"]:
             out.append("instructions: title: missing (the screen's heading names the game)")
         if spec.get("align", "center") not in ("center", "left"):
             out.append(f"instructions: align: expected 'center' or 'left', got {spec['align']!r}")
         out += [f"instructions: {p}" for p in _positive_problems(spec, ("duration",))]
-        keys = spec.get("keys_to_dismiss")
-        out.extend(_dismiss_problems("instructions: keys_to_dismiss", keys))
-        if spec.get("duration") is None and keys is None:
-            out.append("instructions: give a duration, keys_to_dismiss, or both")
+        dismiss = spec.get("controls_to_dismiss")
+        out.extend(_dismiss_problems("instructions: controls_to_dismiss", dismiss))
+        if spec.get("duration") is None and dismiss is None:
+            out.append("instructions: give a duration, controls_to_dismiss, or both")
         return out
 
 
@@ -194,12 +195,12 @@ class Survey(Phase):
     type: ClassVar[str] = "survey"
     questions: tuple[str, ...]
     #: one control per point of the scale, from its lowest
-    keys: tuple[str, ...]
+    controls: tuple[str, ...]
 
     @classmethod
     def from_dict(cls, d: dict, index: int) -> Survey:
         return cls(**cls._shared(d), questions=tuple(d.get("questions", ())),
-                   keys=tuple(d.get("keys", [str(i) for i in range(1, 8)])))
+                   controls=tuple(d.get("controls", [str(i) for i in range(1, 8)])))
 
     @staticmethod
     def problems(d: dict) -> list[str]:
@@ -207,12 +208,13 @@ class Survey(Phase):
         out = [] if isinstance(questions, list) and all(isinstance(q, str) for q in questions) \
             else [f"questions: expected a list of questions, got {questions!r}"]
         if "n_points" in d:
-            out.append('"n_points" is gone: list one control per point under "keys"')
-        keys = d.get("keys", ["1", "2"])
-        if not (isinstance(keys, list) and len(keys) >= 2 and len(set(map(str, keys))) == len(keys)
-                and all(_is_pressable(k) for k in keys)):
-            out.append(f"keys: expected a list of two or more distinct control names, one per "
-                       f"point from the lowest (names {_NAMES_ARE}), got {keys!r}")
+            out.append('"n_points" is gone: list one control per point under "controls"')
+        controls = d.get("controls", ["1", "2"])
+        if not (isinstance(controls, list) and len(controls) >= 2
+                and len(set(map(str, controls))) == len(controls)
+                and all(_is_possible_on_any_input_device(c) for c in controls)):
+            out.append(f"controls: expected a list of two or more distinct control names, one "
+                       f"per point from the lowest (names {_NAMES_ARE}), got {controls!r}")
         return out
 
 
@@ -220,9 +222,9 @@ class Survey(Phase):
 class GamePhase(Phase):
     """A game block: the env it plays, how long, at what rate, and what ends it.
 
-    The keys a block maps (``keys``) and its menu are its spec's, read by the
-    adapter's keymap and :class:`~fmri_gym.menu.Menu`; the backend's own keys
-    stay in ``spec`` for the adapter.
+    The controls a block maps (``controls``) and its menu are its spec's, read
+    by the adapter's keymap and :class:`~fmri_gym.menu.Menu`; the backend's own
+    keys stay in ``spec`` for the adapter.
     """
 
     type: ClassVar[str] = "game"
@@ -265,13 +267,6 @@ class GamePhase(Phase):
     #: HUD's clock keeps time; that redraw is pixels only (no step, no log row,
     #: no trigger, no sound).
     is_turn_based: bool
-    #: Real-time blocks poll HELD keys, so a press that starts and ends
-    #: between two frames is never seen -- at a grid world's few frames per
-    #: second that loses most taps. ``has_latched_keys`` lets a fresh keydown win
-    #: instead, falling back to the held-key poll (so holding a key still
-    #: repeats). Off by default: backends whose actions are key COMBINATIONS
-    #: must keep polling.
-    has_latched_keys: bool
     #: the game has sound to play, and the block plays it (with the rig's own
     #: ``has_audio``); muting never changes what is logged
     has_audio: bool
@@ -306,7 +301,6 @@ class GamePhase(Phase):
             show_outcome_duration=float(d.get("show_outcome_duration", 2.0)),
             seed=d.get("seed"), state_stride=max(1, int(d.get("state_stride", 1))),
             is_turn_based=d.get("is_turn_based", False),
-            has_latched_keys=d.get("has_latched_keys", False),
             has_audio=d.get("has_audio", True),
             fps=d["fps"],
             instructions=None if instructions is None else Instructions.from_dict(instructions),
@@ -319,8 +313,9 @@ class GamePhase(Phase):
             out.append("game: missing env id")
         if d.get("mode", "duration") not in [mode.value for mode in BlockMode]:
             out.append(f"mode: expected 'duration' or 'episode', got {d.get('mode')!r}")
-        out += _fps_problems(d) + _keys_problems(d) + _advance_problems(d) + _rewind_problems(d)
-        out += _bool_problems(d, ("is_turn_based", "has_latched_keys", "has_audio"))
+        out += (_fps_problems(d) + _controls_problems(d) + _advance_problems(d)
+                + _rewind_problems(d))
+        out += _bool_problems(d, ("is_turn_based", "has_audio"))
         seconds = d.get("show_outcome_duration", 0)
         if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or seconds < 0:
             out.append(f"show_outcome_duration: expected seconds >= 0, got {seconds!r}")
@@ -427,7 +422,7 @@ class CheckControls(CheckPhase):
         if "pad_reps" in d:
             out.append("pad_reps: the calibration asks for each control until it comes twice "
                        "in a row, with no count to set; remove it")
-        return out + _rig_owned(d, ("keys",))
+        return out + _rig_owned(d, ("controls", "keys"))
 
 
 @dataclass(frozen=True, slots=True)
@@ -517,36 +512,38 @@ _NAMES_ARE = ("as the keyboard's in fmri_gym/inputs/keyboard.py and each device'
               "fmri_gym/inputs/<device>.py; ESCAPE quits the run")
 
 
-def _is_pressable(name: Any) -> bool:
+def _is_possible_on_any_input_device(name: Any) -> bool:
     """Whether a curriculum may map ``name``: a control of some device, not the run's quit."""
-    return isinstance(name, str) and is_control(name) and name != ESCAPE
+    return isinstance(name, str) and is_control_of_any_input_device(name) and name != ESCAPE
 
 
-def _dismiss_problems(where: str, keys: Any) -> list[str]:
-    """``keys_to_dismiss``, if given: a non-empty list of control names."""
-    if keys is None or (isinstance(keys, list) and keys and all(map(_is_pressable, keys))):
+def _dismiss_problems(where: str, controls: Any) -> list[str]:
+    """``controls_to_dismiss``, if given: a non-empty list of control names."""
+    if controls is None or (isinstance(controls, list) and controls
+                            and all(map(_is_possible_on_any_input_device, controls))):
         return []
-    return [f"{where}: expected a list of control names ({_NAMES_ARE}), got {keys!r}"]
+    return [f"{where}: expected a list of control names ({_NAMES_ARE}), got {controls!r}"]
 
 
-def _keys_problems(d: dict) -> list[str]:
-    """``keys`` is required, and each name in it must be a control that can be pressed.
+def _controls_problems(d: dict) -> list[str]:
+    """``controls`` is required, and each name in it must be a control of some device.
 
     There is no default map, so the file states it in full. A name that is no
     control of any device can never be pressed, and the binding would be dead
-    without a word; ``""`` is the no-key action. Whether the rig has the device
-    is the run's check (:mod:`fmri_gym.config.run`); whether the values fit the
-    env's action space is checked when the env is built (:mod:`fmri_gym.adapters.keymap`).
+    without a word; ``""`` is the no-control action. Whether the rig has the
+    device is the run's check (:mod:`fmri_gym.config.run`); whether the values
+    fit the env's action space is checked when the env is built
+    (:mod:`fmri_gym.adapters.keymap`).
     """
-    keys = d.get("keys")
-    if not isinstance(keys, dict) or not keys:
-        return ['keys: missing; map each control to the env action it sends, e.g. {"": 0, '
+    controls = d.get("controls")
+    if not isinstance(controls, dict) or not controls:
+        return ['controls: missing; map each control to the env action it sends, e.g. {"": 0, '
                 '"LEFT": 3, "RIGHT": 2, "UP+SPACE": 5} ("" is nothing held; names '
                 f"{_NAMES_ARE}; there is no default map)"]
-    unknown = sorted({k for combo in keys if combo for k in combo.split("+")
-                      if not _is_pressable(k)})
+    unknown = sorted({c for combo in controls if combo for c in combo.split("+")
+                      if not _is_possible_on_any_input_device(c)})
     if unknown:
-        return [f"keys: {unknown} are not control names; use those {_NAMES_ARE}"]
+        return [f"controls: {unknown} are not control names; use those {_NAMES_ARE}"]
     return []
 
 

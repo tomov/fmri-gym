@@ -13,7 +13,7 @@
   },
   "has_audio": true,
   "data_root": "data",
-  "inputs": ["gmpd3"],
+  "inputs": ["keyboard", "current_designs_gamepad3"],
   "triggers": {
     "sync": {
       "mode": "none"

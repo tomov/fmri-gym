@@ -1,4 +1,4 @@
 {
   "type": "game", "backend": "gym", "game": "Acrobot-v1",
-  "fps": 30, "keys": {"": 1, "LEFT": 0, "RIGHT": 2}
+  "fps": 30, "controls": {"": 1, "LEFT": 0, "RIGHT": 2}
 }

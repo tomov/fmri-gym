@@ -1,23 +1,24 @@
-"""The seam between the input devices and the run: named controls, their events, the devices.
+"""The seam between the input devices and the run: named controls, their edges, one device.
 
-Every button, key, axis and stick direction a participant can touch has one
-name, unique across devices, and a curriculum names it as it is written here
-(``"SPACE"``, ``"GMPD3_A"``, ``"CONTROLLER_LEFTSTICK_UP"``). A device class
-lists its names at the top of its own file and turns the pygame events that
-are its own into :class:`InputEvent` edges; :class:`InputDevices` is a run's
-devices together, itself a device.
+Every key, button and stick direction a participant can touch has one name,
+unique across devices, and a curriculum names it as it is written here
+(``"SPACE"``, ``"BUTTON_A"``, ``"LEFT_STICK_UP"``). A device lists its names at
+the top of its own file, and its :meth:`InputDevice.handle` turns the pygame
+events that are its own into :class:`InputEvent` edges; it never reads pygame's
+queue itself. As in a game engine, a control is read two ways: an edge the frame
+it happens, and held state (:meth:`InputDevice.held`) at the tick. A run's
+devices together are one :class:`InputDevices`, which is itself a device.
 """
 
 from __future__ import annotations
 
-import time
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import ClassVar, NamedTuple
 
 import pygame
 
-#: The name :class:`InputDevices` gives the window's close button.
+#: The name the run's inputs give the window's close button.
 QUIT = "QUIT"
 
 
@@ -36,103 +37,114 @@ class InputEvent(NamedTuple):
 
 
 class InputDevice(ABC):
-    """One input device: the names of its controls, and what it held at its last events."""
+    """One input device: its controls, and which of them it holds.
+
+    A subclass names itself (:attr:`name`), lists its controls (:attr:`CONTROLS`)
+    and presses and releases them with :meth:`_press` from its :meth:`handle`.
+    """
 
     #: the name a rig file lists it by (``"inputs"``)
     name: ClassVar[str]
-    #: every control the class can have, known before any device is opened
+    #: every control the class has, known before any device is opened
     CONTROLS: ClassVar[frozenset[str]]
 
-    def controls(self) -> frozenset[str]:
-        """The controls this device has: :attr:`CONTROLS`, or fewer."""
-        return self.CONTROLS
+    def __init__(self) -> None:
+        self._held: set[str] = set()
 
-    def devices(self) -> tuple[InputDevice, ...]:
-        """The single devices this one is: itself."""
-        return (self,)
+    @classmethod
+    @abstractmethod
+    def open(cls) -> InputDevice:
+        """The device, ready to read.
 
-    def poll(self) -> list[InputEvent]:
-        """Take every event off pygame's queue and :meth:`handle` it.
-
-        A queue left to fill drops new events, key presses included, so
-        nothing is left there.
+        :raises ValueError: when it is not plugged in.
         """
-        events = pygame.event.get()
-        return self.handle(events, time.perf_counter())
 
     @abstractmethod
     def handle(self, events: list[pygame.event.Event], now: float) -> list[InputEvent]:
-        """The edges in ``events`` that are this device's, in order; the rest it ignores.
+        """The edges ``events`` make on this device, in order; the events of others it ignores.
 
         :param now: ``perf_counter`` when the events were taken off the queue.
         """
 
-    @abstractmethod
-    def last_held(self) -> frozenset[str]:
-        """The buttons, keys and stick directions down as of the last :meth:`handle`."""
+    def controls(self) -> frozenset[str]:
+        """Every control this device has."""
+        return self.CONTROLS
 
-    def axes(self) -> dict[str, float]:
-        """Its axes now, by name, raw, -1..1; none for a device without."""
-        return {}
+    def held(self) -> frozenset[str]:
+        """The controls down as of the last :meth:`handle`."""
+        return frozenset(self._held)
 
-    def require(self, needed: frozenset[str]) -> None:
-        """Refuse a run that needs, of this device, what it cannot give.
+    def require_calibrated_sticks_for(self, required_controls: frozenset[str]) -> None:
+        """Refuse to go on when a stick direction in ``required_controls`` has no calibration.
 
-        :param needed: control names a curriculum asks for, of every device.
-        :raises ValueError: by default, never.
+        A device without sticks has nothing to refuse.
+
+        :raises CalibrationError: naming the stick, and how to calibrate it.
         """
 
-    @abstractmethod
     def status(self) -> str:
-        """One line: which device, and how it is read."""
+        """One line for the console and the manifest: the device, and how it is read."""
+        return self.name
 
     def close(self) -> None:
         """Let go of the device."""
 
+    def _press(self, name: str, down: bool) -> list[InputEvent]:
+        """Press or release ``name``: its edge, or nothing when it already is so."""
+        if down == (name in self._held):
+            return []
+        (self._held.add if down else self._held.discard)(name)
+        return [InputEvent(name, Edge.DOWN if down else Edge.UP)]
+
 
 class InputDevices(InputDevice):
-    """A run's input devices together, as one: the keyboard, and those its rig lists."""
+    """Several input devices read as one: a run's keyboard and controllers together.
+
+    Its edges are each device's, in the devices' order, after the window's
+    close button as :data:`QUIT`.
+    """
 
     name = "inputs"
+    CONTROLS = frozenset()
 
-    def __init__(self, devices: list[InputDevice], ignored: list[str] = ()) -> None:
-        """Hold the devices a run reads.
+    def __init__(self, devices: list[InputDevice], ignored_joysticks: list[str] = ()) -> None:
+        """Read ``devices`` together.
 
-        :param devices: the devices, the keyboard first.
-        :param ignored: joysticks plugged in that no device was opened on, by name.
+        :param ignored_joysticks: joysticks plugged in that no device was opened on, by
+            name, for :meth:`status`.
         """
-        self._devices = tuple(devices)
-        self.ignored = tuple(ignored)
+        super().__init__()
+        self.devices = tuple(devices)
+        self.ignored_joysticks = tuple(ignored_joysticks)
 
-    def devices(self) -> tuple[InputDevice, ...]:
-        return self._devices
+    @classmethod
+    def open(cls) -> InputDevices:
+        """Nothing: the devices are opened one by one (:func:`fmri_gym.inputs.open_input_devices`)."""
+        return cls([])
 
     def handle(self, events: list[pygame.event.Event], now: float) -> list[InputEvent]:
-        """Every device's edges, device by device; the window closing as :data:`QUIT`."""
         out = [InputEvent(QUIT, Edge.DOWN) for e in events if e.type == pygame.QUIT]
-        for device in self._devices:
+        for device in self.devices:
             out += device.handle(events, now)
         return out
 
-    def last_held(self) -> frozenset[str]:
-        return frozenset().union(*(d.last_held() for d in self._devices))
-
-    def axes(self) -> dict[str, float]:
-        return {k: v for d in self._devices for k, v in d.axes().items()}
-
     def controls(self) -> frozenset[str]:
-        return frozenset().union(*(d.controls() for d in self._devices))
+        return frozenset().union(*(d.controls() for d in self.devices))
 
-    def require(self, needed: frozenset[str]) -> None:
-        for device in self._devices:
-            device.require(needed)
+    def held(self) -> frozenset[str]:
+        return frozenset().union(*(d.held() for d in self.devices))
+
+    def require_calibrated_sticks_for(self, required_controls: frozenset[str]) -> None:
+        for device in self.devices:
+            device.require_calibrated_sticks_for(required_controls)
 
     def status(self) -> str:
-        """The devices' lines, and the joysticks ignored."""
-        lines = [d.status() for d in self._devices]
-        lines += [f"IGNORED {name!r}: not in the rig's \"inputs\"" for name in self.ignored]
+        """Each device's line, and the joysticks ignored."""
+        lines = [d.status() for d in self.devices]
+        lines += [f"IGNORED {name!r}: not in the rig's \"inputs\""
+                  for name in self.ignored_joysticks]
         return "; ".join(lines)
 
     def close(self) -> None:
-        for device in self._devices:
+        for device in self.devices:
             device.close()

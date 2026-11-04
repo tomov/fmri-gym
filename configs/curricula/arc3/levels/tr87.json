@@ -16,7 +16,7 @@
           "(press SPACE to start)"
         ]
       },
-      "keys": {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3}
+      "controls": {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3}
     }
   ]
 }

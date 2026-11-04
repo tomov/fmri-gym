@@ -1,7 +1,7 @@
 {
   "type": "game", "backend": "aigamestore",
   "instructions": {
-    "align": "left", "keys_to_dismiss": ["SPACE"],
+    "align": "left", "controls_to_dismiss": ["SPACE"],
     "text": [
       "Sort fluids into matching tubes.",
       "Pour until every tube is uniform (or empty).",
@@ -14,7 +14,7 @@
       "(press SPACE to start)"
     ]
   },
-  "keys": {"LEFT": 0, "RIGHT": 1, "SPACE": 2, "Z": 3},
+  "controls": {"LEFT": 0, "RIGHT": 1, "SPACE": 2, "Z": 3},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 120.0,
   "fps": 30, "frame_skip": 2
 }

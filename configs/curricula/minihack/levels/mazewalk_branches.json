@@ -3,7 +3,7 @@
     {
       "type": "game", "backend": "minihack", "game": "minihack_levels:MiniHack-MazeWalk-Branches-v0",
       "instructions": {
-        "title": "MazeWalk: Branches", "align": "left", "keys_to_dismiss": ["SPACE"],
+        "title": "MazeWalk: Branches", "align": "left", "controls_to_dismiss": ["SPACE"],
         "text": [
           "Explore the maze and find the staircase.",
           "The view follows you. Remember paths you have tried.",
@@ -14,8 +14,8 @@
           "Press SPACE to start."
         ]
       },
-      "keys": {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3},
-      "menu": {"key": "X", "hold": 1.5, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["UP", "DOWN"], "confirm": "SPACE"},
+      "controls": {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3},
+      "menu": {"control": "X", "hold": 1.5, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["UP", "DOWN"], "confirm": "SPACE"},
       "seed": 0, "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 900, "fps": 15, "is_turn_based": true
     }
   ]

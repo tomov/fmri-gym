@@ -14,8 +14,9 @@ and never touches env.unwrapped.
 Recording-device concerns (waiting for or sending the scanner start, trigger
 codes for MEG/EEG) go through :mod:`fmri_gym.triggers`; with no ``triggers``
 config the loop behaves as the fMRI default and sends nothing. What the
-participant presses comes through the run's :class:`~fmri_gym.inputs.InputDevice`,
-the one reader of pygame's event queue, as named controls.
+participant presses comes through the run's :class:`~fmri_gym.inputs.InputDevice`
+as named controls; :func:`read_input_events`, here, is the one reader of
+pygame's event queue.
 
 A rig may give every run a fixation cross after the trigger and one at its end
 (its ``start_fixation`` and ``end_fixation``), the modality's baseline: for
@@ -32,7 +33,7 @@ import math
 import sys
 import time
 from collections import Counter, deque
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Collection, Iterator
 from dataclasses import asdict, dataclass, replace
 from functools import partial
 from typing import TYPE_CHECKING, Any
@@ -48,7 +49,7 @@ from .config.phases import (CHECK_PHASES, BlockMode, CheckControls, Fixation, Ga
                              Phase, Survey)
 from .config.run import RunConfig
 from .display import Display, check_monitor
-from .inputs import ESCAPE, QUIT, Edge, InputDevice, InputEvent, open_inputs
+from .inputs import ESCAPE, QUIT, Edge, InputDevice, InputEvent, open_input_devices
 from .menu import Menu
 from .logging import Logger
 from .triggers import Triggers
@@ -132,12 +133,21 @@ def _is_quit(event: InputEvent) -> bool:
     return event.edge is Edge.DOWN and event.name in (QUIT, ESCAPE)
 
 
+def read_input_events(inputs: InputDevice) -> list[InputEvent]:
+    """Take every event off pygame's queue and hand it to ``inputs``: the edges they make.
+
+    A queue left to fill drops new events, key presses included, so nothing is
+    left there; the window's close button comes back as :data:`QUIT`.
+    """
+    return inputs.handle(pygame.event.get(), time.perf_counter())
+
+
 def _check_quit(inputs: InputDevice) -> bool:
     """Read the presses waiting and report whether the user requested quit.
 
     :return: ``True`` if the window was closed or ESC was pressed.
     """
-    return any(_is_quit(event) for event in inputs.poll())
+    return any(_is_quit(event) for event in read_input_events(inputs))
 
 
 def _poll_keys_until(
@@ -146,77 +156,68 @@ def _poll_keys_until(
     deadline: float,
     clock: Clock,
     logger: Logger,
-    key_to_action: dict | None = None,
     menu: Menu | None = None,
-    latch: bool = False,
+    stop_on: Collection[str] = (),
     redraw: Callable[[], float] | None = None,
-) -> tuple[object | None, bool]:
-    """Poll the inputs until ``deadline``, logging every press/release.
+) -> tuple[list[str], bool]:
+    """Poll the inputs until ``deadline``, logging every press and release.
 
     Replaces a plain sleep between frames: events are time-stamped on arrival
     -- to about a millisecond, or to one refresh when the display is
     vsync-locked and :meth:`Display.idle` re-presents the frame instead of
-    sleeping. In turn-based play (``key_to_action`` given) the wait ends at
-    the first mapped keydown so the step happens then, not at the tick.
-    ``latch`` is the real-time counterpart: the keydown is remembered but the
-    wait still runs to the tick, so the frame period is what it says it is.
-    The wait also ends the moment the block's menu is armed (its key held long
-    enough), which the caller reads off ``menu.pending``.
+    sleeping. The controls pressed meanwhile are returned, so a tap shorter
+    than the wait still counts for the frame. In turn-based play (``stop_on``
+    given) the wait ends at the first press of one of them, so the step happens
+    then, not at the tick. The wait also ends the moment the block's menu is
+    armed (its key held long enough), which the caller reads off ``menu.pending``.
 
     :param inputs: the run's input devices.
     :param display: the display, idled between polls.
     :param deadline: ``perf_counter`` at which to stop waiting.
     :param clock: the run's clock, for the log.
     :param logger: the run's logger.
-    :param key_to_action: turn-based or latched: map of single control names to
-        env actions.
     :param menu: the block's :class:`~.menu.Menu`, if the phase has one.
-    :param latch: keep waiting after a mapped keydown and return the last one
-        seen, instead of ending the wait at the first.
+    :param stop_on: control names a press of which ends the wait.
     :param redraw: called every :data:`HUD_REDRAW_S` while waiting, for a
         wait long enough that the screen would otherwise go stale. It
         redraws; it must not step, log or trigger.
-    :return: ``(action_or_None, user_quit)``; ``action`` is set only when
-        ``key_to_action`` is given, ``user_quit`` on window close / ESC.
+    :return: ``(pressed, user_quit)``: the controls pressed, in order, and
+        whether the window was closed or ESC pressed.
     """
-    latched_action = None
+    pressed: list[str] = []
     next_redraw = time.perf_counter() + HUD_REDRAW_S
     while True:
         if menu is not None and menu.armed():
-            return None, False
-        for name, edge in inputs.poll():
+            return pressed, False
+        for name, edge in read_input_events(inputs):
             down = edge is Edge.DOWN
             if name in (QUIT, ESCAPE):
                 if down:
-                    return None, True
+                    return pressed, True
                 continue
             logger.log(type="input_event", run_time=clock.run_time(), name=name, down=down)
-            if down and key_to_action and name in key_to_action:
-                if not latch:
-                    return key_to_action[name], False
-                # TODO: find out whether every real-time game wants this, not
-                # only the slow ones that asked for it -- a press dropped
-                # between two frames is a lost action at any fps, and if it is
-                # general, latching stops being a phase flag and becomes what
-                # the loop does.
-                latched_action = key_to_action[name]
+            if not down:
+                continue
+            pressed.append(name)
+            if name in stop_on:
+                return pressed, False
         if time.perf_counter() >= deadline:
-            return latched_action, False
+            return pressed, False
         if redraw is not None and time.perf_counter() >= next_redraw:
             redraw()
             next_redraw = time.perf_counter() + HUD_REDRAW_S
         display.idle(deadline)
 
 
-def _wait_for_key(
-    inputs: InputDevice, display: Display, key: str, dummy_trigger: bool = False,
+def _wait_for_control(
+    inputs: InputDevice, display: Display, control: str, dummy_trigger: bool = False,
     until: float = math.inf
 ) -> None:
-    """Block until the control ``key`` is pressed (or briefly sleep in dummy mode).
+    """Block until ``control`` is pressed (or briefly sleep in dummy mode).
 
     :param inputs: the run's input devices.
     :param display: the display, idled between polls (see :meth:`Display.idle`).
-    :param key: the control name that unblocks the wait, or ``"any"`` to
+    :param control: the control name that unblocks the wait, or ``"any"`` to
         accept every control (a self-paced "press any key" screen).
     :param dummy_trigger: if ``True``, sleep briefly and return without waiting.
     :param until: ``perf_counter`` at which to stop waiting regardless.
@@ -226,10 +227,10 @@ def _wait_for_key(
         time.sleep(0.05)
         return
     while time.perf_counter() < until:
-        for event in inputs.poll():
+        for event in read_input_events(inputs):
             if _is_quit(event):
                 raise KeyboardInterrupt
-            if event.edge is Edge.DOWN and key in ("any", event.name):
+            if event.edge is Edge.DOWN and control in ("any", event.name):
                 return
         display.idle(time.perf_counter() + 0.005, poll=0.005)
 
@@ -251,8 +252,8 @@ def _wait_for_duration(inputs: InputDevice, display: Display, duration: float,
         display.idle(end, poll=0.005)
 
 
-def _wait_for_keys(inputs: InputDevice, display: Display, names: list[str],
-                   deadline: float) -> str | None:
+def _wait_for_controls(inputs: InputDevice, display: Display, names: list[str],
+                       deadline: float) -> str | None:
     """Block until one of the controls ``names`` is pressed, or ``deadline``.
 
     :param inputs: the run's input devices.
@@ -263,7 +264,7 @@ def _wait_for_keys(inputs: InputDevice, display: Display, names: list[str],
     :raises KeyboardInterrupt: on window close or ESC.
     """
     while time.perf_counter() < deadline:
-        for event in inputs.poll():
+        for event in read_input_events(inputs):
             if _is_quit(event):
                 raise KeyboardInterrupt
             if event.edge is Edge.DOWN and event.name in names:
@@ -436,8 +437,8 @@ class Run:
         print(f"audio: {audio.status()}", file=sys.stderr)
         makes_calibration = any(isinstance(p, CheckControls) and p.calibrates
                                 for p in config.curriculum.phases)
-        inputs = open_inputs(config.rig.inputs, needed=frozenset() if makes_calibration
-                             else config.needed_controls())
+        inputs = open_input_devices(config.rig.inputs, frozenset() if makes_calibration
+                                    else config.required_controls())
         print(f"inputs: {inputs.status()}", file=sys.stderr)
         screen = config.rig.screen
         display = Display(size=screen.size, fullscreen=screen.is_fullscreen,
@@ -472,12 +473,12 @@ class Run:
             "(experimenter: press SPACE when ready)\n\n"
             f"triggers: {self.triggers.status()}\n"
             f"audio: {self.audio.status()}")
-        _wait_for_key(self.inputs, self.display, EXPERIMENTER_KEY,
+        _wait_for_control(self.inputs, self.display, EXPERIMENTER_KEY,
                       dummy_trigger=self.config.dummy_trigger)
         if self.sync.mode == "wait":
             self.display.draw_text(f"Waiting for the scanner...\n\n(its trigger key: "
                                    f"{self.sync.key!r})")
-            _wait_for_key(self.inputs, self.display, self.sync.key,
+            _wait_for_control(self.inputs, self.display, self.sync.key,
                           dummy_trigger=self.config.dummy_trigger)
         elif self.sync.mode == "send":
             self.display.draw_text("Starting the recording...")
@@ -515,15 +516,15 @@ class Run:
         duration = message.duration
         text = message.text
         onset = self.clock.from_perf(self.display.draw_text(text, align=message.align))
-        if message.keys_to_dismiss is not None:
+        if message.controls_to_dismiss is not None:
             deadline = time.perf_counter() + (math.inf if duration is None else duration)
             if self.config.dummy_trigger:      # a test run skips the waits for a key
                 deadline = min(deadline, time.perf_counter() + 0.05)
-            _wait_for_keys(self.inputs, self.display, list(message.keys_to_dismiss),
-                           min(deadline, self._run_end))
+            _wait_for_controls(self.inputs, self.display, list(message.controls_to_dismiss),
+                               min(deadline, self._run_end))
         elif duration is None:
-            _wait_for_key(self.inputs, self.display, message.key,
-                          dummy_trigger=self.config.dummy_trigger, until=self._run_end)
+            _wait_for_control(self.inputs, self.display, message.control,
+                              dummy_trigger=self.config.dummy_trigger, until=self._run_end)
         else:
             _wait_for_duration(self.inputs, self.display, duration, until=self._run_end)
         return {"text": text, "onset": onset, "offset": self.clock.run_time()}
@@ -548,17 +549,17 @@ class Run:
 
         :raises KeyboardInterrupt: on window close or ESC.
         """
-        keys = list(phase.keys)
-        width = max(len(str(len(keys))), *map(len, keys))
-        points = "  ".join(f"{i:^{width}}" for i in range(1, len(keys) + 1))
-        controls = "  ".join(f"{k:^{width}}" for k in keys)
-        is_digits = keys == [str(i) for i in range(1, len(keys) + 1)]
-        scale = points if is_digits else f"{points}\n{controls}"
+        controls = list(phase.controls)
+        width = max(len(str(len(controls))), *map(len, controls))
+        points = "  ".join(f"{i:^{width}}" for i in range(1, len(controls) + 1))
+        names = "  ".join(f"{c:^{width}}" for c in controls)
+        is_digits = controls == [str(i) for i in range(1, len(controls) + 1)]
+        scale = points if is_digits else f"{points}\n{names}"
         for q in phase.questions:
             self.display.draw_text(f"{q}\n\nDisagree      Agree\n{scale}")
-            key = _wait_for_keys(self.inputs, self.display, keys, math.inf)
-            responses.append({"question": q, "value": keys.index(key) + 1, "key": key,
-                              "run_time": self.clock.run_time()})
+            control = _wait_for_controls(self.inputs, self.display, controls, math.inf)
+            responses.append({"question": q, "value": controls.index(control) + 1,
+                              "key": control, "run_time": self.clock.run_time()})
 
     def _episode(
         self,
@@ -577,10 +578,8 @@ class Run:
         :param adapter: wrapped env for reset/step/render/sound/capture.
         :param game_phase: the phase's settings; read here are
             ``is_turn_based`` (advance only on mapped keydowns, redrawing the
-            HUD through the wait), ``has_latched_keys`` (real-time: let a fresh
-            keydown win over held keys), ``frame_period``, ``state_stride``,
-            ``has_audio`` (with the rig's) and
-            ``show_outcome_duration``.
+            HUD through the wait), ``frame_period``, ``state_stride``,
+            ``has_audio`` (with the rig's) and ``show_outcome_duration``.
         :param seed: RNG seed for this episode's ``reset``.
         :param episode_id: index of this episode within the game block.
         :param block_end: ``perf_counter`` deadline for the game block.
@@ -602,8 +601,7 @@ class Run:
         n_pacing_resets = 0
         ep_frame = 0
         dt = game_phase.frame_period
-        key_to_action = (adapter.keymap.turn_actions()
-                         if game_phase.is_turn_based or game_phase.has_latched_keys else None)
+        key_to_action = adapter.keymap.turn_actions() if game_phase.is_turn_based else {}
 
         # A turn-based wait ends only at a press, and the HUD is drawn only
         # by _show: without this its clock would stop at the last press.
@@ -643,16 +641,16 @@ class Run:
             # not acted on.
             waits_for_press = game_phase.is_turn_based and auto is None
             deadline = block_end if waits_for_press else next_t
-            action, user_quit = _poll_keys_until(
-                self.inputs, self.display, deadline, self.clock, self.logger,
-                key_to_action if waits_for_press else None, menu,
-                latch=game_phase.has_latched_keys and not game_phase.is_turn_based,
+            pressed, user_quit = _poll_keys_until(
+                self.inputs, self.display, deadline, self.clock, self.logger, menu,
+                stop_on=key_to_action if waits_for_press else (),
                 redraw=redraw if waits_for_press else None)
             if user_quit:
                 outcome = "quit"
                 break
             if menu is not None and menu.pending:
-                choice = menu.run(self.display, self.clock.run_time, self.logger, self.inputs)
+                choice = menu.run(self.display, self.clock.run_time, self.logger,
+                                  lambda: read_input_events(self.inputs))
                 if choice != "resume":
                     outcome = choice
                     break
@@ -660,14 +658,18 @@ class Run:
                 next_t = flip_t0 + dt
                 continue
             next_t += dt
-            if waits_for_press and action is None:
+            turn = next((k for k in pressed if k in key_to_action), None)
+            if waits_for_press and turn is None:
                 continue                        # tick ended without a press
             if auto is not None:
                 action = auto                   # the env is not taking ours
-            elif not game_phase.is_turn_based and action is None:
-                # No latched press this frame (or the phase never asked for
-                # one): the action is whatever is held down at the tick.
-                action = adapter.keymap.resolve(self.inputs.last_held())
+            elif waits_for_press:
+                action = key_to_action[turn]
+            else:
+                # As a game engine reads its keys: what is held at the tick, and
+                # what was pressed during the frame, so a tap shorter than a
+                # frame still counts for one.
+                action = adapter.keymap.resolve(self.inputs.held() | frozenset(pressed))
 
             observation, reward, terminated, truncated, info = adapter.step(action)
             auto = adapter.autoplay(info) if game_phase.is_turn_based else None
@@ -819,7 +821,7 @@ class Run:
         own_end = block_start + game_phase.duration - block_time_elapsed
         block_end = min(own_end, self._run_end)
         # The hold-a-key pause menu (reset / forfeit / resume), if the phase has one.
-        menu = Menu(spec["menu"], block_start, self.inputs.last_held) if "menu" in spec else None
+        menu = Menu(spec["menu"], block_start, self.inputs.held) if "menu" in spec else None
         episodes: list[EpisodeResult] = []
         outcome = ""
 

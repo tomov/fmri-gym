@@ -1,7 +1,7 @@
 {
   "type": "game", "backend": "baba_auto",
   "instructions": {
-    "align": "left", "keys_to_dismiss": ["GMPD3_A"],
+    "align": "left", "controls_to_dismiss": ["BUTTON_A"],
     "text": [
       "You are Baba. Push word blocks to rewrite the rules.",
       "",
@@ -16,7 +16,7 @@
       "Press A to start."
     ]
   },
-  "keys": {"GMPD3_RT": 0, "GMPD3_Y": 1, "GMPD3_A": 2, "GMPD3_X": 3, "GMPD3_B": 4},
-  "menu": {"key": "GMPD3_LT", "hold": 3.0, "after": 480.0, "options": ["reset", "forfeit", "resume"], "move": ["GMPD3_Y", "GMPD3_A"], "confirm": "GMPD3_RT"},
+  "controls": {"RIGHT_TRIGGER": 0, "BUTTON_Y": 1, "BUTTON_A": 2, "BUTTON_X": 3, "BUTTON_B": 4},
+  "menu": {"control": "LEFT_TRIGGER", "hold": 3.0, "after": 480.0, "options": ["reset", "forfeit", "resume"], "move": ["BUTTON_Y", "BUTTON_A"], "confirm": "RIGHT_TRIGGER"},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 900.0, "fps": 15, "is_turn_based": true
 }

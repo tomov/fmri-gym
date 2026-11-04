@@ -24,9 +24,9 @@ say the same thing:
 - ``"screen"``: ``{"size": "1024x768", "is_fullscreen": false, "monitor": 0,
   "has_vsync": true}``, the monitor by index (0: the first); fullscreen scales
   ``size`` to the monitor, aspect kept, at the monitor's own resolution;
-- ``"inputs"``: the input devices of the rig besides the keyboard, which is
-  always on, by the names of :data:`fmri_gym.inputs.OPTIONAL_INPUT_DEVICE_NAMES`
-  (``["gmpd3"]``); each must be plugged in when a run starts;
+- ``"inputs"``: the rig's input devices, the keyboard among them, by the names of
+  :data:`fmri_gym.inputs.INPUT_DEVICE_CLASSES_BY_NAME` (``["keyboard",
+  "current_designs_gamepad3"]``); each controller must be plugged in when a run starts;
 - ``"response_keys"``: the keys a response device types by itself (a button
   box, a fORP in a key mode), each with what it stands for, ``{"1": "index
   finger", ...}``: the rig check asks for each;
@@ -42,12 +42,12 @@ say the same thing:
 - ``"rig_check"``: what the rig check measures with (:class:`RigCheckConfig`):
   the photodiode, a microphone, the recording's rate, more frame rates.
 
-**Two kinds of keys**, never mixed. A curriculum's **game keys** (a game
-phase's ``"keys"``) are control names of the keyboard and of the rig's inputs
+**Controls and response keys**, never mixed. A curriculum's **controls** (a game
+phase's ``"controls"``) are control names of the rig's input devices
 (:mod:`fmri_gym.inputs`), mapped to the game's actions. A rig's **response
 keys** are keyboard keys a device types itself; a curriculum binds them like
-any key. What the rig check asks to press is each control of the rig's inputs
-and the response keys: what this rig's participant can press.
+any key. What the rig check asks to press is each control of the rig's
+controllers and the response keys: what this rig's participant can press.
 
 It is written by hand or in the rig form (``rig-config --rig <file>``), which a
 rig check also opens when its rig has no valid file.
@@ -62,7 +62,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from ..inputs import OPTIONAL_INPUT_DEVICE_NAMES, Keyboard
+from ..inputs import INPUT_DEVICE_CLASSES_BY_NAME, Keyboard
 from ..triggers import TriggerError, TriggerSettings
 
 MODALITIES = ("fmri", "meg", "eeg", "behav")
@@ -95,7 +95,7 @@ EXAMPLES = {
 #: the keyboard alone, the audio on, no fixation at either end.
 DEFAULTS: dict[str, Any] = {
     "screen": {"size": "1024x768", "is_fullscreen": False, "monitor": 0, "has_vsync": True},
-    "inputs": [], "has_audio": True, "data_root": "data", "start_fixation": None,
+    "inputs": ["keyboard"], "has_audio": True, "data_root": "data", "start_fixation": None,
     "end_fixation": None, "triggers": {}, "response_keys": {}, "rig_check": {},
 }
 #: Keys refused with a pointer to ``"inputs"``, which says what they would mean.
@@ -215,8 +215,8 @@ class RigConfig:
     fields: dict[str, str]
     #: the window.
     screen: ScreenConfig
-    #: the input devices besides the keyboard, by
-    #: :data:`fmri_gym.inputs.OPTIONAL_INPUT_DEVICE_NAMES` name.
+    #: the input devices, the keyboard among them, by
+    #: :data:`fmri_gym.inputs.INPUT_DEVICE_CLASSES_BY_NAME` name.
     inputs: tuple[str, ...]
     #: the keys a response device types itself -> what each stands for
     response_keys: dict[str, str]
@@ -307,7 +307,7 @@ class RigConfig:
                             if s is not None)
         return (f"{self.path} | {window} on monitor {screen.monitor}, vsync "
                 f"{'on' if screen.has_vsync else 'off'} | inputs "
-                f"{', '.join(('keyboard', *self.inputs))}"
+                f"{', '.join(self.inputs)}"
                 f" | audio {'on' if self.has_audio else 'off'} | data in {self.data_root}"
                 f"{fixations}"
                 f" | triggers {self.triggers.sync.mode}, codes over {self.triggers.backend}")
@@ -437,19 +437,18 @@ def _setting_problems(rig: dict) -> list[str]:
     out += [f'"{k}" must be seconds, 0 or more, or null for none, got {rig[k]!r}'
             for k in ("start_fixation", "end_fixation")
             if rig.get(k) is not None and not _is_seconds(rig[k])]
-    return (out + trigger_problems(rig.get("triggers", {})) + _input_problems(rig)
+    return (out + trigger_problems(rig.get("triggers", {})) + _input_device_problems(rig)
             + _response_key_problems(rig) + _rig_check_problems(rig.get("rig_check", {})))
 
 
-def _input_problems(rig: dict) -> list[str]:
-    """``inputs``: distinct names of the kinds of device a rig lists, the keyboard not among them."""
-    names = rig.get("inputs", [])
-    listed = OPTIONAL_INPUT_DEVICE_NAMES
-    if (isinstance(names, list) and all(isinstance(n, str) and n in listed for n in names)
+def _input_device_problems(rig: dict) -> list[str]:
+    """``inputs``: distinct names of the kinds of input device the rig has."""
+    names = rig.get("inputs", DEFAULTS["inputs"])
+    known = INPUT_DEVICE_CLASSES_BY_NAME
+    if (isinstance(names, list) and all(isinstance(n, str) and n in known for n in names)
             and len(set(names)) == len(names)):
         return []
-    return [f'"inputs": expected a list of distinct names from {sorted(listed)} (the keyboard '
-            f"is always on), got {names!r}"]
+    return [f'"inputs": expected a list of distinct names from {sorted(known)}, got {names!r}']
 
 
 def _response_key_problems(rig: dict) -> list[str]:

@@ -100,14 +100,13 @@ from .config import rig as rig_file
 from .config.phases import (CHECK_PHASES, CheckControls, CheckDisplay, CheckFrames, CheckPhase,
                             CheckPhotodiode, CheckTriggers, GamePhase)
 from .display import Display, is_locked
-from .inputs import ESCAPE, QUIT, Edge, InputDevice
-from .inputs.joystick import Joystick
+from .inputs import ESCAPE, QUIT, Edge, Controller, InputDevice, InputDevices
 from .inputs.keyboard import KEYCODES
 from .pad_calibration import calibrate, cue_order
 from .photodiode import (AudioRecorder, Verdict, _clicker, _light_verdict,
                          _log_clicks, _readout, _sound_verdict, run_flashes)
 from .replay import frame_arrays
-from .run import _wait_for_duration
+from .run import _wait_for_duration, read_input_events
 from .triggers import HID_DEVICES, LIFECYCLE_EVENTS, Codes, TriggerError, Triggers
 
 if TYPE_CHECKING:
@@ -407,23 +406,22 @@ def input_devices() -> list[str]:
 
 def _round_trip(inputs: InputDevice, name: str) -> bool:
     """A synthetic press of the keyboard key ``name`` comes back from ``inputs`` as ``name``."""
-    inputs.poll()
+    read_input_events(inputs)
     for kind in (pygame.KEYDOWN, pygame.KEYUP):
         pygame.event.post(pygame.event.Event(kind, key=KEYCODES[name], mod=0, unicode="",
                                              scancode=0))
-    return (name, Edge.DOWN) in inputs.poll()
+    return (name, Edge.DOWN) in read_input_events(inputs)
 
 
-def _controllers(inputs: InputDevice) -> list[Joystick]:
-    """The devices of ``inputs`` that are controllers, which have buttons and sticks."""
-    return [d for d in inputs.devices() if isinstance(d, Joystick)]
+def _controllers(inputs: InputDevices) -> list[Controller]:
+    return [d for d in inputs.devices if isinstance(d, Controller)]
 
 
-def _controls_to_ask(inputs: InputDevice) -> dict[str, str]:
+def _controls_to_ask(inputs: InputDevices) -> dict[str, str]:
     """Each control of the controllers to press, buttons then stick directions: what it is on."""
     return {c: f"on the {d.name}" for d in _controllers(inputs)
-            for c in (*cue_order(d.buttons()), *(n for s in d.sticks.values()
-                                                 for n in s.directions))}
+            for c in (*cue_order(d.BUTTON_NAMES),
+                      *(n for stick in d.sticks for n in stick.directions()))}
 
 
 def _check_controls(run: Run, phase: CheckControls, summary: dict, arrays: dict, tests: dict,
@@ -431,7 +429,7 @@ def _check_controls(run: Run, phase: CheckControls, summary: dict, arrays: dict,
     rig = run.config.rig
     keys = {**_controls_to_ask(run.inputs), **rig.response_keys}
     if not keys:
-        tests["controls"] = Verdict("not run", "this rig lists no input device and types no "
+        tests["controls"] = Verdict("not run", "this rig lists no controller and types no "
                                                "response keys (rig-config, Response devices step)")
         return
     summary["devices"] = input_devices()
@@ -460,7 +458,7 @@ def _check_controls(run: Run, phase: CheckControls, summary: dict, arrays: dict,
     tests["controls"] = Verdict("fail", "; ".join(problems)) if problems else _PASS
 
 
-def _calibrate(run: Run, phase: CheckControls, device: Joystick) -> dict[str, Any]:
+def _calibrate(run: Run, phase: CheckControls, device: Controller) -> dict[str, Any]:
     """Calibrate ``device``'s sticks before asking for any control, and read it through that.
 
     Each stick has to be measured on the rig before a threshold means anything
@@ -478,8 +476,9 @@ def _calibrate(run: Run, phase: CheckControls, device: Joystick) -> dict[str, An
     if result is None:
         return {"present": True, "device": device.device_name, "measured": False,
                 "why": "stopped before it finished; nothing written"}
-    device.use((result.path, result.calibration))
-    return {"present": True, "why": "", **result.record()}
+    for stick_name, calibration_file in result.written.items():
+        device.set_stick_calibration(device.stick(stick_name), calibration_file)
+    return {"present": True, "device": device.device_name, "why": "", **result.record()}
 
 
 def _key_problem(name: str, result: dict | None) -> str:
@@ -499,7 +498,7 @@ def _prompt(run: Run, name: str, label: str, keys: dict, done: dict, timeout: fl
     run.display.draw_text(f"Rig check: controls\n\nPress  {name}"
                           f"{f'  ({label})' if label and label != name else ''}\n\n{marks}"
                           "\n\n(ESC: skip the rest; they fail)")
-    run.inputs.poll()                       # what was pressed before the prompt
+    read_input_events(run.inputs)           # what was pressed before the prompt
     start = time.perf_counter()
     strays: list[str] = []
     while time.perf_counter() - start < timeout:
@@ -525,7 +524,7 @@ def _key_events(inputs: InputDevice, ignore: str | None) -> list[tuple[bool, str
     :raises _Skipped: on ESC or window close.
     """
     out = []
-    for name, edge in inputs.poll():
+    for name, edge in read_input_events(inputs):
         if name in (QUIT, ESCAPE) and edge is Edge.DOWN:
             raise _Skipped
         if name == ignore:
@@ -653,10 +652,10 @@ def _play_pattern(run: Run, fps: float, load: str, phase: CheckFrames,
     rate = f"{fps:g}".replace(".", "p")
     env_id = _register_pattern(f"Frames{rate}fps{'' if load == 'none' else load.upper()}")
     caption = f"Rig check: frames at {fps:g} fps" + ("" if load == "none" else f", {load} load")
-    # keys: the pattern takes no input; its one action is what a frame with no key sends.
+    # controls: the pattern takes no input; its one action is what a frame with none sends.
     game = {"type": "game", "backend": "gym", "game": env_id, "mode": "duration",
             "duration": phase.seconds, "fps": fps, "has_audio": False, "seed": 1000 + index,
-            "keys": {"": 0}, "env_kwargs": {"caption": caption}}
+            "controls": {"": 0}, "env_kwargs": {"caption": caption}}
     # The run's own game loop, not a copy: its pacing and triggers are what is measured.
     run._game(GamePhase.from_dict(game, index), index)
     entry = run.logger.manifest["phases"][-1]
@@ -1144,7 +1143,7 @@ COLUMNS: list[tuple[str, tuple[str, ...], str, str | None]] = [
      "Median time from the prompt to the press (a person's, not the device's)", "ms"),
     ("pad_device", ("rig_check", "controls", "pad", "device"),
      "The controller found, whose buttons are read as keys", None),
-    ("pad_axis_on", ("rig_check", "controls", "pad", "sticks", "left", "on"),
+    ("pad_axis_on", ("rig_check", "controls", "pad", "sticks", "LEFT_STICK", "on"),
      "Fraction of the left stick's travel that counts as pushed", None),
     ("pad_corrections", ("rig_check", "controls", "pad", "corrections"),
      "Wrong controls pressed, and asked again, while the calibration confirmed each", None),
@@ -2172,11 +2171,11 @@ def _pad_line(pad_out: dict) -> str:
     device = pad_out.get("device", "a controller")
     if not pad_out.get("measured"):
         return f"{device} plugged in, not measured: {pad_out.get('note') or pad_out.get('why')}."
-    sticks = "; ".join(f"{name} stick on past {s['on']:.2f} of its travel and off under "
-                       f"{s['off']:.2f}" for name, s in pad_out["sticks"].items())
+    sticks = "; ".join(f"{name} on past {s['on']:.2f} of its travel and off under {s['off']:.2f}"
+                       f" (written to {s['config']})" for name, s in pad_out["sticks"].items())
     return (f"{device} measured: {sticks or 'no stick'}; {pad_out['confirmed']} controls "
-            f"confirmed, {pad_out['corrections']} wrong presses asked again. Written to "
-            f"{pad_out['config']}, and every run on this rig with it reads it.")
+            f"confirmed, {pad_out['corrections']} wrong presses asked again. Every run on this "
+            "rig with it reads what was written.")
 
 
 def _html_photodiode(m: dict, folder: str) -> str:

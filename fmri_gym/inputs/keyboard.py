@@ -1,6 +1,6 @@
 """The keyboard: every key a curriculum may name, by pygame's constant without its ``K_``.
 
-Always on, whatever the rig lists. ``ESCAPE`` is a control but no curriculum's:
+A rig lists it like any device. ``ESCAPE`` is a control but no curriculum's:
 it ends a run. What it holds is read from the key events it handles, so a press
 posted to the queue (a test, the rig check) is held like a typed one.
 """
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pygame
 
-from .base import Edge, InputDevice, InputEvent
+from .base import InputDevice, InputEvent
 
 # pygame constants: single letters are lowercase (K_a), everything else is
 # uppercase (K_UP, K_SPACE, K_RETURN, K_0). Getting this wrong makes a key
@@ -124,28 +124,17 @@ class Keyboard(InputDevice):
     name = "keyboard"
     CONTROLS = frozenset(NAMES.values())
 
-    def __init__(self) -> None:
-        self._held: set[str] = set()
+    @classmethod
+    def open(cls) -> Keyboard:
+        return cls()
 
     def handle(self, events: list[pygame.event.Event], now: float) -> list[InputEvent]:
-        out = []
+        out: list[InputEvent] = []
         for event in events:
-            if event.type == pygame.WINDOWFOCUSLOST:
-                self._held.clear()              # its key-ups go to the window that has focus
-                continue
-            if event.type not in (pygame.KEYDOWN, pygame.KEYUP) or event.key not in NAMES:
-                continue
-            name = NAMES[event.key]
-            if event.type == pygame.KEYDOWN:
-                self._held.add(name)
-                out.append(InputEvent(name, Edge.DOWN))
-            else:
-                self._held.discard(name)
-                out.append(InputEvent(name, Edge.UP))
+            if event.type == pygame.KEYDOWN and event.key in NAMES:
+                out += self._press(NAMES[event.key], True)
+            elif event.type == pygame.KEYUP and event.key in NAMES:
+                out += self._press(NAMES[event.key], False)
+            elif event.type == pygame.WINDOWFOCUSLOST:  # its key-ups go to the window in focus
+                out += [e for name in sorted(self._held) for e in self._press(name, False)]
         return out
-
-    def last_held(self) -> frozenset[str]:
-        return frozenset(self._held)
-
-    def status(self) -> str:
-        return "keyboard"

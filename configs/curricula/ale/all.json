@@ -7,7 +7,7 @@
     {"type": "fixation", "duration": 1.0},
     {
       "__include": "common/pong.json",
-      "keys": {"": 0, "SPACE": 1, "RIGHT": 2, "LEFT": 3, "RIGHT+SPACE": 4, "LEFT+SPACE": 5},
+      "controls": {"": 0, "SPACE": 1, "RIGHT": 2, "LEFT": 3, "RIGHT+SPACE": 4, "LEFT+SPACE": 5},
       "duration": 15.0
     },
     {"type": "message", "text": "SpaceInvaders", "duration": 1.5},

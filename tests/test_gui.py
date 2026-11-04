@@ -157,16 +157,18 @@ def test_flags_fmri_play_would_refuse_are_problems(gui):
 
 
 CARTPOLE = {"curriculum": [{"type": "game", "backend": "gym", "game": "CartPole-v1", "fps": 30,
-                            "keys": {"": 0, "Q": 1}}]}
+                            "controls": {"": 0, "Q": 1}}]}
 
 
 def test_check_reports_a_game_key_none_of_the_rigs_inputs_has(qt):
     from fmri_gym.gui.session_editor import _Editor
 
-    pad = {"curriculum": [{**CARTPOLE["curriculum"][0], "keys": {"": 0, "GMPD3_A": 1}}]}
+    pad = {"curriculum": [{**CARTPOLE["curriculum"][0], "controls": {"": 0, "BUTTON_A": 1}}]}
     editor = _Editor(pad, None)
+    editor.rig_pick.set_path(str(EXAMPLES / "laptop.json"))
+    assert any("BUTTON_A" in p and "laptop.json" in p for p in editor._problems())
     editor.rig_pick.set_path(str(EXAMPLES / "xbox.json"))
-    assert any("GMPD3_A" in p and "xbox.json" in p for p in editor._problems())
+    assert not any("BUTTON_A" in p for p in editor._problems())
     editor.rig_pick.set_path(str(EXAMPLES / "gmpd3.json"))
     assert editor._problems() == []
 
@@ -197,7 +199,7 @@ def test_an_edit_is_known_until_it_is_saved(qt):
 def test_the_controller_line_says_what_to_do(gui):
     from fmri_gym.gui.rig_config import _controller_line
 
-    xbox = {"index": 0, "device_name": "Xbox Wireless Controller", "input": "gamepad",
+    xbox = {"index": 0, "device_name": "Xbox Wireless Controller", "input": "xbox_controller",
             "calibration": None, "calibrated": None}
     assert "Plug in" in _controller_line({"devices": [], "error": None})
     assert "never been calibrated" in _controller_line({"devices": [xbox], "error": None})
@@ -209,11 +211,11 @@ def test_the_controller_line_says_what_to_do(gui):
 
 def test_the_inputs_ticked_are_the_rigs(qt):
     window, _ = _rig_window("xbox")
-    assert window.rig["inputs"] == ["gamepad"]
-    window.input_boxes["gamepad"].setChecked(False)
-    assert "inputs" not in window.rig
-    window.input_boxes["gmpd3"].setChecked(True)
-    assert window.rig["inputs"] == ["gmpd3"]
+    assert window.rig["inputs"] == ["keyboard", "xbox_controller"]
+    window.input_boxes["xbox_controller"].setChecked(False)
+    assert window.rig["inputs"] == ["keyboard"]
+    window.input_boxes["current_designs_gamepad3"].setChecked(True)
+    assert window.rig["inputs"] == ["keyboard", "current_designs_gamepad3"]
 
 
 def test_a_games_keys_are_edited_in_its_phase(qt):
@@ -224,7 +226,7 @@ def test_a_games_keys_are_edited_in_its_phase(qt):
     assert editor.key_table.get() == {"": 0, "Q": 1}
     editor.key_table.add_row("LEFT", "0")
     editor._commit_phase()
-    assert editor.phases[0]["keys"] == {"": 0, "Q": 1, "LEFT": 0}
+    assert editor.phases[0]["controls"] == {"": 0, "Q": 1, "LEFT": 0}
     assert editor.tabs.count() == 2
 
 
@@ -232,7 +234,7 @@ def test_a_new_rig_has_the_keyboard_alone(qt, tmp_path):
     from fmri_gym.gui.rig_config import _RigWindow
 
     window = _RigWindow({}, str(tmp_path / "site" / "rig.json"))
-    assert "inputs" not in window.rig
+    assert window.rig["inputs"] == ["keyboard"]
 
 
 def test_a_run_opens_on_its_game(qt):

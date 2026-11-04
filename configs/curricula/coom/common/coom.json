@@ -1,6 +1,6 @@
 {
   "type": "game", "backend": "coom",
-  "instructions": {"align": "left", "keys_to_dismiss": ["SPACE"]},
+  "instructions": {"align": "left", "controls_to_dismiss": ["SPACE"]},
   "env_kwargs": {"audio_buffer_enabled": true, "audio_efx": false},
   "mode": "duration", "duration": 300.0, "fps": 35
 }

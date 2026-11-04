@@ -1,7 +1,7 @@
 {
   "type": "game", "backend": "aigamestore",
   "instructions": {
-    "align": "left", "keys_to_dismiss": ["SPACE"],
+    "align": "left", "controls_to_dismiss": ["SPACE"],
     "text": [
       "Escape through 6 levels. Collect objectives,",
       "unlock doors, and hide when the monster sees you.",
@@ -15,6 +15,6 @@
       "(press SPACE to start)"
     ]
   },
-  "keys": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "X": 4, "SPACE": 5, "Z": 6},
+  "controls": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "X": 4, "SPACE": 5, "Z": 6},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 120.0, "fps": 10
 }

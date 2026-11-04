@@ -1,4 +1,4 @@
 {
   "type": "game", "backend": "gym", "game": "Blackjack-v1",
-  "fps": 5, "is_turn_based": true, "keys": {"LEFT": 0, "RIGHT": 1}
+  "fps": 5, "is_turn_based": true, "controls": {"LEFT": 0, "RIGHT": 1}
 }

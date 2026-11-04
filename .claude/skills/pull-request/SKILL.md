@@ -18,6 +18,8 @@ uv run ruff check fmri_gym fmri_play.py agents tests gym/*/tests
 
 Both clean, or the PR says which backend you could not play here and why (the summary's skip line is the sentence to quote). The `testing` skill explains the options and how to read a failure. Commit messages carry the reasoning behind a change; the code, the docstrings and the configs describe the present only (AGENTS.md, rule 3).
 
+Then read every curriculum the branch touches, including each `common/` file the touched ones `__include`, and check by eye that what the subject is told matches what the phase binds: the Controls lines of the instructions' `text` name the same controls as the game phase's `controls` map, each with the action the adapter's docstring gives that index (a line saying "Y shoot" needs `"BUTTON_Y"` bound to the shoot action, and a bound control with no line, or a line with no binding, is a mismatch); the "Press X to start" line names a control in `controls_to_dismiss`; a menu's hint names its `control`, `move` and `confirm`; a survey's text names its `controls`. No test checks this, so the agent does, and says in the PR which files it read.
+
 ## The title
 
 The title names what the branch makes true, in the present tense: "A muted rig logs the game's sound", "ALE: a resumed episode opens where the stopped one ended". It does not name the old behaviour ("Fix missing audio"), the symptom ("audio.h5 missing"), or how the bug was found.

@@ -1,7 +1,7 @@
 {
   "type": "game", "backend": "vizdoom",
   "instructions": {
-    "align": "left", "keys_to_dismiss": ["SPACE"],
+    "align": "left", "controls_to_dismiss": ["SPACE"],
     "text": [
       "Find your way to the exit of the level. Doors and",
       "switches open when you press E in front of them.",
@@ -20,6 +20,6 @@
     ]
   },
   "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true, "automap_buffer_enabled": false},
-  "keys": {"UP": 7, "DOWN": 6, "LEFT": 9, "RIGHT": 8, "Z": 5, "X": 4, "SPACE": 0, "E": 3, "N": 18, "M": 17, "S": 1},
+  "controls": {"UP": 7, "DOWN": 6, "LEFT": 9, "RIGHT": 8, "Z": 5, "X": 4, "SPACE": 0, "E": 3, "N": 18, "M": 17, "S": 1},
   "mode": "duration", "duration": 300.0, "fps": 35
 }

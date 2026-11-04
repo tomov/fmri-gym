@@ -1,7 +1,7 @@
 """``pad-calibration``: calibrate a controller, see what it sends, and tune how it is read.
 
 It shows what the controller plugged in sends and what its device
-(:mod:`fmri_gym.inputs`) makes of it, through the newest calibration of it
+(:mod:`fmri_gym.inputs`) makes of it, through the newest calibration of each stick
 (:mod:`fmri_gym.pad_calibration`), and runs the calibration in its own window.
 Only its buttons act: the keyboard does nothing but ESC, since a program that
 turns a pad into keystrokes would otherwise retune or save as the pad is
@@ -24,12 +24,13 @@ import pygame
 
 from . import pad_calibration as calibration
 from .config.rig import RigConfig
-from .inputs import OPTIONAL_INPUT_DEVICE_NAMES, CalibrationError, Joystick, find_device
-from .inputs.calibration import (MAX_DWELL_S, UNCALIBRATED, Side, StickTuning,
-                                 calibrations_dir, newest, write)
-from .inputs.stick import DIRECTIONS, Stick
+from .inputs import (CONTROLLER_CLASSES_BY_NAME, CalibrationError, Controller,
+                     first_controller_class_plugged_in)
+from .inputs.calibration import (DIRECTIONS, DOWN, LEFT, MAX_DWELL_S, RIGHT, UNCALIBRATED, UP,
+                                 StickTuning, calibrations_dir, write)
+from .inputs.controller import STICK_DIRECTIONS, Stick, short_name
 from .pad_calibration import (FACE, GRID, INK, INK2, INK3, LIVE, PANEL, SURFACE, WARN,
-                              draw_arrow, draw_button, face)
+                              draw_arrow, draw_button)
 
 #: The picture is drawn at this size and shown scaled to its window, which can
 #: be any size from the second.
@@ -41,7 +42,7 @@ X_HUE, Y_HUE = (79, 143, 247), (240, 136, 62)
 _PLOT_Y = 280                   # the top of the plot and of the stick's square
 _VALUE_W = 58                   # the room for a value between its - and +
 #: The angle each stick direction points at (y grows downwards).
-_ANGLE_OF = dict(zip(DIRECTIONS, (-math.pi / 2, math.pi / 2, math.pi, 0.0)))
+_ANGLE_OF = {UP: -math.pi / 2, DOWN: math.pi / 2, LEFT: math.pi, RIGHT: 0.0}
 #: Each tuning button: the field it moves, and by how much.
 _TUNE_STEPS: dict[str, tuple[str, float]] = {
     "on-": ("on", -0.01), "on+": ("on", 0.01), "off-": ("off", -0.01), "off+": ("off", 0.01),
@@ -67,16 +68,22 @@ def _row(x: int, y: int, h: int, items: list[tuple[str, str]]) -> tuple[list[But
     return out, x
 
 
-def _layout(sticks: tuple[Side, ...]) -> tuple[Button, ...]:
-    """The buttons for a pad with ``sticks``: the actions' row above the tuning's.
+def _words(stick_name: str) -> str:
+    """A stick's name as a label: ``LEFT_STICK`` is ``left stick``."""
+    return stick_name.replace("_", " ").lower()
+
+
+def _layout(stick_names: tuple[str, ...]) -> tuple[Button, ...]:
+    """The buttons for a pad with the sticks ``stick_names``: the actions' row above the
+    tuning's.
 
     In the tuning row, each value sits in the gap between its - and +.
     """
     top, _ = _row(20, 10, 30, [
         ("Calibrate", "calibrate"),
-        *((f"Calibrate {s.value}", f"calibrate-{s.value}") for s in sticks),
+        *((f"Calibrate {_words(n)}", f"calibrate-{n}") for n in stick_names),
         ("Save", "save"), ("Reload", "reload"), ("Clear", "clear"), ("Quit", "quit")])
-    shown, x = _row(20, 48, 26, [(s.value.title(), f"show-{s.value}") for s in sticks])
+    shown, x = _row(20, 48, 26, [(_words(n).title(), f"show-{n}") for n in stick_names])
     tuning = []
     for name in ("on", "off", "dwell"):
         x += 20 + 7 * len(name)                     # its name, before the -
@@ -100,10 +107,11 @@ def _mtime(path: Path) -> float:
     return path.stat().st_mtime if path.exists() else 0.0
 
 
-def _watched(device: Joystick | None) -> tuple[float, float]:
-    """When the calibrations' folder last changed, and the file ``device`` reads."""
-    found = device and device.calibration
-    return _mtime(calibrations_dir()), _mtime(found[0]) if found else 0.0
+def _watched(controller: Controller | None) -> tuple[float, ...]:
+    """When the calibrations' folder last changed, and each file ``controller`` reads."""
+    sticks = controller.sticks if controller else []
+    return (_mtime(calibrations_dir()),
+            *(_mtime(s.calibration_path) if s.calibration_path else 0.0 for s in sticks))
 
 
 class _Canvas:
@@ -171,18 +179,19 @@ def _qpos(vx: float, vz: float, mid: tuple[int, int], q: int) -> tuple[int, int]
             int(mid[1] + max(-1, min(1, vz)) * q // 2))
 
 
-def _draw_tiles(screen: pygame.Surface, font: pygame.font.Font, device: Joystick | None,
-                down: set[str], by: int) -> None:
-    """One tile per button the device has: the end of its name."""
-    names = device.buttons() if device else ()
+def _draw_tiles(screen: pygame.Surface, font: pygame.font.Font, controller: Controller | None,
+                down: frozenset[str], by: int) -> None:
+    """One tile per button the controller has."""
+    names = controller.BUTTON_NAMES if controller else ()
     cols, bx, gap = 7, 20, 4
     bw = (W - 2 * bx - (cols - 1) * gap) // cols
     for k, name in enumerate(names):
         x, y = bx + (k % cols) * (bw + gap), by + (k // cols) * (62 + gap)
-        is_down, hue = name in down, FACE.get(face(name), INK2)
+        is_down, hue = name in down, FACE.get(name, INK2)
         pygame.draw.rect(screen, hue if is_down else PANEL, (x, y, bw, 62), border_radius=4)
         pygame.draw.rect(screen, hue if is_down else GRID, (x, y, bw, 62), 1, border_radius=4)
-        screen.blit(font.render(face(name), True, SURFACE if is_down else hue), (x + 8, y + 6))
+        screen.blit(font.render(short_name(name), True, SURFACE if is_down else hue),
+                    (x + 8, y + 6))
 
 
 def _draw_rule(screen: pygame.Surface, stick: Stick, controls: frozenset,
@@ -203,7 +212,7 @@ def _draw_rule(screen: pygame.Surface, stick: Stick, controls: frozenset,
     if not classifying:
         return
     reach = q // 2 - 4
-    for name, base in stick.base.items():
+    for name, base in zip(stick.directions(), DIRECTIONS):
         angle = _ANGLE_OF[base]
         end = (mid[0] + math.cos(angle) * reach, mid[1] + math.sin(angle) * reach)
         pygame.draw.line(screen, (58, 66, 84), mid, end, 1)
@@ -214,50 +223,43 @@ def _draw_rule(screen: pygame.Surface, stick: Stick, controls: frozenset,
                          (mid[0] + math.cos(edge) * reach, mid[1] + math.sin(edge) * reach), 1)
 
 
-def _normalised(stick: Stick, raw: dict[int, float]) -> tuple[float, float]:
-    """``stick``'s x and y in ``raw`` (a device's reading, by :attr:`Side.axes`), calibrated."""
-    x, y = stick.side.axes
-    return stick.normalise(0, raw.get(x, 0.0)), stick.normalise(1, raw.get(y, 0.0))
-
-
-def _draw_dots(screen: pygame.Surface, device: Joystick, side: Side, raw: dict[int, float],
+def _draw_dots(screen: pygame.Surface, controller: Controller, stick: Stick,
                controls: frozenset, trail: list, mid: tuple[int, int],
                q: int) -> tuple[float, float]:
     """The stick's trail and where it is now; the other stick a small dot. Returns its x and y."""
     for i, h in enumerate(trail):
         k = 40 + i // 2
         pygame.draw.circle(screen, (k, k + 6, k + 16), _qpos(h[1], h[2], mid, q), 2)
-    for other in (s for s in device.sticks.values() if s.side != side):
-        pygame.draw.circle(screen, INK3, _qpos(*_normalised(other, raw), mid, q), 4)
-    stick = device.sticks[side]
-    sx, sy = _normalised(stick, raw)
+    for other in (s for s in controller.sticks if s is not stick):
+        pygame.draw.circle(screen, INK3, _qpos(*other.position(), mid, q), 4)
+    sx, sy = stick.position()
     cur = _qpos(sx, sy, mid, q)
     pygame.draw.circle(screen, SURFACE, cur, 9)
-    pygame.draw.circle(screen, LIVE if controls & set(stick.directions) else X_HUE, cur, 6)
+    lit = controls & set(stick.directions())
+    pygame.draw.circle(screen, LIVE if lit else X_HUE, cur, 6)
     return sx, sy
 
 
-def _draw_square(screen: pygame.Surface, fonts, device: Joystick, side: Side,
-                 raw: dict[int, float], controls: frozenset, trail: list,
-                 at: tuple[int, int, int]) -> None:
+def _draw_square(screen: pygame.Surface, fonts, controller: Controller, stick: Stick,
+                 controls: frozenset, trail: list, at: tuple[int, int, int]) -> None:
     """The stick shown: where it is, the rule deciding it, and its numbers."""
     f, f_sm = fonts
     qx, qy, q = at
-    stick = device.sticks[side]
     pygame.draw.rect(screen, PANEL, (qx, qy, q, q))
     mid = (qx + q // 2, qy + q // 2)
     pygame.draw.line(screen, GRID, (qx, mid[1]), (qx + q, mid[1]))
     pygame.draw.line(screen, GRID, (mid[0], qy), (mid[0], qy + q))
     _draw_rule(screen, stick, controls, mid, q)
-    sx, sy = _draw_dots(screen, device, side, raw, controls, trail, mid, q)
-    screen.blit(f.render(f"{side.value} stick position", True, INK2), (qx + 8, qy + 6))
-    centre = " ".join(f"{stick.centre(i):+.3f}" for i in (0, 1))
+    sx, sy = _draw_dots(screen, controller, stick, controls, trail, mid, q)
+    screen.blit(f.render(f"{_words(stick.name)} position", True, INK2), (qx + 8, qy + 6))
+    if stick.calibration is not None:
+        cal = stick.calibration
+        rest = f"rest       {cal.x.rest:+.3f} {cal.y.rest:+.3f}  (calibrated)"
+    else:
+        rest = "rest       +0.000 +0.000  (uncalibrated)"
     rows = [(f"{stick.tuning.rule()}   pushed {math.hypot(sx, sy):.2f}", INK2),
             (f"calibrated {sx:+.3f} {sy:+.3f}", INK),
-            (f"raw        {raw.get(side.axes[0], 0.0):+.3f} "
-             f"{raw.get(side.axes[1], 0.0):+.3f}", INK3),
-            (f"centre     {centre}  " + ("(tracked while idle)" if stick.is_calibrated
-                                         else "(uncalibrated)"), INK3)]
+            (f"raw        {stick.x:+.3f} {stick.y:+.3f}", INK3), (rest, INK3)]
     for k, (text, colour) in enumerate(rows):
         screen.blit(f_sm.render(text, True, colour), (qx + 8, qy + q - 60 + k * 14))
 
@@ -268,19 +270,20 @@ class _Scope:
     def __init__(self, kinds: tuple[str, ...]) -> None:
         """Open the window, and the first controller plugged in of ``kinds``.
 
-        :param kinds: the kinds of device to look for
-            (:data:`fmri_gym.inputs.OPTIONAL_INPUT_DEVICE_NAMES`).
+        :param kinds: the kinds of controller to look for
+            (:data:`fmri_gym.inputs.CONTROLLER_CLASSES_BY_NAME`).
         """
         self.canvas = _Canvas("pad-calibration")
         font = "Menlo,Monaco,monospace"
         self.f_big, self.f, self.f_sm = (pygame.font.SysFont(font, n) for n in (17, 13, 11))
         self.kinds = kinds
-        self.device: Joystick | None = None
+        self.controller: Controller | None = None
+        self.stick: Stick | None = None             # the stick shown
         self.flash, self.flash_until = "", 0.0
         self.hist: deque = deque()
         self.log: deque = deque(maxlen=11)
         self.prev: frozenset = frozenset()
-        self.stick, self.running, self.t0 = Side.LEFT, True, time.perf_counter()
+        self.running, self.t0 = True, time.perf_counter()
         self.reload("")
         self.next_watch = self.now() + WATCH_S
 
@@ -291,22 +294,22 @@ class _Scope:
         self.flash, self.flash_until = text, self.now() + seconds
 
     def reload(self, said: str) -> None:
-        """Open the controller plugged in again, through its newest calibration or the error
-        it gives."""
-        found = find_device(self.kinds)
-        self.device, self.error = None, ""
-        if found is not None:
-            cls, index = found
-            self.device = cls(index, None)
+        """Open the controller plugged in again, through its newest calibrations or the error
+        they give."""
+        cls = first_controller_class_plugged_in(self.kinds)
+        self.controller, self.error = None, ""
+        if cls is not None:
+            self.controller = cls.open(calibrated=False)
             try:
-                self.device.use(newest(self.device.device_name))
+                self.controller.load_stick_calibrations()
             except CalibrationError as exc:
                 self.error = str(exc)
-        self.status = "" if self.device is None else self.device.status()
-        sticks = tuple(self.device.sticks) if self.device else ()
-        self.buttons = _layout(sticks)
-        self.stick = self.stick if self.stick in sticks else Side.LEFT
-        self.watched = _watched(self.device)
+        self.status = "" if self.controller is None else self.controller.status()
+        sticks = self.controller.sticks if self.controller else []
+        self.buttons = _layout(tuple(s.name for s in sticks))
+        shown = self.stick.name if self.stick else None
+        self.stick = next((s for s in sticks if s.name == shown), sticks[0] if sticks else None)
+        self.watched = _watched(self.controller)
         self.hist.clear()
         if said:
             self.say(said)
@@ -316,56 +319,63 @@ class _Scope:
         if now < self.next_watch:
             return
         self.next_watch = now + WATCH_S
-        if _watched(self.device) != self.watched:
+        if _watched(self.controller) != self.watched:
             self.reload("a calibration changed: reloaded")
 
-    def calibrate(self, side: Side | None) -> None:
+    def calibrate(self, stick_name: str | None) -> None:
         """Run the calibration of one stick, or of every stick and button, in this window."""
-        sticks = tuple(self.device.sticks) if side is None else (side,)
+        sticks = (tuple(self.controller.sticks) if stick_name is None
+                  else (self.controller.stick(stick_name),))
         try:
-            result = calibration.calibrate(self.device, self.canvas.surface,
+            result = calibration.calibrate(self.controller, self.canvas.surface,
                                            self.canvas.present, sticks, self.canvas.to_canvas)
         except CalibrationError as exc:
             self.say(f"NOT calibrated: {exc}", 8.0)
             return
         self.reload("NOT calibrated: cancelled; nothing written" if result is None
-                    else f"calibrated: {result.path.name}")
+                    else f"calibrated: {', '.join(p.name for p, _ in result.written.values())}")
 
     def save(self) -> None:
-        """Write the calibration in use, with each stick's tuning now, as a new file."""
-        path, used = self.device.calibration
-        tuned = replace(used, tuned_from=path.name, sticks={
-            s: replace(c, tuning=self.device.sticks[s].tuning) for s, c in used.sticks.items()})
-        self.reload(f"saved {write(tuned).name}, tuned from {path.name}")
+        """Write each retuned stick's calibration, with its tuning now, as a new file."""
+        saved = []
+        for stick in self._retuned_sticks():
+            tuned = replace(stick.calibration, tuned_from=stick.calibration_path.name,
+                            tuning=stick.tuning)
+            saved.append(f"{write(tuned).name} from {stick.calibration_path.name}")
+        self.reload(f"saved {'; '.join(saved)}")
+
+    def _retuned_sticks(self) -> list[Stick]:
+        """The calibrated sticks whose tuning differs from their file's."""
+        sticks = self.controller.sticks if self.controller else []
+        return [s for s in sticks if s.calibration and s.tuning != s.calibration.tuning]
 
     def clear(self) -> None:
         self.hist.clear()
         self.log.clear()
 
-    def show(self, side: Side) -> None:
-        self.stick = side
+    def show(self, stick_name: str) -> None:
+        self.stick = self.controller.stick(stick_name)
         self.hist.clear()
 
     def retune(self, action: str) -> None:
-        stick = self.device.sticks[self.stick]
-        stick.tuning = _retuned(stick.tuning, action)
+        self.stick.tuning = _retuned(self.stick.tuning, action)
 
     def is_enabled(self, action: str) -> bool:
         """Whether a button can do anything now."""
         if action.startswith("calibrate"):
-            return self.device is not None and not self.error
+            return self.controller is not None and not self.error
         if action == "save":
-            return self.device is not None and self.device.calibration is not None
+            return bool(self._retuned_sticks())
         if action.startswith(("show", "on", "off", "dwell", "diag")):
-            return self.device is not None and self.stick in self.device.sticks
+            return self.stick is not None
         return True
 
     def events(self) -> None:
-        """Clicks on the buttons, and ESC or the window's close to quit; the device reads the
+        """Clicks on the buttons, and ESC or the window's close to quit; the controller reads the
         rest."""
         events = pygame.event.get()
-        if self.device is not None:
-            self.device.handle(events, time.perf_counter())
+        if self.controller is not None:
+            self.controller.handle(events, time.perf_counter())
         for e in events:
             if e.type == pygame.QUIT:
                 self.running = False
@@ -389,58 +399,52 @@ class _Scope:
             clock.tick(60)
         pygame.quit()
 
-    def _shown(self) -> Stick | None:
-        """The stick shown, or None when the device has none (or there is no device)."""
-        return self.device.sticks.get(self.stick) if self.device else None
-
     def _tuning(self) -> StickTuning:
-        stick = self._shown()
-        return UNCALIBRATED if stick is None else stick.tuning
+        return UNCALIBRATED if self.stick is None else self.stick.tuning
 
-    def record(self, now: float, controls: frozenset, raw: dict[int, float]) -> None:
+    def record(self, now: float, controls: frozenset) -> None:
         """Log the presses and releases since the last frame, and add this frame to the plot."""
         for name in sorted(controls - self.prev):
             self.log.appendleft((now, f"{name:<24} pressed", LIVE))
         for name in sorted(self.prev - controls):
             self.log.appendleft((now, f"{name:<24} released", INK3))
         self.prev = controls
-        stick = self._shown()
-        sx, sy = (0.0, 0.0) if stick is None else _normalised(stick, raw)
+        sx, sy = (0.0, 0.0) if self.stick is None else self.stick.position()
         self.hist.append((now, sx, sy, controls))
         while self.hist and now - self.hist[0][0] > WINDOW_S:
             self.hist.popleft()
 
     def draw(self) -> None:
-        now, device = self.now(), self.device
-        controls = device.last_held() if device else frozenset()
-        raw, down = device.read() if device else ({}, set())
-        self.record(now, controls, raw)
+        now, controller = self.now(), self.controller
+        controls = controller.held() if controller else frozenset()
+        self.record(now, controls)
         screen = self.canvas.surface
         screen.fill(SURFACE)
         self.draw_toolbar(screen)
         self.draw_status(screen, now)
-        _draw_tiles(screen, self.f_big, device, down, 136)
+        _draw_tiles(screen, self.f_big, controller, controls, 136)
         lanes = self.draw_plot(screen, controls, now)
         trail = [h for h in self.hist if now - h[0] < TRAIL_S]
-        if self._shown() is not None:
-            _draw_square(screen, (self.f, self.f_sm), device, self.stick, raw, controls, trail,
+        if self.stick is not None:
+            _draw_square(screen, (self.f, self.f_sm), controller, self.stick, controls, trail,
                          (676, _PLOT_Y, 310))
         self.draw_lanes(screen, controls, now)
         self.draw_log(screen, _PLOT_Y + 200 + 10 + lanes * 16 + 14)
-        if device is None:
+        if controller is None:
             kinds = " or ".join(self.kinds) or "none: the rig lists no controller"
             screen.blit(self.f_big.render(f"no controller plugged in ({kinds})", True, WARN),
                         (20, _PLOT_Y + 230))
         self.canvas.present()
 
     def draw_status(self, screen: pygame.Surface, now: float) -> None:
-        """The device's status, the calibration in use or why there is none, and the last
-        message."""
-        found = self.device and self.device.calibration
-        cal = (self.error or (f"calibration in use: {found[0]}" if found else
+        """The controller's status, the calibrations in use or why there are none, and the
+        last message."""
+        files = [s.calibration_path.name for s in (self.controller.sticks if self.controller
+                                                   else []) if s.calibration_path]
+        cal = (self.error or (f"calibrations in use: {', '.join(files)}" if files else
                               "UNCALIBRATED: no calibration of this pad; Calibrate makes one"))
         for y, text, colour in ((84, self.status, INK2),
-                                (98, cal, WARN if self.error or not found else INK2)):
+                                (98, cal, WARN if self.error or not files else INK2)):
             line = _wrapped(text, self.f_sm, W - 40, 1)[0]
             screen.blit(self.f_sm.render(line, True, colour), (20, y))
         if self.flash and now < self.flash_until:
@@ -453,7 +457,7 @@ class _Scope:
         values = {"on": f"{tuning.on:.2f}", "off": f"{tuning.off:.2f}",
                   "dwell": f"{tuning.dwell_s * 1000:.0f} ms"}
         for label, action, rect in self.buttons:
-            on = (action == f"show-{self.stick.value}"
+            on = (self.stick is not None and action == f"show-{self.stick.name}"
                   or action == "diag" and tuning.diagonal < 1.0)
             draw_button(screen, self.f_sm, rect, label, rect.collidepoint(mouse),
                         self.is_enabled(action), on)
@@ -469,8 +473,8 @@ class _Scope:
 
         :return: how many lanes go below it.
         """
-        tuning, hist, stick = self._tuning(), self.hist, self._shown()
-        directions = set(stick.directions) if stick else set()
+        tuning, hist, stick = self._tuning(), self.hist, self.stick
+        directions = set(stick.directions()) if stick else set()
         px, py, pw, ph = 20, _PLOT_Y, 630, 200
         cy, half = py + ph // 2, ph // 2
         pygame.draw.rect(screen, PANEL, (px, py, pw, ph))
@@ -492,26 +496,27 @@ class _Scope:
                 if (b[3] - a[3]) & directions:
                     x = _tx(b[0], now, px, pw)
                     pygame.draw.line(screen, LIVE, (x, py), (x, py + ph), 1)
-        screen.blit(self.f.render(f"{self.stick.value} stick x", True, X_HUE), (px + 8, py + 6))
-        screen.blit(self.f.render(f"{self.stick.value} stick y", True, Y_HUE), (px + 150, py + 6))
+        shown = _words(stick.name) if stick else "stick"
+        screen.blit(self.f.render(f"{shown} x", True, X_HUE), (px + 8, py + 6))
+        screen.blit(self.f.render(f"{shown} y", True, Y_HUE), (px + 150, py + 6))
         screen.blit(self.f_sm.render("calibrated units", True, INK3), (px + pw - 100, py + 6))
         return len(self._lanes())
 
     def _lanes(self) -> list[tuple[str, str, Stick]]:
-        """Each direction of each of the device's sticks: its name, its arrow, its stick."""
-        sticks = self.device.sticks.values() if self.device else ()
-        return [(name, base, s) for s in sticks for name, base in s.base.items()]
+        """Each direction of each of the controller's sticks: its name, its arrow, its stick."""
+        sticks = self.controller.sticks if self.controller else []
+        return [(name, base, stick) for stick in sticks
+                for name, base in zip(stick.directions(), DIRECTIONS)]
 
     def draw_lanes(self, screen: pygame.Surface, controls: frozenset, now: float) -> None:
         """A lane per stick direction, lit while it was pressed."""
         px, pw, hist = 20, 630, self.hist
-        many = self.device is not None and len(self.device.sticks) > 1
+        many = self.controller is not None and len(self.controller.sticks) > 1
         for r, (name, base, stick) in enumerate(self._lanes()):
             y = _PLOT_Y + 210 + r * 16
             draw_arrow(screen, base, (px + 8, y + 7), 7, LIVE if name in controls else INK3)
             if many:
-                screen.blit(self.f_sm.render(stick.side.value[0].upper(), True, INK3),
-                            (px + 20, y))
+                screen.blit(self.f_sm.render(stick.name[0], True, INK3), (px + 20, y))
             pygame.draw.rect(screen, PANEL, (px + 46, y + 2, pw - 46, 10))
             for a, b in zip(hist, list(hist)[1:]):
                 if name in b[3]:
@@ -530,8 +535,8 @@ class _Scope:
 #: What each button does.
 _ACTIONS: dict[str, Callable[[_Scope], None]] = {
     "calibrate": lambda s: s.calibrate(None),
-    **{f"calibrate-{st.value}": (lambda s, st=st: s.calibrate(st)) for st in Side},
-    **{f"show-{st.value}": (lambda s, st=st: s.show(st)) for st in Side},
+    **{f"calibrate-{n}": (lambda s, n=n: s.calibrate(n)) for n in STICK_DIRECTIONS},
+    **{f"show-{n}": (lambda s, n=n: s.show(n)) for n in STICK_DIRECTIONS},
     **{a: (lambda s, a=a: s.retune(a)) for a in (*_TUNE_STEPS, "diag")},
     "save": _Scope.save, "reload": lambda s: s.reload("reloaded"), "clear": _Scope.clear,
     "quit": lambda s: setattr(s, "running", False),
@@ -547,4 +552,5 @@ def main() -> None:
     p.add_argument("--rig", default=None, metavar="RIG.json",
                    help='the rig file whose "inputs" to look for (default: any controller)')
     rig = p.parse_args().rig
-    _Scope(RigConfig.open(rig).inputs if rig else tuple(OPTIONAL_INPUT_DEVICE_NAMES)).loop()
+    input_device_names = RigConfig.open(rig).inputs if rig else tuple(CONTROLLER_CLASSES_BY_NAME)
+    _Scope(tuple(n for n in input_device_names if n in CONTROLLER_CLASSES_BY_NAME)).loop()

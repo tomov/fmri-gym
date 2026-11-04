@@ -45,7 +45,7 @@ COMMON_DIRNAME = "common"
 #: block on; any other change makes it a different game. ``seed`` is the
 #: run's own (folded in from the run label).
 RESUMABLE_CHANGES = frozenset({"duration", "n_episodes", "advance_on", "show_outcome_duration",
-                               "instructions", "keys", "menu", "seed", "has_audio",
+                               "instructions", "controls", "menu", "seed", "has_audio",
                                "rewind_on", "rewind_frames"})
 #: Exit status of ``fmri_play`` when the run was quit (ESC) before its end; a
 #: session script (``set -e``) stops on it instead of starting the next run.
@@ -259,7 +259,7 @@ def new_curriculum() -> dict:
             {"type": "message", "text": "Get ready\n\n(press SPACE to start)"},
             {"type": "fixation", "duration": 2.0},
             {"type": "game", "backend": "ale", "game": "ALE/Pong-v5", "mode": "duration",
-             "duration": 60.0, "fps": 30, "keys": {"UP": 2, "DOWN": 3}},
+             "duration": 60.0, "fps": 30, "controls": {"UP": 2, "DOWN": 3}},
         ],
     }
 

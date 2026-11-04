@@ -1,5 +1,5 @@
 {
   "type": "game", "backend": "ale", "game": "ALE/Qbert-v5",
-  "keys": {"": 0, "SPACE": 1, "UP": 2, "RIGHT": 3, "LEFT": 4, "DOWN": 5},
+  "controls": {"": 0, "SPACE": 1, "UP": 2, "RIGHT": 3, "LEFT": 4, "DOWN": 5},
   "mode": "duration", "fps": 30
 }

@@ -109,11 +109,11 @@ def script_for(curriculum_path: str, rate: float, seed: int) -> KeyScript:
     """A :class:`KeyScript` over the keys of the config's game phases and surveys."""
     every = load_curriculum(curriculum_path)["curriculum"]
     phases = [p for p in every if p["type"] == "game"]
-    names = sorted({k for p in phases for combo in p["keys"] for k in combo.split("+") if k}
+    names = sorted({k for p in phases for combo in p["controls"] for k in combo.split("+") if k}
                    | {k for p in every if p["type"] == "survey"
-                      for k in p.get("keys", [str(i) for i in range(1, 8)])})
+                      for k in p.get("controls", [str(i) for i in range(1, 8)])})
     dismiss = sorted({k for p in phases
-                      for k in (p.get("instructions") or {}).get("keys_to_dismiss", [])})
+                      for k in (p.get("instructions") or {}).get("controls_to_dismiss", [])})
     return KeyScript(names, dismiss or ["SPACE"], rate, seed)
 
 
@@ -127,7 +127,7 @@ def use_rig(data_root: str, has_audio: bool, end_fixation: float) -> str:
               "pi": "TT", "modality": "behav", "notes": "",
               "screen": {"size": "640x480", "is_fullscreen": False, "monitor": 0,
                          "has_vsync": False},
-              "inputs": [], "has_audio": has_audio, "data_root": data_root,
+              "inputs": ["keyboard"], "has_audio": has_audio, "data_root": data_root,
               "end_fixation": end_fixation}, path)
     return path
 

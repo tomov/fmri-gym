@@ -8,7 +8,7 @@ The `aigamestore` backend's curricula: the ten public [AI GameStore](https://aig
 
 ## Keys
 
-The env's action is MultiBinary over the game's keys, in `aigamestore_gym.GAME_KEYS` order, so a phase's `keys` values are those indices (the JSON key is what the subject presses), and held keys combine. The env relabels the on-canvas hints to the pressed key; the instructions' Controls text is kept in sync with `keys` by hand. The curricula are keyboard curricula. Game1, game4, game7 and game8 also come in two for a Current Designs GMPD3 (README, "Rigs"), each a curriculum and its `common/` file: `*-GMPD3-ABXY-nav` moves on the face buttons, and `*-GMPD3-stick-nav` on the stick, with the face buttons for the rest (game7's take cover and weapon keys have no button there). They play on a rig whose `"inputs"` list the GMPD3.
+The env's action is MultiBinary over the game's keys, in `aigamestore_gym.GAME_KEYS` order, so a phase's `controls` values are those indices (the JSON key is what the subject presses), and held keys combine. The env relabels the on-canvas hints to the pressed key; the instructions' Controls text is kept in sync with `controls` by hand. The curricula are keyboard curricula. Game1, game4, game7 and game8 also come in two for a Current Designs GMPD3 (README, "Rigs"), each a curriculum and its `common/` file: `*-GMPD3-ABXY-nav` moves on the face buttons, and `*-GMPD3-stick-nav` on the stick, with the face buttons for the rest (game7's take cover and weapon keys have no button there). They play on a rig whose `"inputs"` list the GMPD3 or an Xbox controller.
 
 | game | `GAME_KEYS` order | reference |
 |---|---|---|

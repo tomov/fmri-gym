@@ -8,7 +8,7 @@ Legend: ✅ verified · 🟡 runs, display-only · ⚠️ needs assets · ❌ do
 
 | Game | curricula | backend | status | one-liner |
 |---|---|---|---|---|
-| Atari | `ale/` | ale | ✅ verified | any `ALE/*` id; `keys` index its action meanings |
+| Atari | `ale/` | ale | ✅ verified | any `ALE/*` id; `controls` index its action meanings |
 | VGDL | `vgdl/` | vgdl | ✅ verified | needs the gymnasium-ported fork checkout |
 | Crafter | `crafter/` | crafter | ✅ verified | new adapter over `gym/crafter`; obs is the frame; logs achievements; replays only on the determinism fork |
 | MiniHack | `minihack/` | minihack | ✅ verified | new adapter; pixel obs + 8-way compass; logs blstats/glyphs/message |
@@ -38,7 +38,7 @@ Runs from the gymnasium-ported fork <https://github.com/tomov/language_and_exper
 `uv sync --extra crafter`, which installs `gym/crafter` and, through it, crafter itself from the determinism fork the package pins (crafter speaks the **old-gym API shape** — reset()→obs only, step()→4-tuple — so the Gymnasium contract lives in `gym/crafter`, not in the adapter). The observation IS the RGB frame (64×64 by default, 384 in the DBP config); `Discrete(17)` actions, all 17 keyed (arrows move, SPACE=interact, S=sleep, R/T/F/P place, 1–6 make). The whole env pickles, so every frame carries a savestate (`state_stride` anchors), and a replay is bit-exact only against the fork. Achievements, inventory, player position and the semantic grid are logged; `cues` adds the score/hit/blocked feedback layer, crafter having no audio of its own. `crafter_menu` is the same game and level through the eight buttons the scanner rig uses, a `MenuWrapper` shipped with the env: six actions keep a button, the other ten sit in a cursor the subject cycles to.
 
 ### ✅ minihack (minihack)  — new backend
-`pip install minihack` (needs `setuptools<81` for `pkg_resources`; pulls `nle`, downgrades gymnasium to 1.2). Default `render()` is None and obs is ASCII/tty, so the adapter requests a `pixel` observation (336×1264×3) and displays that. `Discrete(8)` compass (arrows = N/E/S/W; diagonals via `keys` override 4–7). Savestate by replay (`ReplayState`); NetHack's own RNGs are seeded on every reset and the reset refused if that did not take (`NLESeeding`), `fix_moon_phase` takes the real date out of the game. blstats/glyphs/message logged.
+`pip install minihack` (needs `setuptools<81` for `pkg_resources`; pulls `nle`, downgrades gymnasium to 1.2). Default `render()` is None and obs is ASCII/tty, so the adapter requests a `pixel` observation (336×1264×3) and displays that. `Discrete(8)` compass (arrows = N/E/S/W; diagonals via `controls` override 4–7). Savestate by replay (`ReplayState`); NetHack's own RNGs are seeded on every reset and the reset refused if that did not take (`NLESeeding`), `fix_moon_phase` takes the real date out of the game. blstats/glyphs/message logged.
 
 ### 🟡 tile-match-gym (gym, display-only)
 `pip install tile-match-gym` (pulls numba → numpy 1.26). Import the package to register `TileMatch-v0`; constructor needs board kwargs (via `env_kwargs`). 5-tuple, `render_mode="rgb_array"` → (324,273,3). Runs & logs fine, but `action_space = Discrete(84)` (choose a tile swap) has no natural arrow-key mapping — a human would need a pointer/selection input mode.

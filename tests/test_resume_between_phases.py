@@ -34,7 +34,7 @@ RUN_S = 15.0
 MESSAGE_S = 120.0
 CURRICULUM = [
     {"type": "fixation", "duration": 0.5, "include_on_resume": True},
-    {"type": "game", "game": "CartPole-v1", "keys": {"": 0, "LEFT": 0, "RIGHT": 1}, "fps": 50,
+    {"type": "game", "game": "CartPole-v1", "controls": {"": 0, "LEFT": 0, "RIGHT": 1}, "fps": 50,
      "mode": "duration", "duration": 2.0, "show_outcome_duration": 0},
     {"type": "message", "text": "A message the run's clock cuts short.", "duration": MESSAGE_S},
     {"type": "fixation", "duration": 1.0},
