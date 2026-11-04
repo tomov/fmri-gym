@@ -23,6 +23,8 @@ jobs:
       # Step 1: Check out the source code
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
 
       # Step 2: Set up Docker Buildx (for caching and multi-platform support)
       - name: Set up Docker Buildx

@@ -1,10 +1,16 @@
 FROM ubuntu:26.04 AS runtime-base
 
+# Python is uv's standalone build, not the distribution's: the version is the project's
+# (.python-version), whatever the base image ships. It lives outside /root so the venv's
+# interpreter link resolves in the runtime stage too.
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+ENV UV_PYTHON_INSTALL_DIR=/opt/python UV_PYTHON_PREFERENCE=only-managed UV_LINK_MODE=copy
+COPY .python-version /tmp/.python-version
+RUN uv python install "$(cat /tmp/.python-version)" && rm /tmp/.python-version
+
 RUN apt-get update \
   && apt-get -y install --no-install-recommends \
-       gosu \
-       python3-minimal \
-       python3-pip \
+       gosu ca-certificates \
        libasound2t64 pulseaudio libpulse0 libportaudio2 \
        libsdl3-0 \
        x11-xserver-utils \
@@ -24,7 +30,6 @@ RUN apt-get update \
     && apt-get -y install --no-install-recommends \
         wget curl unzip \
         build-essential cmake make nasm meson ninja-build pkg-config swig \
-        python3-dev python3-pip python3-setuptools \
         libusb-1.0-0-dev portaudio19-dev libasound2-dev libpulse-dev \
         qtbase5-dev \
         libglew-dev libtbb-dev \
@@ -40,18 +45,10 @@ RUN apt-get update \
         git \
 ## require for nle compilation, crashes on more recent gcc
         gcc-12 \
-        autoconf libtool python3-numpy flex bison libbz2-dev \
+        autoconf libtool flex bison libbz2-dev \
     && apt-get autoremove \
       && apt-get clean \
       && rm -rf /var/lib/apt/lists/*
-
-
-RUN apt-get update \
-    && apt-get -y install \
-        python3-virtualenv \
-    && apt-get autoremove \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
 
 COPY fmri_gym ./ /src
 # external/ (the vgdl / coom / baba_auto submodules) comes in with the build context. An
@@ -60,18 +57,14 @@ COPY fmri_gym ./ /src
 RUN test -d /src/external/vgdl/games -a -d /src/external/coom/COOM/env/scenarios \
          -a -f /src/external/baba_auto/CMakeLists.txt \
     || { echo "external/ submodules are not checked out: run 'git submodule update --init' before 'docker build'" >&2; exit 1; }
-RUN virtualenv /venv \
-    && . /venv/bin/activate \
+## uv pip reads [tool.uv.sources], so the gym/ wrappers come from their paths in one resolve.
+## nle/nethack compile crash in modern gcc; baba_auto compiles pyBaba (~30 s)
+RUN uv venv /venv --python "$(cat /src/.python-version)" \
     && cd /src \
-## nle/nethack compile crash in modern gcc
-    && CC=/usr/bin/gcc-12 pip install --no-cache-dir -e .[nethack]  \
-## the gym/ wrappers by path first (pip has no [tool.uv.sources]); baba_auto compiles pyBaba (~30 s)
-    && pip install --no-cache-dir -e gym/aigamestore -e gym/coom -e gym/crafter \
-                                  -e gym/vgdl -e gym/baba_auto \
-    && pip install --no-cache-dir -e .[dbp,vgdl] \
+    && CC=/usr/bin/gcc-12 uv pip install --python /venv --no-cache -e '.[nethack,dbp,vgdl]' \
 ## some of the deps above overwrite pygame-ce, not solved by pyproject.toml need to be reinstalled.
-    && pip uninstall -y pygame \
-    && pip install --no-cache-dir --force pygame-ce
+    && uv pip uninstall --python /venv pygame \
+    && uv pip install --python /venv --no-cache --reinstall pygame-ce
 
 FROM runtime-base AS runtime
 
