@@ -8,6 +8,9 @@ configs/
   curricula/<backend>/<name>.json                   what one run plays: several levels in a row
   curricula/<backend>/common/<name>.json            a game phase several of them include
   curricula/<backend>/common/README.md              what they play, and how
+  images/controllers/<name>.png                     controller layouts a screen's text can show (images/controllers/README.md)
+  images/controls/<backend>/<name>.png              one game's controls, each named by its action, for its common/<name>.json
+  images/controls/labels.json                       those names; tools/controls_images.py draws the images from it
   examples/rigs/<rig>.json                          example rigs, one per kind of setup (examples/rigs/README.md)
   examples/sessions/<name>.sh                       example sessions, subject and rig given when started
   <team>/rigs/<rig>.json                            how one of the team's setups plays every run

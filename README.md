@@ -462,6 +462,9 @@ The `MT` team's sessions are in `configs/MT/subjects/`: three of about an hour f
 {"type": "fixation", "duration": 1.0, "include_on_resume": true}  // also played first by a resumed run (below)
 {"type": "message", "text": "Get ready", "duration": 2.0}  // text: string or list of lines; omit duration to wait for a key
                                                            // ("control": one name, or "controls_to_dismiss": names)
+                                                           // a line "![alt](images/controllers/xbox-controller.png)"
+                                                           // (path from configs/, PNG or JPEG) shows the image,
+                                                           // fit to the window; so does one of an instructions' text
 {"type": "survey", "controls": ["1", "2", "3", "4", "5", "6", "7"], "questions": ["...","..."]}
                                                            // one press per question: the control of a point of
                                                            // the scale, in order (default 1-7); a controller

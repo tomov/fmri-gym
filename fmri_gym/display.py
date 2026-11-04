@@ -29,15 +29,23 @@ photons (swap-chain depth, panel latency); that is what a photodiode is for.
 
 from __future__ import annotations
 
+import re
 import statistics
 import sys
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
 import pygame
 
 if TYPE_CHECKING:
     import numpy as np
+
+#: A line of a screen's text that is only Markdown's ``![alt](path)`` shows the image at
+#: ``path``, from :data:`IMAGES_ROOT`, in its place. Transparent pixels show the black screen.
+IMAGE_LINE = re.compile(r"^\s*!\[[^\]]*\]\((?P<path>[^)]+)\)\s*$")
+IMAGES_ROOT = Path(__file__).resolve().parents[1] / "configs"
+IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg")
 
 BG_COLOR = (0, 0, 0)
 TEXT_COLOR = (220, 220, 220)
@@ -373,7 +381,8 @@ class Display:
         ``align="center"`` centers each line horizontally (default, for
         messages); ``align="left"`` left-aligns all lines against a common left
         edge so the whole block is horizontally centered (good for controls
-        tables). Long lines are word-wrapped to fit the window.
+        tables). Long lines are word-wrapped to fit the window. An image line
+        (:data:`IMAGE_LINE`) is drawn as its image, centered.
 
         :param text: multi-line string (``\\n``-separated).
         :param color: RGB text color.
@@ -383,22 +392,43 @@ class Display:
         """
         font = font or self.font
         self.canvas.fill(BG_COLOR)
-        max_w = int(self.size[0] * 0.92)
-        lines = []
-        for raw in text.split("\n"):
-            lines.extend(self._wrap(font, raw, max_w))
-        surfs = [font.render(ln, True, color) for ln in lines]
-        total_h = sum(s.get_height() for s in surfs)
-        y = (self.size[1] - total_h) // 2
-        block_left = (self.size[0] - max((s.get_width() for s in surfs), default=0)) // 2
-        for surf in surfs:
-            if align == "left":
+        rows = self._text_rows(text, font, color, int(self.size[0] * 0.92))
+        y = (self.size[1] - sum(surf.get_height() for surf, _ in rows)) // 2
+        text_w = max((surf.get_width() for surf, is_image in rows if not is_image), default=0)
+        block_left = (self.size[0] - text_w) // 2
+        for surf, is_image in rows:
+            if align == "left" and not is_image:
                 rect = surf.get_rect(topleft=(block_left, y))
             else:
                 rect = surf.get_rect(center=(self.size[0] // 2, y + surf.get_height() // 2))
             self.canvas.blit(surf, rect)
             y += surf.get_height()
         return self._present()
+
+    def _text_rows(self, text: str, font: pygame.font.Font, color: tuple[int, int, int],
+                   max_w: int) -> list[tuple[pygame.Surface, bool]]:
+        """``text`` rendered row by row as ``(surface, is_image)``, its lines wrapped to ``max_w``.
+
+        The images share the height the text leaves, each between a quarter and
+        half of the window's, and are scaled (aspect kept) to fit it and ``max_w``.
+        """
+        lines = text.split("\n")
+        image_paths = [image_path_in_line(line) for line in lines]
+        rendered_lines = {i: [font.render(row, True, color) for row in self._wrap(font, line, max_w)]
+                          for i, line in enumerate(lines) if image_paths[i] is None}
+        text_h = sum(s.get_height() for surfs in rendered_lines.values() for s in surfs)
+        n_images = max(1, sum(path is not None for path in image_paths))
+        max_h = min(max(self.size[1] - text_h, self.size[1] // 4) // n_images, self.size[1] // 2)
+        rows: list[tuple[pygame.Surface, bool]] = []
+        for i, path in enumerate(image_paths):
+            if path is None:
+                rows += [(surf, False) for surf in rendered_lines[i]]
+                continue
+            image = pygame.image.load(str(path)).convert_alpha()
+            scale = min(max_w / image.get_width(), max_h / image.get_height())
+            size = (round(image.get_width() * scale), round(image.get_height() * scale))
+            rows.append((pygame.transform.smoothscale(image, size), True))
+        return rows
 
     def draw_fixation(self) -> float:
         """Draw a centered white ``+`` fixation cross.
@@ -454,6 +484,30 @@ def _try_mode(size: tuple[int, int], flags: int, vsync: int,
         return pygame.display.set_mode(size, flags, display=display, vsync=vsync)
     except pygame.error:
         return None
+
+
+def image_path_in_line(line: str) -> Path | None:
+    """The image a line of text shows (:data:`IMAGE_LINE`), or ``None`` for a line of text."""
+    match = IMAGE_LINE.match(line)
+    return None if match is None else IMAGES_ROOT / match["path"].strip()
+
+
+def image_line_problems(text: str) -> list[str]:
+    """Each image line of ``text`` whose path is not a PNG or JPEG pygame can read, as text."""
+    problems = []
+    for line in text.split("\n"):
+        path = image_path_in_line(line)
+        if path is None:
+            continue
+        if path.suffix.lower() not in IMAGE_SUFFIXES:
+            problems.append(f"{line.strip()}: expected one of {IMAGE_SUFFIXES}")
+            continue
+        try:
+            pygame.image.load(str(path))
+        except (pygame.error, FileNotFoundError) as error:
+            problems.append(f"{line.strip()}: cannot read {path} ({error}); an image's path "
+                            f"is from {IMAGES_ROOT}")
+    return problems
 
 
 def monitor_label(index: int, monitor: tuple[int, int, int]) -> str:

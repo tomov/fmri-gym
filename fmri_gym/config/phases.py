@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, ClassVar
 
+from ..display import image_line_problems
 from ..inputs import ESCAPE, is_control_of_any_input_device
 from ..menu import menu_problems
 
@@ -140,6 +141,7 @@ class Message(Phase):
                        f"got {control!r}")
         if d.get("align", "center") not in ("center", "left"):
             out.append(f"align: expected 'center' or 'left', got {d['align']!r}")
+        out += [f"text: {p}" for p in image_line_problems(join_text(d.get("text", "")))]
         return out + _positive_problems(d, ("duration",))
 
 
@@ -181,6 +183,8 @@ class Instructions:
         if spec.get("align", "center") not in ("center", "left"):
             out.append(f"instructions: align: expected 'center' or 'left', got {spec['align']!r}")
         out += [f"instructions: {p}" for p in _positive_problems(spec, ("duration",))]
+        out += [f"instructions: text: {p}"
+                for p in image_line_problems(join_text(spec.get("text", "")))]
         dismiss = spec.get("controls_to_dismiss")
         out.extend(_dismiss_problems("instructions: controls_to_dismiss", dismiss))
         if spec.get("duration") is None and dismiss is None:

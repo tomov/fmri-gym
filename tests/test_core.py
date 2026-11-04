@@ -128,6 +128,9 @@ def test_keymap_refuses_an_action_outside_the_space():
     ({**PHASE, "controls": {"": 0, "NOSUCHKEY": 1}}, "NOSUCHKEY"),
     ({k: v for k, v in PHASE.items() if k != "controls"}, "controls"),
     ({**PHASE, "fps": 0}, "fps"),
+    ({**PHASE, "instructions": {"title": "T", "controls_to_dismiss": ["SPACE"],
+                                "text": ["a", "![pad](images/no-such.png)"]}}, "no-such.png"),
+    ({"type": "message", "text": "![pad](README.md)"}, "README.md"),
 ])
 def test_validate_config_refuses(phase, problem):
     problems = validate_curriculum({"curriculum": [phase]})
@@ -136,6 +139,20 @@ def test_validate_config_refuses(phase, problem):
 
 def test_validate_config_accepts_a_plain_game_phase():
     assert validate_curriculum({"curriculum": [PHASE]}) == []
+
+
+def test_an_image_line_is_drawn_as_its_image_between_the_text(monkeypatch):
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    from fmri_gym.display import Display
+    import pygame
+    display = Display(size=(400, 300), vsync=False)
+    try:
+        display.draw_text("above\n![pad](images/controllers/xbox-controller-labelled.png)\nbelow")
+        assert pygame.transform.average_color(display.canvas)[0] > 50     # the white diagram
+        display.draw_text("![pad] (images/controllers/xbox-controller-labelled.png)")
+        assert pygame.transform.average_color(display.canvas)[0] < 50     # a line of text
+    finally:
+        display.close()
 
 
 @pytest.mark.parametrize("path, label", [
