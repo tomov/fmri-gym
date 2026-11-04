@@ -53,6 +53,8 @@ class RunConfig:
     loop: bool
     #: skip the experimenter and scanner waits: a test run, not a session.
     dummy_trigger: bool
+    #: do not build, reset and close each game once before the window.
+    skip_load_games: bool
 
     @classmethod
     def from_args(cls, args: argparse.Namespace, curriculum: Curriculum,
@@ -65,7 +67,8 @@ class RunConfig:
         """
         return cls(curriculum=curriculum, rig=rig, subject=args.subject, ses=args.ses,
                    run=args.run, duration=args.duration, resume=args.resume, loop=args.loop,
-                   dummy_trigger=args.dummy_trigger)
+                   dummy_trigger=args.dummy_trigger,
+                   skip_load_games=args.skip_load_games)
 
     @property
     def start_fixation(self) -> float | None:

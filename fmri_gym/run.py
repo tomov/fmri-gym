@@ -362,7 +362,7 @@ class Run:
         """Set up clock, logger, and phase dispatch for one subject.
 
         :param config: the run config: its curriculum (seeded), its rig, subject,
-            duration, test switch; the curriculum and the rig go in the manifest.
+            duration, test switches; the curriculum and the rig go in the manifest.
         :param display: shared pygame display used by all phases.
         :param outdir: the run's folder, for its manifest and block logs.
         :param audio: shared audio output used by all phases.
@@ -381,6 +381,7 @@ class Run:
         self.logger.set_extra("rig", config.rig.record())
         self.logger.set_extra("display", display.describe())
         self.logger.set_extra("dummy_trigger", config.dummy_trigger)
+        self.logger.set_extra("skip_load_games", config.skip_load_games)
         self.logger.set_extra("audio", self.audio.describe())
         self.outdir = outdir
         self.triggers = triggers
