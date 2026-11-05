@@ -2,7 +2,7 @@ name: Build and Push Docker Image
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "docker-build-actions"]
     tags: [ "v*" ]
 
 env:
@@ -50,8 +50,44 @@ jobs:
             type=sha,format=short
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
-      # Step 5: Build and Push the Docker image
-      - name: Build and push Docker image
+      # Step 5: Build the image into the runner's docker, under the name run_docker.sh plays
+      - name: Build Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          tags: fmri-gym:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Step 6: Play a short run in the container through run_docker.sh, on a virtual X display
+      # and a PulseAudio server whose only sink is a null one (the runner has no screen or sound card)
+      - name: Test the container
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install --no-install-recommends xvfb xauth pulseaudio
+          export XDG_RUNTIME_DIR=$(mktemp -d)
+          pulseaudio -D -n --exit-idle-time=-1 --use-pid-file=no \
+            --load="module-null-sink sink_name=ci" \
+            --load="module-native-protocol-unix auth-anonymous=1"
+          mkdir -p data
+          timeout 60 xvfb-run -a -s "-screen 0 1280x1024x24" ./run_docker.sh \
+            --subject sub-ci --ses 1 --run 1 --duration 20 --dummy-trigger \
+            --rig configs/examples/rigs/empty.json \
+            --curriculum configs/curricula/vizdoom/levels/basic.json
+          find data/sub-ci -name manifest.json | grep -q .
+
+      - name: Keep the test run's folder
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-test-run
+          path: data/
+          retention-days: 7
+
+      # Step 7: Push the image that was tested (the build is the cached one above)
+      - name: Push Docker image
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -60,4 +96,3 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
