@@ -83,7 +83,7 @@ class COOMAdapter(EnvAdapter):
         """Return this tic's native PCM, or None for disabled/terminal audio."""
         if not self._game.is_audio_buffer_enabled():
             return None
-        state = self._game.get_state()
+        state = self.env.unwrapped.state
         if state is None:
             return None
         return Sound(state.audio_buffer, self._game.get_audio_sampling_rate())
@@ -97,7 +97,7 @@ class COOMAdapter(EnvAdapter):
         return super().outcome(terminated, truncated)
 
     def capture(self, obs: Any, info: dict, want_blob: bool = True) -> FrameState:
-        state = self._game.get_state()
+        state = self.env.unwrapped.state
         variables = {"game_variables": state.game_variables.copy() if state is not None
                      else np.full(len(self._game.get_available_game_variables()), np.nan)}
         variables["tic"] = state.tic if state is not None else -1
