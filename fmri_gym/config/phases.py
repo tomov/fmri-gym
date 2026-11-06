@@ -412,7 +412,7 @@ class CheckControls(CheckPhase):
     type: ClassVar[str] = "check_controls"
     #: seconds to press each key
     timeout_s: float
-    #: calibrate the sticks of the rig's input devices first
+    #: calibrate the stick axes of the rig's input devices first
     calibrates: bool
 
     @classmethod

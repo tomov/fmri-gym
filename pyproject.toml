@@ -100,7 +100,7 @@ session-editor = "fmri_gym.gui:session_editor_main"
 # all of its runs land in one session. Nothing else reads the disk for a number.
 fmri-ses = "fmri_gym.bids:main"
 # The game controller plugged in: calibrate it (each run with that controller reads
-# its newest calibration), see what it sends, and tune how its sticks are read.
+# its newest calibration), see what it sends, and tune how its stick axes are read.
 pad-calibration = "fmri_gym.pad_scope:main"
 
 [tool.setuptools]

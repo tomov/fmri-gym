@@ -806,7 +806,7 @@ class _RigWindow(QtWidgets.QDialog):
         self.controller_text.setWordWrap(True)
         self.calibrate = ui.button("Calibrate controller...", self._calibrate)
         self.calibrate.setToolTip("Open pad-calibration on the controller plugged in: measure "
-                                  "its sticks and check every button (about 20 s a stick), and "
+                                  "each stick axis and check every control, and "
                                   "see what it sends.")
         look = ui.button("Look again", self._look_for_controller)
         look.setToolTip("Look again for a controller plugged in, and its calibration.")

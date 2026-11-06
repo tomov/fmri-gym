@@ -25,7 +25,7 @@ A test the rig gives no reason to run is recorded as "not run", with why:
   says nothing of where it went.
 * ``check_controls`` -- the response devices: what the rig's participant can
   press, i.e. each control of the devices its ``"inputs"`` list (each stick
-  calibrated first) and each of its ``"response_keys"``. Every response key is
+  axis calibrated first) and each of its ``"response_keys"``. Every response key is
   first checked automatically -- one that comes back through the event queue
   as itself -- and the input devices plugged in are listed; then each control
   is asked for on screen and pressed on the real device.
@@ -420,8 +420,7 @@ def _controllers(inputs: InputDevices) -> list[Controller]:
 def _controls_to_ask(inputs: InputDevices) -> dict[str, str]:
     """Each control of the controllers to press, buttons then stick directions: what it is on."""
     return {c: f"on the {d.name}" for d in _controllers(inputs)
-            for c in (*cue_order(d.BUTTON_NAMES),
-                      *(n for stick in d.sticks for n in stick.directions()))}
+            for c in (*cue_order(d.BUTTON_NAMES), *d.axis_controls())}
 
 
 def _check_controls(run: Run, phase: CheckControls, summary: dict, arrays: dict, tests: dict,
@@ -459,25 +458,24 @@ def _check_controls(run: Run, phase: CheckControls, summary: dict, arrays: dict,
 
 
 def _calibrate(run: Run, phase: CheckControls, device: Controller) -> dict[str, Any]:
-    """Calibrate ``device``'s sticks before asking for any control, and read it through that.
+    """Calibrate ``device``'s stick axes before asking for any control, and read it through that.
 
-    Each stick has to be measured on the rig before a threshold means anything
+    Each axis has to be measured on the rig before a threshold means anything
     (see :mod:`fmri_gym.pad_calibration`), so the calibration runs here and is
     written for the device, which every later run on this rig with it reads.
     ``"calibrates": false`` in the phase skips it and leaves any calibration alone.
     """
-    if not device.sticks:
+    if not device.AXIS_NAMES:
         return {"present": True, "device": device.device_name, "measured": False, "why": "",
                 "note": "it has no stick"}
     if not phase.calibrates:
         return {"present": True, "device": device.device_name, "measured": False, "why": "",
                 "note": 'skipped ("calibrates": false)'}
-    result = calibrate(device, run.display.screen, pygame.display.flip, tuple(device.sticks))
+    result = calibrate(device, run.display.screen, pygame.display.flip)
     if result is None:
         return {"present": True, "device": device.device_name, "measured": False,
                 "why": "stopped before it finished; nothing written"}
-    for stick_name, calibration_file in result.written.items():
-        device.set_stick_calibration(device.stick(stick_name), calibration_file)
+    device.set_calibration((result.path, result.calibration))
     return {"present": True, "device": device.device_name, "why": "", **result.record()}
 
 
@@ -1143,8 +1141,8 @@ COLUMNS: list[tuple[str, tuple[str, ...], str, str | None]] = [
      "Median time from the prompt to the press (a person's, not the device's)", "ms"),
     ("pad_device", ("rig_check", "controls", "pad", "device"),
      "The controller found, whose buttons are read as keys", None),
-    ("pad_axis_on", ("rig_check", "controls", "pad", "sticks", "LEFT_STICK", "on"),
-     "Fraction of the left stick's travel that counts as pushed", None),
+    ("pad_axis_on", ("rig_check", "controls", "pad", "axes", "LEFT_STICK_X", "on"),
+     "Fraction of the left stick's horizontal travel that counts as pushed", None),
     ("pad_corrections", ("rig_check", "controls", "pad", "corrections"),
      "Wrong controls pressed, and asked again, while the calibration confirmed each", None),
     ("input_devices", ("rig_check", "controls", "devices"),
@@ -2171,9 +2169,10 @@ def _pad_line(pad_out: dict) -> str:
     device = pad_out.get("device", "a controller")
     if not pad_out.get("measured"):
         return f"{device} plugged in, not measured: {pad_out.get('note') or pad_out.get('why')}."
-    sticks = "; ".join(f"{name} on past {s['on']:.2f} of its travel and off under {s['off']:.2f}"
-                       f" (written to {s['config']})" for name, s in pad_out["sticks"].items())
-    return (f"{device} measured: {sticks or 'no stick'}; {pad_out['confirmed']} controls "
+    axes = "; ".join(f"{name} on past {a['on']:.2f} of its travel and off under {a['off']:.2f}"
+                     for name, a in pad_out["axes"].items())
+    return (f"{device} measured, written to {pad_out['config']}: {axes}; "
+            f"{pad_out['confirmed']} controls "
             f"confirmed, {pad_out['corrections']} wrong presses asked again. Every run on this "
             "rig with it reads what was written.")
 
