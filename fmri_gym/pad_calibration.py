@@ -1,29 +1,26 @@
-"""Measuring a stick's calibration: the procedure, and the fit that turns it into one.
+"""Measuring a controller's calibration: the procedure, and the fit that turns it into one.
 
-A stick rests off centre, travels further one way than the other, and moves its
-centre between sessions, so each is measured on the rig it is used on.
-:func:`calibrate` measures it, waiting on the controller at every step, never on
-a clock, and writes each stick's calibration as a new file
+A stick axis rests off centre, travels further one way than the other, and moves
+its centre between sessions, so each is measured on the rig it is used on.
+:func:`calibrate` measures every axis, waiting on the controller at every step,
+never on a clock, and writes the controller's calibration as a new file
 (:func:`fmri_gym.inputs.calibration.write`), the one a run then reads.
 """
 
 from __future__ import annotations
 
-import math
 import statistics
 import time
 from collections import deque
-from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, NamedTuple
 
 import pygame
 
-from .inputs.calibration import (DOWN, LEFT, RIGHT, UNCALIBRATED, UP,
-                                 AxisCalibration, StickCalibration, write)
-from .inputs.controller import (BUTTON_A, BUTTON_B, BUTTON_X, BUTTON_Y, FACE_BUTTONS, Controller,
-                                Stick, short_name)
+from .inputs.calibration import AxisCalibration, ControllerCalibration, write
+from .inputs.controller import (AXIS_CONTROLS, BUTTON_A, BUTTON_B, BUTTON_X, BUTTON_Y,
+                                FACE_BUTTONS, Controller, short_name)
 
 #: The procedure's colours: the face buttons in the colour they are printed in,
 #: so a cue can be matched by colour without reading it.
@@ -34,10 +31,6 @@ FACE: dict[str, tuple[int, int, int]] = {
     BUTTON_Y: (226, 192, 68), BUTTON_B: (230, 86, 86), BUTTON_X: (79, 143, 247),
     BUTTON_A: (63, 185, 80),
 }
-#: Each direction of a stick as (its axis, 0 for x and 1 for y; the sign a push gives it).
-PUSHES: dict[str, tuple[int, int]] = {UP: (1, -1), DOWN: (1, 1), LEFT: (0, -1), RIGHT: (0, 1)}
-#: The order the procedure asks for the directions.
-CUE_DIRECTIONS = (DOWN, LEFT, UP, RIGHT)
 
 
 def cue_order(buttons: tuple[str, ...]) -> list[str]:
@@ -48,18 +41,19 @@ def cue_order(buttons: tuple[str, ...]) -> list[str]:
     return sorted(buttons, key=rank)
 
 
-def columns_of(stick: Stick) -> tuple[str, str]:
-    """The recording's columns for a stick's raw x and y."""
-    return f"{stick.name}_x", f"{stick.name}_y"
+def arrow_of(control: str) -> str:
+    """The arrow (UP, DOWN, LEFT, RIGHT) of one of :data:`AXIS_CONTROLS`' controls."""
+    return control.rsplit("_", 1)[1]
+
+
 #: Each control is asked for this many times in a row, so one slip is caught.
 TWICE = 2
-#: A stick is at rest once each axis has stayed within this, raw, for this long.
+#: An axis is at rest once each has stayed within this, raw, for this long.
 STILL_S, STILL_RANGE = 1.0, 0.02
-#: A roll is done when each of this many directions round the edge has been
-#: pushed this far, as a fraction of the travel seen that way, with no axis
-#: reaching further since; and each side has travelled at least this far, raw.
-ROLL_BINS, ROLL_REACH, ROLL_MIN = 12, 0.9, 0.3
-#: A cued push counts past this fraction of its travel; the next waits for the stick under
+#: An axis has been pushed to its stops when each side has reached this fraction of
+#: the travel seen that way, with no further reach since; and has travelled this far, raw.
+STOP_REACH, STOP_MIN = 0.9, 0.3
+#: A cued push counts past this fraction of its travel; the next waits for every axis under
 #: the second.
 PUSH, RELEASE = 0.5, 0.2
 #: The thresholds a calibration writes, in fractions of travel; raised above ten times the dither.
@@ -67,18 +61,18 @@ CAL_ON, CAL_OFF = 0.5, 0.3
 
 
 class CalibrationResult(NamedTuple):
-    """The calibrations written, by stick, and how the controls answered."""
+    """The calibration written, and how the controls answered."""
 
-    #: each stick measured: its new file, and what it holds
-    written: dict[str, tuple[Path, StickCalibration]]
+    path: Path
+    calibration: ControllerCalibration
     confirmed: int          # controls asked for and given, each twice in a row
     corrections: int        # wrong controls given, named and asked again
 
     def record(self) -> dict[str, Any]:
         """For the rig check's report."""
         return {"measured": True, "confirmed": self.confirmed, "corrections": self.corrections,
-                "sticks": {name: {"config": str(path), "samples": str(path.with_suffix(".csv")),
-                                  **cal.record()} for name, (path, cal) in self.written.items()}}
+                "config": str(self.path), "samples": str(self.path.with_suffix(".csv")),
+                "axes": {name: axis.record() for name, axis in self.calibration.axes.items()}}
 
 
 # ------------------------------------------------------------ the procedure
@@ -154,7 +148,7 @@ class _Task:
     def frame(self, phase: str, cue: str) -> tuple[dict[str, float], set[str]]:
         """Wait for the next frame, hand the controller its events and record its reading.
 
-        :return: each stick's raw x and y, by :func:`columns_of`; and the buttons down.
+        :return: each axis's raw reading, by its name; and the buttons down.
         :raises _Quit: on ESC, a click on Cancel, or the window closing (which is
             left on the queue for the window's owner, when it has a Cancel).
         """
@@ -171,28 +165,23 @@ class _Task:
             if e.type == pygame.MOUSEBUTTONDOWN and self.cancel \
                     and self.cancel.collidepoint(self.to_canvas(e.pos)):
                 raise _Quit
-        ax = {col: v for stick in self.controller.sticks
-              for col, v in zip(columns_of(stick), (stick.x, stick.y))}
+        ax = dict(self.controller.axis_values)
         bt = set(self.controller.held()) & set(self.buttons)
         row = {"t": round(self.now - self.t0, 4), "phase": phase, "cue": cue}
-        row.update({col: round(v, 5) for col, v in ax.items()})
+        row.update({name: round(v, 5) for name, v in ax.items()})
         row.update({f"b_{c}": int(c in bt) for c in self.buttons})
         self.samples.append(row)
         return ax, bt
 
-    def draw(self, lines: list[str], colour=INK, sub: str = "", arrow: str | None = None,
-             ring: tuple[int, set[int]] | None = None) -> None:
-        """One screen: a word or two, an arrow or the roll's ring of directions, a line under."""
+    def draw(self, lines: list[str], colour=INK, sub: str = "",
+             arrows: tuple[tuple[str, Any], ...] = ()) -> None:
+        """One screen: arrows side by side (a direction and its colour each), a word or two,
+        a line under."""
         self.screen.fill(SURFACE)
-        if arrow:
-            draw_arrow(self.screen, arrow, (self.mx, 235), 74, colour)
-        if ring:
-            n, lit = ring
-            for b in range(n):
-                angle = (b + 0.5) / n * 2 * math.pi - math.pi
-                at = (self.mx + math.cos(angle) * 110, 235 + math.sin(angle) * 110)
-                pygame.draw.circle(self.screen, LIVE if b in lit else GRID, at, 12)
-        top = 360 if ring else 300 if arrow else 235
+        for k, (direction, arrow_colour) in enumerate(arrows):
+            at = (int(self.mx + (k - (len(arrows) - 1) / 2) * 200), 235)
+            draw_arrow(self.screen, direction, at, 74, arrow_colour)
+        top = 300 if arrows else 235
         for k, line in enumerate(lines):
             font, ink = (self.big, colour) if k == 0 else (self.mid, INK2)
             surf = font.render(line, True, ink)
@@ -205,45 +194,55 @@ class _Task:
         self.present()
 
 
-def _hold_still(task: _Task, columns: tuple[str, str], phase: str, cue: str,
-                words: list[str]) -> dict[str, float]:
-    """Wait until the stick has been still for :data:`STILL_S`. Returns where it rests."""
+def _stick_words(controller: Controller, axis_name: str) -> str:
+    """The stick an axis is on, as a cue says it: ``the stick``, or ``the left stick`` on a
+    pad with two."""
+    sticks = {name.rsplit("_", 1)[0] for name in controller.AXIS_NAMES}
+    stick = axis_name.rsplit("_", 1)[0]
+    return f"the {stick.replace('_', ' ').lower()}" if len(sticks) > 1 else "the stick"
+
+
+def _hold_still(task: _Task, phase: str, words: list[str]) -> dict[str, float]:
+    """Wait until every axis has been still for :data:`STILL_S`. Returns where each rests."""
     window: deque = deque()
     while True:
         task.draw(words, INK2)
-        ax, _ = task.frame(phase, cue)
+        ax, _ = task.frame(phase, "")
         window.append((task.now, ax))
         while task.now - window[0][0] > STILL_S:
             window.popleft()
         if task.now - window[0][0] < 0.95 * STILL_S:
             continue
-        spans = [max(a[c] for _, a in window) - min(a[c] for _, a in window) for c in columns]
-        if max(spans) <= STILL_RANGE:
-            return {c: statistics.median(a[c] for _, a in window) for c in columns}
+        spans = [max(a[c] for _, a in window) - min(a[c] for _, a in window) for c in ax]
+        if max(spans, default=0.0) <= STILL_RANGE:
+            return {c: statistics.median(a[c] for _, a in window) for c in ax}
 
 
-def _roll(task: _Task, columns: tuple[str, str], cue: str, rest: dict[str, float],
-          which: str) -> dict[str, tuple[float, float]]:
-    """Wait until the stick has been rolled to its stop all the way round.
+def _push_to_stops(task: _Task, axis_name: str, rest: float) -> tuple[float, float]:
+    """Wait until the axis has been pushed to its stop each way.
 
-    :return: each axis's (min, max).
+    :return: its (min, max), raw.
     """
-    lo, hi, lit = dict(rest), dict(rest), set()
+    negative, positive = AXIS_CONTROLS[axis_name]
+    lo, hi, reached = rest, rest, set()
+    words = [f"push {_stick_words(task.controller, axis_name)}",
+             f"{arrow_of(negative).lower()} and {arrow_of(positive).lower()}"]
     while True:
-        task.draw([f"roll {which}", "round its edge"], ring=(ROLL_BINS, lit),
-                  sub="push it to its stop, all the way round, until every dot is lit")
-        ax, _ = task.frame("roll", cue)
-        for c in columns:
-            if ax[c] < lo[c] - 0.01 or ax[c] > hi[c] + 0.01:
-                lit.clear()                     # further than before: round again at it
-            lo[c], hi[c] = min(lo[c], ax[c]), max(hi[c], ax[c])
-        n = [_fraction(ax[c], rest[c], lo[c], hi[c]) for c in columns]
-        if math.hypot(*n) >= ROLL_REACH:
-            turn = (math.atan2(n[1], n[0]) + math.pi) / (2 * math.pi)
-            lit.add(int(turn * ROLL_BINS) % ROLL_BINS)
-        if len(lit) == ROLL_BINS and all(min(hi[c] - rest[c], rest[c] - lo[c]) >= ROLL_MIN
-                                         for c in columns):
-            return {c: (lo[c], hi[c]) for c in columns}
+        arrows = tuple((arrow_of(c), LIVE if c in reached else GRID) for c in (negative, positive))
+        task.draw(words, sub="push it to its stop each way, until both arrows are lit",
+                  arrows=arrows)
+        ax, _ = task.frame("stops", axis_name)
+        value = ax[axis_name]
+        if value < lo - 0.01 or value > hi + 0.01:
+            reached.clear()                     # further than before: to each stop again
+        lo, hi = min(lo, value), max(hi, value)
+        pushed = _fraction(value, rest, lo, hi)
+        if pushed <= -STOP_REACH:
+            reached.add(negative)
+        if pushed >= STOP_REACH:
+            reached.add(positive)
+        if len(reached) == 2 and min(hi - rest, rest - lo) >= STOP_MIN:
+            return lo, hi
 
 
 def _fraction(value: float, rest: float, lo: float, hi: float) -> float:
@@ -259,13 +258,14 @@ def _ask(task: _Task, cue: str, words: str, colour, arrow: str | None, answer, i
     :param idle: the reading -> whether the pad is let go of, which a next answer waits for.
     """
     wrong, row, said = 0, 0, ""
+    arrows = ((arrow, colour),) if arrow else ()
     while row < TWICE:
-        task.draw([words, f"{row + 1} of {TWICE}"], colour, said, arrow)
+        task.draw([words, f"{row + 1} of {TWICE}"], colour, said, arrows)
         while not idle(*task.frame("idle", cue)):
             pass
         got = None
         while got is None:
-            task.draw([words, f"{row + 1} of {TWICE}"], colour, said, arrow)
+            task.draw([words, f"{row + 1} of {TWICE}"], colour, said, arrows)
             got = answer(*task.frame("ask", cue))
         if got == cue:
             row, said = row + 1, ""
@@ -274,17 +274,19 @@ def _ask(task: _Task, cue: str, words: str, colour, arrow: str | None, answer, i
     return wrong
 
 
-def _calibrate_stick(task: _Task, stick: Stick, which: str) -> int:
-    """Rest, travel and directions of one stick. Returns the wrong answers."""
-    columns = columns_of(stick)
-    cold = _hold_still(task, columns, "cold", stick.name, ["hands off"])
-    travel = _roll(task, columns, stick.name, cold, which)
-    rest = _hold_still(task, columns, "rest", stick.name, ["let go", "hands off"])
+def _ask_axis_controls(task: _Task, rest: dict[str, float],
+                       travel: dict[str, tuple[float, float]]) -> int:
+    """Each control of each axis, asked for twice in a row. Returns the wrong answers.
 
+    The answer is the side pushed furthest of every axis, so a push that moves the
+    wrong axis further than the one asked for is named.
+    """
     def pushes(ax: dict[str, float]) -> dict[str, float]:
-        return {stick.control_of(d): _fraction(ax[columns[axis]], rest[columns[axis]],
-                                               *travel[columns[axis]]) * sign
-                for d, (axis, sign) in PUSHES.items()}
+        out = {}
+        for name, (negative, positive) in ((n, AXIS_CONTROLS[n]) for n in rest):
+            pushed = _fraction(ax[name], rest[name], *travel[name])
+            out[negative], out[positive] = -pushed, pushed
+        return out
 
     def answer(ax: dict[str, float], _bt: set[str]) -> str | None:
         best = max(pushes(ax).items(), key=lambda kv: kv[1])
@@ -293,8 +295,9 @@ def _calibrate_stick(task: _Task, stick: Stick, which: str) -> int:
     def idle(ax: dict[str, float], _bt: set[str]) -> bool:
         return all(abs(v) < RELEASE for v in pushes(ax).values())
 
-    return sum(_ask(task, stick.control_of(d), f"push {which}", INK, d, answer, idle)
-               for d in CUE_DIRECTIONS)
+    return sum(_ask(task, control, f"push {_stick_words(task.controller, name)}", INK,
+                    arrow_of(control), answer, idle)
+               for name in rest for control in AXIS_CONTROLS[name])
 
 
 def _ask_buttons(task: _Task) -> int:
@@ -304,55 +307,40 @@ def _ask_buttons(task: _Task) -> int:
                for name in task.buttons)
 
 
-def _measure(task: _Task, sticks: tuple[Stick, ...], has_buttons: bool) -> tuple[int, int]:
-    """Each of ``sticks``, then each button if ``has_buttons``. Returns (confirmed, wrong)."""
-    confirmed = wrong = 0
-    for stick in sticks:
-        which = (f"the {stick.name.replace('_', ' ').lower()}"
-                 if len(task.controller.sticks) > 1 else "the stick")
-        wrong += _calibrate_stick(task, stick, which)
-        confirmed += len(CUE_DIRECTIONS)
-    if has_buttons:
-        wrong += _ask_buttons(task)
-        confirmed += len(task.buttons)
+def _measure(task: _Task) -> tuple[int, int]:
+    """Every axis, then each of its controls, then each button. Returns (confirmed, wrong)."""
+    cold = _hold_still(task, "cold", ["hands off"])
+    travel = {name: _push_to_stops(task, name, cold[name]) for name in task.controller.AXIS_NAMES}
+    rest = _hold_still(task, "rest", ["let go", "hands off"])
+    wrong = _ask_axis_controls(task, rest, travel) + _ask_buttons(task)
     task.draw(["done"], LIVE)
-    return confirmed, wrong
+    return len(task.controller.axis_controls()) + len(task.buttons), wrong
 
 
 def calibrate(controller: Controller, screen: pygame.Surface, present: Callable[[], None],
-              sticks: tuple[Stick, ...],
               to_canvas: Callable[[tuple[int, int]], tuple[int, int]] | None = None,
               ) -> CalibrationResult | None:
-    """Measure ``sticks`` of ``controller`` on ``screen``, and write each a new calibration.
+    """Measure every axis of ``controller`` on ``screen``, and write its new calibration.
 
-    Per stick: hands off until still, roll it round its edge until each direction
-    has reached its stop, let go until still; then each of its directions asked
-    for until it comes twice in a row, a wrong one named and asked again. With
-    every stick the pad has, its buttons are asked for the same way. The
-    controller goes on reading through the calibrations it had; the caller
-    applies the new ones (:meth:`Controller.set_stick_calibration`).
+    Hands off until every axis is still; each axis pushed to its stop each way;
+    let go until still. Then each control of each axis, and each button, asked
+    for until it comes twice in a row, a wrong one named and asked again. The
+    controller goes on reading through the calibration it had; the caller
+    applies the new one (:meth:`Controller.set_calibration`).
 
     :param present: shows ``screen``.
     :param to_canvas: a window position -> ``screen``'s; given, the screen has a Cancel button.
     :return: what was written; None when ESC, Cancel or the window closing stopped
         it, with nothing written.
-    :raises ValueError: for a stick the controller does not have.
     """
-    unknown = [s.name for s in sticks if s not in controller.sticks]
-    if unknown:
-        raise ValueError(f"{controller.device_name!r} has no {' or '.join(unknown)}")
     task = _Task(controller, screen, present, to_canvas)
     try:
-        confirmed, wrong = _measure(task, sticks, len(sticks) == len(controller.sticks))
+        confirmed, wrong = _measure(task)
     except _Quit:
         return None
     made = datetime.now(timezone.utc).replace(microsecond=0)
-    written = {}
-    for stick in sticks:
-        rows = [r for r in task.samples if r["cue"] == stick.name]
-        calibration = fit(rows, stick, controller.device_name, made)
-        written[stick.name] = (write(calibration, rows), calibration)
-    return CalibrationResult(written, confirmed, wrong)
+    calibration = fit(task.samples, controller.AXIS_NAMES, controller.device_name, made)
+    return CalibrationResult(write(calibration, task.samples), calibration, confirmed, wrong)
 
 
 # ------------------------------------------------------------ the fit
@@ -364,26 +352,25 @@ def _still_at(rows: list[dict], column: str) -> tuple[float, float]:
     return statistics.median(vals), (max(vals) - min(vals)) / 2
 
 
-def fit(rows: list[dict], stick: Stick, device_name: str, made: datetime) -> StickCalibration:
-    """One stick's calibration from the frames that measured it: its axes' rest, stops and
-    drift, and its thresholds.
+def fit(rows: list[dict], axis_names: tuple[str, ...], device_name: str,
+        made: datetime) -> ControllerCalibration:
+    """A controller's calibration from the frames that measured it: each axis's rest, stops,
+    drift and thresholds.
 
-    It presses at :data:`CAL_ON` of travel and releases under :data:`CAL_OFF`,
-    raised to ten times the dither at rest for a stick that dithers.
+    An axis presses at :data:`CAL_ON` of its travel and releases under :data:`CAL_OFF`,
+    raised to ten times its dither at rest for an axis that dithers.
 
-    :param rows: the stick's frames of a calibration (raw readings), as
-        :func:`calibrate` records them.
+    :param rows: the frames of a calibration (raw readings), as :func:`calibrate` records them.
     :param made: when the measurement was made.
     """
-    axes, dither = [], 0.0
-    for column in columns_of(stick):
-        cold, _ = _still_at([r for r in rows if r["phase"] == "cold"], column)
-        rest, noise = _still_at([r for r in rows if r["phase"] == "rest"], column)
-        col = [r[column] for r in rows]
-        lo, hi = min(col), max(col)
-        axes.append(AxisCalibration(round(rest, 5), round(lo, 5), round(hi, 5),
-                                    round(abs(rest - cold), 5)))
-        dither = max(dither, noise / max(min(hi - rest, rest - lo), 1e-3))
-    on = round(min(max(CAL_ON, 10 * dither), 0.65), 3)
-    tuning = replace(UNCALIBRATED, on=on, off=CAL_OFF if on == CAL_ON else round(0.6 * on, 3))
-    return StickCalibration(device_name, stick.name, None, made, axes[0], axes[1], tuning)
+    axes = {}
+    for name in axis_names:
+        cold, _ = _still_at([r for r in rows if r["phase"] == "cold"], name)
+        rest, noise = _still_at([r for r in rows if r["phase"] == "rest"], name)
+        lo, hi = min(r[name] for r in rows), max(r[name] for r in rows)
+        dither = noise / max(min(hi - rest, rest - lo), 1e-3)
+        on = round(min(max(CAL_ON, 10 * dither), 0.65), 3)
+        off = CAL_OFF if on == CAL_ON else round(0.6 * on, 3)
+        axes[name] = AxisCalibration(round(rest, 5), round(lo, 5), round(hi, 5),
+                                     round(abs(rest - cold), 5), on, off)
+    return ControllerCalibration(device_name, None, made, axes)

@@ -1,4 +1,4 @@
-"""The input devices with none plugged in: their events, their sticks, their calibration.
+"""The input devices with none plugged in: their events, their stick axes, their calibration.
 
 A scripted controller answers the calibration frame by frame, on a fake clock,
 so a whole calibration plays in well under a second and writes into a
@@ -23,17 +23,17 @@ from fmri_gym import pad_calibration as cal
 from fmri_gym.inputs import (QUIT, CalibrationError, CurrentDesignsGamepad3, Edge, InputDevices,
                              InputEvent, Keyboard, XBoxController)
 from fmri_gym.inputs import calibration as files
-from fmri_gym.inputs.calibration import UNCALIBRATED, StickTuning
-from fmri_gym.inputs.controller import (LEFT_STICK, RIGHT_STICK, STICK_DIRECTIONS, Controller,
-                                        Stick)
+from fmri_gym.inputs.calibration import AxisCalibration
+from fmri_gym.inputs.controller import (AXIS_CONTROLS, LEFT_STICK_X, LEFT_STICK_Y, RIGHT_STICK_X,
+                                        RIGHT_STICK_Y, Controller)
 
+LX, LY, RX, RY = LEFT_STICK_X, LEFT_STICK_Y, RIGHT_STICK_X, RIGHT_STICK_Y
 MADE = "2026-01-21T14:15:00+00:00"
-AXIS = {"rest": 0.0, "low": -1.0, "high": 1.0, "drift": 0.01}
-FILE = {"device": "Scripted", "stick": LEFT_STICK, "tuned_from": None, "made": MADE,
-        "x": AXIS, "y": AXIS, "on": 0.5, "off": 0.3, "diagonal": 1.0, "dwell_s": 0.05}
-RIGHT_FILE = {**FILE, "stick": RIGHT_STICK, "on": 0.6}
-#: The recording's columns for the scripted controller's sticks.
-LX, LY, RX, RY = f"{LEFT_STICK}_x", f"{LEFT_STICK}_y", f"{RIGHT_STICK}_x", f"{RIGHT_STICK}_y"
+AXIS = {"rest": 0.0, "low": -1.0, "high": 1.0, "drift": 0.01, "on": 0.5, "off": 0.3}
+#: A calibration of the scripted controller's four axes, and of the GMPD3's two.
+FILE = {"device": "Scripted", "tuned_from": None, "made": MADE,
+        "axes": {LX: AXIS, LY: AXIS, RX: {**AXIS, "on": 0.6}, RY: AXIS}}
+GMPD3_FILE = {**FILE, "axes": {LX: AXIS, LY: AXIS}}
 
 
 @pytest.fixture
@@ -65,64 +65,59 @@ def _set(blob: dict, path: str, value) -> dict:
     return out
 
 
-def _calibration(blob: dict) -> tuple[None, files.StickCalibration]:
-    """A calibration as a controller takes it: its (absent) file, and its contents."""
-    return None, files.StickCalibration.from_dict(blob)
-
-
 # -- the calibration file -----------------------------------------------------------------
 
 
 def test_a_calibration_round_trips_through_its_file():
-    loaded = files.StickCalibration.from_dict(copy.deepcopy(RIGHT_FILE))
-    assert loaded.record() == RIGHT_FILE
-    assert (loaded.stick, loaded.tuning.on) == (RIGHT_STICK, 0.6)
+    loaded = files.ControllerCalibration.from_dict(copy.deepcopy(FILE))
+    assert loaded.record() == FILE
+    assert (loaded.axes[RX].on, loaded.axes[LX].on) == (0.6, 0.5)
     assert loaded.made == datetime(2026, 1, 21, 14, 15, tzinfo=timezone.utc)
 
 
 @pytest.mark.parametrize("field, value, says", [
-    ("on", "0.5", "on: expected a number in (0, 1), got '0.5'"),
-    ("off", 0.6, "off: expected a number in (0, on=0.5], got 0.6"),
-    ("diagonal", 0, "diagonal: expected a number in (0, 1], got 0"),
-    ("dwell_s", 0.5, "dwell_s: expected a number of seconds in [0, 0.3]"),
-    ("x.drift", True, "x.drift: expected a number >= 0, got True"),
-    ("x.low", 0.5, "x: expected low < rest < high"),
-    ("x.noise", 0.001, "x.noise: unknown key"),
+    (f"axes.{LX}.on", "0.5", f"axes.{LX}.on: expected a number in (0, 1), got '0.5'"),
+    (f"axes.{LX}.off", 0.6, f"axes.{LX}.off: expected a number in (0, on=0.5], got 0.6"),
+    (f"axes.{LX}.drift", True, f"axes.{LX}.drift: expected a number >= 0, got True"),
+    (f"axes.{LX}.low", 0.5, f"axes.{LX}: expected low < rest < high"),
+    (f"axes.{LX}.noise", 0.001, f"axes.{LX}.noise: unknown key"),
+    (f"axes.{LY}", ..., None),
+    ("axes", {}, "axes: expected each axis by its name, got {}"),
     ("made", "2026-10-21T14:15:00", "made: expected a time such as"),
-    ("y", ..., "y: missing"),
-    ("stick", "", "stick: expected a name, got ''"),
     ("device", ..., "device: missing"),
+    ("device", "", "device: expected a name, got ''"),
     ("tuned_from", 3, "tuned_from: expected null or a file name, got 3"),
-    ("sectors", {}, "sectors: unknown key"),
+    ("stick", "LEFT_STICK", "stick: unknown key"),
 ])
 def test_each_wrong_field_is_refused_by_its_file_and_name(tmp_path, field, value, says):
-    path = tmp_path / "Scripted_LEFT_STICK_20261021-141500.json"
+    path = tmp_path / "Scripted_20261021-141500.json"
     path.write_text(json.dumps(_set(FILE, field, value)))
+    if says is None:                                # fewer axes is a file; a controller refuses it
+        files.read(path)
+        return
     with pytest.raises(CalibrationError, match=re.escape(f"{path}: {says}")):
         files.read(path)
 
 
-def test_a_stick_is_read_through_its_newest_calibration(config_home):
-    _write(config_home, "Scripted_a.json", _set(FILE, "on", 0.31), 1000)
-    newest = _write(config_home, "Scripted_b.json", _set(FILE, "on", 0.33), 3000)
-    _write(config_home, "Scripted_c.json", _set(FILE, "on", 0.32), 2000)
-    _write(config_home, "Scripted_r.json", RIGHT_FILE, 4000)            # newer, the other stick
+def test_a_controller_is_read_through_its_newest_calibration(config_home):
+    _write(config_home, "Scripted_a.json", _set(FILE, f"axes.{LX}.on", 0.31), 1000)
+    newest = _write(config_home, "Scripted_b.json", _set(FILE, f"axes.{LX}.on", 0.33), 3000)
+    _write(config_home, "Scripted_c.json", _set(FILE, f"axes.{LX}.on", 0.32), 2000)
     _write(config_home, "Other_d.json", {**FILE, "device": "Other"}, 4000)   # newer, another pad
     _write(config_home, "Other_e.json", {"device": "Other", "axes": {}}, 5000)  # bad, not ours
-    path, found = files.newest("Scripted", LEFT_STICK)
-    assert (path, found.tuning.on) == (newest, 0.33)
-    assert files.newest("Scripted", RIGHT_STICK)[1].tuning.on == 0.6
-    assert files.newest("Nobody", LEFT_STICK) is None
+    path, found = files.newest("Scripted")
+    assert (path, found.axes[LX].on) == (newest, 0.33)
+    assert files.newest("Nobody") is None
 
 
 def test_a_malformed_newest_calibration_stops_the_run_with_no_fallback(config_home):
     _write(config_home, "Scripted_a.json", FILE, 1000)
-    bad = _write(config_home, "Scripted_b.json", _set(FILE, "on", "0.5"), 2000)
-    with pytest.raises(CalibrationError, match=re.escape(f"{bad}: on")):
-        files.newest("Scripted", LEFT_STICK)
+    bad = _write(config_home, "Scripted_b.json", _set(FILE, f"axes.{LX}.on", "0.5"), 2000)
+    with pytest.raises(CalibrationError, match=re.escape(f"{bad}: axes.{LX}.on")):
+        files.newest("Scripted")
     bad.write_text("{not json")                    # names no device: it may be this one's
     with pytest.raises(CalibrationError, match="not JSON"):
-        files.newest("Scripted", LEFT_STICK)
+        files.newest("Scripted")
 
 
 # -- a controller with no SDL behind it -----------------------------------------------------
@@ -160,10 +155,9 @@ def _bare(cls: type[Controller], name: str = "Scripted") -> Controller:
     return cls(_FakeHandle(name=name), calibrated=False)
 
 
-def _calibrated(controller: Controller, *blobs: dict) -> Controller:
-    """``controller`` reading each stick a blob names through that blob."""
-    for blob in blobs:
-        controller.set_stick_calibration(controller.stick(blob["stick"]), _calibration(blob))
+def _calibrated(controller: Controller, blob: dict) -> Controller:
+    """``controller`` reading its axes through ``blob``."""
+    controller.set_calibration((None, files.ControllerCalibration.from_dict(blob)))
     return controller
 
 
@@ -172,10 +166,9 @@ class _ScriptedController(Controller):
     ESC."""
 
     name = "scripted"
-    STICK_NAMES = (LEFT_STICK, RIGHT_STICK)
+    AXIS_NAMES = (LX, LY, RX, RY)
     BUTTON_NAMES = ("S_A", "S_B")
-    CONTROLS = frozenset({*BUTTON_NAMES, *STICK_DIRECTIONS[LEFT_STICK],
-                          *STICK_DIRECTIONS[RIGHT_STICK]})
+    CONTROLS = frozenset({*BUTTON_NAMES, *(c for a in AXIS_NAMES for c in AXIS_CONTROLS[a])})
     HANDLE = _FakeHandle
 
     def __init__(self, handle=None, calibrated: bool = False, frames=()) -> None:
@@ -199,32 +192,33 @@ class _ScriptedController(Controller):
             pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
             frame = (self.axes_at({}), set())
         axes, buttons = frame
-        for stick in self.sticks:
-            stick.x, stick.y = axes[f"{stick.name}_x"], axes[f"{stick.name}_y"]
         out = [e for b in self.BUTTON_NAMES for e in self._press(b, b in buttons)]
-        return out + self._read_sticks(now)
+        return out + [e for name in self.AXIS_NAMES for e in self._move_axis(name, axes[name])]
 
-    @staticmethod
-    def axes_at(moved: dict[str, float]) -> dict[str, float]:
-        return {c: moved.get(c, 0.0) for c in (LX, LY, RX, RY)}
-
-
-def _stick_frames(d: _ScriptedController, stick: Stick, wrong: str | None = None) -> list:
-    """Hands off, roll, let go, then each direction twice (``wrong`` pushed once first)."""
-    x, y = cal.columns_of(stick)
-    still = [(d.axes_at({x: 0.02}), set())] * 70
-    circle = [(d.axes_at({x: math.cos(2 * math.pi * k / 48), y: math.sin(2 * math.pi * k / 48)}),
-               set()) for k in range(48 * 3)]
-    rest = [(d.axes_at({x: -0.05, y: 0.01}), set())] * 70
-    out = still + circle + rest
-    for b in ([wrong] if wrong else []) + [b for b in cal.CUE_DIRECTIONS for _ in range(2)]:
-        axis, sign = cal.PUSHES[b]
-        out += [rest[0], (d.axes_at({x: -0.05, y: 0.01, (x, y)[axis]: 0.9 * sign}), set())]
-    return out
+    @classmethod
+    def axes_at(cls, moved: dict[str, float]) -> dict[str, float]:
+        return {name: moved.get(name, 0.0) for name in cls.AXIS_NAMES}
 
 
-def _button_frames(d: _ScriptedController) -> list:
-    return [f for b in ("S_A", "S_B") for f in [(d.axes_at({}), set()), (d.axes_at({}), {b})] * 2]
+#: Where the scripted controller rests, cold and then warm.
+COLD, REST = {LX: 0.02}, {LX: -0.05, LY: 0.01}
+
+
+def _frames(d: _ScriptedController, wrong: str | None = None) -> list:
+    """Hands off; each axis to each stop and back to the first; let go; each axis control
+    twice (``wrong`` pushed once first); each button twice."""
+    still = [(d.axes_at(COLD), set())] * 70
+    sweep = ([-k / 10 for k in range(1, 11)] + [k / 10 for k in range(-9, 11)]
+             + [k / 10 for k in range(9, -11, -1)])
+    stops = [(d.axes_at({**COLD, name: v}), set()) for name in d.AXIS_NAMES for v in sweep]
+    rest = [(d.axes_at(REST), set())] * 70
+    out = still + stops + rest
+    for control in ([wrong] if wrong else []) + [c for c in d.axis_controls() for _ in range(2)]:
+        name = next(n for n, sides in AXIS_CONTROLS.items() if control in sides)
+        sign = -1 if control == AXIS_CONTROLS[name][0] else 1
+        out += [rest[0], (d.axes_at({**REST, name: 0.9 * sign}), set())]
+    buttons = [f for b in d.BUTTON_NAMES for f in [(d.axes_at({}), set()), (d.axes_at({}), {b})] * 2]
+    return out + buttons
 
 
 class _FakeClock:
@@ -249,61 +243,46 @@ def screen(monkeypatch):
 # -- the calibration procedure ------------------------------------------------------------
 
 
-def test_a_calibration_of_both_sticks_measures_each_and_confirms_each_control(config_home,
-                                                                              screen):
+def test_a_calibration_measures_each_axis_and_confirms_each_control(config_home, screen):
     d = _ScriptedController()
-    left, right = d.sticks
-    d.frames = iter(_stick_frames(d, left, wrong="LEFT") + _stick_frames(d, right)
-                    + _button_frames(d))
-    result = cal.calibrate(d, screen, lambda: None, tuple(d.sticks))
-    assert (result.confirmed, result.corrections) == (4 + 4 + 2, 1)
-    path, measured = result.written[LEFT_STICK]
-    assert (measured.x.rest, measured.x.low, measured.x.high, measured.x.drift) == (
-        -0.05, -1.0, 1.0, 0.07)
-    assert (measured.tuning.on, measured.tuning.off) == (cal.CAL_ON, cal.CAL_OFF)
-    assert set(result.written) == {LEFT_STICK, RIGHT_STICK}
-    assert files.newest("Scripted", LEFT_STICK) == (path, measured)
-    assert path.with_suffix(".csv").exists() and "Scripted_LEFT-STICK_" in path.name
-    assert left.calibration is None                 # the caller applies what was written
+    d.frames = iter(_frames(d, wrong="LEFT_STICK_RIGHT"))
+    result = cal.calibrate(d, screen, lambda: None)
+    assert (result.confirmed, result.corrections) == (8 + 2, 1)
+    measured = result.calibration.axes[LX]
+    assert (measured.rest, measured.low, measured.high, measured.drift) == (-0.05, -1.0, 1.0, 0.07)
+    assert (measured.on, measured.off) == (cal.CAL_ON, cal.CAL_OFF)
+    assert set(result.calibration.axes) == {LX, LY, RX, RY}
+    assert files.newest("Scripted") == (result.path, result.calibration)
+    assert result.path.with_suffix(".csv").exists() and "Scripted_" in result.path.name
+    assert d.calibration is None                    # the caller applies what was written
     from fmri_gym.checks import _pad_line
     line = _pad_line({"present": True, "device": "Scripted", **result.record()})
-    assert "LEFT_STICK on past 0.50" in line and "10 controls confirmed, 1 wrong" in line
-
-
-def test_one_stick_calibrated_alone_leaves_the_others_file_alone(config_home, screen):
-    base = files.write(files.StickCalibration.from_dict(_set(FILE, "on", 0.4)))
-    d = _ScriptedController()
-    d.frames = iter(_stick_frames(d, d.stick(RIGHT_STICK)))     # no buttons: not every stick
-    result = cal.calibrate(d, screen, lambda: None, (d.stick(RIGHT_STICK),))
-    assert list(result.written) == [RIGHT_STICK] and result.confirmed == 4
-    assert files.newest("Scripted", LEFT_STICK)[0] == base
-    assert files.newest("Scripted", RIGHT_STICK) == result.written[RIGHT_STICK]
+    assert f"{LX} on past 0.50" in line and "10 controls confirmed, 1 wrong" in line
 
 
 def test_a_calibration_stopped_part_way_writes_nothing(config_home, screen):
     d = _ScriptedController()
-    d.frames = iter(_stick_frames(d, d.stick(LEFT_STICK))[:100])
-    assert cal.calibrate(d, screen, lambda: None, (d.stick(LEFT_STICK),)) is None
+    d.frames = iter(_frames(d)[:100])
+    assert cal.calibrate(d, screen, lambda: None) is None
     assert not config_home.exists()
 
 
-def test_the_fit_raises_the_threshold_of_a_stick_that_dithers():
-    stick = Stick(LEFT_STICK, *STICK_DIRECTIONS[LEFT_STICK])
-    rows = ([{"t": k / 60, "phase": "cold", "cue": LEFT_STICK, LX: 0.0, LY: 0.0}
-             for k in range(60)]
-            + [{"t": 1 + k / 60, "phase": "roll", "cue": LEFT_STICK, LX: v, LY: -v}
+def test_the_fit_raises_the_threshold_of_the_axis_that_dithers_and_no_other():
+    rows = ([{"t": k / 60, "phase": "cold", "cue": "", LX: 0.0, LY: 0.0} for k in range(60)]
+            + [{"t": 1 + k / 60, "phase": "stops", "cue": LX, LX: v, LY: -v}
                for k, v in enumerate((-0.5, 1.0, 0.2))]
-            + [{"t": 2 + k / 60, "phase": "rest", "cue": LEFT_STICK, LX: 0.1 + 0.02 * (k % 2),
-                LY: 0.0} for k in range(60)])
-    fitted = cal.fit(rows, stick, "Scripted", datetime.now(timezone.utc))
-    assert (fitted.x.rest, fitted.x.low, fitted.x.high, fitted.x.drift) == (0.11, -0.5, 1.0, 0.11)
-    assert (fitted.device, fitted.stick) == ("Scripted", LEFT_STICK)
+            + [{"t": 2 + k / 60, "phase": "rest", "cue": "", LX: 0.1 + 0.02 * (k % 2), LY: 0.0}
+               for k in range(60)])
+    fitted = cal.fit(rows, (LX, LY), "Scripted", datetime.now(timezone.utc))
+    x = fitted.axes[LX]
+    assert (x.rest, x.low, x.high, x.drift) == (0.11, -0.5, 1.0, 0.11)
     # dither 0.01 of the 0.61 travel to the low side: ten times it is 0.164, under 0.5
-    assert (fitted.tuning.on, fitted.tuning.off) == (0.5, 0.3)
+    assert (x.on, x.off) == (0.5, 0.3) and fitted.device == "Scripted"
     shaky = [{**r, LX: 0.1 + 0.1 * (k % 2)} if r["phase"] == "rest" else r
              for k, r in enumerate(rows)]
-    tuning = cal.fit(shaky, stick, "Scripted", datetime.now(timezone.utc)).tuning
-    assert tuning.on > cal.CAL_ON and tuning.off == round(0.6 * tuning.on, 3)
+    fitted = cal.fit(shaky, (LX, LY), "Scripted", datetime.now(timezone.utc))
+    assert fitted.axes[LX].on > cal.CAL_ON and fitted.axes[LX].off == round(0.6 * fitted.axes[LX].on, 3)
+    assert (fitted.axes[LY].on, fitted.axes[LY].off) == (cal.CAL_ON, cal.CAL_OFF)
 
 
 def test_a_check_controls_phase_refuses_pad_reps():
@@ -311,56 +290,54 @@ def test_a_check_controls_phase_refuses_pad_reps():
     assert any("pad_reps" in p for p in CheckControls.problems({"pad_reps": 3}))
 
 
-# -- the sticks and the controllers ----------------------------------------------------------
+# -- the axes and the controllers --------------------------------------------------------------
 
 
-def test_each_stick_reads_its_own_tuning():
-    d = _calibrated(_ScriptedController(), _set(FILE, "dwell_s", 0), _set(RIGHT_FILE, "dwell_s", 0))
-    d.frames = iter([(d.axes_at({LX: 0.55, RX: 0.55}), set()),    # past the left's 0.5, not the
-                     (d.axes_at({LX: 0.55, RX: 0.65}), set())])   # right's 0.6
+def test_each_axis_reads_its_own_thresholds():
+    d = _calibrated(_ScriptedController(), FILE)
+    d.frames = iter([(d.axes_at({LX: 0.55, RX: 0.55}), set()),    # past LX's 0.5, not RX's 0.6
+                     (d.axes_at({LX: 0.55, RX: 0.65}), set())])
     assert d.handle([], 1.0) == [_down("LEFT_STICK_RIGHT")]
     assert d.handle([], 1.1) == [_down("RIGHT_STICK_RIGHT")]
     assert d.held() == {"LEFT_STICK_RIGHT", "RIGHT_STICK_RIGHT"}
 
 
-def test_a_direction_is_pressed_once_it_has_dwelt_and_released_at_once():
-    d = _calibrated(_ScriptedController(), FILE)                   # dwell 50 ms
-    pushed, rest = (d.axes_at({LY: -0.9}), set()), (d.axes_at({}), set())
-    d.frames = iter([pushed, pushed, pushed, rest])
-    assert d.handle([], 1.0) == [] and d.handle([], 1.03) == []
-    assert d.handle([], 1.05) == [_down("LEFT_STICK_UP")]
-    assert d.handle([], 1.06) == [_up("LEFT_STICK_UP")]
+def test_a_side_is_pressed_past_on_at_once_and_released_under_off():
+    d = _calibrated(_ScriptedController(), FILE)
+    d.frames = iter([(d.axes_at({LY: v}), set()) for v in (-0.4, -0.9, -0.4, -0.2, 0.9)])
+    assert d.handle([], 1.0) == []                                  # short of on
+    assert d.handle([], 1.01) == [_down("LEFT_STICK_UP")]
+    assert d.handle([], 1.02) == []                                 # past off: still held
+    assert d.handle([], 1.03) == [_up("LEFT_STICK_UP")]
+    assert d.handle([], 1.04) == [_down("LEFT_STICK_DOWN")]
 
 
-def test_the_stick_rule_reads_one_direction_by_angle_and_keeps_the_one_held():
-    one = StickTuning(on=0.5, off=0.3, diagonal=1.0, dwell_s=0)
-    assert one.directions(0.2, 0.2, set()) == set()                 # inside on
-    assert one.directions(0.3, 0.9, set()) == {"DOWN"}              # both axes moved: the angle
-    assert one.directions(0.6, 0.65, {"RIGHT"}) == {"RIGHT"}        # held, and not clearly nearer
-    assert one.directions(0.2, 0.3, {"DOWN"}) == {"DOWN"}           # past off while held
-    assert one.directions(0.1, 0.1, {"DOWN"}) == set()
-    both = StickTuning(on=0.5, off=0.3, diagonal=0.7, dwell_s=0)
-    assert both.directions(0.9, 0.5, set()) == {"RIGHT"}            # the weaker under 0.7 of it
-    assert both.directions(0.9, 0.7, set()) == {"RIGHT", "DOWN"}
-    assert both.directions(-0.4, 0.0, {"LEFT"}) == {"LEFT"}
+def test_a_diagonal_push_presses_a_side_of_each_axis():
+    d = _calibrated(_ScriptedController(), FILE)
+    d.frames = iter([(d.axes_at({LX: -0.9, LY: 0.6}), set())])
+    assert d.handle([], 1.0) == [_down("LEFT_STICK_LEFT"), _down("LEFT_STICK_DOWN")]
 
 
-def test_a_controller_refuses_a_stick_the_curriculum_names_with_no_calibration(config_home):
+def test_an_uncalibrated_axis_presses_nothing():
+    d = _ScriptedController()
+    d.frames = iter([(d.axes_at({LX: 1.0, LY: -1.0}), set())])
+    assert d.handle([], 1.0) == [] and d.axis_values[LX] == 1.0
+    assert d.calibrated_value(LX) is None
+
+
+def test_a_controller_refuses_an_axis_the_curriculum_names_with_no_calibration(config_home):
     pad = _bare(CurrentDesignsGamepad3)
-    with pytest.raises(CalibrationError, match="no calibration of 'Scripted'.s LEFT_STICK in "
-                                               ".*rig check"):
-        pad.require_calibrated_sticks_for(frozenset({"LEFT_STICK_UP", "BUTTON_A"}))
-    pad.require_calibrated_sticks_for(frozenset({"BUTTON_A", "SPACE"}))    # buttons only
-    assert "LEFT_STICK UNCALIBRATED" in pad.status()
-    assert pad.stick(LEFT_STICK).tuning == UNCALIBRATED
-    files.write(files.StickCalibration.from_dict(RIGHT_FILE))     # a stick it does not have
-    pad.load_stick_calibrations()
-    with pytest.raises(CalibrationError, match="LEFT_STICK"):
-        pad.require_calibrated_sticks_for(frozenset({"LEFT_STICK_UP"}))
-    path = files.write(files.StickCalibration.from_dict(FILE))
-    pad.load_stick_calibrations()
-    pad.require_calibrated_sticks_for(frozenset({"LEFT_STICK_UP"}))
-    assert str(path) in pad.status() and pad.stick(LEFT_STICK).calibration_path == path
+    with pytest.raises(CalibrationError, match="no calibration of 'Scripted' in .*rig check"):
+        pad.require_calibrated_axes_for(frozenset({"LEFT_STICK_UP", "BUTTON_A"}))
+    pad.require_calibrated_axes_for(frozenset({"BUTTON_A", "SPACE"}))    # buttons only
+    assert "axes UNCALIBRATED" in pad.status()
+    other = _write(config_home, "Scripted_a.json", FILE, 1000)          # axes it does not have
+    with pytest.raises(CalibrationError, match=re.escape(f"{other}: calibrates the axes")):
+        pad.load_calibration()
+    path = _write(config_home, "Scripted_b.json", GMPD3_FILE, 2000)
+    pad.load_calibration()
+    pad.require_calibrated_axes_for(frozenset({"LEFT_STICK_UP"}))
+    assert str(path) in pad.status() and pad.calibration_path == path
 
 
 def _down(name: str) -> InputEvent:
@@ -376,7 +353,7 @@ def _joy(type_: int, **fields) -> pygame.event.Event:
 
 
 def test_the_gmpd3_names_its_buttons_as_an_xbox_pad_does_and_reads_its_stick():
-    pad = _calibrated(_bare(CurrentDesignsGamepad3), _set(FILE, "dwell_s", 0))
+    pad = _calibrated(_bare(CurrentDesignsGamepad3), GMPD3_FILE)
     events = [_joy(pygame.JOYBUTTONDOWN, button=4), _joy(pygame.JOYBUTTONDOWN, button=9),
               pygame.event.Event(pygame.JOYBUTTONDOWN, instance_id=8, button=0),  # another's
               _joy(pygame.JOYAXISMOTION, axis=1, value=-0.9),
@@ -400,6 +377,14 @@ def test_an_xbox_controller_reads_its_mapping_and_not_the_joystick_twin():
     assert pad.handle(ease, 1.2) == []
     let_go = [_joy(pygame.CONTROLLERAXISMOTION, axis=trigger, value=0)]
     assert pad.handle(let_go, 1.3) == [_up("LEFT_TRIGGER")]
+
+
+def test_an_xbox_controller_reads_each_stick_axis_through_its_calibration():
+    pad = _calibrated(_bare(XBoxController), FILE)
+    right_x = pygame.CONTROLLER_AXIS_RIGHTX
+    assert pad.handle([_joy(pygame.CONTROLLERAXISMOTION, axis=right_x, value=-20000)], 1.0) == [
+        _down("RIGHT_STICK_LEFT")]
+    assert pad.calibrated_value(RX) == pytest.approx(-20000 / 32767)
 
 
 def test_no_two_kinds_of_device_share_a_control_name():
@@ -503,7 +488,7 @@ def test_a_rigs_inputs_open_its_devices_and_say_which_joysticks_they_ignore(sdl,
     assert [d.name for d in opened.devices] == ["keyboard", "current_designs_gamepad3"]
     assert "IGNORED \"Joystick Of Nobody's\"" in opened.status()
     assert opened.controls() == Keyboard.CONTROLS | CurrentDesignsGamepad3.CONTROLS
-    with pytest.raises(CalibrationError, match="LEFT_STICK"):
+    with pytest.raises(CalibrationError, match="no calibration of 'Scripted'"):
         inputs.open_input_devices(["current_designs_gamepad3"], frozenset({"LEFT_STICK_LEFT"}))
     assert [d.name for d in inputs.open_input_devices(["current_designs_gamepad3"]).devices] == [
         "current_designs_gamepad3"]                   # no keyboard unless the rig lists one
@@ -524,56 +509,55 @@ def scope(config_home, screen, monkeypatch):
 
 
 def test_the_keyboard_does_nothing_in_the_tool_but_esc(scope):
-    path = files.write(files.StickCalibration.from_dict(copy.deepcopy(FILE)))
+    path = files.write(files.ControllerCalibration.from_dict(copy.deepcopy(FILE)))
     scope.reload("")
-    before = (scope.stick.tuning, scope.stick.name, sorted(files.calibrations_dir().iterdir()))
+    before = (scope.controller.calibration, scope.axis, sorted(files.calibrations_dir().iterdir()))
     for key in (pygame.K_s, pygame.K_d, pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT,
                 pygame.K_RIGHT, pygame.K_LEFTBRACKET, pygame.K_RIGHTBRACKET, pygame.K_TAB):
         pygame.event.post(_key(pygame.KEYDOWN, key))
     scope.events()
-    assert (scope.stick.tuning, scope.stick.name,
+    assert (scope.controller.calibration, scope.axis,
             sorted(files.calibrations_dir().iterdir())) == before and scope.running
-    assert scope.controller.stick(LEFT_STICK).calibration_path == path
+    assert scope.controller.calibration_path == path
     pygame.event.post(_key(pygame.KEYDOWN, pygame.K_ESCAPE))
     scope.events()
     assert not scope.running
 
 
-@pytest.mark.parametrize("action", ["on-", "on+", "off-", "off+", "dwell-", "dwell+", "diag"])
+@pytest.mark.parametrize("action", ["on-", "on+", "off-", "off+"])
 def test_each_tuning_button_moves_one_field_within_bounds(action):
     from fmri_gym import pad_scope
-    for start in (UNCALIBRATED, StickTuning(0.99, 0.99, 0.7, 0.3),
-                  StickTuning(0.5, 0.01, 1.0, 0.0)):
+    for start in (AxisCalibration.from_dict(AXIS, ""), AxisCalibration(0, -1, 1, 0, 0.99, 0.99),
+                  AxisCalibration(0, -1, 1, 0, 0.5, 0.01)):
         moved = pad_scope._retuned(start, action)
         assert sum(a != b for a, b in zip(vars(moved).values(), vars(start).values())) <= 1
-        StickTuning.from_dict(moved.record(), "")      # what a file allows
-    middle = StickTuning(0.5, 0.3, 1.0, 0.05)
+        AxisCalibration.from_dict(moved.record(), "")      # what a file allows
+    middle = AxisCalibration(0, -1, 1, 0, 0.5, 0.3)
     assert pad_scope._retuned(middle, action) != middle
 
 
-def test_save_writes_a_new_newest_file_of_the_retuned_stick_and_leaves_its_source(scope):
+def test_save_writes_a_new_newest_file_of_the_retuned_axis_and_leaves_its_source(scope):
     from fmri_gym import pad_scope
-    source = files.write(files.StickCalibration.from_dict(copy.deepcopy(FILE)))
-    right = files.write(files.StickCalibration.from_dict(copy.deepcopy(RIGHT_FILE)))
-    for p in (source, right):
-        os.utime(p, (1000, 1000))
+    source = files.write(files.ControllerCalibration.from_dict(copy.deepcopy(FILE)))
+    os.utime(source, (1000, 1000))
     was = source.read_bytes()
     scope.reload("")
+    assert not scope.is_enabled("save")
+    pad_scope._ACTIONS[f"show-{LY}"](scope)
     pad_scope._ACTIONS["on+"](scope)
     scope.click(next(b.rect.center for b in scope.buttons if b.action == "save"))
     assert source.read_bytes() == was
-    path, saved = files.newest("Scripted", LEFT_STICK)
+    path, saved = files.newest("Scripted")
     assert path != source and saved.tuned_from == source.name
-    assert (saved.tuning.on, saved.made) == (0.51, files.read(source).made)
-    assert files.newest("Scripted", RIGHT_STICK)[0] == right      # not retuned: not rewritten
-    assert scope.controller.stick(LEFT_STICK).calibration_path == path
+    assert (saved.axes[LY].on, saved.axes[LX].on, saved.made) == (0.51, 0.5, files.read(source).made)
+    assert scope.controller.calibration_path == path
 
 
 def test_the_watch_reloads_only_on_its_one_second_tick(scope, monkeypatch):
     reloads = []
     monkeypatch.setattr(scope, "reload", reloads.append)
     start = scope.next_watch
-    files.write(files.StickCalibration.from_dict(copy.deepcopy(FILE)))   # a calibration added
+    files.write(files.ControllerCalibration.from_dict(copy.deepcopy(FILE)))   # a calibration added
     scope.watch(start - 0.5)
     assert reloads == []
     scope.watch(start)

@@ -13,22 +13,22 @@ from __future__ import annotations
 import pygame
 
 from .base import InputEvent
-from .controller import (BUTTON_A, BUTTON_B, BUTTON_X, BUTTON_Y, LEFT_STICK, LEFT_TRIGGER,
-                         RIGHT_TRIGGER, STICK_DIRECTIONS, Controller)
+from .controller import (AXIS_CONTROLS, BUTTON_A, BUTTON_B, BUTTON_X, BUTTON_Y, LEFT_STICK_X,
+                         LEFT_STICK_Y, LEFT_TRIGGER, RIGHT_TRIGGER, Controller)
 
 #: SDL's button number -> the control.
 BUTTONS = {0: BUTTON_Y, 1: BUTTON_B, 2: BUTTON_X, 3: LEFT_TRIGGER, 4: BUTTON_A, 5: RIGHT_TRIGGER}
-#: SDL's axis number -> the stick it is, and whether it is the stick's x or y.
-STICK_AXES = {0: (LEFT_STICK, "x"), 1: (LEFT_STICK, "y")}
+#: SDL's axis number -> the stick axis it is.
+STICK_AXES = {0: LEFT_STICK_X, 1: LEFT_STICK_Y}
 
 
 class CurrentDesignsGamepad3(Controller):
-    """The GMPD3: four face buttons, two index-finger buttons, one stick."""
+    """The GMPD3: four face buttons, two index-finger buttons, one stick's two axes."""
 
     name = "current_designs_gamepad3"
     BUTTON_NAMES = tuple(BUTTONS.values())
-    STICK_NAMES = (LEFT_STICK,)
-    CONTROLS = frozenset({*BUTTON_NAMES, *STICK_DIRECTIONS[LEFT_STICK]})
+    AXIS_NAMES = tuple(STICK_AXES.values())
+    CONTROLS = frozenset({*BUTTON_NAMES, *(c for a in AXIS_NAMES for c in AXIS_CONTROLS[a])})
     HANDLE = pygame.joystick.Joystick
 
     @classmethod
@@ -40,8 +40,8 @@ class CurrentDesignsGamepad3(Controller):
     def attach(self, handle: pygame.joystick.Joystick) -> None:
         self.joystick, self.instance_id = handle, handle.get_instance_id()
         self.device_name = handle.get_name()
-        for axis, (stick_name, axis_name) in STICK_AXES.items():
-            self._move_stick(stick_name, axis_name, handle.get_axis(axis))
+        for axis, axis_name in STICK_AXES.items():
+            self.axis_values[axis_name] = handle.get_axis(axis)
 
     def is_open(self) -> bool:
         return self.joystick.get_init()
@@ -57,9 +57,8 @@ class CurrentDesignsGamepad3(Controller):
             elif event.type == pygame.JOYBUTTONUP and event.button in BUTTONS:
                 out += self._press(BUTTONS[event.button], False)
             elif event.type == pygame.JOYAXISMOTION and event.axis in STICK_AXES:
-                stick_name, axis_name = STICK_AXES[event.axis]
-                self._move_stick(stick_name, axis_name, event.value)
-        return out + self._read_sticks(now)
+                out += self._move_axis(STICK_AXES[event.axis], event.value)
+        return out
 
     def close(self) -> None:
         if self.joystick.get_init():

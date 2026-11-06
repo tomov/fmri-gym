@@ -3,7 +3,7 @@
 Read through SDL's game-controller layer, whose numbers are the same for every
 such pad, OS and connection; the raw joystick events SDL sends beside them are
 not this device's and go unread. Each analog trigger is a button, pressed past
-half its travel.
+half its travel; each stick axis is two controls, read through its calibration.
 """
 
 from __future__ import annotations
@@ -12,10 +12,11 @@ import pygame
 from pygame._sdl2 import controller as sdl_controller
 
 from .base import InputEvent
-from .controller import (BUTTON_A, BUTTON_B, BUTTON_BACK, BUTTON_GUIDE, BUTTON_START, BUTTON_X,
-                         BUTTON_Y, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT, DPAD_UP, LEFT_SHOULDER,
-                         LEFT_STICK, LEFT_STICK_PRESS, LEFT_TRIGGER, RIGHT_SHOULDER, RIGHT_STICK,
-                         RIGHT_STICK_PRESS, RIGHT_TRIGGER, STICK_DIRECTIONS, Controller)
+from .controller import (AXIS_CONTROLS, BUTTON_A, BUTTON_B, BUTTON_BACK, BUTTON_GUIDE,
+                         BUTTON_START, BUTTON_X, BUTTON_Y, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT,
+                         DPAD_UP, LEFT_SHOULDER, LEFT_STICK_PRESS, LEFT_STICK_X, LEFT_STICK_Y,
+                         LEFT_TRIGGER, RIGHT_SHOULDER, RIGHT_STICK_PRESS, RIGHT_STICK_X,
+                         RIGHT_STICK_Y, RIGHT_TRIGGER, Controller)
 
 #: SDL's button number -> the control.
 BUTTONS = {
@@ -40,12 +41,12 @@ TRIGGERS = {
     pygame.CONTROLLER_AXIS_TRIGGERLEFT: LEFT_TRIGGER,
     pygame.CONTROLLER_AXIS_TRIGGERRIGHT: RIGHT_TRIGGER,
 }
-#: SDL's axis number -> the stick it is, and whether it is the stick's x or y.
+#: SDL's axis number -> the stick axis it is.
 STICK_AXES = {
-    pygame.CONTROLLER_AXIS_LEFTX: (LEFT_STICK, "x"),
-    pygame.CONTROLLER_AXIS_LEFTY: (LEFT_STICK, "y"),
-    pygame.CONTROLLER_AXIS_RIGHTX: (RIGHT_STICK, "x"),
-    pygame.CONTROLLER_AXIS_RIGHTY: (RIGHT_STICK, "y"),
+    pygame.CONTROLLER_AXIS_LEFTX: LEFT_STICK_X,
+    pygame.CONTROLLER_AXIS_LEFTY: LEFT_STICK_Y,
+    pygame.CONTROLLER_AXIS_RIGHTX: RIGHT_STICK_X,
+    pygame.CONTROLLER_AXIS_RIGHTY: RIGHT_STICK_Y,
 }
 #: How far a trigger is pulled to press, and let go to release, of its travel.
 _TRIGGER_ON, _TRIGGER_OFF = 0.5, 0.3
@@ -57,13 +58,12 @@ def _scaled(value: float) -> float:
 
 
 class XBoxController(Controller):
-    """An Xbox-layout controller: its buttons, its triggers as buttons, and both sticks."""
+    """An Xbox-layout controller: its buttons, its triggers as buttons, and both sticks' axes."""
 
     name = "xbox_controller"
     BUTTON_NAMES = (*BUTTONS.values(), *TRIGGERS.values())
-    STICK_NAMES = (LEFT_STICK, RIGHT_STICK)
-    CONTROLS = frozenset({*BUTTON_NAMES, *STICK_DIRECTIONS[LEFT_STICK],
-                          *STICK_DIRECTIONS[RIGHT_STICK]})
+    AXIS_NAMES = tuple(STICK_AXES.values())
+    CONTROLS = frozenset({*BUTTON_NAMES, *(c for a in AXIS_NAMES for c in AXIS_CONTROLS[a])})
     HANDLE = sdl_controller.Controller
 
     @classmethod
@@ -73,8 +73,8 @@ class XBoxController(Controller):
 
     def attach(self, handle: sdl_controller.Controller) -> None:
         self.controller, self.instance_id, self.device_name = handle, handle.id, handle.name
-        for axis, (stick_name, axis_name) in STICK_AXES.items():
-            self._move_stick(stick_name, axis_name, _scaled(handle.get_axis(axis)))
+        for axis, axis_name in STICK_AXES.items():
+            self.axis_values[axis_name] = _scaled(handle.get_axis(axis))
 
     def is_open(self) -> bool:
         return self.controller.get_init()
@@ -90,19 +90,11 @@ class XBoxController(Controller):
             elif event.type == pygame.CONTROLLERBUTTONUP and event.button in BUTTONS:
                 out += self._press(BUTTONS[event.button], False)
             elif event.type == pygame.CONTROLLERAXISMOTION and event.axis in TRIGGERS:
-                out += self._pull_trigger(TRIGGERS[event.axis], _scaled(event.value))
+                out += self._pull(TRIGGERS[event.axis], _scaled(event.value),
+                                  _TRIGGER_ON, _TRIGGER_OFF)
             elif event.type == pygame.CONTROLLERAXISMOTION and event.axis in STICK_AXES:
-                stick_name, axis_name = STICK_AXES[event.axis]
-                self._move_stick(stick_name, axis_name, _scaled(event.value))
-        return out + self._read_sticks(now)
-
-    def _pull_trigger(self, name: str, value: float) -> list[InputEvent]:
-        """Press a trigger past :data:`_TRIGGER_ON`, release it under :data:`_TRIGGER_OFF`."""
-        if value >= _TRIGGER_ON:
-            return self._press(name, True)
-        if value < _TRIGGER_OFF:
-            return self._press(name, False)
-        return []
+                out += self._move_axis(STICK_AXES[event.axis], _scaled(event.value))
+        return out
 
     def close(self) -> None:
         if self.controller.get_init():

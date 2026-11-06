@@ -63,10 +63,9 @@ def detect_controllers() -> list[dict]:
     for index, device_name in enumerate(sdl_joystick_names()):
         cls = next((c for c in CONTROLLER_CLASSES_BY_NAME.values()
                     if index in c.plugged_in_indices()), None)
-        calibration_paths = [calibration_file[0] for stick_name in (cls.STICK_NAMES if cls else ())
-                             if (calibration_file := newest(device_name, stick_name)) is not None]
+        calibration_file = newest(device_name) if cls and cls.AXIS_NAMES else None
         out.append({"index": index, "device_name": device_name, "input": cls and cls.name,
-                    "calibration": str(max(calibration_paths)) if calibration_paths else None})
+                    "calibration": str(calibration_file[0]) if calibration_file else None})
     return out
 
 
@@ -76,9 +75,9 @@ def open_input_devices(input_device_names: Sequence[str],
 
     :param input_device_names: a rig's ``"inputs"``.
     :param required_controls: the controls the curriculum names; a stick direction
-        among them needs its stick calibrated. Empty for a run that calibrates.
+        among them needs its controller calibrated. Empty for a run that calibrates.
     :raises ValueError: for a kind that is not one, listed twice, or not plugged in.
-    :raises CalibrationError: for a malformed calibration, or a needed stick without one.
+    :raises CalibrationError: for a malformed calibration, or a needed axis without one.
     """
     unknown = [n for n in input_device_names if n not in INPUT_DEVICE_CLASSES_BY_NAME]
     if unknown or len(set(input_device_names)) < len(input_device_names):
@@ -89,5 +88,5 @@ def open_input_devices(input_device_names: Sequence[str],
     devices = [cls.open() for cls in classes]
     opened = {d.device_name for d in devices if isinstance(d, Controller)}
     inputs = InputDevices(devices, [n for n in sdl_joystick_names() if n not in opened])
-    inputs.require_calibrated_sticks_for(required_controls)
+    inputs.require_calibrated_axes_for(required_controls)
     return inputs

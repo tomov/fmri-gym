@@ -1,12 +1,11 @@
-"""One stick's calibration file: how it rests, how far it travels, and how its push is read.
+"""A controller's calibration file: for each stick axis, how it rests, how far it travels, and
+how far it must be pushed.
 
-One file per stick per measurement in :func:`calibrations_dir`, outside the
+One file per controller per measurement in :func:`calibrations_dir`, outside the
 checkout since it describes this machine's controller, found by the name SDL
-gives the device and the controller's name for the stick (:func:`newest`), and
-never rewritten (:func:`write`). It is made by :mod:`fmri_gym.pad_calibration`.
-Nothing here knows how many sticks a controller has; the rule that turns a
-stick's position into its four directions is :meth:`AxisCalibration.normalise`
-and :meth:`StickTuning.directions`.
+gives the device (:func:`newest`), and never rewritten (:func:`write`). It is
+made by :mod:`fmri_gym.pad_calibration`. Nothing here knows which axes a
+controller has; each axis is read on its own (:meth:`AxisCalibration.normalise`).
 """
 
 from __future__ import annotations
@@ -22,37 +21,27 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
-#: A stick's four directions, as :meth:`StickTuning.directions` names them.
-UP, DOWN, LEFT, RIGHT = "UP", "DOWN", "LEFT", "RIGHT"
-DIRECTIONS = (UP, DOWN, LEFT, RIGHT)
-#: Where each direction points, as the angle of a push (y grows downwards).
-_ANGLES = {UP: -math.pi / 2, DOWN: math.pi / 2, LEFT: math.pi, RIGHT: 0.0}
-#: How much nearer another direction must point before the stick changes hands.
-_SECTOR_KEEP = math.radians(15)
-#: What to do about a stick with no calibration, for the messages that say so.
+#: What to do about a controller with no calibration, for the messages that say so.
 HOW_TO_CALIBRATE = ("run pad-calibration (or Calibrate controller... in rig-config), or the "
                     "rig check")
-#: The longest a direction may be made to wait before it is pressed.
-MAX_DWELL_S = 0.3
-
-
-def _away(a: float, b: float) -> float:
-    """How far apart two angles are, the short way round."""
-    return abs((a - b + math.pi) % (2 * math.pi) - math.pi)
 
 
 class CalibrationError(ValueError):
-    """A calibration file that is not one, or a stick a run needs calibrated that is not."""
+    """A calibration file that is not one, or a controller a run needs calibrated that is not."""
 
 
 @dataclass(frozen=True)
 class AxisCalibration:
-    """One stick axis, raw: where it rests, its two stops, and how far its centre moves."""
+    """One stick axis: where it rests, its two stops and how far its centre moves, raw; and
+    the fraction of its travel past which a side is pressed (``on``) and under which it is
+    released (``off``)."""
 
     rest: float
     low: float
     high: float
     drift: float
+    on: float
+    off: float
 
     @classmethod
     def from_dict(cls, d: Any, where: str) -> AxisCalibration:
@@ -60,23 +49,26 @@ class AxisCalibration:
 
         :raises CalibrationError: naming the field that is missing, unknown or out of range.
         """
-        d = _checked(d, where, ("rest", "low", "high", "drift"))
+        d = _checked(d, where, ("rest", "low", "high", "drift", "on", "off"))
         rest, low, high = (_number(d, k, where, math.isfinite, "a number")
                            for k in ("rest", "low", "high"))
         drift = _number(d, "drift", where, lambda v: 0 <= v < math.inf, "a number >= 0")
         if not low < rest < high:
             raise CalibrationError(f"{where}: expected low < rest < high, got low={low:g}, "
                                    f"rest={rest:g}, high={high:g}")
-        return cls(rest, low, high, drift)
+        on = _number(d, "on", where, lambda v: 0 < v < 1, "a number in (0, 1)")
+        off = _number(d, "off", where, lambda v: 0 < v <= on, f"a number in (0, on={on:g}]")
+        return cls(rest, low, high, drift, on, off)
 
     def record(self) -> dict[str, float]:
         """The axis as a calibration file writes it."""
-        return {"rest": self.rest, "low": self.low, "high": self.high, "drift": self.drift}
+        return {"rest": self.rest, "low": self.low, "high": self.high, "drift": self.drift,
+                "on": round(self.on, 3), "off": round(self.off, 3)}
 
     def normalise(self, value: float) -> float:
         """A raw reading as a fraction of the travel on its side of rest, -1..1.
 
-        Each side is scaled by its own span, so a stick reaching -0.5 one way and
+        Each side is scaled by its own span, so an axis reaching -0.5 one way and
         +1.0 the other still reports -1.0 and +1.0 at its stops.
         """
         span = (self.high - self.rest) if value >= self.rest else (self.rest - self.low)
@@ -86,128 +78,44 @@ class AxisCalibration:
 
 
 @dataclass(frozen=True)
-class StickTuning:
-    """How a stick's push is read, in fractions of its travel.
-
-    It presses a direction past ``on`` and releases it under ``off``. ``diagonal``
-    is how far a second direction must go, as a fraction of the first, to be
-    pressed too: at 1.0 never, so a push is exactly one direction. A new direction
-    is pressed once it has held for ``dwell_s``: a thumb leaving rest crosses a
-    neighbouring direction for a frame or two (17 ms, against 254 ms for the
-    shortest real push measured).
-    """
-
-    on: float
-    off: float
-    diagonal: float
-    dwell_s: float
-
-    def directions(self, x: float, y: float, held: set[str]) -> set[str]:
-        """The directions (:data:`DIRECTIONS`) a calibrated position means, given those held.
-
-        One at a time: how far the stick is from rest says *whether* a direction
-        is pressed (past ``on``, or ``off`` while one is held), and the angle of
-        the push says *which*; the one held keeps it unless another points
-        clearly nearer. That is what keeps the horizontal axis from answering a
-        push meant for down, which moves both axes, a lot, but points much closer
-        to down than to left. With diagonals, each axis is read on its own.
-        """
-        if self.diagonal < 1.0:
-            return self._each_axis(x, y, held)
-        if math.hypot(x, y) < (self.off if held else self.on):
-            return set()
-        theta = math.atan2(y, x)
-        best = min(DIRECTIONS, key=lambda d: _away(theta, _ANGLES[d]))
-        for name in held:
-            if _away(theta, _ANGLES[name]) - _away(theta, _ANGLES[best]) < _SECTOR_KEEP:
-                return {name}
-        return {best}
-
-    def _each_axis(self, x: float, y: float, held: set[str]) -> set[str]:
-        """Each axis past ``on`` (or ``off`` while held), the weaker dropped under ``diagonal``."""
-        pushed: dict[str, float] = {}
-        for value, (negative, positive) in ((x, (LEFT, RIGHT)), (y, (UP, DOWN))):
-            name = negative if value < 0 else positive
-            if abs(value) >= (self.off if name in held else self.on):
-                pushed[name] = abs(value)
-        if len(pushed) == 2:
-            strong, weak = sorted(pushed, key=pushed.get, reverse=True)
-            if pushed[weak] < self.diagonal * pushed[strong]:
-                return {strong}
-        return set(pushed)
-
-    @classmethod
-    def from_dict(cls, d: dict, where: str) -> StickTuning:
-        """The tuning in a calibration file: its on, off, diagonal and dwell_s.
-
-        :raises CalibrationError: naming the field that is out of range.
-        """
-        on = _number(d, "on", where, lambda v: 0 < v < 1, "a number in (0, 1)")
-        off = _number(d, "off", where, lambda v: 0 < v <= on, f"a number in (0, on={on:g}]")
-        diagonal = _number(d, "diagonal", where, lambda v: 0 < v <= 1, "a number in (0, 1]")
-        dwell_s = _number(d, "dwell_s", where, lambda v: 0 <= v <= MAX_DWELL_S,
-                          f"a number of seconds in [0, {MAX_DWELL_S:g}]")
-        return cls(on, off, diagonal, dwell_s)
-
-    def record(self) -> dict[str, float]:
-        """The tuning as a calibration file writes it."""
-        return {"on": round(self.on, 3), "off": round(self.off, 3),
-                "diagonal": round(self.diagonal, 2), "dwell_s": round(self.dwell_s, 3)}
-
-    def rule(self) -> str:
-        """How it reads a push, in words."""
-        how = ("one direction at a time" if self.diagonal >= 1.0
-               else f"diagonals past {self.diagonal:.2f}")
-        return f"{self.on:.2f}/{self.off:.2f}, {how}, {self.dwell_s * 1000:.0f} ms dwell"
-
-
-#: How a stick with no calibration is read.
-UNCALIBRATED = StickTuning(on=0.2, off=0.2, diagonal=1.0, dwell_s=0.05)
-_TUNING_KEYS = ("on", "off", "diagonal", "dwell_s")
-_FILE_KEYS = ("device", "stick", "tuned_from", "made", "x", "y", *_TUNING_KEYS)
-
-
-@dataclass(frozen=True)
-class StickCalibration:
-    """One calibration file: one stick of one device, measured at ``made``, and its tuning.
+class ControllerCalibration:
+    """One calibration file: each stick axis of one device, measured at ``made``.
 
     ``tuned_from`` names the file this one was retuned from, None for a measurement.
     """
 
     #: the name SDL gives the device
     device: str
-    #: the controller's name for the stick
-    stick: str
     tuned_from: str | None
     made: datetime
-    x: AxisCalibration
-    y: AxisCalibration
-    tuning: StickTuning
+    #: each axis, by the controller's name for it
+    axes: dict[str, AxisCalibration]
 
     @classmethod
-    def from_dict(cls, d: Any, where: str = "") -> StickCalibration:
-        """A calibration file's contents, its tuning flattened into it.
+    def from_dict(cls, d: Any, where: str = "") -> ControllerCalibration:
+        """A calibration file's contents.
 
         :raises CalibrationError: naming the field that is missing, unknown or wrong.
         """
-        d = _checked(d, where, _FILE_KEYS)
-        for key in ("device", "stick"):
-            if not isinstance(d[key], str) or not d[key]:
-                raise CalibrationError(f"{_at(where, key)}: expected a name, got {d[key]!r}")
+        d = _checked(d, where, ("device", "tuned_from", "made", "axes"))
+        if not isinstance(d["device"], str) or not d["device"]:
+            raise CalibrationError(f"{_at(where, 'device')}: expected a name, got {d['device']!r}")
         tuned_from = d["tuned_from"]
         if tuned_from is not None and not (isinstance(tuned_from, str) and tuned_from):
             raise CalibrationError(f"{_at(where, 'tuned_from')}: expected null or a file "
                                    f"name, got {tuned_from!r}")
-        return cls(d["device"], d["stick"], tuned_from, _made(d["made"], _at(where, "made")),
-                   AxisCalibration.from_dict(d["x"], _at(where, "x")),
-                   AxisCalibration.from_dict(d["y"], _at(where, "y")),
-                   StickTuning.from_dict(d, where))
+        if not isinstance(d["axes"], dict) or not d["axes"]:
+            raise CalibrationError(f"{_at(where, 'axes')}: expected each axis by its name, "
+                                   f"got {d['axes']!r}")
+        axes = {name: AxisCalibration.from_dict(axis, _at(_at(where, "axes"), name))
+                for name, axis in d["axes"].items()}
+        return cls(d["device"], tuned_from, _made(d["made"], _at(where, "made")), axes)
 
     def record(self) -> dict[str, Any]:
         """The calibration file's contents."""
-        return {"device": self.device, "stick": self.stick, "tuned_from": self.tuned_from,
-                "made": self.made.isoformat(timespec="seconds"), "x": self.x.record(),
-                "y": self.y.record(), **self.tuning.record()}
+        return {"device": self.device, "tuned_from": self.tuned_from,
+                "made": self.made.isoformat(timespec="seconds"),
+                "axes": {name: axis.record() for name, axis in self.axes.items()}}
 
 
 def _at(where: str, key: str) -> str:
@@ -260,12 +168,12 @@ def _made(value: Any, where: str) -> datetime:
 
 
 def calibrations_dir() -> Path:
-    """Where this machine's calibrations are kept, one file per stick per measurement."""
+    """Where this machine's calibrations are kept, one file per controller per measurement."""
     base = os.environ.get("XDG_CONFIG_HOME") or "~/.config"
     return Path(base).expanduser() / "fmri-gym" / "pads"
 
 
-def read(path: Path) -> StickCalibration:
+def read(path: Path) -> ControllerCalibration:
     """A calibration file's contents.
 
     :raises CalibrationError: naming the file and the field that is wrong.
@@ -275,7 +183,7 @@ def read(path: Path) -> StickCalibration:
     except ValueError as exc:
         raise CalibrationError(f"{path}: not JSON ({exc})") from None
     try:
-        return StickCalibration.from_dict(d)
+        return ControllerCalibration.from_dict(d)
     except CalibrationError as exc:
         raise CalibrationError(f"{path}: {exc}") from None
 
@@ -290,13 +198,12 @@ def _device_in(path: Path) -> str | None:
     return device if isinstance(device, str) else None
 
 
-def newest(device: str, stick: str) -> tuple[Path, StickCalibration] | None:
-    """The newest calibration of ``device``'s ``stick`` in :func:`calibrations_dir`, by file
-    time; or None.
+def newest(device: str) -> tuple[Path, ControllerCalibration] | None:
+    """The newest calibration of ``device`` in :func:`calibrations_dir`, by file time; or None.
 
     :raises CalibrationError: when a file there is malformed and is, or may be, ``device``'s.
     """
-    calibrations_of_stick = []
+    calibrations_of_device = []
     for path in sorted(calibrations_dir().glob("*.json")):
         try:
             calibration = read(path)
@@ -305,11 +212,11 @@ def newest(device: str, stick: str) -> tuple[Path, StickCalibration] | None:
                 raise CalibrationError(f"{exc}; fix it, or move it out of "
                                        f"{calibrations_dir()}") from None
             continue
-        if calibration.device == device and calibration.stick == stick:
-            calibrations_of_stick.append((path.stat().st_mtime_ns, path.name, path, calibration))
-    if not calibrations_of_stick:
+        if calibration.device == device:
+            calibrations_of_device.append((path.stat().st_mtime_ns, path.name, path, calibration))
+    if not calibrations_of_device:
         return None
-    _, _, path, calibration = max(calibrations_of_stick, key=lambda m: m[:2])
+    _, _, path, calibration = max(calibrations_of_device, key=lambda m: m[:2])
     return path, calibration
 
 
@@ -318,19 +225,18 @@ def _slug(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9]+", "-", name).strip("-") or "pad"
 
 
-def write(calibration: StickCalibration, samples: list[dict] | None = None) -> Path:
+def write(calibration: ControllerCalibration, samples: list[dict] | None = None) -> Path:
     """Write ``calibration`` to a new file, never over another, and its recording beside it.
 
     :param samples: the frames it was measured from, written as the ``.csv`` of the same name.
-    :return: the calibration's path: ``<device>_<stick>_<YYYYmmdd-HHMMSS>.json`` in
+    :return: the calibration's path: ``<device>_<YYYYmmdd-HHMMSS>.json`` in
         :func:`calibrations_dir`.
     """
     record = calibration.record()
-    StickCalibration.from_dict(record)              # what is written reads back
+    ControllerCalibration.from_dict(record)         # what is written reads back
     folder = calibrations_dir()
     folder.mkdir(parents=True, exist_ok=True)
-    stem = (f"{_slug(calibration.device)}_{_slug(calibration.stick)}_"
-            f"{time.strftime('%Y%m%d-%H%M%S')}")
+    stem = f"{_slug(calibration.device)}_{time.strftime('%Y%m%d-%H%M%S')}"
     path, n = folder / f"{stem}.json", 1
     while path.exists() or path.with_suffix(".csv").exists():
         n += 1

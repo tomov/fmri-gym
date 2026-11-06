@@ -74,12 +74,12 @@ class InputDevice(ABC):
         """The controls down as of the last :meth:`handle`."""
         return frozenset(self._held)
 
-    def require_calibrated_sticks_for(self, required_controls: frozenset[str]) -> None:
+    def require_calibrated_axes_for(self, required_controls: frozenset[str]) -> None:
         """Refuse to go on when a stick direction in ``required_controls`` has no calibration.
 
-        A device without sticks has nothing to refuse.
+        A device without stick axes has nothing to refuse.
 
-        :raises CalibrationError: naming the stick, and how to calibrate it.
+        :raises CalibrationError: naming the device, and how to calibrate it.
         """
 
     def status(self) -> str:
@@ -134,9 +134,9 @@ class InputDevices(InputDevice):
     def held(self) -> frozenset[str]:
         return frozenset().union(*(d.held() for d in self.devices))
 
-    def require_calibrated_sticks_for(self, required_controls: frozenset[str]) -> None:
+    def require_calibrated_axes_for(self, required_controls: frozenset[str]) -> None:
         for device in self.devices:
-            device.require_calibrated_sticks_for(required_controls)
+            device.require_calibrated_axes_for(required_controls)
 
     def status(self) -> str:
         """Each device's line, and the joysticks ignored."""
