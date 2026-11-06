@@ -23,6 +23,8 @@ os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 import numpy as np  # noqa: E402
 import pygame  # noqa: E402
 
+from fmri_gym.inputs.control_names import ControlNames  # noqa: E402
+
 PAPER, TEXT, LEADER = (255, 255, 255), (25, 25, 25), (70, 70, 70)
 #: the part of the underlay that is the controller, and its scale in the image
 CROP, SCALE = pygame.Rect(50, 50, 1180, 800), 0.75
@@ -50,14 +52,21 @@ class Control:
     side: str
 
 
+#: each control a label may name, and the stick as a whole as ``LEFT_STICK``
 CONTROLS = {
-    "LEFT_TRIGGER": Control(pygame.Rect(285, 65, 77, 103), False, (285, 150), "left"),
-    "RIGHT_TRIGGER": Control(pygame.Rect(920, 65, 82, 103), False, (995, 150), "right"),
+    ControlNames.CONTROLLER_AXIS_TRIGGERLEFT:
+        Control(pygame.Rect(285, 65, 77, 103), False, (285, 150), "left"),
+    ControlNames.CONTROLLER_AXIS_TRIGGERRIGHT:
+        Control(pygame.Rect(920, 65, 82, 103), False, (995, 150), "right"),
     "LEFT_STICK": Control(pygame.Rect(138, 300, 288, 285), True, (205, 456), "left"),
-    "BUTTON_Y": Control(pygame.Rect(940, 296, 110, 104), True, (1037, 345), "right"),
-    "BUTTON_B": Control(pygame.Rect(1038, 380, 102, 92), True, (1123, 421), "right"),
-    "BUTTON_A": Control(pygame.Rect(936, 460, 104, 92), True, (1024, 503), "right"),
-    "BUTTON_X": Control(pygame.Rect(846, 388, 102, 90), True, (896, 459), "below"),
+    ControlNames.CONTROLLER_BUTTON_Y:
+        Control(pygame.Rect(940, 296, 110, 104), True, (1037, 345), "right"),
+    ControlNames.CONTROLLER_BUTTON_B:
+        Control(pygame.Rect(1038, 380, 102, 92), True, (1123, 421), "right"),
+    ControlNames.CONTROLLER_BUTTON_A:
+        Control(pygame.Rect(936, 460, 104, 92), True, (1024, 503), "right"),
+    ControlNames.CONTROLLER_BUTTON_X:
+        Control(pygame.Rect(846, 388, 102, 90), True, (896, 459), "below"),
 }
 #: the drawing's controls no controller rig has, always greyed out: (area, is_round), an
 #: area being a rect or the corners of a polygon

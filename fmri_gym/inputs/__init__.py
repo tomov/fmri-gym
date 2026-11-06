@@ -13,13 +13,15 @@ from collections.abc import Iterable, Sequence
 
 from .base import QUIT, Edge, InputDevice, InputDevices, InputEvent
 from .calibration import CalibrationError, newest
+from .control_names import ControlNames
 from .controller import Controller, sdl_joystick_names, start_sdl_joysticks_and_wait_for
 from .current_designs_gamepad3 import CurrentDesignsGamepad3
-from .keyboard import ESCAPE, Keyboard
+from .keyboard import Keyboard
 from .xbox_controller import XBoxController
 
-__all__ = ["ESCAPE", "INPUT_DEVICE_CLASSES_BY_NAME", "QUIT", "CalibrationError", "Controller",
-           "CurrentDesignsGamepad3", "Edge", "InputDevice", "InputDevices", "InputEvent",
+__all__ = ["INPUT_DEVICE_CLASSES_BY_NAME", "QUIT", "CalibrationError", "ControlNames",
+           "Controller", "CurrentDesignsGamepad3", "Edge", "InputDevice", "InputDevices",
+           "InputEvent",
            "Keyboard", "XBoxController", "controls_of_input_devices", "detect_controllers",
            "first_controller_class_plugged_in", "is_control_of_any_input_device",
            "open_input_devices"]

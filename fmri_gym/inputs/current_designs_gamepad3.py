@@ -13,13 +13,23 @@ from __future__ import annotations
 import pygame
 
 from .base import InputEvent
-from .controller import (AXIS_CONTROLS, BUTTON_A, BUTTON_B, BUTTON_X, BUTTON_Y, LEFT_STICK_X,
-                         LEFT_STICK_Y, LEFT_TRIGGER, RIGHT_TRIGGER, Controller)
+from .control_names import ControlNames
+from .controller import AXIS_CONTROLS, Controller
 
 #: SDL's button number -> the control.
-BUTTONS = {0: BUTTON_Y, 1: BUTTON_B, 2: BUTTON_X, 3: LEFT_TRIGGER, 4: BUTTON_A, 5: RIGHT_TRIGGER}
+BUTTONS = {
+    0: ControlNames.CONTROLLER_BUTTON_Y,
+    1: ControlNames.CONTROLLER_BUTTON_B,
+    2: ControlNames.CONTROLLER_BUTTON_X,
+    3: ControlNames.CONTROLLER_AXIS_TRIGGERLEFT,
+    4: ControlNames.CONTROLLER_BUTTON_A,
+    5: ControlNames.CONTROLLER_AXIS_TRIGGERRIGHT,
+}
 #: SDL's axis number -> the stick axis it is.
-STICK_AXES = {0: LEFT_STICK_X, 1: LEFT_STICK_Y}
+STICK_AXES = {
+    0: ControlNames.CONTROLLER_AXIS_LEFTX,
+    1: ControlNames.CONTROLLER_AXIS_LEFTY
+}
 
 
 class CurrentDesignsGamepad3(Controller):

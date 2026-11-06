@@ -16,15 +16,17 @@ from typing import Any, Callable, Iterator, Sequence
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import Qt
 
+from ..inputs.control_names import ControlNames
 from . import Field, field_values, format_action, format_value, parse_action
 
 
-#: Qt keys -> the key NAMES used in ``keys`` (see fmri_gym/inputs/keyboard.py); letters
-#: and digits are taken from the event's text.
-_QT_KEYS = {Qt.Key.Key_Up: "UP", Qt.Key.Key_Down: "DOWN", Qt.Key.Key_Left: "LEFT",
-            Qt.Key.Key_Right: "RIGHT", Qt.Key.Key_Space: "SPACE", Qt.Key.Key_Return: "RETURN",
-            Qt.Key.Key_Tab: "TAB", Qt.Key.Key_Shift: "LSHIFT", Qt.Key.Key_Comma: "COMMA",
-            Qt.Key.Key_Period: "PERIOD"}
+#: Qt keys -> the key names used in ``keys`` (:class:`ControlNames`); letters and digits
+#: are taken from the event's text.
+_QT_KEYS = {Qt.Key.Key_Up: ControlNames.K_UP, Qt.Key.Key_Down: ControlNames.K_DOWN,
+            Qt.Key.Key_Left: ControlNames.K_LEFT, Qt.Key.Key_Right: ControlNames.K_RIGHT,
+            Qt.Key.Key_Space: ControlNames.K_SPACE, Qt.Key.Key_Return: ControlNames.K_RETURN,
+            Qt.Key.Key_Tab: ControlNames.K_TAB, Qt.Key.Key_Shift: ControlNames.K_LSHIFT,
+            Qt.Key.Key_Comma: ControlNames.K_COMMA, Qt.Key.Key_Period: ControlNames.K_PERIOD}
 
 
 STYLE = """

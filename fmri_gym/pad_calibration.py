@@ -19,8 +19,8 @@ from typing import Any, Callable, NamedTuple
 import pygame
 
 from .inputs.calibration import AxisCalibration, ControllerCalibration, write
-from .inputs.controller import (AXIS_CONTROLS, BUTTON_A, BUTTON_B, BUTTON_X, BUTTON_Y,
-                                FACE_BUTTONS, Controller, short_name)
+from .inputs.control_names import ControlNames
+from .inputs.controller import AXIS_CONTROLS, FACE_BUTTONS, Controller, short_name
 
 #: The procedure's colours: the face buttons in the colour they are printed in,
 #: so a cue can be matched by colour without reading it.
@@ -28,8 +28,10 @@ SURFACE, PANEL, GRID = (18, 21, 28), (24, 28, 37), (35, 41, 54)
 INK, INK2, INK3 = (231, 234, 240), (154, 164, 178), (91, 100, 114)
 LIVE, WARN = (63, 185, 80), (210, 153, 34)
 FACE: dict[str, tuple[int, int, int]] = {
-    BUTTON_Y: (226, 192, 68), BUTTON_B: (230, 86, 86), BUTTON_X: (79, 143, 247),
-    BUTTON_A: (63, 185, 80),
+    ControlNames.CONTROLLER_BUTTON_Y: (226, 192, 68),
+    ControlNames.CONTROLLER_BUTTON_B: (230, 86, 86),
+    ControlNames.CONTROLLER_BUTTON_X: (79, 143, 247),
+    ControlNames.CONTROLLER_BUTTON_A: (63, 185, 80),
 }
 
 
@@ -197,9 +199,9 @@ class _Task:
 def _stick_words(controller: Controller, axis_name: str) -> str:
     """The stick an axis is on, as a cue says it: ``the stick``, or ``the left stick`` on a
     pad with two."""
-    sticks = {name.rsplit("_", 1)[0] for name in controller.AXIS_NAMES}
-    stick = axis_name.rsplit("_", 1)[0]
-    return f"the {stick.replace('_', ' ').lower()}" if len(sticks) > 1 else "the stick"
+    sticks = {short_name(name)[:-1] for name in controller.AXIS_NAMES}
+    stick = short_name(axis_name)[:-1]
+    return f"the {stick.lower()} stick" if len(sticks) > 1 else "the stick"
 
 
 def _hold_still(task: _Task, phase: str, words: list[str]) -> dict[str, float]:

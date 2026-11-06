@@ -30,7 +30,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING
 
-from .inputs import ESCAPE, QUIT, Edge, InputEvent, is_control_of_any_input_device
+from .inputs import QUIT, ControlNames, Edge, InputEvent, is_control_of_any_input_device
 
 if TYPE_CHECKING:
     from .display import Display
@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 OPTIONS = ("reset", "forfeit", "resume")
 _LABELS = {"reset": "Restart the level", "forfeit": "Give up this level", "resume": "Resume"}
 _DEFAULTS = {"hold": 5.0, "after": 15.0, "options": list(OPTIONS),
-             "move": ["UP", "DOWN"], "confirm": "RETURN"}
+             "move": [ControlNames.K_UP, ControlNames.K_DOWN], "confirm": ControlNames.K_RETURN}
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,11 +84,12 @@ def menu_problems(spec: object) -> list[str]:
     for field, names in (("control", [spec.get("control")]), ("move", spec.get("move", [])),
                          ("confirm", [spec.get("confirm", _DEFAULTS["confirm"])])):
         wrong = [n for n in (names if isinstance(names, list) else []) if isinstance(n, str)
-                 and (not is_control_of_any_input_device(n.upper()) or n.upper() == ESCAPE)]
+                 and (not is_control_of_any_input_device(n.upper())
+                      or n.upper() == ControlNames.K_ESCAPE)]
         if wrong:
-            out.append(f"menu.{field}: {wrong} is no control name (ESCAPE quits the run): "
-                       "the keyboard's (fmri_gym/inputs/keyboard.py) or a device's "
-                       "(fmri_gym/inputs/<device>.py)")
+            out.append(f"menu.{field}: {wrong} is no control name "
+                       f"({ControlNames.K_ESCAPE} quits the run): a value in "
+                       "fmri_gym/inputs/control_names.py")
     for field in ("hold", "after"):
         value = spec.get(field, _DEFAULTS[field])
         if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
@@ -164,7 +165,7 @@ class Menu:
             self._draw(display, choice)
             for name, edge in read_input_events():
                 down = edge is Edge.DOWN
-                if name in (QUIT, ESCAPE):
+                if name in (QUIT, ControlNames.K_ESCAPE):
                     if down:
                         return "quit"
                     continue

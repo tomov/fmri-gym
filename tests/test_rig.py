@@ -11,6 +11,7 @@ import pytest
 from fmri_gym.config import rig
 from fmri_gym.config.phases import phase_problems
 from fmri_gym.config.rig import RigConfig
+from fmri_gym.inputs import ControlNames
 
 FIELDS = {**{k: "x" for k in rig.FIELDS}, "site": "site1", "pi": "MT", "modality": "fmri",
           "notes": ""}
@@ -163,16 +164,19 @@ def test_a_control_none_of_the_rigs_inputs_has_is_refused_on_that_rig():
     def game(keys: dict, **more) -> dict:
         return {"type": "game", "game": "CartPole-v1", "fps": 30, "controls": keys, **more}
 
-    stick = game({"": 0, "LEFT_STICK_UP": 1, "UP": 1, "BUTTON_A": 2})
+    a, x, y = (ControlNames.CONTROLLER_BUTTON_A, ControlNames.CONTROLLER_BUTTON_X,
+               ControlNames.CONTROLLER_BUTTON_Y)
+    stick_up = ControlNames.CONTROLLER_AXIS_LEFTY_UP
+    stick = game({"": 0, stick_up: 1, "UP": 1, a: 2})
     assert run(stick, pad).problems() == []
-    assert "needs ['BUTTON_A', 'LEFT_STICK_UP'], which none of" in run(stick, keyboard).problems()[0]
+    assert f"needs {[stick_up, a]}, which none of" in run(stick, keyboard).problems()[0]
     assert run(game({"": 0, "UP": 1}), keyboard).problems() == []
     assert "needs ['UP'], which none of" in run(game({"": 0, "UP": 1}), nothing).problems()[0]
-    assert run(stick, pad).required_controls() == {"LEFT_STICK_UP", "UP", "BUTTON_A"}
-    menu = {"control": "BUTTON_X", "move": ["UP", "DOWN"], "confirm": "SPACE"}
-    assert "needs ['BUTTON_X']" in run(game({"": 0, "UP": 1}, menu=menu), keyboard).problems()[0]
-    survey = {"type": "survey", "questions": ["ok?"], "controls": ["BUTTON_Y", "BUTTON_A"]}
-    assert "needs ['BUTTON_A', 'BUTTON_Y']" in run(survey, keyboard).problems()[0]
+    assert run(stick, pad).required_controls() == {stick_up, "UP", a}
+    menu = {"control": x, "move": ["UP", "DOWN"], "confirm": "SPACE"}
+    assert f"needs {[x]}" in run(game({"": 0, "UP": 1}, menu=menu), keyboard).problems()[0]
+    survey = {"type": "survey", "questions": ["ok?"], "controls": [y, a]}
+    assert f"needs {[a, y]}" in run(survey, keyboard).problems()[0]
     xbox = RigConfig.open(write("xbox", inputs=["keyboard", "xbox_controller"]))
     assert run(stick, xbox).problems() == []       # the GMPD3's controls are the Xbox's too
 
@@ -229,5 +233,5 @@ def test_a_wrong_rig_check_section_is_refused(values, problem):
 def test_a_message_is_dismissed_by_a_control_name_not_a_character():
     message = {"type": "message", "text": "hi"}
     assert not phase_problems(message) and not phase_problems({**message, "control": "any"})
-    assert not phase_problems({**message, "control": "BUTTON_A"})
+    assert not phase_problems({**message, "control": ControlNames.CONTROLLER_BUTTON_A})
     assert any("control name" in p for p in phase_problems({**message, "control": " "}))

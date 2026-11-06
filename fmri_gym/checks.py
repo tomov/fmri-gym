@@ -100,7 +100,7 @@ from .config import rig as rig_file
 from .config.phases import (CHECK_PHASES, CheckControls, CheckDisplay, CheckFrames, CheckPhase,
                             CheckPhotodiode, CheckTriggers, GamePhase)
 from .display import Display, is_locked
-from .inputs import ESCAPE, QUIT, Edge, Controller, InputDevice, InputDevices
+from .inputs import QUIT, ControlNames, Controller, Edge, InputDevice, InputDevices
 from .inputs.keyboard import KEYCODES
 from .pad_calibration import calibrate, cue_order
 from .photodiode import (AudioRecorder, Verdict, _clicker, _light_verdict,
@@ -523,7 +523,7 @@ def _key_events(inputs: InputDevice, ignore: str | None) -> list[tuple[bool, str
     """
     out = []
     for name, edge in read_input_events(inputs):
-        if name in (QUIT, ESCAPE) and edge is Edge.DOWN:
+        if name in (QUIT, ControlNames.K_ESCAPE) and edge is Edge.DOWN:
             raise _Skipped
         if name == ignore:
             continue
@@ -1141,7 +1141,7 @@ COLUMNS: list[tuple[str, tuple[str, ...], str, str | None]] = [
      "Median time from the prompt to the press (a person's, not the device's)", "ms"),
     ("pad_device", ("rig_check", "controls", "pad", "device"),
      "The controller found, whose buttons are read as keys", None),
-    ("pad_axis_on", ("rig_check", "controls", "pad", "axes", "LEFT_STICK_X", "on"),
+    ("pad_axis_on", ("rig_check", "controls", "pad", "axes", ControlNames.CONTROLLER_AXIS_LEFTX, "on"),
      "Fraction of the left stick's horizontal travel that counts as pushed", None),
     ("pad_corrections", ("rig_check", "controls", "pad", "corrections"),
      "Wrong controls pressed, and asked again, while the calibration confirmed each", None),

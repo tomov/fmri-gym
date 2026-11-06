@@ -29,7 +29,7 @@ A screen's text shows an image where a line is only `![alt](path)`, the path fro
 
 Whenever a branch touches a curriculum, or a `common/` file one includes, whose instructions show a controls image (`rg -l images/controls configs/curricula`), and above all when it changes `controls`, `menu` or the Controls lines:
 
-- **Labels match the bindings.** For each such phase, the controls in its image's entry are exactly the ones it binds (any `LEFT_STICK_*` counts as `LEFT_STICK`) plus the menu's `control`, and each label says the action that control's index is bound to: a remapped button with its old label, a binding with no label, or a label with no binding is a mismatch. Labels and the Controls lines say the same thing.
+- **Labels match the bindings.** For each such phase, the controls in its image's entry are exactly the ones it binds (any `CONTROLLER_AXIS_LEFTX_*` or `CONTROLLER_AXIS_LEFTY_*` counts as `LEFT_STICK`) plus the menu's `control`, and each label says the action that control's index is bound to: a remapped button with its old label, a binding with no label, or a label with no binding is a mismatch. Labels and the Controls lines say the same thing.
 - **Images match the labels.** Redraw, then `git status --short configs/images/controls`: a PNG that changed was stale; commit it. Nothing changed means the images are what `labels.json` says.
 - **Every image line has an entry** in `labels.json`, and every entry is shown by some curriculum.
 

@@ -20,7 +20,7 @@ from enum import Enum
 from typing import Any, ClassVar
 
 from ..display import image_line_problems
-from ..inputs import ESCAPE, is_control_of_any_input_device
+from ..inputs import ControlNames, is_control_of_any_input_device
 from ..menu import menu_problems
 
 #: An episode's possible outcomes: EnvAdapter.outcome's names, and the subject's own endings.
@@ -30,6 +30,9 @@ OUTCOMES = frozenset({"won", "lost", "terminated", "truncated", "playing", "forf
 REWINDABLE = frozenset({"won", "lost", "terminated"})
 #: What a frames check plays its rates under: nothing else, or every core kept busy.
 LOADS = ("none", "cpu")
+#: A survey's controls when it names none: one per point, from its lowest.
+_SURVEY_CONTROLS = (ControlNames.K_1, ControlNames.K_2, ControlNames.K_3, ControlNames.K_4,
+                    ControlNames.K_5, ControlNames.K_6, ControlNames.K_7)
 
 
 class BlockMode(str, Enum):
@@ -128,14 +131,14 @@ class Message(Phase):
     def from_dict(cls, d: dict, index: int) -> Message:
         dismiss = d.get("controls_to_dismiss")
         return cls(**cls._shared(d), text=join_text(d.get("text", "")),
-                   duration=d.get("duration"), control=d.get("control", "SPACE"),
+                   duration=d.get("duration"), control=d.get("control", ControlNames.K_SPACE),
                    controls_to_dismiss=None if dismiss is None else tuple(dismiss),
                    align=d.get("align", "center"))
 
     @staticmethod
     def problems(d: dict) -> list[str]:
         out = _dismiss_problems("controls_to_dismiss", d.get("controls_to_dismiss"))
-        control = d.get("control", "SPACE")
+        control = d.get("control", ControlNames.K_SPACE)
         if control != "any" and not _is_possible_on_any_input_device(control):
             out.append(f'control: expected a control name ({_NAMES_ARE}) or "any", '
                        f"got {control!r}")
@@ -166,7 +169,7 @@ class Instructions:
         """As the message shown, its heading marking a block a run carries on."""
         heading = f"{'Resuming:' if resumed else 'Starting:'} {self.title}"
         return Message(spec={}, include_on_resume=False, text=f"{heading}\n\n{self.text}",
-                       duration=self.duration, control="SPACE",
+                       duration=self.duration, control=ControlNames.K_SPACE,
                        controls_to_dismiss=self.controls_to_dismiss, align=self.align)
 
     @staticmethod
@@ -204,7 +207,7 @@ class Survey(Phase):
     @classmethod
     def from_dict(cls, d: dict, index: int) -> Survey:
         return cls(**cls._shared(d), questions=tuple(d.get("questions", ())),
-                   controls=tuple(d.get("controls", [str(i) for i in range(1, 8)])))
+                   controls=tuple(d.get("controls", _SURVEY_CONTROLS)))
 
     @staticmethod
     def problems(d: dict) -> list[str]:
@@ -213,7 +216,7 @@ class Survey(Phase):
             else [f"questions: expected a list of questions, got {questions!r}"]
         if "n_points" in d:
             out.append('"n_points" is gone: list one control per point under "controls"')
-        controls = d.get("controls", ["1", "2"])
+        controls = d.get("controls", list(_SURVEY_CONTROLS))
         if not (isinstance(controls, list) and len(controls) >= 2
                 and len(set(map(str, controls))) == len(controls)
                 and all(_is_possible_on_any_input_device(c) for c in controls)):
@@ -512,13 +515,14 @@ def _bool_problems(d: dict, keys: tuple[str, ...]) -> list[str]:
 
 
 #: Where a curriculum's control names are listed, for its messages.
-_NAMES_ARE = ("as the keyboard's in fmri_gym/inputs/keyboard.py and each device's in "
-              "fmri_gym/inputs/<device>.py; ESCAPE quits the run")
+_NAMES_ARE = ("as the values in fmri_gym/inputs/control_names.py, of a device the rig "
+              f"lists; {ControlNames.K_ESCAPE} quits the run")
 
 
 def _is_possible_on_any_input_device(name: Any) -> bool:
     """Whether a curriculum may map ``name``: a control of some device, not the run's quit."""
-    return isinstance(name, str) and is_control_of_any_input_device(name) and name != ESCAPE
+    return (isinstance(name, str) and is_control_of_any_input_device(name)
+            and name != ControlNames.K_ESCAPE)
 
 
 def _dismiss_problems(where: str, controls: Any) -> list[str]:

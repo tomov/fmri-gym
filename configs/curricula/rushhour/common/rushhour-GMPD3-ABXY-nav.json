@@ -1,7 +1,7 @@
 {
   "type": "game", "backend": "rushhour", "game": "RushHourHuman-v0",
   "instructions": {
-    "align": "left", "controls_to_dismiss": ["BUTTON_A"],
+    "align": "left", "controls_to_dismiss": ["CONTROLLER_BUTTON_A"],
     "text": [
       "On each puzzle, get the RED car out through the opening",
       "on the right wall after moving the other cars out of the way.",
@@ -16,8 +16,8 @@
       "Press A to begin."
     ]
   },
-  "controls": {"LEFT_TRIGGER": 4, "RIGHT_TRIGGER": 5, "BUTTON_X": 8, "BUTTON_B": 9, "BUTTON_Y": 10, "BUTTON_A": 11},
-  "menu": {"control": "LEFT_TRIGGER", "hold": 3.0, "after": 300.0, "options": ["reset", "forfeit", "resume"], "move": ["BUTTON_Y", "BUTTON_A"], "confirm": "RIGHT_TRIGGER"},
+  "controls": {"CONTROLLER_AXIS_TRIGGERLEFT": 4, "CONTROLLER_AXIS_TRIGGERRIGHT": 5, "CONTROLLER_BUTTON_X": 8, "CONTROLLER_BUTTON_B": 9, "CONTROLLER_BUTTON_Y": 10, "CONTROLLER_BUTTON_A": 11},
+  "menu": {"control": "CONTROLLER_AXIS_TRIGGERLEFT", "hold": 3.0, "after": 300.0, "options": ["reset", "forfeit", "resume"], "move": ["CONTROLLER_BUTTON_Y", "CONTROLLER_BUTTON_A"], "confirm": "CONTROLLER_AXIS_TRIGGERRIGHT"},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 480.0,
   "env_kwargs": {"movable_only": true}, "fps": 60,
   "is_turn_based": true

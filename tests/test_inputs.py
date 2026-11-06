@@ -20,14 +20,14 @@ import pytest
 
 import fmri_gym.inputs as inputs
 from fmri_gym import pad_calibration as cal
-from fmri_gym.inputs import (QUIT, CalibrationError, CurrentDesignsGamepad3, Edge, InputDevices,
-                             InputEvent, Keyboard, XBoxController)
+from fmri_gym.inputs import (QUIT, CalibrationError, ControlNames, CurrentDesignsGamepad3, Edge,
+                             InputDevices, InputEvent, Keyboard, XBoxController)
 from fmri_gym.inputs import calibration as files
 from fmri_gym.inputs.calibration import AxisCalibration
-from fmri_gym.inputs.controller import (AXIS_CONTROLS, LEFT_STICK_X, LEFT_STICK_Y, RIGHT_STICK_X,
-                                        RIGHT_STICK_Y, Controller)
+from fmri_gym.inputs.controller import AXIS_CONTROLS, Controller
 
-LX, LY, RX, RY = LEFT_STICK_X, LEFT_STICK_Y, RIGHT_STICK_X, RIGHT_STICK_Y
+LX, LY = ControlNames.CONTROLLER_AXIS_LEFTX, ControlNames.CONTROLLER_AXIS_LEFTY
+RX, RY = ControlNames.CONTROLLER_AXIS_RIGHTX, ControlNames.CONTROLLER_AXIS_RIGHTY
 MADE = "2026-01-21T14:15:00+00:00"
 AXIS = {"rest": 0.0, "low": -1.0, "high": 1.0, "drift": 0.01, "on": 0.5, "off": 0.3}
 #: A calibration of the scripted controller's four axes, and of the GMPD3's two.
@@ -245,7 +245,7 @@ def screen(monkeypatch):
 
 def test_a_calibration_measures_each_axis_and_confirms_each_control(config_home, screen):
     d = _ScriptedController()
-    d.frames = iter(_frames(d, wrong="LEFT_STICK_RIGHT"))
+    d.frames = iter(_frames(d, wrong=ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT))
     result = cal.calibrate(d, screen, lambda: None)
     assert (result.confirmed, result.corrections) == (8 + 2, 1)
     measured = result.calibration.axes[LX]
@@ -297,25 +297,27 @@ def test_each_axis_reads_its_own_thresholds():
     d = _calibrated(_ScriptedController(), FILE)
     d.frames = iter([(d.axes_at({LX: 0.55, RX: 0.55}), set()),    # past LX's 0.5, not RX's 0.6
                      (d.axes_at({LX: 0.55, RX: 0.65}), set())])
-    assert d.handle([], 1.0) == [_down("LEFT_STICK_RIGHT")]
-    assert d.handle([], 1.1) == [_down("RIGHT_STICK_RIGHT")]
-    assert d.held() == {"LEFT_STICK_RIGHT", "RIGHT_STICK_RIGHT"}
+    assert d.handle([], 1.0) == [_down(ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT)]
+    assert d.handle([], 1.1) == [_down(ControlNames.CONTROLLER_AXIS_RIGHTX_RIGHT)]
+    assert d.held() == {ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT,
+                        ControlNames.CONTROLLER_AXIS_RIGHTX_RIGHT}
 
 
 def test_a_side_is_pressed_past_on_at_once_and_released_under_off():
     d = _calibrated(_ScriptedController(), FILE)
     d.frames = iter([(d.axes_at({LY: v}), set()) for v in (-0.4, -0.9, -0.4, -0.2, 0.9)])
     assert d.handle([], 1.0) == []                                  # short of on
-    assert d.handle([], 1.01) == [_down("LEFT_STICK_UP")]
+    assert d.handle([], 1.01) == [_down(ControlNames.CONTROLLER_AXIS_LEFTY_UP)]
     assert d.handle([], 1.02) == []                                 # past off: still held
-    assert d.handle([], 1.03) == [_up("LEFT_STICK_UP")]
-    assert d.handle([], 1.04) == [_down("LEFT_STICK_DOWN")]
+    assert d.handle([], 1.03) == [_up(ControlNames.CONTROLLER_AXIS_LEFTY_UP)]
+    assert d.handle([], 1.04) == [_down(ControlNames.CONTROLLER_AXIS_LEFTY_DOWN)]
 
 
 def test_a_diagonal_push_presses_a_side_of_each_axis():
     d = _calibrated(_ScriptedController(), FILE)
     d.frames = iter([(d.axes_at({LX: -0.9, LY: 0.6}), set())])
-    assert d.handle([], 1.0) == [_down("LEFT_STICK_LEFT"), _down("LEFT_STICK_DOWN")]
+    assert d.handle([], 1.0) == [_down(ControlNames.CONTROLLER_AXIS_LEFTX_LEFT),
+                                 _down(ControlNames.CONTROLLER_AXIS_LEFTY_DOWN)]
 
 
 def test_an_uncalibrated_axis_presses_nothing():
@@ -328,15 +330,17 @@ def test_an_uncalibrated_axis_presses_nothing():
 def test_a_controller_refuses_an_axis_the_curriculum_names_with_no_calibration(config_home):
     pad = _bare(CurrentDesignsGamepad3)
     with pytest.raises(CalibrationError, match="no calibration of 'Scripted' in .*rig check"):
-        pad.require_calibrated_axes_for(frozenset({"LEFT_STICK_UP", "BUTTON_A"}))
-    pad.require_calibrated_axes_for(frozenset({"BUTTON_A", "SPACE"}))    # buttons only
+        pad.require_calibrated_axes_for(frozenset({ControlNames.CONTROLLER_AXIS_LEFTY_UP,
+                                                   ControlNames.CONTROLLER_BUTTON_A}))
+    buttons_only = frozenset({ControlNames.CONTROLLER_BUTTON_A, "SPACE"})
+    pad.require_calibrated_axes_for(buttons_only)
     assert "axes UNCALIBRATED" in pad.status()
     other = _write(config_home, "Scripted_a.json", FILE, 1000)          # axes it does not have
     with pytest.raises(CalibrationError, match=re.escape(f"{other}: calibrates the axes")):
         pad.load_calibration()
     path = _write(config_home, "Scripted_b.json", GMPD3_FILE, 2000)
     pad.load_calibration()
-    pad.require_calibrated_axes_for(frozenset({"LEFT_STICK_UP"}))
+    pad.require_calibrated_axes_for(frozenset({ControlNames.CONTROLLER_AXIS_LEFTY_UP}))
     assert str(path) in pad.status() and pad.calibration_path == path
 
 
@@ -358,9 +362,11 @@ def test_the_gmpd3_names_its_buttons_as_an_xbox_pad_does_and_reads_its_stick():
               pygame.event.Event(pygame.JOYBUTTONDOWN, instance_id=8, button=0),  # another's
               _joy(pygame.JOYAXISMOTION, axis=1, value=-0.9),
               _joy(pygame.JOYAXISMOTION, axis=3, value=-1.0)]            # pinned: no control
-    assert pad.handle(events, 1.0) == [_down("BUTTON_A"), _down("LEFT_STICK_UP")]
-    assert pad.held() == {"BUTTON_A", "LEFT_STICK_UP"}
-    assert pad.handle([_joy(pygame.JOYBUTTONUP, button=4)], 1.1) == [_up("BUTTON_A")]
+    assert pad.handle(events, 1.0) == [_down(ControlNames.CONTROLLER_BUTTON_A),
+                                       _down(ControlNames.CONTROLLER_AXIS_LEFTY_UP)]
+    assert pad.held() == {ControlNames.CONTROLLER_BUTTON_A, ControlNames.CONTROLLER_AXIS_LEFTY_UP}
+    assert (pad.handle([_joy(pygame.JOYBUTTONUP, button=4)], 1.1)
+            == [_up(ControlNames.CONTROLLER_BUTTON_A)])
     assert pad.handle([], 1.2) == []                        # the stick held still stays pressed
     assert CurrentDesignsGamepad3.CONTROLS < XBoxController.CONTROLS
 
@@ -370,20 +376,20 @@ def test_an_xbox_controller_reads_its_mapping_and_not_the_joystick_twin():
     a, trigger = pygame.CONTROLLER_BUTTON_A, pygame.CONTROLLER_AXIS_TRIGGERLEFT
     events = [_joy(pygame.CONTROLLERBUTTONDOWN, button=a), _joy(pygame.JOYBUTTONDOWN, button=0),
               _joy(pygame.CONTROLLERAXISMOTION, axis=trigger, value=12000)]   # under half
-    assert pad.handle(events, 1.0) == [_down("BUTTON_A")]
+    assert pad.handle(events, 1.0) == [_down(ControlNames.CONTROLLER_BUTTON_A)]
     pull = [_joy(pygame.CONTROLLERAXISMOTION, axis=trigger, value=20000)]
-    assert pad.handle(pull, 1.1) == [_down("LEFT_TRIGGER")]
+    assert pad.handle(pull, 1.1) == [_down(ControlNames.CONTROLLER_AXIS_TRIGGERLEFT)]
     ease = [_joy(pygame.CONTROLLERAXISMOTION, axis=trigger, value=12000)]   # still past off
     assert pad.handle(ease, 1.2) == []
     let_go = [_joy(pygame.CONTROLLERAXISMOTION, axis=trigger, value=0)]
-    assert pad.handle(let_go, 1.3) == [_up("LEFT_TRIGGER")]
+    assert pad.handle(let_go, 1.3) == [_up(ControlNames.CONTROLLER_AXIS_TRIGGERLEFT)]
 
 
 def test_an_xbox_controller_reads_each_stick_axis_through_its_calibration():
     pad = _calibrated(_bare(XBoxController), FILE)
     right_x = pygame.CONTROLLER_AXIS_RIGHTX
     assert pad.handle([_joy(pygame.CONTROLLERAXISMOTION, axis=right_x, value=-20000)], 1.0) == [
-        _down("RIGHT_STICK_LEFT")]
+        _down(ControlNames.CONTROLLER_AXIS_RIGHTX_LEFT)]
     assert pad.calibrated_value(RX) == pytest.approx(-20000 / 32767)
 
 
@@ -484,12 +490,13 @@ def test_a_rigs_inputs_that_cannot_be_opened_stop_the_run(sdl, config_home, name
 
 def test_a_rigs_inputs_open_its_devices_and_say_which_joysticks_they_ignore(sdl, config_home):
     opened = inputs.open_input_devices(["keyboard", "current_designs_gamepad3"],
-                                       frozenset({"BUTTON_A", "SPACE"}))
+                                       frozenset({ControlNames.CONTROLLER_BUTTON_A, "SPACE"}))
     assert [d.name for d in opened.devices] == ["keyboard", "current_designs_gamepad3"]
     assert "IGNORED \"Joystick Of Nobody's\"" in opened.status()
     assert opened.controls() == Keyboard.CONTROLS | CurrentDesignsGamepad3.CONTROLS
     with pytest.raises(CalibrationError, match="no calibration of 'Scripted'"):
-        inputs.open_input_devices(["current_designs_gamepad3"], frozenset({"LEFT_STICK_LEFT"}))
+        inputs.open_input_devices(["current_designs_gamepad3"],
+                                  frozenset({ControlNames.CONTROLLER_AXIS_LEFTX_LEFT}))
     assert [d.name for d in inputs.open_input_devices(["current_designs_gamepad3"]).devices] == [
         "current_designs_gamepad3"]                   # no keyboard unless the rig lists one
 

@@ -11,6 +11,7 @@ import pytest
 
 from fmri_gym.config import curriculum
 from fmri_gym.config import rig as rig_file
+from fmri_gym.inputs import ControlNames
 from fmri_gym.session_script import read_session, write_session
 from fmri_gym.triggers import TriggerSettings
 
@@ -163,12 +164,13 @@ CARTPOLE = {"curriculum": [{"type": "game", "backend": "gym", "game": "CartPole-
 def test_check_reports_a_game_key_none_of_the_rigs_inputs_has(qt):
     from fmri_gym.gui.session_editor import _Editor
 
-    pad = {"curriculum": [{**CARTPOLE["curriculum"][0], "controls": {"": 0, "BUTTON_A": 1}}]}
+    a = ControlNames.CONTROLLER_BUTTON_A
+    pad = {"curriculum": [{**CARTPOLE["curriculum"][0], "controls": {"": 0, a: 1}}]}
     editor = _Editor(pad, None)
     editor.rig_pick.set_path(str(EXAMPLES / "laptop.json"))
-    assert any("BUTTON_A" in p and "laptop.json" in p for p in editor._problems())
+    assert any(a in p and "laptop.json" in p for p in editor._problems())
     editor.rig_pick.set_path(str(EXAMPLES / "xbox.json"))
-    assert not any("BUTTON_A" in p for p in editor._problems())
+    assert not any(a in p for p in editor._problems())
     editor.rig_pick.set_path(str(EXAMPLES / "gmpd3.json"))
     assert editor._problems() == []
 
