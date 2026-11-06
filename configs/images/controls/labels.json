@@ -10,8 +10,8 @@
     },
     "aigamestore/game1-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["left / right:", "highlight a tube"],
-      "BUTTON_A": ["select / pour"],
-      "BUTTON_Y": ["undo"]
+      "RIGHT_TRIGGER": ["select / pour"],
+      "BUTTON_X": ["undo"]
     },
     "aigamestore/game4-GMPD3-ABXY-nav.png": {
       "RIGHT_TRIGGER": ["thrust / fly"],
@@ -44,7 +44,7 @@
     },
     "aigamestore/game8-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["left / right:", "aim"],
-      "BUTTON_A": ["fire"],
+      "RIGHT_TRIGGER": ["fire"],
       "BUTTON_Y": ["swap current", "/ next"]
     },
     "baba_auto/baba_auto-GMPD3-ABXY-nav.png": {

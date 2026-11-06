@@ -4,16 +4,7 @@
     "align": "left", "controls_to_dismiss": ["BUTTON_A"],
     "text": [
       "On each puzzle, get the RED car out through the opening",
-      "on the right wall.",
-      "",
-      "Vehicles only slide along their own axis, and cannot pass",
-      "through each other.",
-      "",
-      "One car is outlined in white; the arrows on it show which ways",
-      "it can still move.",
-      "",
-      "Cars that cannot move at all are skipped: choosing only ever",
-      "lands on a car with at least one arrow.",
+      "on the right wall after moving the other cars out of the way.",
       "",
       "![controls](images/controls/rushhour/rushhour-GMPD3-stick-nav.png)",
       "",
@@ -21,10 +12,6 @@
       "   stick left / right     slide a horizontal car left / right",
       "   stick up / down        slide a vertical car up / down",
       "   hold X                 pause menu (restart / give up / resume)",
-      "",
-      "There are 49 puzzles. The first 12 get harder one by one;",
-      "after that, easy and hard ones come in any order.",
-      "Take all the time you need.",
       "",
       "Press A to begin."
     ]
