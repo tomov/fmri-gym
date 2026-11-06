@@ -515,8 +515,8 @@ def _bool_problems(d: dict, keys: tuple[str, ...]) -> list[str]:
 
 
 #: Where a curriculum's control names are listed, for its messages.
-_NAMES_ARE = ("as the values in fmri_gym/inputs/control_names.py, of a device the rig "
-              f"lists; {ControlNames.K_ESCAPE} quits the run")
+_NAMES_ARE = (f"as listed in fmri_gym/inputs/control_names.py; {ControlNames.K_ESCAPE} "
+              "quits the run")
 
 
 def _is_possible_on_any_input_device(name: Any) -> bool:
