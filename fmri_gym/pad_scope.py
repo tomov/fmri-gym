@@ -64,8 +64,8 @@ def _row(x: int, y: int, h: int, items: list[tuple[str, str]]) -> tuple[list[But
 
 
 def _words(axis_name: str) -> str:
-    """An axis's name as a label: ``LEFT_STICK_X`` is ``left stick x``."""
-    return axis_name.replace("_", " ").lower()
+    """An axis's name as a label: its short name, lower-cased."""
+    return short_name(axis_name).lower()
 
 
 def _layout(axis_names: tuple[str, ...]) -> tuple[Button, ...]:

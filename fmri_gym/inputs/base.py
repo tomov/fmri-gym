@@ -1,8 +1,8 @@
 """The seam between the input devices and the run: named controls, their edges, one device.
 
 Every key, button and stick direction a participant can touch has one name,
-unique across devices, and a curriculum names it as it is written here
-(``"SPACE"``, ``"BUTTON_A"``, ``"LEFT_STICK_UP"``). A device lists its names at
+unique across devices, and a curriculum names it by its value in
+:class:`~fmri_gym.inputs.control_names.ControlNames`. A device lists its names at
 the top of its own file, and its :meth:`InputDevice.handle` turns the pygame
 events that are its own into :class:`InputEvent` edges; it never reads pygame's
 queue itself. As in a game engine, a control is read two ways: an edge the frame

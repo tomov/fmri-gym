@@ -1,7 +1,7 @@
 {
   "type": "game", "backend": "aigamestore",
   "instructions": {
-    "align": "left", "controls_to_dismiss": ["BUTTON_A"],
+    "align": "left", "controls_to_dismiss": ["CONTROLLER_BUTTON_A"],
     "text": [
       "Sort fluids into matching tubes.",
       "Pour until every tube is uniform (or empty).",
@@ -16,7 +16,7 @@
       "Press A to start."
     ]
   },
-  "controls": {"LEFT_STICK_LEFT": 0, "LEFT_STICK_RIGHT": 1, "RIGHT_TRIGGER": 2, "BUTTON_X": 3},
+  "controls": {"CONTROLLER_AXIS_LEFTX_LEFT": 0, "CONTROLLER_AXIS_LEFTX_RIGHT": 1, "CONTROLLER_AXIS_TRIGGERRIGHT": 2, "CONTROLLER_BUTTON_X": 3},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 120.0,
   "fps": 30, "frame_skip": 2
 }

@@ -1,14 +1,13 @@
 """A game controller: buttons, triggers and stick axes, under the names every kind of controller
 shares.
 
-A curriculum names a controller's controls as below, whatever the controller
-(``BUTTON_A``, ``LEFT_TRIGGER``, ``LEFT_STICK_UP``), so one written for a
-controller plays on any other that has those controls. A kind of controller is
-a subclass that maps what SDL sends to these names. Each stick axis is two
-controls, one per side of rest, read like a trigger through the axis's own
-calibration (:mod:`fmri_gym.inputs.calibration`), and independent of every
-other axis. SDL's joystick subsystem is started here, since only a controller
-needs it.
+A curriculum names a controller's controls by :class:`ControlNames`, whatever
+the controller, so one written for a controller plays on any other that has
+those controls. A kind of controller is a subclass that maps what SDL sends to
+these names. Each stick axis is two controls, one per side of rest, read like a
+trigger through the axis's own calibration (:mod:`fmri_gym.inputs.calibration`),
+and independent of every other axis. SDL's joystick subsystem is started here,
+since only a controller needs it.
 """
 
 from __future__ import annotations
@@ -25,37 +24,30 @@ from pygame._sdl2 import controller as sdl_controller
 from .base import InputDevice, InputEvent
 from .calibration import (HOW_TO_CALIBRATE, AxisCalibration, CalibrationError,
                           ControllerCalibration, calibrations_dir, newest)
+from .control_names import ControlNames
 
-# -- the control names every controller shares ---------------------------------------
-BUTTON_A, BUTTON_B, BUTTON_X, BUTTON_Y = "BUTTON_A", "BUTTON_B", "BUTTON_X", "BUTTON_Y"
-BUTTON_BACK, BUTTON_GUIDE, BUTTON_START = "BUTTON_BACK", "BUTTON_GUIDE", "BUTTON_START"
-LEFT_SHOULDER, RIGHT_SHOULDER = "LEFT_SHOULDER", "RIGHT_SHOULDER"
-LEFT_TRIGGER, RIGHT_TRIGGER = "LEFT_TRIGGER", "RIGHT_TRIGGER"
-LEFT_STICK_PRESS, RIGHT_STICK_PRESS = "LEFT_STICK_PRESS", "RIGHT_STICK_PRESS"
-DPAD_UP, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT = "DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT"
-LEFT_STICK_UP, LEFT_STICK_DOWN = "LEFT_STICK_UP", "LEFT_STICK_DOWN"
-LEFT_STICK_LEFT, LEFT_STICK_RIGHT = "LEFT_STICK_LEFT", "LEFT_STICK_RIGHT"
-RIGHT_STICK_UP, RIGHT_STICK_DOWN = "RIGHT_STICK_UP", "RIGHT_STICK_DOWN"
-RIGHT_STICK_LEFT, RIGHT_STICK_RIGHT = "RIGHT_STICK_LEFT", "RIGHT_STICK_RIGHT"
-# -- the stick axes, as a calibration file names them ----------------------------------
-LEFT_STICK_X, LEFT_STICK_Y = "LEFT_STICK_X", "LEFT_STICK_Y"
-RIGHT_STICK_X, RIGHT_STICK_Y = "RIGHT_STICK_X", "RIGHT_STICK_Y"
 #: Each stick axis's two controls: the one its negative side presses, then its positive side's.
-AXIS_CONTROLS: dict[str, tuple[str, str]] = {
-    LEFT_STICK_X: (LEFT_STICK_LEFT, LEFT_STICK_RIGHT),
-    LEFT_STICK_Y: (LEFT_STICK_UP, LEFT_STICK_DOWN),
-    RIGHT_STICK_X: (RIGHT_STICK_LEFT, RIGHT_STICK_RIGHT),
-    RIGHT_STICK_Y: (RIGHT_STICK_UP, RIGHT_STICK_DOWN),
+AXIS_CONTROLS: dict[ControlNames, tuple[ControlNames, ControlNames]] = {
+    ControlNames.CONTROLLER_AXIS_LEFTX: (ControlNames.CONTROLLER_AXIS_LEFTX_LEFT,
+                                         ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT),
+    ControlNames.CONTROLLER_AXIS_LEFTY: (ControlNames.CONTROLLER_AXIS_LEFTY_UP,
+                                         ControlNames.CONTROLLER_AXIS_LEFTY_DOWN),
+    ControlNames.CONTROLLER_AXIS_RIGHTX: (ControlNames.CONTROLLER_AXIS_RIGHTX_LEFT,
+                                          ControlNames.CONTROLLER_AXIS_RIGHTX_RIGHT),
+    ControlNames.CONTROLLER_AXIS_RIGHTY: (ControlNames.CONTROLLER_AXIS_RIGHTY_UP,
+                                          ControlNames.CONTROLLER_AXIS_RIGHTY_DOWN),
 }
 #: The face buttons, in the order a tool asks for them: round the face under a thumb.
-FACE_BUTTONS = (BUTTON_A, BUTTON_X, BUTTON_Y, BUTTON_B)
+FACE_BUTTONS = (ControlNames.CONTROLLER_BUTTON_A, ControlNames.CONTROLLER_BUTTON_X,
+                ControlNames.CONTROLLER_BUTTON_Y, ControlNames.CONTROLLER_BUTTON_B)
 #: How long SDL is given to announce a controller it sees late (macOS: about 0.1 s).
 _SDL_DEVICE_ARRIVAL_S = 0.5
 
 
 def short_name(control: str) -> str:
-    """A control's name as a tile or cue shows it: a button's without its ``BUTTON_``."""
-    return control.removeprefix("BUTTON_")
+    """A control's name as a tile or cue shows it: without its ``CONTROLLER_BUTTON_`` or
+    ``CONTROLLER_AXIS_``."""
+    return control.removeprefix("CONTROLLER_BUTTON_").removeprefix("CONTROLLER_AXIS_")
 
 
 def start_sdl_joysticks_and_wait_for(expected_count: int) -> None:

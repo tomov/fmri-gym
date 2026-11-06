@@ -49,7 +49,7 @@ from .config.phases import (CHECK_PHASES, BlockMode, CheckControls, Fixation, Ga
                              Phase, Survey)
 from .config.run import RunConfig
 from .display import Display, check_monitor
-from .inputs import ESCAPE, QUIT, Edge, InputDevice, InputEvent, open_input_devices
+from .inputs import QUIT, ControlNames, Edge, InputDevice, InputEvent, open_input_devices
 from .menu import Menu
 from .logging import Logger
 from .triggers import Triggers
@@ -57,7 +57,7 @@ from .triggers import Triggers
 if TYPE_CHECKING:
     from .adapters.base import EnvAdapter
 
-EXPERIMENTER_KEY = "SPACE"
+EXPERIMENTER_KEY = ControlNames.K_SPACE
 #: How far ``fps`` may sit from the engine's own rate and still count as real
 #: speed: what the audio output absorbs by resampling.
 _SAME_SPEED = 2e-3
@@ -130,7 +130,7 @@ class Clock:
 
 def _is_quit(event: InputEvent) -> bool:
     """Whether ``event`` asks to stop the run: the window closing, or ESC."""
-    return event.edge is Edge.DOWN and event.name in (QUIT, ESCAPE)
+    return event.edge is Edge.DOWN and event.name in (QUIT, ControlNames.K_ESCAPE)
 
 
 def read_input_events(inputs: InputDevice) -> list[InputEvent]:
@@ -191,7 +191,7 @@ def _poll_keys_until(
             return pressed, False
         for name, edge in read_input_events(inputs):
             down = edge is Edge.DOWN
-            if name in (QUIT, ESCAPE):
+            if name in (QUIT, ControlNames.K_ESCAPE):
                 if down:
                     return pressed, True
                 continue
