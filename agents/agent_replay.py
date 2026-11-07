@@ -4,7 +4,7 @@ The backend only narrates what it sees, into a text scratchpad that grows across
 whole block; nothing here maps its narration to the game's actual keys.
 
 Usage:
-    python agents/replay_watch.py --block data/pilot/.../block-00_aigamestore_game4 \
+    python agents/agent_replay.py --block data/pilot/.../block-00_aigamestore_game4 \
         --backend openrouter --model anthropic/claude-sonnet-5 --max-steps 20
 """
 
