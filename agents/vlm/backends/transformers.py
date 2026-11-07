@@ -1,9 +1,6 @@
 """Any Hugging Face vision-language checkpoint: hidden states by hooks, replies by generate.
 
-Always loads the full vision-language model (AutoProcessor + AutoModelForImageTextToText),
-never just its language model -- native vision weights, not a separately-trained encoder
-bolted on after the fact. Decoder hooks expect model.model.layers, falling back to
-model.model.language_model.layers; unverified on real hardware, no GPU here to check it.
+Decoder hooks expect model.model.layers, falling back to model.model.language_model.layers.
 """
 
 from __future__ import annotations

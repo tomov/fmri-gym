@@ -1,11 +1,8 @@
-"""Watch a logged block's own frames back, one at a time, without choosing an action.
-
-The backend only narrates what it sees, into a text scratchpad that grows across the
-whole block; nothing here maps its narration to the game's actual keys.
+"""Show a VLM a logged block's frames one at a time and print its notes; nothing plays the game.
 
 Usage:
     python agents/agent_replay.py --block data/pilot/.../block-00_aigamestore_game4 \
-        --backend openrouter --model anthropic/claude-sonnet-5 --max-steps 20
+        --backend transformers --model Qwen/Qwen3.5-35B-A3B --every 8 --max-steps 57
 """
 
 from __future__ import annotations
@@ -30,14 +27,13 @@ REPLY_INSTRUCTION = 'Reply with exactly this JSON: {"rationale": "<brief note>"}
 
 def watch(block: str, backend: Any, token_budget: int | None = 8000, every: int = 1,
          max_steps: int | None = None) -> None:
-    """Narrate a block's recorded frames back, one at a time, into one scratchpad.
+    """Send a block's frames to ``backend`` one per turn, keeping its notes as a scratchpad.
 
     :param block: a logged block's folder (``frames.h5`` + ``events.jsonl``).
-    :param backend: a model host that can ``generate`` a reply and read images.
-    :param token_budget: the scratchpad's size cap, in estimated tokens; ``None`` or
-        ``0`` keeps the whole block.
-    :param every: narrate every this-th recorded frame, not all of them.
-    :param max_steps: stop after narrating this many frames; ``None`` for the whole block.
+    :param backend: a backend that can ``generate`` and read images.
+    :param token_budget: the scratchpad's cap in estimated tokens; ``None`` or ``0`` for none.
+    :param every: use every this-th recorded frame.
+    :param max_steps: stop after this many frames; ``None`` for the whole block.
     """
     episodes = {e["frame"]: e["episode_id"] for e in read_events(block) if e["type"] == "frame"}
     frame_ids = [int(i) for i in read_frames(block)[1]][::every]

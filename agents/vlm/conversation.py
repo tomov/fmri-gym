@@ -1,10 +1,8 @@
-"""A growing chat for one block: the model's own past turns stay in view as text.
-"""
+"""A growing chat for one block: the model's own past turns stay in view as text."""
 
 from __future__ import annotations
 
-#: rough text-size proxy for the truncation budget: no tokenizer call, so this can run
-#: on every frame without the cost of one.
+#: rough tokens-from-characters estimate, so the budget needs no tokenizer call
 CHARS_PER_TOKEN = 3.0
 
 

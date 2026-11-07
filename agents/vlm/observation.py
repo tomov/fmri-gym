@@ -12,9 +12,8 @@ def frame_content(frame: np.ndarray, status: list[str], state: str,
 
     :param frame: the RGB frame a player would see.
     :param status: the HUD/overlay lines shown beside or over it, if any.
-    :param state: an agent adapter's text for this frame (``""`` for none).
-    :param reply_instruction: the turn's closing line, so a caller asking for more than
-        a bare key (a rationale alongside it, say) can still share this turn's shape.
+    :param state: the game's state as text (``""`` for none).
+    :param reply_instruction: the turn's last line, saying what to reply.
     :return: ``[{"type": "image", ...}, {"type": "text", ...}]``.
     """
     from PIL import Image
