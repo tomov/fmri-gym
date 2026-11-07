@@ -15,7 +15,6 @@ import json
 from typing import Any
 
 from fmri_gym.logging import read_events, read_frame, read_frames
-from policies import _parse_rationale
 from vlm.conversation import Conversation
 from vlm.observation import frame_content
 
@@ -57,13 +56,31 @@ def watch(block: str, backend: Any, token_budget: int | None = 8000, every: int 
         if boundary:
             content = [{"type": "text", "text": boundary}, *content]
         reply = backend.generate(conversation.chat(content))
-        rationale, _ = _parse_rationale(reply.text)
+        rationale = _parse_rationale(reply.text)
         conversation.add(content, json.dumps({"rationale": rationale}))
         if not rationale:
             print(f"frame {frame_id} (episode {episode}): reply did not parse "
                   f"({reply.output_tokens} tokens out; cut off by the token cap?)")
             continue
         print(f"frame {frame_id} (episode {episode}): {rationale}")
+
+
+def _parse_rationale(text: str) -> str:
+    """The reply's ``rationale``, or ``""`` if it holds no JSON object.
+
+    A reply cut off mid-thought is not kept as text: it would fill the scratchpad.
+    """
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end < start:
+        return ""
+    try:
+        reply = json.loads(text[start:end + 1])
+    except json.JSONDecodeError:
+        return ""
+    if not isinstance(reply, dict):
+        return ""
+    return str(reply.get("rationale", ""))
 
 
 def main() -> None:

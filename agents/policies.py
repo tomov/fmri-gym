@@ -19,7 +19,6 @@ import base64
 import io
 import json
 import os
-import re
 import urllib.request
 from typing import Any
 
@@ -171,41 +170,6 @@ class VLMPolicy(Policy):
                 print(f"vlm policy: call failed ({e}); this frame is a noop. "
                       "Later failures are counted, not printed.")
             return ""
-
-
-def _parse_rationale(text: str) -> tuple[str, str]:
-    """A reply's ``(rationale, action)``; ``("", "?")`` if nothing parses.
-
-    Tries ``text`` as plain JSON, then with a ```` ```json ```` fence stripped, then
-    its first ``{...}`` substring -- a model that wraps its JSON in prose or markdown
-    still gives up one working turn instead of going unparsable for the rest of the
-    block. An unparsable reply gives no rationale: it is often a reasoning trace cut
-    off by the token cap, and kept as one it would fill the scratchpad.
-
-    :param text: the backend's raw reply text.
-    """
-    if not isinstance(text, str):
-        return "", "?"
-    for candidate in filter(None, (text, _fenced_object(text), _first_object(text))):
-        try:
-            reply = json.loads(candidate)
-            action = str(reply.get("action", "")).strip().upper()
-            return str(reply.get("rationale", "")), action or "?"
-        except (json.JSONDecodeError, AttributeError):
-            continue
-    return "", "?"
-
-
-def _fenced_object(text: str) -> str | None:
-    """The ``{...}`` inside a ```` ```json ... ``` ```` (or bare ```` ``` ````) fence."""
-    match = re.search(r"```(?:json)?\s*(\{.*\})\s*```", text, re.DOTALL)
-    return match.group(1) if match else None
-
-
-def _first_object(text: str) -> str | None:
-    """The first ``{...}`` substring in ``text``, for a reply with JSON plus prose."""
-    start, end = text.find("{"), text.rfind("}")
-    return text[start:end + 1] if 0 <= start < end else None
 
 
 def _png(frame: np.ndarray) -> str:
