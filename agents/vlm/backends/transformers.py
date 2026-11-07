@@ -23,7 +23,7 @@ class TransformersBackend(VLMBackend):
     can_see_images = True
 
     def __init__(self, model_id: str, device_map: str = "auto", dtype: str = "auto",
-                 max_new_tokens: int = 512, temperature: float = 0.5, top_p: float = 0.95,
+                 max_new_tokens: int = 4096, temperature: float = 0.5, top_p: float = 0.95,
                  seed: int = 0) -> None:
         import torch
         from transformers import AutoModelForImageTextToText, AutoProcessor
