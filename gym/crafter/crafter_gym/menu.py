@@ -81,18 +81,16 @@ class MenuWrapper(gym.Wrapper):
         return self.menu_names[self.menu_idx]
 
     def reset(self, **kwargs: Any) -> tuple[Any, dict]:
-        """Reset the game, leaving the cursor where the last episode left it.
+        """Reset the game, with the cursor on the menu's first entry.
 
-        The cursor is the subject's hand position, not the world's state: the
-        rig's own frontend carries it across episodes within a run, and
-        zeroing it here would move it under them between two episodes they
-        experience as one sitting. A block still replays from its seeds and
-        actions, because a replay starts where the block did.
+        An episode is then fixed by its seed and actions alone, so it replays
+        without the episodes before it.
 
         :param kwargs: passed through (``seed``, ``options``).
         :return: ``(obs, info)`` with the menu fields added.
         """
         obs, info = self.env.reset(**kwargs)
+        self.menu_idx = 0
         self.showing = False
         return obs, self._with_menu(info, 0)
 
