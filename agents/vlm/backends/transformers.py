@@ -1,9 +1,6 @@
 """Any Hugging Face vision-language checkpoint: hidden states by hooks, replies by generate.
 
-Always loads the full vision-language model (AutoProcessor + AutoModelForImageTextToText),
-never just its language model -- native vision weights, not a separately-trained encoder
-bolted on after the fact. Decoder hooks expect model.model.layers, falling back to
-model.model.language_model.layers; unverified on real hardware, no GPU here to check it.
+Decoder hooks expect model.model.layers, falling back to model.model.language_model.layers.
 """
 
 from __future__ import annotations
@@ -23,7 +20,7 @@ class TransformersBackend(VLMBackend):
     can_see_images = True
 
     def __init__(self, model_id: str, device_map: str = "auto", dtype: str = "auto",
-                 max_new_tokens: int = 512, temperature: float = 0.5, top_p: float = 0.95,
+                 max_new_tokens: int = 4096, temperature: float = 0.5, top_p: float = 0.95,
                  seed: int = 0) -> None:
         import torch
         from transformers import AutoModelForImageTextToText, AutoProcessor
