@@ -31,7 +31,7 @@ import argparse
 import signal
 import sys
 
-from fmri_gym import Run, checks
+from fmri_gym import Run
 from fmri_gym.config.curriculum import EXIT_QUIT, Curriculum
 from fmri_gym.display import quit_like_esc
 from fmri_gym.config.rig import RigConfig
@@ -76,8 +76,7 @@ def _parser() -> argparse.ArgumentParser:
                    "first phase, until --duration (which it needs)")
     p.add_argument("--rig", required=True,
                    help="the rig file it is played on, e.g. configs/examples/rigs/laptop.json: "
-                   "it says the window, input devices, audio and data root. A rig check makes "
-                   "one when the file is missing")
+                   "it says the window, input devices, audio and data root")
     p.add_argument("--skip-load-games", action="store_true",
                    help="do not build, reset and close each game once before the window. "
                    "Default: do, so a game that cannot start fails before the participant screen")
@@ -89,15 +88,11 @@ def main() -> None:
     args = _parser().parse_args()
     # The editor's Check runs on load, so a file edited by hand gets it too.
     curriculum = Curriculum.load(args.curriculum)
-    do_rig_check = curriculum.has_checks
-    # A rig check is how a rig gets its file: it opens the form when there is none.
-    rig = checks.ensure_rig(args.rig) if do_rig_check else RigConfig.open(args.rig)
-    trigger_error = None
-    if do_rig_check:  # its triggers, and a line that opens, first
-        rig, trigger_error = checks.prepare(rig)
+    rig = RigConfig.open(args.rig)
     print(f"rig: {rig.status()}", file=sys.stderr)
-    if rig.fixation_warning and not do_rig_check:
-        print(f"rig: WARNING: {rig.fixation_warning}", file=sys.stderr)
+    for warning in (rig.fixation_warning, rig.measured_latency_warning):
+        if warning:
+            print(f"rig: WARNING: {warning}", file=sys.stderr)
     run_config = RunConfig.from_args(args, curriculum, rig)
     if run_config.skip_load_games:
         print("--skip-load-games: the games are not built before the window; one that cannot "
@@ -105,11 +100,7 @@ def main() -> None:
     problems = run_config.problems(load_games=not run_config.skip_load_games)
     if problems:
         raise ValueError(f"{args.curriculum} on {rig.path}: " + "; ".join(problems))
-    if not do_rig_check:
-        checks.offer_check(run_config)
     run = Run.from_config(run_config)
-    if do_rig_check:
-        run.logger.set_extra("trigger_error", trigger_error)
     previous = signal.signal(signal.SIGINT, quit_like_esc)
     try:
         completed = run.play()
@@ -117,9 +108,6 @@ def main() -> None:
         run.close()
         # Last: a terminal's Ctrl+C can come twice (to uv and to us), the second one late.
         signal.signal(signal.SIGINT, previous)
-    if do_rig_check:
-        # A failed test is a finding, listed in the report: the session goes on.
-        checks.finish(run, run_config.ses)
     if not completed:
         # A session script (set -e) must not start the next run after an ESC.
         sys.exit(EXIT_QUIT)

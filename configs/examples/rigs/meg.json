@@ -17,5 +17,5 @@
     "backend": "serial", "port": "/dev/ttyUSB0",
     "codes": {"frame_bits": 3, "task_start": 8, "task_stop": 16, "episode_start": 32, "scanner_start": 64}
   },
-  "rig_check": {"photodiode": "recording", "recording_hz": 1000}
+  "rig_measurement": {"photodiode": "recording", "recording_hz": 1000}
 }

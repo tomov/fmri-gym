@@ -1,12 +1,12 @@
-"""``rig-config``: make, check and change a rig file, one step at a time, and run its rig checks.
+"""``rig-config``: make, check and change a rig file, one step at a time, and measure the rig.
 
 A rig file (:mod:`fmri_gym.config.rig`) says how one rig plays every run: what
 the rig is, its screen, sound and data folder, how the participant responds,
-its triggers, and the equipment its rig check measures with. The window walks
+its triggers, and the equipment its rig measurement measures with. The window walks
 through these in order; each step must be complete before the next, and a rig
-check can only be run on the file once it is saved. The rig check opens the
+measurement can only be run on the file once it is saved. The rig measurement opens the
 same window on a rig whose file is missing or incomplete
-(:func:`fmri_gym.checks.ensure_rig`).
+(:func:`fmri_gym.rig_measure.ensure_rig`).
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import subprocess
 import sys
 import time
 from dataclasses import asdict
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import Qt
@@ -32,6 +32,9 @@ from ..triggers import (HID_DEVICES, SYNC_MODES, TRIGGER_BACKENDS, Codes, SyncSe
                         TriggerError, Triggers, TriggerSettings)
 from . import Field
 from . import widgets as ui
+
+if TYPE_CHECKING:
+    from ..rig_measure import RigMeasurementSettings
 
 SYNC_FIELDS = [
     Field("mode", "how a run starts", "choice", SYNC_MODES,
@@ -93,30 +96,31 @@ CODE_FIELDS = [
 BACKEND_ROWS = {"null": (), "serial": ("port",), "parallel": ("port", "pulse_ms"),
                 "hid": ("hid_device", "port", "pulse_ms"), "lsl": ("lsl_stream_name",)}
 
-#: The rig file's ``"rig_check"`` (:class:`~fmri_gym.config.rig.RigCheckConfig`), as a form.
-RIG_CHECK_FIELDS = [
+#: The rig file's ``"rig_measurement"``, as a form
+#: (:class:`~fmri_gym.config.rig.RigMeasurementConfig`).
+RIG_MEASUREMENT_FIELDS = [
     Field("photodiode", "photodiode", "choice", rig_file.PHOTODIODE_READOUTS,
           tip="A light sensor taped to the screen measures when an image really appears. "
               "none: this rig has none. soundcard: it is plugged into this computer's "
-              "sound-card input, and the delay is measured during the check. recording: your "
+              "sound-card input, and the delay is measured then. recording: your "
               "MEG/EEG system records it, and you compare it to the frame codes afterwards."),
     Field("input_device", "sound-card input", "combo",
           tip="The sound-card input the photodiode (and the microphone) is plugged into. The "
               "list shows this computer's inputs. Blank: the default input."),
     Field("has_mic", "microphone at the ear", "bool", default=False,
           tip="A microphone at the participant's ear, on the sound card's second input: the "
-              "check then measures when the sound is heard, not only when it is sent."),
+              "rig measurement then measures when the sound is heard, not only when it is sent."),
     Field("corner", "photodiode corner", "choice", rig_file.CORNERS,
           tip="The corner of the screen the photodiode is taped to: br bottom right, bl bottom "
-              "left, tr top right, tl top left. The check flashes a square there."),
+              "left, tr top right, tl top left. The rig measurement flashes a square there."),
     Field("patch_px", "flashing square (px)", "int",
           tip="The side of the flashing square, in pixels: big enough to cover the photodiode."),
     Field("recording_hz", "recording rate (Hz)", "float",
-          tip="Your MEG/EEG system's sampling rate. The check makes sure each frame code lasts "
-              "long enough to be seen in the recording. Blank if this rig records nothing."),
+          tip="Your MEG/EEG system's sampling rate. The rig measurement checks each frame "
+              "code lasts long enough to be seen in the recording. Blank if this rig records nothing."),
     Field("frame_rates", "more frame rates (fps)", "list",
-          tip="Frame rates your games play at that the check should also test, separated by "
-              "commas (e.g. 35). Every check already tests 60 and 30 fps."),
+          tip="Frame rates your games play at that the rig measurement also tests, separated by "
+              "commas (e.g. 35). Every rig measurement already tests 60 and 30 fps."),
 ]
 
 #: Window sizes offered when not fullscreen (those that fit the monitor).
@@ -198,12 +202,11 @@ def rig_summary(path: str | None) -> str:
         rig = rig_file.RigConfig.open(path)
     except ValueError as exc:
         return f"This rig file is not complete, and no run would start on it:\n{exc}"
-    from ..checks import measured_files  # pygame and numpy: only once a rig is shown
-
-    checks = len(measured_files(path))
+    measured = len(rig.measured_latency_files)
     return "\n".join([_describe(rig, rig_file.load(path).get("triggers")),
-                      f"Rig checks run on this computer: {checks}." if checks else
-                      "No rig check has been run on this computer yet: run the long one once."])
+                      f"Rig measurements that measured this rig on this computer: {measured}."
+                      if measured else "This rig has not been measured on this computer yet: "
+                      "run the long rig measurement once."])
 
 
 def _describe(rig: rig_file.RigConfig, triggers: dict | None) -> str:
@@ -226,21 +229,19 @@ def _describe(rig: rig_file.RigConfig, triggers: dict | None) -> str:
         f"Triggers: NOT SET -- a run waits for {SyncSettings().key!r} and sends no codes."])
 
 
-def check_plan(rig: rig_file.RigConfig) -> str:
-    """What a rig check tests on ``rig``, and what it leaves out and why, in plain lines."""
-    from ..checks import RIG_CHECKS
-    from ..config.curriculum import load_curriculum
+def measurement_plan(rig: rig_file.RigConfig) -> str:
+    """What a rig measurement tests on ``rig``, and what it leaves out and why, in plain lines."""
+    from ..rig_measure import LONG, QUICK  # pygame and numpy: only once a rig is shown
 
-    def rates(which: str) -> str:
-        found = [r for p in load_curriculum(RIG_CHECKS[which])["curriculum"]
-                 if p["type"] == "check_frames" for r in p.get("rates", [60])]
-        return ", ".join(f"{r:g}" for r in dict.fromkeys([*found, *rig.rig_check.frame_rates]))
+    def rates(settings: RigMeasurementSettings) -> str:
+        found = [*settings.frame_rates, *rig.rig_measurement.frame_rates]
+        return ", ".join(f"{r:g}" for r in dict.fromkeys(found))
 
-    t, c = rig.triggers, rig.rig_check
+    t, c = rig.triggers, rig.rig_measurement
     codes = t.backend != "null"
     lines = ["• Screen: whether images change exactly with the screen's refresh.",
-             f"• Frame timing: a test pattern played like a game at {rates('q')} fps "
-             f"(long check: {rates('l')})"
+             f"• Frame timing: a test pattern played like a game at {rates(QUICK)} fps "
+             f"(long rig measurement: {rates(LONG)})"
              + (", with its frame codes" + (f", each lasting at least 2 samples at "
                                             f"{c.recording_hz:g} Hz" if c.recording_hz else "")
                 if codes and t.on_frame else "") + "."]
@@ -270,31 +271,31 @@ def check_plan(rig: rig_file.RigConfig) -> str:
     return "\n".join(lines)
 
 
-def run_rig_check(path: str, which: str) -> str:
-    """Play a rig check on the rig file at ``path``, as ``fmri-play`` would, and say how it went.
+def run_rig_measurement(path: str, is_long: bool) -> str:
+    """Measure the rig whose file is at ``path``, as ``rig-measure`` would; say how it went.
 
-    :param which: ``"q"`` the short check, ``"l"`` the long one.
+    :param is_long: the long rig measurement; otherwise the quick one.
     :return: a few lines for the person who started it: the verdict and the report's path.
     """
     from ..bids import next_session
-    from ..checks import RIG_CHECKS
+    from ..rig_measure import SUBJECT
 
     rig = rig_file.RigConfig.open(path)
-    ses = next_session(rig.data_root, "sub-rig")
-    command = [sys.executable, "-m", "fmri_play", "--curriculum", RIG_CHECKS[which],
-               "--subject", "sub-rig", "--ses", str(ses), "--run", "1", "--rig", path]
+    ses = next_session(rig.data_root, SUBJECT)
+    command = [sys.executable, "-m", "fmri_gym.rig_measure", "--rig", path,
+               *(["--long"] if is_long else [])]
     print("rig-config: " + " ".join(command), file=sys.stderr)
     status = subprocess.run(command, check=False).returncode
-    reports = glob.glob(os.path.join(rig.data_root, "sub-rig", f"ses-{ses:03d}", "*", "*",
+    reports = glob.glob(os.path.join(rig.data_root, SUBJECT, f"ses-{ses:03d}", "*", "*",
                                      "report.html"))
     if not reports:
-        return (f"The rig check stopped before it finished (exit status {status}). The terminal "
-                "says why.")
+        return (f"The rig measurement stopped before it finished (exit status {status}). The "
+                "terminal says why.")
     with open(os.path.join(os.path.dirname(reports[0]), "manifest.json")) as f:
         manifest = json.load(f)
-    verdict = ("every test passed" if manifest.get("status") == "pass"
-               else f"failed: {manifest.get('failed_tests') or 'see the report'}")
-    return f"Rig check {verdict}.\n\nThe report: {os.path.abspath(reports[0])}"
+    verdict = ("every test passed" if manifest["status"] == "pass"
+               else f"failed: {manifest['failed_tests'] or 'see the report'}")
+    return f"Rig measurement {verdict}.\n\nThe report: {os.path.abspath(reports[0])}"
 
 
 def trigger_defaults() -> dict:
@@ -369,7 +370,7 @@ def _device_line(d: dict[str, Any]) -> str:
 
 def _trigger_ports() -> list[str]:
     """The serial and parallel ports found on this computer, and its USB boxes' ports."""
-    from ..checks import detect_outputs
+    from ..rig_measure import detect_outputs
     return list(dict.fromkeys(p["port"] for p in detect_outputs()))
 
 
@@ -419,7 +420,7 @@ class RigPick(QtWidgets.QWidget):
 #: Each step of the window: its title and what the user has to do on it.
 _STEPS = [
     ("About this rig",
-     "Describe this setup so that you, and anyone reading its rig check reports, can tell it "
+     "Describe this setup so that you, and anyone reading its rig measurement reports, can tell it "
      "apart from others. Say what is actually plugged in; write \"none\" for a part this rig "
      "does not have."),
     ("Screen, sound, fixation and data",
@@ -435,11 +436,11 @@ _STEPS = [
      "How a run starts with your scanner or recording, and which codes it sends to the "
      "recording. Pick the preset that matches your setup and press Apply, then adjust: only the "
      "options that apply to your choices are shown."),
-    ("Rig check equipment",
-     "The rig check measures this rig's timing with this equipment. Set what this rig has; "
-     "what the check will then test is listed below."),
+    ("Rig measurement equipment",
+     "The rig measurement measures this rig's timing with this equipment. Set what this rig has; "
+     "what the rig measurement will then test is listed below."),
     ("Save and check",
-     "Read the summary, then Save. A rig check can be run once the file is saved: the short "
+     "Read the summary, then Save. A rig measurement can be run once the file is saved: the short "
      "one (under a minute) before each session, the long one (about 25 minutes) once when the "
      "rig is set up, and again after any change of hardware, drivers or system."),
 ]
@@ -448,7 +449,7 @@ _NO_TRIGGERS = "pick a preset and press Apply, or set the fields"
 
 class _RigWindow(QtWidgets.QDialog):
     """One rig file, filled in step by step: Next is off until the step is complete, and the
-    rig checks are off until the file is saved as shown."""
+    rig measurements are off until the file is saved as shown."""
 
     def __init__(self, values: dict, path: str, need_triggers: bool = False) -> None:
         super().__init__()
@@ -472,7 +473,7 @@ class _RigWindow(QtWidgets.QDialog):
             lambda: self._about_page(values), lambda: self._screen_page(values),
             lambda: self._responses_page(values),
             lambda: self._triggers_page(values.get("triggers", {})),
-            lambda: self._check_page(values.get("rig_check", {})), self._save_page]
+            lambda: self._measurement_page(values.get("rig_measurement", {})), self._save_page]
         for build in builders:
             scroll = QtWidgets.QScrollArea()
             scroll.setWidgetResizable(True)
@@ -482,7 +483,7 @@ class _RigWindow(QtWidgets.QDialog):
         #: per step, what keeps it from being complete
         self._step_problems: list[Callable[[], list[str]]] = [
             self._about_problems, self._screen_problems, self._responses_problems,
-            self._triggers_problems, self._check_problems, self._all_problems]
+            self._triggers_problems, self._measurement_problems, self._all_problems]
         self.problems = QtWidgets.QLabel()
         self.problems.setWordWrap(True)
         self.problems.setStyleSheet("color: #c0392b")
@@ -561,11 +562,11 @@ class _RigWindow(QtWidgets.QDialog):
                                  + ["episode_start"] * bool(
                                      self._value(self.trigger_form, "on_episode_start")))
         self.test_button.setVisible(codes)
-        diode = self._value(self.check_form, "photodiode")
-        if diode != "soundcard" and self._value(self.check_form, "has_mic"):
-            self.check_form.write("has_mic", False)  # a microphone is read beside the diode
+        diode = self._value(self.measurement_form, "photodiode")
+        if diode != "soundcard" and self._value(self.measurement_form, "has_mic"):
+            self.measurement_form.write("has_mic", False)  # a microphone is read beside the diode
         sound = self.switches["has_audio"].isChecked()
-        self.check_form.show_rows(["photodiode", "frame_rates"]
+        self.measurement_form.show_rows(["photodiode", "frame_rates"]
                                   + ["corner", "patch_px"] * (diode != "none")
                                   + ["input_device"] * (diode == "soundcard")
                                   + ["has_mic"] * (diode == "soundcard" and sound)
@@ -579,7 +580,7 @@ class _RigWindow(QtWidgets.QDialog):
                 else widget.text())
 
     def _refresh_reports(self) -> None:
-        """The fixation warning, the trigger summary, the check plan and the save step's
+        """The fixation warning, the trigger summary, the rig measurement plan and the save step's
         summary, as things stand."""
         self._refresh_fixation_note()
         self.trigger_text.setText(self._trigger_report())
@@ -589,9 +590,9 @@ class _RigWindow(QtWidgets.QDialog):
             self.plan.setText(f"Complete the steps before to see it: {exc}")
             self.summary.setText(f"Not complete yet: {exc}")
         else:
-            self.plan.setText(check_plan(rig))
-            self.summary.setText(_describe(rig, self.rig.get("triggers")) + "\n\nA rig check "
-                                 "will test:\n" + check_plan(rig))
+            self.plan.setText(measurement_plan(rig))
+            self.summary.setText(_describe(rig, self.rig.get("triggers")) + "\n\nA rig measurement "
+                                 "will test:\n" + measurement_plan(rig))
         self._refresh_saved()
 
     # -- step 1: about ----------------------------------------------------------
@@ -711,7 +712,7 @@ class _RigWindow(QtWidgets.QDialog):
                         f"{'right after the trigger' if key == 'start_fixation' else 'at its end'}"
                         ", outside its curriculum: the baseline the recording needs (fMRI: "
                         "10 s, for the slow blood response; MEG, EEG: a few seconds). Blank: "
-                        "none. A rig check shows none.")
+                        "none. A rig measurement shows none.")
         edit.textChanged.connect(self._check)
         self.fixations[key] = edit
         return edit
@@ -867,8 +868,8 @@ class _RigWindow(QtWidgets.QDialog):
         box = QtWidgets.QGroupBox("Response keys: a button box that types keys by itself")
         layout = QtWidgets.QVBoxLayout(box)
         hint = QtWidgets.QLabel("Press each button of the box: its key is added. Then say what "
-                                "it is (e.g. index finger); the rig check shows it when it asks "
-                                "for that button. The games you play on this rig must use these "
+                                "it is (e.g. index finger); the rig measurement shows it "
+                                "when asking for that button. The games you play on this rig must use these "
                                 "keys.")
         hint.setObjectName("hint")
         hint.setWordWrap(True)
@@ -1026,34 +1027,34 @@ class _RigWindow(QtWidgets.QDialog):
         self.trigger_text.setText(f"Sent {value} on {triggers.active}: check that your "
                                   "recording shows one code.")
 
-    # -- step 5: rig check equipment ------------------------------------------------
+    # -- step 5: rig measurement equipment ------------------------------------------------
 
-    def _check_page(self, section: Any) -> QtWidgets.QWidget:
+    def _measurement_page(self, section: Any) -> QtWidgets.QWidget:
         page, layout = self._page()
-        self.check_form = ui.Form(RIG_CHECK_FIELDS)
-        self.check_form.set_choices("input_device", _sound_inputs())
+        self.measurement_form = ui.Form(RIG_MEASUREMENT_FIELDS)
+        self.measurement_form.set_choices("input_device", _sound_inputs())
         given = section if isinstance(section, dict) else {}
-        self.check_form.set({**rig_file.RIG_CHECK_DEFAULTS, **given})
-        self.check_form.changed.connect(self._check)
-        layout.addWidget(ui.group("This rig's equipment", self.check_form))
+        self.measurement_form.set({**rig_file.RIG_MEASUREMENT_DEFAULTS, **given})
+        self.measurement_form.changed.connect(self._check)
+        layout.addWidget(ui.group("This rig's equipment", self.measurement_form))
         self.plan = QtWidgets.QLabel()
         self.plan.setObjectName("report")
         self.plan.setWordWrap(True)
-        layout.addWidget(ui.group("What a rig check will test on this rig", self.plan))
+        layout.addWidget(ui.group("What a rig measurement will test on this rig", self.plan))
         layout.addStretch(1)
         return page
 
-    def _rig_check(self) -> dict:
-        """The equipment form as the file's ``"rig_check"``: what differs from the defaults.
+    def _rig_measurement(self) -> dict:
+        """The equipment form as the file's ``"rig_measurement"``: what differs from the defaults.
 
         :raises ValueError: a number half typed, named in the message.
         """
-        values = self.check_form.get()
-        return {k: v for k, v in values.items() if v != rig_file.RIG_CHECK_DEFAULTS.get(k)}
+        values = self.measurement_form.get()
+        return {k: v for k, v in values.items() if v != rig_file.RIG_MEASUREMENT_DEFAULTS.get(k)}
 
-    def _check_problems(self) -> list[str]:
+    def _measurement_problems(self) -> list[str]:
         try:
-            return rig_file.problems({"rig_check": self._rig_check()})
+            return rig_file.problems({"rig_measurement": self._rig_measurement()})
         except ValueError as exc:
             return [str(exc)]
 
@@ -1080,27 +1081,30 @@ class _RigWindow(QtWidgets.QDialog):
         row.addWidget(self.save)
         row.addWidget(self.save_state, 1)
         layout.addLayout(row)
-        self.short_check = ui.button("Run the short rig check", lambda: self._run_check("q"))
-        self.long_check = ui.button("Run the long rig check", lambda: self._run_check("l"))
-        self.short_check.setToolTip("Under a minute: before each session, to see the rig is as "
+        self.short_measurement = ui.button("Run the short rig measurement",
+                                           lambda: self._run_measurement(False))
+        self.long_measurement = ui.button("Run the long rig measurement",
+                                          lambda: self._run_measurement(True))
+        self.short_measurement.setToolTip(
+            "Under a minute: before each session, to see the rig is as "
                                     "it was measured. Have the participant's device at hand.")
-        self.long_check.setToolTip("About 25 minutes: measures this rig. Run it once when the "
+        self.long_measurement.setToolTip(
+            "About 25 minutes: measures this rig. Run it once when the "
                                    "rig is set up, and again after any change.")
-        layout.addWidget(ui.group("Rig check", self._check_buttons()))
+        layout.addWidget(ui.group("Rig measurement", self._measurement_buttons()))
         layout.addStretch(1)
         return page
 
-    def _check_buttons(self) -> QtWidgets.QWidget:
+    def _measurement_buttons(self) -> QtWidgets.QWidget:
         box = QtWidgets.QWidget()
         column = QtWidgets.QVBoxLayout(box)
-        hint = QtWidgets.QLabel("The check opens in a window of its own, as a run would, and "
-                                "files a report. Place the photodiode and the microphone first, "
-                                "if this rig has them; the check asks for each response button "
-                                "in turn.")
+        hint = QtWidgets.QLabel("The rig measurement opens a window of its own and files a report. "
+                                "Place the photodiode and the microphone first, if this rig "
+                                "has them; the measurement asks for each response button in turn.")
         hint.setObjectName("hint")
         hint.setWordWrap(True)
         column.addWidget(hint)
-        column.addLayout(ui.row(self.short_check, self.long_check))
+        column.addLayout(ui.row(self.short_measurement, self.long_measurement))
         return box
 
     def _all_problems(self) -> list[str]:
@@ -1111,7 +1115,7 @@ class _RigWindow(QtWidgets.QDialog):
 
     def _refresh_saved(self) -> None:
         """Save is on when the file is complete and differs from what is on disk; the rig
-        checks only when what is shown is what is saved."""
+        rig measurements only when what is shown is what is saved."""
         complete = not self._all_problems()
         try:
             current = self.rig if complete else None
@@ -1119,13 +1123,13 @@ class _RigWindow(QtWidgets.QDialog):
             current = None
         on_disk = current is not None and current == self.saved
         self.save.setEnabled(complete and not on_disk)
-        for button in (self.short_check, self.long_check):
+        for button in (self.short_measurement, self.long_measurement):
             button.setEnabled(on_disk)
         self.save_state.setText(
             "Complete every step to save." if not complete else
             f"Saved in {self.path}." if on_disk else
-            "Not saved yet: Save before running a rig check." if self.saved is None else
-            "Changed since it was saved: Save again before running a rig check.")
+            "Not saved yet: Save before running a rig measurement." if self.saved is None else
+            "Changed since it was saved: Save again before running a rig measurement.")
 
     def _save(self) -> None:
         if self._all_problems():
@@ -1139,14 +1143,14 @@ class _RigWindow(QtWidgets.QDialog):
         self.saved = rig
         self._refresh_saved()
 
-    def _run_check(self, which: str) -> None:
-        """Play a rig check on the saved file in its own window; say how it went."""
+    def _run_measurement(self, is_long: bool) -> None:
+        """Run a rig measurement on the saved file in its own window; say how it went."""
         self.hide()
         try:
-            outcome = run_rig_check(self.path, which)
+            outcome = run_rig_measurement(self.path, is_long)
         finally:
             self.show()
-        QtWidgets.QMessageBox.information(self, "Rig check", outcome)
+        QtWidgets.QMessageBox.information(self, "Rig measurement", outcome)
 
     # -- the file --------------------------------------------------------------
 
@@ -1159,9 +1163,9 @@ class _RigWindow(QtWidgets.QDialog):
         out = {**self._about(), **self._screen(), **self._responses()}
         if self.has_triggers:
             out["triggers"] = self._triggers()
-        rig_check = self._rig_check()
-        if rig_check:
-            out["rig_check"] = rig_check
+        equipment = self._rig_measurement()
+        if equipment:
+            out["rig_measurement"] = equipment
         return {**out, **self._kept}
 
     def accept(self) -> None:
@@ -1220,7 +1224,7 @@ class _RigChooser(QtWidgets.QDialog):
         self.open_button = ui.button("Open", self._open)
         self.open_button.setObjectName("run")
         self.open_button.setToolTip("Go through this rig's settings, change them, and run its "
-                                    "rig checks.")
+                                    "rig measurements.")
         new = ui.button("New rig...", self._new)
         new.setToolTip("Make a rig file for a setup that has none yet.")
         layout.addLayout(ui.row(new, ui.button("Close", self.reject), self.open_button))
@@ -1254,7 +1258,7 @@ def ask_new_rig(parent: QtWidgets.QWidget) -> str | None:
                              "this repository; commit it, so the other teams see it. The team "
                              "is your PI's initials; name the rig after its place and setup "
                              "(mgh-prisma, mit-desk). Both appear in every run's data and "
-                             "every rig check report.")
+                             "every rig measurement report.")
     intro.setWordWrap(True)
     layout.addWidget(intro)
     form = QtWidgets.QFormLayout()
@@ -1303,7 +1307,7 @@ def ask_new_rig(parent: QtWidgets.QWidget) -> str | None:
 def main() -> None:
     """``rig-config [--rig <file>]``: pick a rig file (or make one), then go through it."""
     p = argparse.ArgumentParser(description="Make, check or change a rig file, and run its rig "
-                                            "checks. Without --rig, a window asks which rig.")
+                                            "measurements. Without --rig, a window asks which rig.")
     p.add_argument("--rig", help="the rig file, e.g. configs/<team>/rigs/<rig>.json; made when "
                                  "missing")
     args = p.parse_args()

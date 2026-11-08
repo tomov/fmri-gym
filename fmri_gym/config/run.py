@@ -70,17 +70,6 @@ class RunConfig:
                    dummy_trigger=args.dummy_trigger,
                    skip_load_games=args.skip_load_games)
 
-    @property
-    def start_fixation(self) -> float | None:
-        """Seconds of fixation the run opens on: the rig's; ``None`` for none, and for a
-        rig check, which measures rather than scans."""
-        return None if self.curriculum.has_checks else self.rig.start_fixation
-
-    @property
-    def end_fixation(self) -> float | None:
-        """Seconds of fixation the run closes on: the rig's; ``None`` as for the start."""
-        return None if self.curriculum.has_checks else self.rig.end_fixation
-
     def problems(self, *, load_games: bool = False) -> list[str]:
         """What keeps this curriculum from being played on this rig, which neither shows alone.
 
@@ -135,7 +124,7 @@ class RunConfig:
 
     def _duration_problems(self) -> list[str]:
         """A ``duration`` no longer than the rig's fixations together."""
-        fixed = (self.start_fixation or 0) + (self.end_fixation or 0)
+        fixed = (self.rig.start_fixation or 0) + (self.rig.end_fixation or 0)
         if self.duration is None or self.duration > fixed:
             return []
         return [f"--duration {self.duration:g}: {self.rig.path}'s fixations take {fixed:g} s "

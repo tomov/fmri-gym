@@ -322,27 +322,26 @@ def test_a_curriculum_loads_once_into_typed_phases(tmp_path):
 
 
 def test_every_phase_type_is_a_phase():
-    from fmri_gym.config.phases import CHECK_PHASES, PHASE_CLASSES, CheckPhase, Phase
+    from fmri_gym.config.phases import PHASE_CLASSES, Phase
     assert all(issubclass(cls, Phase) and cls.type == name for name, cls in PHASE_CLASSES.items())
-    assert set(CHECK_PHASES) == {c for c in PHASE_CLASSES.values() if issubclass(c, CheckPhase)}
     with pytest.raises(TypeError):
         Phase(spec={}, include_on_resume=False)  # abstract: only a phase type is read
 
 
-def test_a_check_that_broke_part_way_is_reported_not_crashed_on():
-    from fmri_gym.checks import _html_frames, _html_section
-    half = {"rig_check": {"frames": {"blocks": []}}}      # it broke before refresh_rate
+def test_a_measurement_that_broke_part_way_is_reported_not_crashed_on():
+    from fmri_gym.rig_measure import _html_frames, _html_section
+    half = {"summaries": {"frames": {"blocks": []}}}      # it broke before refresh_rate
     note = _html_section(_html_frames, half, ".", {"status": "fail", "why": "KeyError: 'keys'"})
     assert "stopped before it finished" in note and "KeyError" in note
 
 
-def test_each_check_files_its_measurements_beside_the_rig_under_a_new_number(tmp_path):
-    from fmri_gym.checks import file_measured
+def test_each_rig_measurement_files_its_latencies_beside_the_rig_under_a_new_number(tmp_path):
+    from fmri_gym.rig_measure import file_measured
     offset = {"median_ms": 12.0, "sd_ms": 0.3, "n_matched": 10, "n": 10}
-    m = {"start_time": "2026-10-20T10:00:00", "task": "rigcheck", "status": "fail",
-         "failed_tests": "audio", "run": {"label": "sub-rig_task-rigcheck_run-01"},
+    m = {"start_time": "2026-10-20T10:00:00", "task": "rigMeasurement", "status": "fail",
+         "failed_tests": "audio", "run": {"label": "sub-rig_ses-001_task-rigMeasurement_run-001"},
          "tests": {"photodiode": {"status": "pass"}, "audio": {"status": "fail"}},
-         "rig_check": {"photodiode": {"offset": offset, "acoustic_offset": offset}},
+         "summaries": {"photodiode": {"offset": offset, "acoustic_offset": offset}},
          "rig": {"path": "laptop.json"}, "machine": {}, "versions": {}}
     rig_path = str(tmp_path / "laptop.json")
     first = file_measured(m, "run1", rig_path)
@@ -357,10 +356,48 @@ def test_each_check_files_its_measurements_beside_the_rig_under_a_new_number(tmp
     assert len(list((tmp_path / "measured").iterdir())) == 2
 
 
+def test_a_quick_rig_measurement_runs_on_its_own_and_files_its_report(tmp_path, monkeypatch):
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    from dataclasses import replace
+
+    import pygame
+
+    from fmri_gym import rig_measure
+    from fmri_gym.config.rig import RigConfig
+    rig_path = tmp_path / "laptop.json"
+    rig_path.write_text(json.dumps({"data_root": str(tmp_path / "data"), "has_audio": False,
+                                    "triggers": {"sync": {"mode": "none"}}}))
+    wait_for_control = rig_measure._wait_for_control
+
+    def press_space_then_wait(inputs, display, control):
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE, mod=0,
+                                             unicode=" ", scancode=0))
+        wait_for_control(inputs, display, control)
+
+    monkeypatch.setattr(rig_measure, "_wait_for_control", press_space_then_wait)
+    monkeypatch.setattr(rig_measure, "lsl_probe", lambda: "not probed in the test")
+    monkeypatch.setattr(rig_measure, "machine", lambda: {})
+    monkeypatch.setattr(rig_measure, "_VERDICT_S", 0.0)
+    monkeypatch.setattr(rig_measure, "_SUMMARY_S", 0.0)
+    settings = replace(rig_measure.QUICK, display_flips=10, frame_seconds=0.2)
+    rig_measure.measure_rig(str(rig_path), settings)
+    folder, = (tmp_path / "data" / "sub-rig" / "ses-001" / "beh").iterdir()
+    m = json.loads((folder / "manifest.json").read_text())
+    assert m["task"] == "rigMeasurement" and set(m["tests"]) == set(rig_measure.TESTS)
+    assert list(m["summaries"]) == list(rig_measure.MEASUREMENTS)
+    assert all(m["tests"][t]["status"] == "not run" for t in ("triggers", "controls",
+                                                              "photodiode", "audio"))
+    assert len(m["summaries"]["frames"]["blocks"]) == 2
+    for name in ("report.html", "report.md", "rigmeasurement.tsv", "display.npz", "frames.npz"):
+        assert (folder / name).exists(), name
+    assert (tmp_path / "data" / "rigmeasurements.tsv").exists()
+    assert RigConfig.open(str(rig_path)).measured_latency_warning   # no latency measured
+
+
 def test_the_machine_is_described_and_pygame_left_as_it_was():
     import pygame
 
-    from fmri_gym.checks import machine
+    from fmri_gym.rig_measure import machine
     pygame.quit()
     m = machine()
     assert {"cpu", "memory_gb", "displays", "gpus", "audio_devices", "input_devices",
@@ -368,27 +405,19 @@ def test_the_machine_is_described_and_pygame_left_as_it_was():
     assert not pygame.display.get_init()
 
 
-def test_a_run_on_a_rig_never_measured_says_so_and_offers_a_check_once_a_session(
-        tmp_path, capsys, monkeypatch):
-    from types import SimpleNamespace
-
-    from fmri_gym.checks import offer_check
-    from fmri_gym.config.rig import RigConfig
+def test_a_rig_with_no_measured_latencies_says_so_until_one_is_filed(tmp_path):
+    from fmri_gym.config.rig import RigConfig, next_measured_latency_file
     rig_path = tmp_path / "laptop.json"
     rig_path.write_text(json.dumps({"data_root": str(tmp_path / "data")}))
-    run = SimpleNamespace(rig=RigConfig.open(str(rig_path)), subject="sub-01", ses=1)
-    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
-    offer_check(run)
-    err = capsys.readouterr().err
-    assert "never been measured" in err and "rig-check-long.json" in err
-    (tmp_path / "data" / "sub-01" / "ses-001" / "beh").mkdir(parents=True)
-    offer_check(run)                              # the session has begun: warned, not offered
-    err = capsys.readouterr().err
-    assert "never been measured" in err and "rig-check-long.json" not in err
+    rig = RigConfig.open(str(rig_path))
+    assert "no measured latencies" in rig.measured_latency_warning
+    assert rig.measured_latency_files == []
+    first = next_measured_latency_file(str(rig_path))
+    assert first == str(tmp_path / "measured" / "laptop-1.json")
     (tmp_path / "measured").mkdir()
-    (tmp_path / "measured" / "laptop-1.json").write_text("{}")
-    offer_check(run)
-    assert capsys.readouterr().err == ""
+    Path(first).write_text("{}")
+    rig = RigConfig.open(str(rig_path))
+    assert rig.measured_latency_warning is None and rig.measured_latency_files == [first]
 
 
 def test_claude_md_imports_agents_md():

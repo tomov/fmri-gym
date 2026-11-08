@@ -30,7 +30,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, replace
 from typing import Any
 
-from .phases import PHASE_CLASSES, CheckPhase, GamePhase, Phase, phase_from_dict, phase_problems
+from .phases import PHASE_CLASSES, GamePhase, Phase, phase_from_dict, phase_problems
 
 #: The phase types, one class each (:mod:`fmri_gym.config.phases`).
 PHASE_TYPES = tuple(PHASE_CLASSES)
@@ -335,11 +335,6 @@ class Curriculum:
             raise ValueError(f"{path}: " + "; ".join(problems))
         return cls(path=path, phases=tuple(phase_from_dict(d, i)
                                            for i, d in enumerate(curriculum["curriculum"])))
-
-    @property
-    def has_checks(self) -> bool:
-        """Whether it is a rig check: any of its phases is a check (:mod:`fmri_gym.checks`)."""
-        return any(isinstance(p, CheckPhase) for p in self.phases)
 
     def with_seeds(self, seed_of: Callable[[int], int]) -> tuple[Curriculum, dict[int, str]]:
         """The curriculum with every game phase seeded: its own ``seed``, else ``seed_of(index)``.

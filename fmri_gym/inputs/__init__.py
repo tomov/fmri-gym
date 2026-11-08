@@ -77,7 +77,7 @@ def open_input_devices(input_device_names: Sequence[str],
 
     :param input_device_names: a rig's ``"inputs"``.
     :param required_controls: the controls the curriculum names; a stick direction
-        among them needs its controller calibrated. Empty for a run that calibrates.
+        among them needs its controller calibrated. Empty: none needs it.
     :raises ValueError: for a kind that is not one, listed twice, or not plugged in.
     :raises CalibrationError: for a malformed calibration, or a needed axis without one.
     """

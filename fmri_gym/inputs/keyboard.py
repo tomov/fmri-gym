@@ -2,7 +2,7 @@
 
 A rig lists it like any device. Escape is a control but no curriculum's: it
 ends a run. What it holds is read from the key events it handles, so a press
-posted to the queue (a test, the rig check) is held like a typed one.
+posted to the queue (a test, the rig measurement) is held like a typed one.
 """
 
 from __future__ import annotations

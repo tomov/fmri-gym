@@ -109,7 +109,6 @@ PHASE_ROWS: dict[str, Callable[[dict], list[str]]] = {
     "game": lambda v: [f.key for f in _GAME_FIELDS
                        if v.get("mode") == "episode" or f.key not in ("n_episodes", "advance_on")],
     "message": lambda v: ["text", "duration", "align"] + ["control"] * (not v.get("duration")),
-    "check_display": lambda v: ["seconds"] + ["n"] * (not v.get("seconds")),
 }
 
 _GAME_FIELDS = [
@@ -173,48 +172,6 @@ PHASE_FIELDS: dict[str, list[Field]] = {
               tip="One control per point of the scale, in order (default 1-7)."),
     ],
     "game": _GAME_FIELDS,
-    # The rig check's phases (fmri_gym/checks.py): blank = the quick check's value.
-    "check_display": [
-        Field("n", "flips", "int", tip="Flip intervals to measure (default 60)."),
-        Field("seconds", "seconds", "float",
-              tip="Flip for this long instead (the long check: 600, missed refreshes)."),
-    ],
-    "check_frames": [
-        Field("rates", "rates (fps)", "list",
-              tip="Frame rates to play the test pattern at, through the session's own game "
-                  "loop: the rates your games use, and one that does not divide the refresh."),
-        Field("seconds", "seconds per rate", "float", tip="Per rate and load (default 2)."),
-        Field("loads", "loads", "list",
-              tip="none, and/or cpu: every core kept busy while the frames play, to see "
-                  "how the pacing and the frame triggers hold up."),
-    ],
-    "check_triggers": [
-        Field("repeat", "passes", "int", tip="How many times every code is sent to the "
-                                             "recording (default 1); only on a rig that sends "
-                                             "codes."),
-        Field("hold_ms", "hold (ms)", "float", tip="How long each code is held (default 40)."),
-        Field("gap_ms", "gap (ms)", "float", tip="Silence after each code (default 40)."),
-        Field("pulses", "scanner pulses", "int",
-              tip="Scanner pulses to count, when the run waits for the scanner (default 3)."),
-        Field("seconds", "pulse seconds", "float",
-              tip="Count pulses for this long instead (the long check: 600, clock drift)."),
-        Field("timeout_s", "timeout (s)", "float",
-              tip="Seconds allowed without a pulse before the test fails (default 60)."),
-    ],
-    "check_controls": [
-        Field("timeout_s", "timeout (s)", "float",
-              tip="Seconds to press each key when asked (default 10). The keys asked for are "
-                  "the rig's: each control of its input devices and its response keys "
-                  "(rig-config, Response devices step)."),
-    ],
-    "check_photodiode": [
-        Field("n", "flashes", "int", tip="Flashes (default 10; the long check 850)."),
-        Field("on_ms", "on (ms)", "float", tip="White time per flash (default 50)."),
-        Field("gap_min_ms", "gap min (ms)", "float", tip="Shortest black gap (default 150)."),
-        Field("gap_max_ms", "gap max (ms)", "float", tip="Longest black gap (default 250)."),
-        Field("settle_ms", "settle (ms)", "float",
-              tip="Black before the first flash, for the input to settle (default 300)."),
-    ],
 }
 
 
@@ -301,8 +258,6 @@ def phase_label(index: int, phase: dict) -> str:
         detail = (text[0] if text else "") if isinstance(text, list) else text.split("\n")[0]
     elif kind == "survey":
         detail = f"{len(phase.get('questions', []))} questions"
-    elif kind.startswith("check_"):
-        detail = "rig check"
     else:
         detail = f"{phase.get('duration', 2.0)} s"
     return f"{index:02d} {kind:<8} {detail[:26]}"
@@ -1444,14 +1399,7 @@ class _Editor(QtWidgets.QMainWindow):
                      # No fps: Check names it, as it does the empty game id -- the rate
                      # belongs to the game about to be picked, not to this template.
                      "game": {"type": "game", "backend": "gym", "game": "", "mode": "duration",
-                              "duration": 30.0},
-                     # The rig check's: the quick check's values; the rig says what each tests.
-                     "check_display": {"type": "check_display", "n": 60},
-                     "check_frames": {"type": "check_frames", "rates": [60, 30],
-                                      "seconds": 2, "loads": ["none"]},
-                     "check_triggers": {"type": "check_triggers", "pulses": 3},
-                     "check_controls": {"type": "check_controls", "timeout_s": 10.0},
-                     "check_photodiode": {"type": "check_photodiode", "n": 10}}
+                              "duration": 30.0}}
         self._insert_phase(templates[kind])
 
     def _duplicate_phase(self) -> None:

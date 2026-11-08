@@ -255,7 +255,7 @@ def test_a_calibration_measures_each_axis_and_confirms_each_control(config_home,
     assert files.newest("Scripted") == (result.path, result.calibration)
     assert result.path.with_suffix(".csv").exists() and "Scripted_" in result.path.name
     assert d.calibration is None                    # the caller applies what was written
-    from fmri_gym.checks import _pad_line
+    from fmri_gym.rig_measure import _pad_line
     line = _pad_line({"present": True, "device": "Scripted", **result.record()})
     assert f"{LX} on past 0.50" in line and "10 controls confirmed, 1 wrong" in line
 
@@ -283,11 +283,6 @@ def test_the_fit_raises_the_threshold_of_the_axis_that_dithers_and_no_other():
     fitted = cal.fit(shaky, (LX, LY), "Scripted", datetime.now(timezone.utc))
     assert fitted.axes[LX].on > cal.CAL_ON and fitted.axes[LX].off == round(0.6 * fitted.axes[LX].on, 3)
     assert (fitted.axes[LY].on, fitted.axes[LY].off) == (cal.CAL_ON, cal.CAL_OFF)
-
-
-def test_a_check_controls_phase_refuses_pad_reps():
-    from fmri_gym.config.phases import CheckControls
-    assert any("pad_reps" in p for p in CheckControls.problems({"pad_reps": 3}))
 
 
 # -- the axes and the controllers --------------------------------------------------------------
@@ -329,7 +324,7 @@ def test_an_uncalibrated_axis_presses_nothing():
 
 def test_a_controller_refuses_an_axis_the_curriculum_names_with_no_calibration(config_home):
     pad = _bare(CurrentDesignsGamepad3)
-    with pytest.raises(CalibrationError, match="no calibration of 'Scripted' in .*rig check"):
+    with pytest.raises(CalibrationError, match="no calibration of 'Scripted' in .*pad-calibration"):
         pad.require_calibrated_axes_for(frozenset({ControlNames.CONTROLLER_AXIS_LEFTY_UP,
                                                    ControlNames.CONTROLLER_BUTTON_A}))
     buttons_only = frozenset({ControlNames.CONTROLLER_BUTTON_A, "SPACE"})

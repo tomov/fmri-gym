@@ -11,13 +11,11 @@ says how this rig plays it, and every run played on the rig reads it.
 curriculum's (:meth:`RigConfig.open`); it is required, since which window,
 controller and data folder a session gets is not something to guess.
 
-Every key of a rig file is optional: an empty ``{}`` plays on the defaults. The
-rig check files its results under ``site`` and ``rig``: the team's folder
-(:func:`site_of`) and the file's name; written in the file they must say the
-same. It may describe the rig for
-people -- :data:`FIELDS`, notes
-nothing plays from, filed with every run and pooled by the rig check -- and
-say how its runs are played (:data:`DEFAULTS` when left out), under the field
+Every key of a rig file is optional: an empty ``{}`` plays on the defaults. A
+rig's ``site`` and ``rig`` are the team's folder (:func:`site_of`) and the
+file's name; written in the file they must say the same. It may describe the
+rig for people -- :data:`FIELDS`, notes nothing plays from, filed with every
+run -- and say how its runs are played (:data:`DEFAULTS` when left out), under the field
 names of :class:`RigConfig` and :class:`ScreenConfig`, so the file and the code
 say the same thing:
 
@@ -29,7 +27,7 @@ say the same thing:
   "current_designs_gamepad3"]``); each controller must be plugged in when a run starts;
 - ``"response_keys"``: the keys a response device types by itself (a button
   box, a fORP in a key mode), each with what it stands for, ``{"1": "index
-  finger", ...}``: the rig check asks for each;
+  finger", ...}``;
 - ``"has_audio"``: play game audio; ``false`` mutes every block;
 - ``"data_root"``: where the BIDS tree goes, ``<root>/sub-XX/ses-NNN/beh/<run>/``;
 - ``"start_fixation"``, ``"end_fixation"``: seconds of fixation cross every run
@@ -39,22 +37,23 @@ say the same thing:
   line (:class:`~fmri_gym.triggers.TriggerSettings`); left out, the run waits
   for ``=`` and sends no codes, and says so on the experimenter screen and in
   the manifest (``defaulted``);
-- ``"rig_check"``: what the rig check measures with (:class:`RigCheckConfig`):
-  the photodiode, a microphone, the recording's rate, more frame rates.
+- ``"rig_measurement"``: the equipment the rig's timing is measured with
+  (:class:`RigMeasurementConfig`): the photodiode, a microphone, the recording's rate,
+  more frame rates.
 
 **Controls and response keys**, never mixed. A curriculum's **controls** (a game
 phase's ``"controls"``) are control names of the rig's input devices
 (:mod:`fmri_gym.inputs`), mapped to the game's actions. A rig's **response
 keys** are keyboard keys a device types itself; a curriculum binds them like
-any key. What the rig check asks to press is each control of the rig's
-controllers and the response keys: what this rig's participant can press.
+any key.
 
-It is written by hand or in the rig form (``rig-config --rig <file>``), which a
-rig check also opens when its rig has no valid file.
+It is written by hand or in the rig form (``rig-config --rig <file>``). What was
+measured on the rig is kept beside its file (:func:`measured_latency_files`).
 """
 
 from __future__ import annotations
 
+import glob
 import json
 import os
 import re
@@ -69,7 +68,7 @@ MODALITIES = ("fmri", "meg", "eeg", "behav")
 #: The modalities that record the brain: their runs need a fixation baseline at each end.
 NEUROIMAGING = ("fmri", "meg", "eeg")
 #: What the rig is, for people: notes nothing plays from, each optional, filed with
-#: every run and pooled by the rig check (``site`` and ``rig`` are the file's place).
+#: every run (``site`` and ``rig`` are the file's place).
 FIELDS = {
     "site": "the team, the folder its rigs are in (configs/<team>/rigs/): letters, digits, "
             "_ and -",
@@ -96,21 +95,21 @@ EXAMPLES = {
 DEFAULTS: dict[str, Any] = {
     "screen": {"size": "1024x768", "is_fullscreen": False, "monitor": 0, "has_vsync": True},
     "inputs": ["keyboard"], "has_audio": True, "data_root": "data", "start_fixation": None,
-    "end_fixation": None, "triggers": {}, "response_keys": {}, "rig_check": {},
+    "end_fixation": None, "triggers": {}, "response_keys": {}, "rig_measurement": {},
 }
 #: Keys refused with a pointer to ``"inputs"``, which says what they would mean.
 _GONE = {"has_pad", "bindings"}
-#: How a rig check can read its photodiode: not at all, on this PC's sound card
+#: How the rig's photodiode can be read: not at all, on this PC's sound card
 #: (input 0), or in the MEG/EEG recording (matched offline).
 PHOTODIODE_READOUTS = ("none", "soundcard", "recording")
-#: Where the photodiode check's patch is, under the diode.
+#: Where the flashing patch the photodiode reads is.
 CORNERS = ("br", "bl", "tr", "tl")
-#: A rig file's ``"rig_check"`` where it says nothing (:class:`RigCheckConfig`).
-RIG_CHECK_DEFAULTS: dict[str, Any] = {
+#: A rig file's ``"rig_measurement"`` where it says nothing (:class:`RigMeasurementConfig`).
+RIG_MEASUREMENT_DEFAULTS: dict[str, Any] = {
     "photodiode": "none", "input_device": None, "has_mic": False, "corner": "br",
     "patch_px": 120, "recording_hz": None, "frame_rates": [],
 }
-#: Trigger presets the editor and the rig check offer. Each names ``sync.mode``
+#: Trigger presets the rig form offers. Each names ``sync.mode``
 #: and ``backend`` outright: a section that leaves them out runs, but is
 #: reported as NOT SET.
 TRIGGER_PRESETS: dict[str, dict] = {
@@ -133,20 +132,19 @@ TRIGGER_PRESETS: dict[str, dict] = {
 LABEL = re.compile(r"[A-Za-z0-9_-]+")
 _INITIALS = re.compile(r"[A-Z]{2,4}")
 _SIZE = re.compile(r"([1-9]\d*)x([1-9]\d*)")
-_MAKE = ("make it with the rig's long rig check, which opens a form for it: fmri-play "
-         "--subject sub-rig --ses 1 --run 1 --rig <file> --curriculum "
-         "configs/curricula/checks/rig-check-long.json (rig-config --rig <file> opens the "
-         "form alone), or start from configs/examples/rigs/empty.json")
+_MAKE = ("make it in the rig form, rig-config --rig <file>, or start from "
+         "configs/examples/rigs/empty.json")
 #: The repo's ``configs/``: a folder per team, each with its ``rigs/``, and the examples.
 CONFIGS = Path(__file__).resolve().parents[2] / "configs"
 #: The folder a team keeps its rig files in.
 RIGS_DIRNAME = "rigs"
+#: The folder beside a rig file that holds what was measured on the rig.
+MEASURED_DIRNAME = "measured"
 
 
 @dataclass(frozen=True, slots=True)
-class RigCheckConfig:
-    """What a rig check measures this rig with: a rig file's ``"rig_check"``. The check
-    curricula say only for how long and how many."""
+class RigMeasurementConfig:
+    """The equipment the rig's timing is measured with: a rig file's ``"rig_measurement"``."""
 
     #: one of :data:`PHOTODIODE_READOUTS`; ``none``: the rig has no photodiode
     photodiode: str
@@ -159,13 +157,14 @@ class RigCheckConfig:
     patch_px: int
     #: the MEG/EEG recording's sampling rate: each frame code must last two samples there
     recording_hz: float | None
-    #: frame rates this rig's games use, tested besides the check curriculum's
+    #: frame rates this rig's games use, measured besides the usual ones
     frame_rates: tuple[float, ...]
 
     @classmethod
-    def from_dict(cls, section: dict) -> RigCheckConfig:
-        """Read a checked ``"rig_check"`` (:func:`problems`), defaults where it says nothing."""
-        d = {**RIG_CHECK_DEFAULTS, **section}
+    def from_dict(cls, section: dict) -> RigMeasurementConfig:
+        """Read a checked ``"rig_measurement"`` (:func:`problems`), defaults where it says
+        nothing."""
+        d = {**RIG_MEASUREMENT_DEFAULTS, **section}
         device = d["input_device"]
         if isinstance(device, str) and device.isdigit():
             device = int(device)
@@ -230,8 +229,8 @@ class RigConfig:
     end_fixation: float | None
     #: the scanner's start sync and the trigger codes, over which line.
     triggers: TriggerSettings
-    #: what the rig check measures with.
-    rig_check: RigCheckConfig
+    #: the equipment the rig's timing is measured with.
+    rig_measurement: RigMeasurementConfig
 
     @classmethod
     def from_dict(cls, rig: dict, path: str) -> RigConfig:
@@ -262,7 +261,7 @@ class RigConfig:
                    start_fixation=settings["start_fixation"],
                    end_fixation=settings["end_fixation"],
                    triggers=TriggerSettings.from_dict(settings["triggers"]),
-                   rig_check=RigCheckConfig.from_dict(settings["rig_check"]))
+                   rig_measurement=RigMeasurementConfig.from_dict(settings["rig_measurement"]))
 
     @classmethod
     def open(cls, path: str) -> RigConfig:
@@ -281,9 +280,9 @@ class RigConfig:
         return set(self.triggers.defaulted) != {"sync.mode", "backend"}
 
     def without_trigger_line(self) -> RigConfig:
-        """This rig with no trigger line (``null`` backend): what a rig check plays on when
-        the line does not open, so its other checks still run. ``send`` becomes ``none``,
-        since it needs a line; the file is untouched."""
+        """This rig with no trigger line (``null`` backend), for measuring the rest of it when
+        the line does not open. ``send`` becomes ``none``, since it needs a line; the file
+        is untouched."""
         sync = self.triggers.sync
         if sync.mode == "send":
             sync = replace(sync, mode="none")
@@ -295,7 +294,7 @@ class RigConfig:
                 "inputs": list(self.inputs), "response_keys": self.response_keys,
                 "has_audio": self.has_audio, "data_root": self.data_root,
                 "start_fixation": self.start_fixation, "end_fixation": self.end_fixation,
-                "triggers": asdict(self.triggers), "rig_check": self.rig_check.record()}
+                "triggers": asdict(self.triggers), "rig_measurement": self.rig_measurement.record()}
 
     def status(self) -> str:
         """One line for the console: which file, and what it settles."""
@@ -319,6 +318,19 @@ class RigConfig:
         return fixation_warning(self.fields.get("modality"), self.start_fixation,
                                 self.end_fixation)
 
+    @property
+    def measured_latency_files(self) -> list[str]:
+        """What was measured on this rig, oldest first (:func:`measured_latency_files`)."""
+        return measured_latency_files(self.path)
+
+    @property
+    def measured_latency_warning(self) -> str | None:
+        """That nothing was ever measured on this rig; ``None`` once something was."""
+        if self.measured_latency_files:
+            return None
+        return (f"{self.path} has no measured latencies beside it: when a frame's light and "
+                "sound reach the participant on this rig is not known")
+
 
 def fixation_warning(modality: str | None, start: float | None,
                      end: float | None) -> str | None:
@@ -333,6 +345,27 @@ def fixation_warning(modality: str | None, start: float | None,
         return None
     return (f"the rig's modality is {modality}, but it has no {' and no '.join(missing)}: its "
             "runs have no fixation baseline there (10 s each is usual for fMRI)")
+
+
+def measured_latency_files(rig_path: str) -> list[str]:
+    """What was measured on the rig file at ``rig_path``, in the order it was filed:
+    ``<rig>-<n>.json`` in :data:`MEASURED_DIRNAME` beside it, by ``n``."""
+    folder = os.path.join(os.path.dirname(rig_path), MEASURED_DIRNAME)
+    rig = Path(rig_path).stem
+    numbered = {}
+    for path in Path(folder).glob(f"{glob.escape(rig)}-*.json"):
+        n = re.fullmatch(rf"{re.escape(rig)}-(\d+)\.json", path.name)
+        if n:
+            numbered[int(n[1])] = str(path)
+    return [numbered[n] for n in sorted(numbered)]
+
+
+def next_measured_latency_file(rig_path: str) -> str:
+    """Where the next measurement of the rig file at ``rig_path`` is filed: one more than
+    the last :func:`measured_latency_files`."""
+    rig = Path(rig_path).stem
+    return os.path.join(os.path.dirname(rig_path), MEASURED_DIRNAME,
+                        f"{rig}-{len(measured_latency_files(rig_path)) + 1}.json")
 
 
 def site_of(path: str) -> str:
@@ -414,7 +447,7 @@ def problems(rig: dict) -> list[str]:
 
 def _setting_problems(rig: dict) -> list[str]:
     """What is wrong with the file's ``screen``, ``inputs``, ``has_audio``, ``data_root``,
-    fixations, triggers, response keys and ``rig_check``."""
+    fixations, triggers, response keys and ``rig_measurement``."""
     screen = rig.get("screen", {})
     if not isinstance(screen, dict):
         return [f'"screen": expected {{"size", "is_fullscreen", "monitor", "has_vsync"}}, '
@@ -438,7 +471,8 @@ def _setting_problems(rig: dict) -> list[str]:
             for k in ("start_fixation", "end_fixation")
             if rig.get(k) is not None and not _is_seconds(rig[k])]
     return (out + trigger_problems(rig.get("triggers", {})) + _input_device_problems(rig)
-            + _response_key_problems(rig) + _rig_check_problems(rig.get("rig_check", {})))
+            + _response_key_problems(rig)
+            + _rig_measurement_problems(rig.get("rig_measurement", {})))
 
 
 def _input_device_problems(rig: dict) -> list[str]:
@@ -462,34 +496,35 @@ def _response_key_problems(rig: dict) -> list[str]:
                if not isinstance(v, str)])
 
 
-def _rig_check_problems(section: Any) -> list[str]:
-    """``rig_check``: :data:`RIG_CHECK_DEFAULTS`' keys, each of the right kind."""
+def _rig_measurement_problems(section: Any) -> list[str]:
+    """``rig_measurement``: :data:`RIG_MEASUREMENT_DEFAULTS`' keys, each of the right kind."""
     if not isinstance(section, dict):
-        return [f'"rig_check": expected an object, got {section!r}']
-    d = {**RIG_CHECK_DEFAULTS, **section}
-    out = [f'"rig_check": unknown key {k!r}' for k in section if k not in RIG_CHECK_DEFAULTS]
+        return [f'"rig_measurement": expected an object, got {section!r}']
+    d = {**RIG_MEASUREMENT_DEFAULTS, **section}
+    out = [f'"rig_measurement": unknown key {k!r}'
+           for k in section if k not in RIG_MEASUREMENT_DEFAULTS]
     if d["photodiode"] not in PHOTODIODE_READOUTS:
-        out.append(f'"rig_check": "photodiode" must be one of {PHOTODIODE_READOUTS}, '
+        out.append(f'"rig_measurement": "photodiode" must be one of {PHOTODIODE_READOUTS}, '
                    f'got {d["photodiode"]!r}')
     if not isinstance(d["has_mic"], bool):
-        out.append(f'"rig_check": "has_mic" must be true or false, got {d["has_mic"]!r}')
+        out.append(f'"rig_measurement": "has_mic" must be true or false, got {d["has_mic"]!r}')
     if d["has_mic"] and d["photodiode"] != "soundcard":
-        out.append('"rig_check": "has_mic" needs "photodiode": "soundcard" -- the microphone '
+        out.append('"rig_measurement": "has_mic" needs "photodiode": "soundcard" -- the microphone '
                    "is read on the sound card, next to the diode")
     if d["corner"] not in CORNERS:
-        out.append(f'"rig_check": "corner" must be one of {CORNERS}, got {d["corner"]!r}')
+        out.append(f'"rig_measurement": "corner" must be one of {CORNERS}, got {d["corner"]!r}')
     if not _is_positive(d["patch_px"], int):
-        out.append(f'"rig_check": "patch_px" must be a whole number of pixels, got '
+        out.append(f'"rig_measurement": "patch_px" must be a whole number of pixels, got '
                    f'{d["patch_px"]!r}')
     if d["recording_hz"] is not None and not _is_positive(d["recording_hz"]):
-        out.append(f'"rig_check": "recording_hz" must be a rate in Hz, or null, got '
+        out.append(f'"rig_measurement": "recording_hz" must be a rate in Hz, or null, got '
                    f'{d["recording_hz"]!r}')
     rates = d["frame_rates"]
     if not (isinstance(rates, list) and all(_is_positive(r) for r in rates)):
-        out.append(f'"rig_check": "frame_rates" must be a list of frames per second, got '
+        out.append(f'"rig_measurement": "frame_rates" must be a list of frames per second, got '
                    f"{rates!r}")
     if not (d["input_device"] is None or isinstance(d["input_device"], (int, str))):
-        out.append(f'"rig_check": "input_device" must be an index or a name, got '
+        out.append(f'"rig_measurement": "input_device" must be an index or a name, got '
                    f'{d["input_device"]!r}')
     return out
 

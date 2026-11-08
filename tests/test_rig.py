@@ -56,7 +56,7 @@ def test_settings_are_read():
 
 
 def test_a_missing_file_says_how_to_make_one():
-    with pytest.raises(ValueError, match="no such file.*rig-check-long"):
+    with pytest.raises(ValueError, match="no such file.*rig-config --rig"):
         RigConfig.open("site1/none.json")
 
 
@@ -208,25 +208,15 @@ def test_a_teams_rig_is_filed_under_the_team(tmp_path):
     assert rig.fields == {"site": "MT", "rig": "mgh-prisma"}
 
 
-@pytest.mark.parametrize("phase", [
-    {"type": "check_photodiode", "readout": "soundcard"},
-    {"type": "check_photodiode", "corner": "br"},
-    {"type": "check_frames", "recording_hz": 1000},
-    {"type": "check_controls", "controls": {"1": "index"}},
-])
-def test_a_check_curriculum_cannot_set_what_is_the_rigs(phase):
-    assert any("rig-config" in p for p in phase_problems(phase))
-
-
 @pytest.mark.parametrize("values, problem", [
     ({"response_keys": {"NOSUCHKEY": "index"}}, "not a keyboard key name"),
     ({"triggers": {"sync": {"mode": "wait", "key": "="}}}, "not a keyboard key name"),
-    ({"rig_check": {"photodiode": "eyes"}}, '"photodiode"'),
-    ({"rig_check": {"has_mic": True}}, '"has_mic" needs'),
-    ({"rig_check": {"frame_rates": [0]}}, '"frame_rates"'),
-    ({"rig_check": {"what": 1}}, "unknown key"),
+    ({"rig_measurement": {"photodiode": "eyes"}}, '"photodiode"'),
+    ({"rig_measurement": {"has_mic": True}}, '"has_mic" needs'),
+    ({"rig_measurement": {"frame_rates": [0]}}, '"frame_rates"'),
+    ({"rig_measurement": {"what": 1}}, "unknown key"),
 ])
-def test_a_wrong_rig_check_section_is_refused(values, problem):
+def test_a_wrong_rig_measurement_section_is_refused(values, problem):
     assert any(problem in p for p in rig.problems(values))
 
 
