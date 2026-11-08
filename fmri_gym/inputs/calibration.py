@@ -22,8 +22,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 #: What to do about a controller with no calibration, for the messages that say so.
-HOW_TO_CALIBRATE = ("run pad-calibration (or Calibrate controller... in rig-config), or the "
-                    "rig check")
+HOW_TO_CALIBRATE = "run pad-calibration (or Calibrate controller... in rig-config)"
 
 
 class CalibrationError(ValueError):

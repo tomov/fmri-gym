@@ -1,4 +1,4 @@
-"""The rig check plan and the windows, built offscreen: a window that does not open is a rig
+"""The rig measurement plan and the windows, built offscreen: a window that does not open is a rig
 that cannot be set up without JSON."""
 
 from __future__ import annotations
@@ -25,16 +25,16 @@ def gui():
     pytest.importorskip("PySide6", reason="the gui extra: uv sync --extra gui")
 
 
-def test_the_check_plan_follows_the_rig(gui):
-    from fmri_gym.gui.rig_config import check_plan
+def test_the_measurement_plan_follows_the_rig(gui):
+    from fmri_gym.gui.rig_config import measurement_plan
 
-    laptop = check_plan(rig_file.RigConfig.open(str(EXAMPLES / "laptop.json")))
-    meg = check_plan(rig_file.RigConfig.open(str(EXAMPLES / "meg.json")))
+    laptop = measurement_plan(rig_file.RigConfig.open(str(EXAMPLES / "laptop.json")))
+    meg = measurement_plan(rig_file.RigConfig.open(str(EXAMPLES / "meg.json")))
     assert "Triggers: not tested" in laptop and "Responses: not tested" in laptop
     assert "serial" in meg and "1000 Hz" in meg and "recording" in meg
     typed = rig_file.RigConfig.from_dict({"response_keys": {"1": "index"}},
                                          str(EXAMPLES / "typed.json"))
-    assert "1 (index)" in check_plan(typed)
+    assert "1 (index)" in measurement_plan(typed)
 
 
 # -- the windows -------------------------------------------------------------------------
@@ -85,18 +85,18 @@ def test_a_rig_without_triggers_is_not_given_any_until_chosen(qt):
     assert window._triggers_problems()
 
 
-def test_response_keys_and_the_rig_check_are_the_rig_files(qt):
+def test_response_keys_and_the_rig_measurement_are_the_rig_files(qt):
     window, _ = _rig_window("laptop")
     window._add_response_key("1", "index finger")
-    window.check_form.write("photodiode", "soundcard")
-    window.check_form.write("has_mic", True)
+    window.measurement_form.write("photodiode", "soundcard")
+    window.measurement_form.write("has_mic", True)
     rig = window.rig
     assert rig["response_keys"] == {"1": "index finger"}
-    assert rig["rig_check"] == {"photodiode": "soundcard", "has_mic": True}
+    assert rig["rig_measurement"] == {"photodiode": "soundcard", "has_mic": True}
     assert "1 (index finger)" in window.plan.text()
 
 
-def test_a_rig_check_waits_for_its_triggers_to_be_chosen(qt):
+def test_a_rig_measurement_waits_for_its_triggers_to_be_chosen(qt):
     window, _ = _rig_window("empty", need_triggers=True)
     assert window.stack.currentIndex() == 3 and not window.next.isEnabled()
     window.preset.setCurrentIndex(0)
@@ -115,13 +115,13 @@ def test_only_the_options_that_apply_are_shown(qt):
     assert window.code_box.isHidden()
     assert not visible(window.trigger_form, "port") and not visible(window.trigger_form,
                                                                      "on_frame")
-    assert not visible(window.check_form, "recording_hz")
-    window.check_form.write("photodiode", "none")
-    assert not visible(window.check_form, "corner") and not visible(window.check_form,
+    assert not visible(window.measurement_form, "recording_hz")
+    window.measurement_form.write("photodiode", "none")
+    assert not visible(window.measurement_form, "corner") and not visible(window.measurement_form,
                                                                     "input_device")
 
 
-def test_a_new_rig_is_filled_step_by_step_then_saved_then_checked(qt, tmp_path):
+def test_a_new_rig_is_filled_step_by_step_then_saved_then_measured(qt, tmp_path):
     path = str(tmp_path / "site" / "rig.json")
     window, _ = _rig_window("empty", path=path)
     assert not window.next.isEnabled()  # the rig is not described yet
@@ -141,12 +141,12 @@ def test_a_new_rig_is_filled_step_by_step_then_saved_then_checked(qt, tmp_path):
     window.next.click()
     window.next.click()
     assert window.stack.currentIndex() == 5
-    assert window.save.isEnabled() and not window.short_check.isEnabled()
+    assert window.save.isEnabled() and not window.short_measurement.isEnabled()
     window.save.click()
     assert rig_file.RigConfig.open(path).fields["pi"] == "MT"
-    assert window.short_check.isEnabled() and not window.save.isEnabled()
-    window.switches["has_audio"].setChecked(False)  # a change: save again before a check
-    assert not window.short_check.isEnabled() and window.save.isEnabled()
+    assert window.short_measurement.isEnabled() and not window.save.isEnabled()
+    window.switches["has_audio"].setChecked(False)  # a change: save again before a rig measurement
+    assert not window.short_measurement.isEnabled() and window.save.isEnabled()
 
 
 def test_flags_fmri_play_would_refuse_are_problems(gui):

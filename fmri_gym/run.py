@@ -35,7 +35,6 @@ import time
 from collections import Counter, deque
 from collections.abc import Callable, Collection, Iterator
 from dataclasses import asdict, dataclass, replace
-from functools import partial
 from typing import TYPE_CHECKING, Any
 
 import pygame
@@ -45,8 +44,7 @@ from .adapters import get_adapter
 from .audio import Audio
 from .bids import BlockProgress, RunProgress
 from .config.curriculum import Curriculum, game_changes
-from .config.phases import (CHECK_PHASES, BlockMode, CheckControls, Fixation, GamePhase, Message,
-                             Phase, Survey)
+from .config.phases import BlockMode, Fixation, GamePhase, Message, Phase, Survey
 from .config.run import RunConfig
 from .display import Display, check_monitor
 from .inputs import QUIT, ControlNames, Edge, InputDevice, InputEvent, open_input_devices
@@ -412,7 +410,8 @@ class Run:
         """
         if config.loop and config.duration is None:
             raise ValueError("--loop plays the curriculum until --duration: give a --duration")
-        out = bids.run_output(config.rig.data_root, config.subject, config.curriculum.path,
+        out = bids.run_output(config.rig.data_root, config.subject,
+                              bids.task_label(config.curriculum.path),
                               config.ses, config.run)
         if out.attempt > 1:
             print(f"{out.label} already has data: this is attempt {out.attempt} at it, and "
@@ -436,10 +435,7 @@ class Run:
                   "this is a test run, not a session", file=sys.stderr)
         audio = Audio(enabled=config.rig.has_audio)
         print(f"audio: {audio.status()}", file=sys.stderr)
-        makes_calibration = any(isinstance(p, CheckControls) and p.calibrates
-                                for p in config.curriculum.phases)
-        inputs = open_input_devices(config.rig.inputs, frozenset() if makes_calibration
-                                    else config.required_controls())
+        inputs = open_input_devices(config.rig.inputs, config.required_controls())
         print(f"inputs: {inputs.status()}", file=sys.stderr)
         screen = config.rig.screen
         display = Display(size=screen.size, fullscreen=screen.is_fullscreen,
@@ -928,7 +924,7 @@ class Run:
         ``include_on_resume`` opening ones, and hands the block it carries on
         what that run left of it. A run with a duration stops its phases
         ``end_fixation`` seconds before the end. Either fixation is shown only
-        when the run has one (:attr:`RunConfig.start_fixation`).
+        when the rig has one (:attr:`RigConfig.start_fixation`).
         Always writes the run's manifest in ``finally``, including after an
         interrupt (partial data).
 
@@ -942,16 +938,14 @@ class Run:
         handlers: dict[type, Callable[[Any, int], None]] = {
             Fixation: self._fixation, Message: self._message, GamePhase: self._game,
             Survey: self._survey}
-        if self.config.curriculum.has_checks:
-            from . import checks  # rig-check phases: measured with this run's display and lines
-            handlers.update({kind: partial(checks.run_check, self) for kind in CHECK_PHASES})
+        rig = self.config.rig
         try:
             self._trigger()
             if self.config.duration is not None:
                 self._run_end = (self.clock.t0_perf + self.config.duration
-                                 - (self.config.end_fixation or 0))
-            if self.config.start_fixation is not None:
-                self._run_fixation(self.config.start_fixation, "start_of_run", self._run_end)
+                                 - (rig.end_fixation or 0))
+            if rig.start_fixation is not None:
+                self._run_fixation(rig.start_fixation, "start_of_run", self._run_end)
 
             reached_end = True
             for index, phase in self._schedule(start):
@@ -965,8 +959,8 @@ class Run:
                     continue
                 handler(phase, index)
 
-            if self.config.end_fixation is not None:
-                self._run_fixation(self.config.end_fixation, "end_of_run",
+            if rig.end_fixation is not None:
+                self._run_fixation(rig.end_fixation, "end_of_run",
                                    math.inf if self.config.duration is None
                                    else self.clock.t0_perf + self.config.duration)
             if reached_end:

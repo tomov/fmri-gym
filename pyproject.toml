@@ -102,6 +102,8 @@ fmri-ses = "fmri_gym.bids:main"
 # The game controller plugged in: calibrate it (each run with that controller reads
 # its newest calibration), see what it sends, and tune how its stick axes are read.
 pad-calibration = "fmri_gym.pad_scope:main"
+# Measure a rig, making its rig file first if it has none. Not a run: it plays no curriculum.
+rig-measure = "fmri_gym.rig_measure:main"
 
 [tool.setuptools]
 packages = ["fmri_gym", "fmri_gym.adapters", "fmri_gym.gui"]

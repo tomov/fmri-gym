@@ -28,8 +28,6 @@ OUTCOMES = frozenset({"won", "lost", "terminated", "truncated", "playing", "forf
 #: Outcomes a block may rewind on: the game's own endings. Not `truncated`,
 #: the env's step cap, which a rewound episode would hit again for ever.
 REWINDABLE = frozenset({"won", "lost", "terminated"})
-#: What a frames check plays its rates under: nothing else, or every core kept busy.
-LOADS = ("none", "cpu")
 #: A survey's controls when it names none: one per point, from its lowest.
 _SURVEY_CONTROLS = (ControlNames.K_1, ControlNames.K_2, ControlNames.K_3, ControlNames.K_4,
                     ControlNames.K_5, ControlNames.K_6, ControlNames.K_7)
@@ -87,11 +85,6 @@ class Phase(ABC):
     def _shared(d: dict) -> dict[str, Any]:
         """The fields every phase reads the same way, for :meth:`from_dict`."""
         return {"spec": d, "include_on_resume": d.get("include_on_resume", False)}
-
-
-@dataclass(frozen=True, slots=True)
-class CheckPhase(Phase, ABC):
-    """A rig check's phase (:mod:`fmri_gym.checks`): it measures the rig, plays no game."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -333,150 +326,9 @@ class GamePhase(Phase):
         return out
 
 
-@dataclass(frozen=True, slots=True)
-class CheckDisplay(CheckPhase):
-    """A rig check: are flips locked to the refresh; missed refreshes."""
-
-    type: ClassVar[str] = "check_display"
-    #: flip intervals to measure
-    n: int
-    #: flip for this long instead of ``n`` flips, if given
-    seconds: float | None
-
-    @classmethod
-    def from_dict(cls, d: dict, index: int) -> CheckDisplay:
-        return cls(**cls._shared(d), n=d.get("n", 60), seconds=d.get("seconds"))
-
-    @staticmethod
-    def problems(d: dict) -> list[str]:
-        return _positive_problems(d, ("n", "seconds"))
-
-
-@dataclass(frozen=True, slots=True)
-class CheckFrames(CheckPhase):
-    """A rig check: the test pattern played through the run's own game loop, per rate and load."""
-
-    type: ClassVar[str] = "check_frames"
-    rates: tuple[float, ...]
-    loads: tuple[str, ...]
-    #: seconds per rate and load
-    seconds: float
-
-    @classmethod
-    def from_dict(cls, d: dict, index: int) -> CheckFrames:
-        return cls(**cls._shared(d), rates=tuple(d.get("rates", (60,))),
-                   loads=tuple(d.get("loads", ("none",))), seconds=d.get("seconds", 2.0))
-
-    @staticmethod
-    def problems(d: dict) -> list[str]:
-        rates, loads = d.get("rates", [60]), d.get("loads", ["none"])
-        out = _positive_problems(d, ("seconds",)) + _rig_owned(d, ("recording_hz",))
-        if not (isinstance(rates, list) and rates and all(_positive(r) for r in rates)):
-            out.append(f"rates: expected frames per second, e.g. [60, 30], got {rates!r}")
-        if not (isinstance(loads, list) and loads and all(x in LOADS for x in loads)):
-            out.append(f"loads: expected a list of {LOADS}, got {loads!r}")
-        return out
-
-
-@dataclass(frozen=True, slots=True)
-class CheckTriggers(CheckPhase):
-    """A rig check: every line and code sent on the rig's trigger line; scanner pulses counted."""
-
-    type: ClassVar[str] = "check_triggers"
-    #: passes of every line and code
-    repeat: int
-    hold_ms: float
-    gap_ms: float
-    #: scanner pulses to count, when the run waits for the scanner
-    pulses: int
-    #: count pulses for this long instead, if given
-    seconds: float | None
-    #: seconds allowed without a pulse
-    timeout_s: float
-
-    @classmethod
-    def from_dict(cls, d: dict, index: int) -> CheckTriggers:
-        return cls(**cls._shared(d), repeat=d.get("repeat", 1), hold_ms=d.get("hold_ms", 40),
-                   gap_ms=d.get("gap_ms", 40), pulses=d.get("pulses", 3),
-                   seconds=d.get("seconds"), timeout_s=d.get("timeout_s", 60.0))
-
-    @staticmethod
-    def problems(d: dict) -> list[str]:
-        return _positive_problems(d, ("repeat", "hold_ms", "gap_ms", "pulses", "seconds",
-                                      "timeout_s"))
-
-
-@dataclass(frozen=True, slots=True)
-class CheckControls(CheckPhase):
-    """A rig check: each control of the rig's ``"inputs"`` and each of its
-    ``"response_keys"`` (:mod:`fmri_gym.config.rig`), asked for on screen and
-    pressed on the device."""
-
-    type: ClassVar[str] = "check_controls"
-    #: seconds to press each key
-    timeout_s: float
-    #: calibrate the stick axes of the rig's input devices first
-    calibrates: bool
-
-    @classmethod
-    def from_dict(cls, d: dict, index: int) -> CheckControls:
-        return cls(**cls._shared(d), timeout_s=d.get("timeout_s", 10.0),
-                   calibrates=d.get("calibrates", True))
-
-    @staticmethod
-    def problems(d: dict) -> list[str]:
-        out = _positive_problems(d, ("timeout_s",)) + _bool_problems(d, ("calibrates",))
-        if "pad_reps" in d:
-            out.append("pad_reps: the calibration asks for each control until it comes twice "
-                       "in a row, with no count to set; remove it")
-        return out + _rig_owned(d, ("controls", "keys"))
-
-
-@dataclass(frozen=True, slots=True)
-class CheckPhotodiode(CheckPhase):
-    """A rig check: the flip-to-photon offset, and on the same flashes the audio test.
-
-    Which of the two it measures, and with what, is the rig's ``"rig_check"``
-    (:class:`~fmri_gym.config.rig.RigCheckConfig`): this is only how many flashes and
-    how they are timed."""
-
-    type: ClassVar[str] = "check_photodiode"
-    #: the sound-card input's rate
-    samplerate: int
-    #: flashes
-    n: int
-    on_ms: float
-    gap_min_ms: float
-    gap_max_ms: float
-    settle_ms: float
-    seed: int
-
-    @classmethod
-    def from_dict(cls, d: dict, index: int) -> CheckPhotodiode:
-        return cls(**cls._shared(d), samplerate=d.get("samplerate", 48000), n=d.get("n", 10),
-                   on_ms=d.get("on_ms", 50.0), gap_min_ms=d.get("gap_min_ms", 150.0),
-                   gap_max_ms=d.get("gap_max_ms", 250.0), settle_ms=d.get("settle_ms", 300.0),
-                   seed=d.get("seed", 0))
-
-    @staticmethod
-    def problems(d: dict) -> list[str]:
-        out = _positive_problems(d, ("n", "on_ms", "gap_min_ms", "gap_max_ms", "settle_ms",
-                                     "samplerate"))
-        out += _rig_owned(d, ("readout", "input_device", "has_mic", "has_audio", "corner",
-                              "patch_px"))
-        low, high = d.get("gap_min_ms", 150), d.get("gap_max_ms", 250)
-        if _positive(low) and _positive(high) and low > high:
-            out.append(f"gap_min_ms ({low}) is above gap_max_ms ({high})")
-        return out
-
-
 #: Each phase ``type`` and the class it is read as.
 PHASE_CLASSES: dict[str, type[Phase]] = {cls.type: cls for cls in (
-    Fixation, Message, Survey, GamePhase, CheckDisplay, CheckFrames, CheckTriggers,
-    CheckControls, CheckPhotodiode)}
-#: The rig check's phase classes (:mod:`fmri_gym.checks`).
-CHECK_PHASES: tuple[type[CheckPhase], ...] = tuple(
-    cls for cls in PHASE_CLASSES.values() if issubclass(cls, CheckPhase))
+    Fixation, Message, Survey, GamePhase)}
 
 
 def phase_from_dict(d: dict, index: int) -> Phase:
@@ -494,13 +346,6 @@ def phase_problems(d: dict) -> list[str]:
 
 def _positive(v: Any) -> bool:
     return isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0
-
-
-def _rig_owned(d: dict, keys: tuple[str, ...]) -> list[str]:
-    """Keys a check phase may not set: they describe the rig, so its rig file says them."""
-    return [f"{k}: this is the rig's, not the curriculum's: set it in the rig file "
-            "(rig-config: the Rig check equipment step, or Response devices for response keys)"
-            for k in keys if k in d]
 
 
 def _positive_problems(d: dict, keys: tuple[str, ...]) -> list[str]:

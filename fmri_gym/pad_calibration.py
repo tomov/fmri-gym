@@ -71,7 +71,7 @@ class CalibrationResult(NamedTuple):
     corrections: int        # wrong controls given, named and asked again
 
     def record(self) -> dict[str, Any]:
-        """For the rig check's report."""
+        """For the rig measurement's report."""
         return {"measured": True, "confirmed": self.confirmed, "corrections": self.corrections,
                 "config": str(self.path), "samples": str(self.path.with_suffix(".csv")),
                 "axes": {name: axis.record() for name, axis in self.calibration.axes.items()}}

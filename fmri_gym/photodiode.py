@@ -82,7 +82,7 @@ CORNERS = ("br", "bl", "tr", "tl")
 
 
 class Verdict(NamedTuple):
-    """A rig-check test's verdict, as the manifest and the report record it."""
+    """A measurement's verdict, as the manifest and the report record it."""
 
     #: ``pass``, ``fail``, ``offline`` (read in the recording) or ``not run``
     status: str

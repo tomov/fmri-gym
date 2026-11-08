@@ -156,8 +156,7 @@ def run_label(subject: str, session: int, task: str, run: int) -> str:
     return f"{subject}_ses-{session:03d}_task-{task}_run-{run:03d}"
 
 
-def run_output(root: str, subject: str, curriculum_path: str,
-               session: int, run: int) -> RunOutput:
+def run_output(root: str, subject: str, task: str, session: int, run: int) -> RunOutput:
     """Where this run writes, what names it, and which attempt at it this is.
 
     Nothing is ever overwritten: the folder of a run that already has data
@@ -165,17 +164,16 @@ def run_output(root: str, subject: str, curriculum_path: str,
 
     :param root: the BIDS tree's root (``--data-root``).
     :param subject: ``sub-<label>``.
-    :param curriculum_path: the run's curriculum file; its name is the task label.
+    :param task: the BIDS task label (:func:`task_label` of a curriculum).
     :param session: the BIDS session number (``--ses``), from 1.
     :param run: this task's run number in the session (``--run``), from 1.
-    :raises ValueError: on a subject or curriculum name BIDS refuses, or a
-        session or run number below 1.
+    :raises ValueError: on a subject name BIDS refuses, or a session or run number below 1.
     """
     subject = subject_label(subject)
     for flag, number in (("ses", session), ("run", run)):
         if number < 1:
             raise ValueError(f"--{flag} counts from 1, got {number}")
-    label = run_label(subject, session, task_label(curriculum_path), run)
+    label = run_label(subject, session, task, run)
     base = os.path.join(_beh(root, subject, session), label)
     folder, attempt = base, 1
     while os.path.exists(folder):

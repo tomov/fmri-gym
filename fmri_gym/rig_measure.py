@@ -1,74 +1,66 @@
-"""The rig check: measure the rig with the very window, trigger line and audio a run opens.
+"""Rig measurement: make a rig's file, and measure the rig with the window, trigger line and audio
+its runs open.
 
-A rig check is a run like any other (``configs/curricula/checks/rig-check.json``):
-``fmri-play`` plays it -- first in a session, from ``rig-config``, or on its own --
-and it writes a run folder. Its curriculum holds check phases where a game run
-holds games, and says only for how long and how many; **what is tested, and
-with what, is the rig file's** (:mod:`fmri_gym.config.rig`), so a check is
-complete for the rig it runs on and asks nothing of what the rig does not have.
-A test the rig gives no reason to run is recorded as "not run", with why:
+``rig-measure --rig <file>`` (``--long`` for the long one) is not a run and plays no
+curriculum: what it measures, for how long and how many, is fixed here (:data:`QUICK`,
+:data:`LONG`), and **with what is the rig file's** (:mod:`fmri_gym.config.rig`), so a
+rig measurement is complete for the rig it runs on and asks nothing of what the rig does not have.
+A test the rig gives no reason to run is recorded as "not run", with why. In order:
 
-* ``check_display`` -- are flips locked to the refresh; missed refreshes.
-* ``check_frames`` -- a test pattern (:class:`TestPattern`) played as a game,
-  through the run's own game loop, at each of ``rates`` frames per second (and
-  the rig's ``rig_check.frame_rates``) and under each of ``loads`` (``cpu``:
-  every core kept busy): frames lost, frames shown a refresh late, pacing
-  resets, and -- when the rig sends frame codes -- whether they marked every
-  frame, in order, and given the rig's ``recording_hz``, for two samples each.
-  The run's own loop, not a copy of it: its pacing is what is measured.
-* ``check_triggers`` -- the trigger outputs this PC has (serial ports with
-  hardware behind them, parallel ports, HID trigger boxes, whether LSL reads
-  back), with a warning when none is usable; then the rig's line: every bit alone and every code
-  of its scheme sent (read back, over LSL), and scanner pulses counted when the
-  run waits for the scanner. Only the configured port is written to: another
-  may be wired to a response box or an eye tracker, and a write that succeeds
-  says nothing of where it went.
-* ``check_controls`` -- the response devices: what the rig's participant can
-  press, i.e. each control of the devices its ``"inputs"`` list (each stick
-  axis calibrated first) and each of its ``"response_keys"``. Every response key is
-  first checked automatically -- one that comes back through the event queue
-  as itself -- and the input devices plugged in are listed; then each control
-  is asked for on screen and pressed on the real device.
-* ``check_photodiode`` -- the flip-to-photon offset, read as the rig's
-  ``rig_check.photodiode`` says, and on the same flashes the audio test when the
-  rig plays audio: a tone burst on every other flash, timed at the DAC, and at
-  a microphone at the ear when the rig has one.
+* ``display`` -- are flips locked to the refresh; missed refreshes.
+* ``frames`` -- a test pattern (:class:`TestPattern`) played at each frame rate (and
+  the rig's ``rig_measurement.frame_rates``) under each of :data:`LOADS` (``cpu``: every
+  core kept busy), paced as a game block is: frames lost, frames shown a refresh
+  late, pacing resets, and -- when the rig sends frame codes -- whether they marked
+  every frame, in order, and given the rig's ``recording_hz``, for two samples each.
+  The pacing is a copy of the game loop's, so a change to that loop is made here too.
+* ``triggers`` -- the trigger outputs this PC has (serial ports with hardware behind
+  them, parallel ports, HID trigger boxes, whether LSL reads back), with a warning
+  when none is usable; then the rig's line: every bit alone and every code of its
+  scheme sent (read back, over LSL), and scanner pulses counted when the rig waits
+  for the scanner (a sequence, or the trigger box's test mode). Only the configured
+  port is written to: another may be wired to a response box or an eye tracker, and a
+  write that succeeds says nothing of where it went.
+* ``controls`` -- the response devices: what the rig's participant can press, i.e.
+  each control of the devices its ``"inputs"`` list (each stick axis calibrated
+  first, :mod:`fmri_gym.pad_calibration`) and each of its ``"response_keys"``. Every
+  response key is first checked automatically -- one that comes back through the
+  event queue as itself -- and the input devices plugged in are listed; then each
+  control is asked for on screen and pressed on the real device.
+* ``photodiode`` -- the flip-to-photon offset, read as the rig's
+  ``rig_measurement.photodiode`` says, and on the same flashes the ``audio`` test when the
+  rig plays audio: a tone burst on every other flash, timed at the DAC, and at a
+  microphone at the ear when the rig has one.
 
-The screen says what each check does while it does it, then its verdict. A
-check does not raise: it records a verdict for each of its tests (pass, fail,
-offline, not run, and why), so one failure hides none of the others, and a
-failed test ends nothing, neither the check nor the session.
+The screen says what each measurement does while it does it, then its verdict. A
+measurement does not raise: it records a verdict for each of its tests (pass, fail,
+offline, not run, and why), so one failure hides none of the others.
 
 **The rig file** (:mod:`fmri_gym.config.rig`, one per rig) says what software cannot
-see: the site and rig, the PI, the monitor or projector, the photodiode, the
-sound path to the ear, the trigger hardware. A rig check is how a rig gets its
-file: when it is missing or invalid, the check opens a form to fill it in
-(:func:`ensure_rig`); a check that says nothing of where it ran could not be
-pooled, so without it none starts. A rig whose file says nothing of its
-triggers is asked for them on its first check, and the answer is saved in
-the rig file: no setup is anyone's default.
+see: the site and rig, the PI, the monitor or projector, the photodiode, the sound
+path to the ear, the trigger hardware. A rig measurement is how a rig gets its file: when
+it is missing or invalid, the rig measurement opens a form to fill it in (:func:`ensure_rig`);
+a rig whose file says nothing of its triggers is asked for them, and the answer is
+saved in the rig file: no rig measurement is anyone's default.
 
-**What is filed.** Beside the run's own ``manifest.json`` and one ``.npz`` per
-check: ``report.html`` for the people who run the rig (a verdict per test, the
-numbers, charts, this rig's previous checks; one offline file),
-``report.md``, and ``rigcheck.tsv`` -- one row of fixed columns
-(:data:`COLUMNS`) with its BIDS sidecar. The data root's ``rigchecks.tsv``
-holds every check filed there, read from their manifests, so checks filed by
-an earlier version still line up.
+**What is filed.** A folder in the rig's data root, under :data:`SUBJECT` and its next
+session: ``manifest.json``, one ``.npz`` per measurement, ``report.html`` for the
+people who run the rig (a verdict per test, the numbers, charts, this rig's previous
+rig measurements; one offline file), ``report.md``, and ``rigmeasurement.tsv`` -- one row of fixed
+columns (:data:`COLUMNS`) with its BIDS sidecar. The data root's ``rigmeasurements.tsv``
+holds every rig measurement filed there, read from their manifests.
 
-**What the rig measured.** Every check also files its measurements beside the
-rig file, in ``measured/<rig>-<n>.json`` (:func:`file_measured`), ``n`` one
-more than the last, when it measured any latency: the latencies -- flip to light at the screen, flip to the
-sound card, sound card to the ear -- with every check's summary, the verdicts,
-the rig file as played, the software and the machine (:func:`machine`:
-processor, memory, displays, GPUs, sound and input devices, what is plugged
-into USB). The rig file is the rig's settings,
-shared; these are one machine's measurements, and stay on it (``.gitignore``).
-A run on a rig with none says so, and the first run of a session, on a
-terminal, offers to run a check first (:func:`offer_check`)::
+**What the rig measured.** Every rig measurement that measured a latency also files it beside
+the rig file (:func:`file_measured`, :func:`fmri_gym.config.rig.measured_latency_files`):
+flip to light at the screen, flip to the sound card, sound card to the ear, with
+every measurement's summary, the verdicts, the rig file as played, the software and
+the machine (:func:`machine`: processor, memory, displays, GPUs, sound and input
+devices, what is plugged into USB). The rig file is the rig's settings, shared; these
+are one machine's measurements, and stay on it (``.gitignore``)::
 
-    python -m fmri_gym.checks report <run folder>...   # re-file checks already run
-    python -m fmri_gym.checks pool data/ /mnt/siteB/data/ --out rigchecks.tsv
+    rig-measure --rig <rig file> [--long]
+    rig-measure report <rig measurement folder>...   # re-file rig measurements already run
+    rig-measure pool data/ /mnt/siteB/data/ --out rigmeasurements.tsv
 """
 
 from __future__ import annotations
@@ -78,71 +70,186 @@ import datetime
 import glob
 import html
 import json
+import math
 import os
 import platform
 import random
 import re
+import signal
 import socket
 import subprocess
 import sys
 import time
 from contextlib import contextmanager
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Iterator, Sequence
+from dataclasses import asdict, dataclass, field
+from typing import Any, Callable, Iterator, Sequence
 
 import gymnasium as gym
 import numpy as np
 import pygame
 from gymnasium import spaces
 
-from .bids import has_session, next_session
+from .audio import Audio
+from .bids import next_session, run_output
 from .config import rig as rig_file
-from .config.phases import (CHECK_PHASES, CheckControls, CheckDisplay, CheckFrames, CheckPhase,
-                            CheckPhotodiode, CheckTriggers, GamePhase)
-from .display import Display, is_locked
-from .inputs import QUIT, ControlNames, Controller, Edge, InputDevice, InputDevices
+from .display import Display, check_monitor, is_locked, quit_like_esc
+from .inputs import (QUIT, ControlNames, Controller, Edge, InputDevice, InputDevices,
+                     open_input_devices)
 from .inputs.keyboard import KEYCODES
 from .pad_calibration import calibrate, cue_order
 from .photodiode import (AudioRecorder, Verdict, _clicker, _light_verdict,
                          _log_clicks, _readout, _sound_verdict, run_flashes)
-from .replay import frame_arrays
-from .run import _wait_for_duration, read_input_events
+from .run import EXPERIMENTER_KEY, _wait_for_control, _wait_for_duration, read_input_events
 from .triggers import HID_DEVICES, LIFECYCLE_EVENTS, Codes, TriggerError, Triggers
 
-if TYPE_CHECKING:
-    from .config.run import RunConfig
-    from .run import Run
-
-
-#: The rig checks a run on a rig never measured offers to play first, by the key that picks one.
-RIG_CHECKS = {key: str(Path(__file__).resolve().parents[1] / "configs" / "curricula" / "checks"
-                       / name)
-              for key, name in (("q", "rig-check.json"), ("l", "rig-check-long.json"))}
-#: The check phases' types, as a manifest's phase entries name them.
-CHECK_TYPES = tuple(c.type for c in CHECK_PHASES)
-#: Seconds each check's verdict stays on screen.
+#: The subject every rig measurement is filed under in the data root.
+SUBJECT = "sub-rig"
+#: What the frame test plays its rates under: nothing else, or every core kept busy.
+LOADS = ("none", "cpu")
+#: Seconds each measurement's verdict stays on screen.
 _VERDICT_S = 1.5
 #: Seconds the list of every test's verdict stays up at the end.
 _SUMMARY_S = 5.0
 _PASS = Verdict("pass", None)
 
 
+@dataclass(frozen=True, slots=True)
+class RigMeasurementSettings:
+    """How long and how many each measurement of a rig measurement takes; what it measures with
+    is the rig file's."""
+
+    #: the BIDS task label the rig measurement is filed under
+    task: str
+    #: how long it takes, for the screen that offers it
+    about: str
+    #: flip intervals the display test times; for ``display_seconds`` instead, if given
+    display_flips: int
+    display_seconds: float | None
+    #: the frame test's rates (the rig's own are added) and loads (:data:`LOADS`)
+    frame_rates: tuple[float, ...]
+    frame_loads: tuple[str, ...]
+    #: seconds of frames per rate and load
+    frame_seconds: float
+    #: passes of every line and code; how long each is held, and the gap after it
+    trigger_repeat: int
+    trigger_hold_ms: float
+    trigger_gap_ms: float
+    #: scanner pulses to count; for ``pulse_seconds`` after the first instead, if given
+    pulses: int
+    pulse_seconds: float | None
+    #: seconds allowed without a pulse, before the first or between two
+    pulse_timeout_s: float
+    #: seconds to press each control asked for
+    control_timeout_s: float
+    #: flashes; how long each is on, the range its gap is drawn from, and the settle first
+    flashes: int
+    flash_on_ms: float
+    flash_gap_ms: tuple[float, float]
+    flash_settle_ms: float
+    #: the seed the flash gaps are drawn with
+    flash_seed: int
+    #: the sound-card input's rate
+    samplerate: int
+
+    def record(self) -> dict[str, Any]:
+        """As the manifest records it."""
+        return asdict(self)
+
+
+#: Before a session: under a minute, most of it pressing the buttons.
+QUICK = RigMeasurementSettings(
+    task="rigMeasurement", about="under a minute", display_flips=60, display_seconds=None,
+    frame_rates=(60, 30), frame_loads=("none",), frame_seconds=2, trigger_repeat=1,
+    trigger_hold_ms=40, trigger_gap_ms=40, pulses=3, pulse_seconds=None,
+    pulse_timeout_s=60, control_timeout_s=10, flashes=10, flash_on_ms=50,
+    flash_gap_ms=(150, 250), flash_settle_ms=300, flash_seed=0, samplerate=48000)
+#: Measuring the rig: once per rig, and after any hardware, driver or OS change.
+LONG = RigMeasurementSettings(
+    task="rigMeasurementLong", about="about 25 minutes", display_flips=60, display_seconds=120,
+    frame_rates=(60, 30, 20, 50), frame_loads=("none", "cpu"), frame_seconds=60,
+    trigger_repeat=20, trigger_hold_ms=100, trigger_gap_ms=400, pulses=3,
+    pulse_seconds=600, pulse_timeout_s=60, control_timeout_s=10, flashes=850,
+    flash_on_ms=100, flash_gap_ms=(400, 800), flash_settle_ms=1000, flash_seed=0,
+    samplerate=48000)
+
+
+@dataclass
+class RigMeasurement:
+    """One rig measurement under way: the rig, what it measures, the devices it opened, where it
+    files, and what each measurement recorded."""
+
+    rig: rig_file.RigConfig
+    settings: RigMeasurementSettings
+    display: Display
+    triggers: Triggers
+    audio: Audio
+    inputs: InputDevices
+    #: the folder it files in; the session and the BIDS label of it
+    folder: str
+    session: int
+    label: str
+    #: 1, or 2, 3... for a rig measurement filed again under the same label
+    attempt: int
+    #: why the trigger line did not open (:func:`prepare`); ``None`` when it did
+    trigger_error: str | None
+    #: each measurement's record, by its name, in the order taken
+    measurements: dict[str, dict] = field(default_factory=dict)
+    start_epoch: float = field(default_factory=time.time)
+    t0: float = field(default_factory=time.perf_counter)
+
+    @classmethod
+    def open(cls, rig: rig_file.RigConfig, settings: RigMeasurementSettings,
+             trigger_error: str | None) -> RigMeasurement:
+        """Make its folder, then open the trigger line, the audio output, the input devices
+        and the window, saying on stderr what each got.
+
+        :raises ValueError: on a monitor this machine does not have, or an input device
+            that is not plugged in.
+        """
+        session = next_session(rig.data_root, SUBJECT)
+        out = run_output(rig.data_root, SUBJECT, settings.task, session, 1)
+        os.makedirs(out.folder)
+        print(f"output: {out.folder}", file=sys.stderr)
+        check_monitor(rig.screen.monitor)
+        triggers = Triggers(rig.triggers)
+        print(f"triggers: {triggers.status()}", file=sys.stderr)
+        audio = Audio(enabled=rig.has_audio)
+        print(f"audio: {audio.status()}", file=sys.stderr)
+        inputs = open_input_devices(rig.inputs, frozenset())
+        print(f"inputs: {inputs.status()}", file=sys.stderr)
+        screen = rig.screen
+        display = Display(size=screen.size, fullscreen=screen.is_fullscreen,
+                          vsync=screen.has_vsync, monitor=screen.monitor)
+        return cls(rig, settings, display, triggers, audio, inputs, out.folder, session,
+                   out.label, out.attempt, trigger_error)
+
+    def now(self) -> float:
+        """Seconds since the rig measurement opened."""
+        return time.perf_counter() - self.t0
+
+    def close(self) -> None:
+        """Close the window, the audio output, the trigger line and the inputs."""
+        self.display.close()
+        self.audio.close()
+        self.triggers.close()
+        self.inputs.close()
+
+
 # ---------------------------------------------------------------------------
-# Before and after the run
+# Before and after the measurements
 # ---------------------------------------------------------------------------
 
 
 def prepare(rig: rig_file.RigConfig) -> tuple[rig_file.RigConfig, str | None]:
-    """Before the window: the rig's trigger settings, and a line the run can open.
+    """Before the window: the rig's trigger settings, and a line the rig measurement can open.
 
     A rig whose file says nothing of its triggers is asked for them -- a
     preset, or one's own -- and the answer is saved in its file
-    (:func:`_ask_triggers`). A trigger line that does not open would stop the
-    run before any check; here it fails the triggers check instead, and the
-    run plays on the rig without its line (said on the console and in the
-    manifest), so the other checks still run.
+    (:func:`_ask_triggers`). A trigger line that does not open fails the
+    triggers test, and the rig measurement goes on without the line (said on the console
+    and in the manifest), so the other measurements still run.
 
-    :param rig: the rig the check plays on.
+    :param rig: the rig to set up.
     :raises ValueError: when the rig has no trigger settings and none is chosen.
     :return: the rig to play on, and why its line did not open (``None`` when it did).
     """
@@ -153,8 +260,8 @@ def prepare(rig: rig_file.RigConfig) -> tuple[rig_file.RigConfig, str | None]:
         return rig, None
     except (TriggerError, OSError) as exc:
         error = f"{type(exc).__name__}: {exc}"
-    print(f"rig check: the trigger line did not open ({error}); the triggers check fails, "
-          "the other checks run without codes", file=sys.stderr)
+    print(f"rig measurement: the trigger line did not open ({error}); the triggers test fails, "
+          "the other measurements run without codes", file=sys.stderr)
     return rig.without_trigger_line(), error
 
 
@@ -165,152 +272,156 @@ def _ask_triggers(rig: rig_file.RigConfig) -> rig_file.RigConfig:
     """
     where = rig.path
     fix = (f'{where} has no "triggers": set them with rig-config --rig {where} or in the '
-           "file, or in the form a rig check opens")
+           "file, or in the form a rig measurement opens")
     if not can_show_form():
-        raise ValueError(f"rig check: {fix}; there is no screen here for the form")
+        raise ValueError(f"rig measurement: {fix}; there is no screen here for the form")
     from .gui.rig_config import fill_rig
     if fill_rig(rig_file.load(where), where, need_triggers=True) is None:
-        raise ValueError(f"rig check: {fix}; it was cancelled")
-    print(f"rig check: trigger settings saved in {where}", file=sys.stderr)
+        raise ValueError(f"rig measurement: {fix}; it was cancelled")
+    print(f"rig measurement: trigger settings saved in {where}", file=sys.stderr)
     return rig_file.RigConfig.open(where)
 
 
-def offer_check(config: RunConfig) -> None:
-    """Before a run that is not a rig check: say so when its rig has never been measured,
-    and before the session's first run, on a terminal, offer to measure it first, as a
-    rig check run of its own.
+def measure_rig(rig_path: str, settings: RigMeasurementSettings) -> bool:
+    """Set the rig up and measure it: its file (:func:`ensure_rig`, :func:`prepare`), the
+    start screen, each measurement and its verdict, every verdict; then file it all
+    (:func:`finish`). ESC or Ctrl+C stops the measurements; what they measured is filed.
 
-    :param config: the run.
+    :param rig_path: the rig's file, made in the form when it is missing or invalid.
+    :param settings: how long and how many (:data:`QUICK`, :data:`LONG`).
+    :return: ``True`` if a test failed or did not finish.
+    :raises ValueError: when the rig file is not made, or a device does not open.
     """
-    rig = config.rig
-    if measured_files(rig.path):
-        return
-    print(f"WARNING: {rig.path} has never been measured: no rig check has filed when a "
-          "frame's light and sound reach the participant on it", file=sys.stderr)
-    if has_session(rig.data_root, config.subject, config.ses):
-        return
-    args = ["--subject", "sub-rig", "--ses", str(next_session(rig.data_root, "sub-rig")),
-            "--run", "1", "--rig", rig.path]
-    if not sys.stdin.isatty():
-        curriculum = os.path.relpath(RIG_CHECKS["l"])
-        print("  measure it: uv run fmri-play " + " ".join(args + ["--curriculum", curriculum]),
-              file=sys.stderr)
-        return
+    rig, trigger_error = prepare(ensure_rig(rig_path))
+    print(f"rig: {rig.status()}", file=sys.stderr)
+    rig_measurement = RigMeasurement.open(rig, settings, trigger_error)
+    previous_handler = signal.signal(signal.SIGINT, quit_like_esc)
     try:
-        answer = input("Run a rig check first? [q]uick (under a minute), [l]ong (about 25 "
-                       "minutes), Enter to go on without: ").strip().lower()
-    except EOFError:  # Ctrl+D: nothing typed
-        answer = ""
-    if answer not in RIG_CHECKS:
-        return
-    subprocess.run([sys.executable, "-m", "fmri_play", *args,
-                    "--curriculum", RIG_CHECKS[answer]], check=False)
-    print(f"rig check done; the run starts on {rig.path}", file=sys.stderr)
+        _start_screen(rig_measurement)
+        for name, measure in MEASUREMENTS.items():
+            _measure(rig_measurement, name, measure)
+        _summary_screen(rig_measurement)
+    except KeyboardInterrupt:
+        print("rig measurement: stopped; filing what it measured", file=sys.stderr)
+    finally:
+        signal.signal(signal.SIGINT, previous_handler)
+        rig_measurement.close()
+    return finish(rig_measurement)
 
 
-def finish(run: Run, session: int) -> bool:
-    """File the rig check: the tests in the manifest, the report, the pooling row, and
-    the rig's data root's ``rigchecks.tsv``, rebuilt.
+def finish(rig_measurement: RigMeasurement) -> bool:
+    """File the rig measurement: its manifest, the report, the pooling row, the rig's data
+    root's ``rigmeasurements.tsv`` rebuilt, and what it measured beside the rig file.
 
-    :param run: the run, played (its manifest saved).
-    :param session: its BIDS session.
-    :return: ``True`` if a test failed or did not finish (the report lists them; the
-        session goes on).
+    :param rig_measurement: the rig measurement, its measurements taken (or stopped).
+    :return: ``True`` if a test failed or did not finish (the report lists them).
     """
-    path = os.path.join(run.outdir, "manifest.json")
-    with open(path) as f:
-        m = json.load(f)
-    entries = [e for e in m["phases"] if e.get("type") in CHECK_TYPES]
-    m["rig_check"] = {e["type"].removeprefix("check_"): e["summary"] for e in entries}
-    tests = {test: {"status": "not run", "why": None} for test in TESTS}
-    kinds = {p["type"] for p in m["curriculum"]}
-    tests.update({t: {"status": "fail", "why": "did not finish (quit before it)"}
-                  for t, kind in TESTS.items() if kind in kinds})
-    for e in entries:
-        tests.update(e["tests"])
-    started = m.get("start_epoch") or time.time()
-    m.update(tests=tests, session=session, task=m["run"]["label"].split("_task-")[1].split("_")[0],
-             start_time=datetime.datetime.fromtimestamp(started).astimezone()
-             .isoformat(timespec="seconds"),
-             versions={**m.get("versions", {}), **versions()},
-             platform=platform_info(), machine=machine())
-    data_root = run.config.rig.data_root
-    write_outputs(run.outdir, m, data_root)
-    file_measured(m, run.outdir, run.config.rig.path)
-    print(f"rig check {'PASS' if m['status'] == 'pass' else 'FAIL (' + m['failed_tests'] + ')'}"
-          f": {os.path.join(run.outdir, 'report.html')} "
-          f"(all checks: {os.path.join(data_root, 'rigchecks.tsv')})", file=sys.stderr)
+    tests = {test: {"status": "fail", "why": "did not finish (stopped before it)"}
+             for test in TESTS}
+    for entry in rig_measurement.measurements.values():
+        tests.update(entry["tests"])
+    m = {"subject": SUBJECT, "session": rig_measurement.session,
+         "task": rig_measurement.settings.task,
+         "run": {"label": rig_measurement.label, "attempt": rig_measurement.attempt},
+         "start_time": datetime.datetime.fromtimestamp(rig_measurement.start_epoch).astimezone()
+         .isoformat(timespec="seconds"),
+         "rig": rig_measurement.rig.record(), "settings": rig_measurement.settings.record(),
+         "trigger_error": rig_measurement.trigger_error,
+         "measurements": rig_measurement.measurements,
+         "summaries": {name: e["summary"] for name, e in rig_measurement.measurements.items()},
+         "tests": tests, "versions": versions(), "platform": platform_info(),
+         "machine": machine()}
+    data_root = rig_measurement.rig.data_root
+    write_outputs(rig_measurement.folder, m, data_root)
+    file_measured(m, rig_measurement.folder, rig_measurement.rig.path)
+    verdict = "PASS" if m["status"] == "pass" else f"FAIL ({m['failed_tests']})"
+    print(f"rig measurement {verdict}: {os.path.join(rig_measurement.folder, 'report.html')} "
+          f"(all rig measurements: {os.path.join(data_root, 'rigmeasurements.tsv')})",
+          file=sys.stderr)
     return m["status"] != "pass"
 
 
 # ---------------------------------------------------------------------------
-# The phase
+# The measurements
 # ---------------------------------------------------------------------------
 
 
-def run_check(run: Run, phase: CheckPhase, index: int) -> None:
-    """Play one check phase: measure, record its tests' verdicts, save its arrays.
+def _start_screen(rig_measurement: RigMeasurement) -> None:
+    """Say what this is and what to have ready; wait for the experimenter's key.
 
-    :raises KeyboardInterrupt: on ESC or window close (the run is quit); the
-        phase is logged first, with what it measured.
+    :raises KeyboardInterrupt: on ESC or window close.
     """
-    kind = phase.type
-    onset = run.clock.run_time()
+    rig = rig_measurement.rig
+    ready = ["Photodiode on the patch, bottom-right; microphone at the ear if there is one.",
+             "The controls test asks for each button: press it on the participant's device."]
+    if rig.triggers.sync.mode == "wait":
+        ready.append("The triggers test counts scanner pulses: start a sequence, or switch "
+                     "the trigger box to its test mode, when it asks.")
+    rig_measurement.display.draw_text(
+        f"Rig measurement ({rig_measurement.settings.about}) of {rig.path}\n"
+        "This is a rig measurement, not a scanner run: no participant plays.\n\n"
+        + "\n".join(ready) + f"\n\nPress {EXPERIMENTER_KEY} to start, ESC to stop.")
+    _wait_for_control(rig_measurement.inputs, rig_measurement.display, EXPERIMENTER_KEY)
+
+
+def _measure(rig_measurement: RigMeasurement, name: str, measure: Callable[..., None]) -> None:
+    """Take one measurement: record its tests' verdicts, save its arrays, show the verdicts.
+
+    :raises KeyboardInterrupt: on ESC or window close; the measurement is recorded first,
+        with what it measured.
+    """
+    onset = rig_measurement.now()
     summary: dict[str, Any] = {}
     arrays: dict[str, np.ndarray] = {}
     tests: dict[str, Verdict] = {}
     try:
-        _CHECKS[type(phase)](run, phase, summary, arrays, tests, index)
-    except Exception as exc:  # noqa: BLE001 -- a check that breaks fails its tests; the rest run
-        for test in (t for t, k in TESTS.items() if k == kind):
+        measure(rig_measurement, summary, arrays, tests)
+    except Exception as exc:  # noqa: BLE001 -- one that breaks fails its tests; the rest run
+        for test in (t for t, m in TESTS.items() if m == name):
             tests.setdefault(test, Verdict("fail", f"{type(exc).__name__}: {exc}"))
     finally:
         if arrays:
-            np.savez_compressed(os.path.join(run.outdir, f"block-{index:02d}_{kind}.npz"),
-                                **arrays)
-        run.logger.log_phase({"index": index, "type": kind, "onset": onset,
-                              "offset": run.clock.run_time(), "summary": summary,
-                              "tests": {t: v._asdict() for t, v in tests.items()}})
+            np.savez_compressed(os.path.join(rig_measurement.folder, f"{name}.npz"), **arrays)
+        rig_measurement.measurements[name] = {
+            "onset": onset, "offset": rig_measurement.now(), "summary": summary,
+            "tests": {t: v._asdict() for t, v in tests.items()}}
         for test, v in tests.items():
-            print(f"rig check: {test}: {v.status}" + (f" -- {v.why}" if v.why else ""),
+            print(f"rig measurement: {test}: {v.status}" + (f" -- {v.why}" if v.why else ""),
                   file=sys.stderr)
     lines = [f"{t}: {v.status.upper()}" + (f"\n  {v.why[:160]}" if v.why else "")
              for t, v in tests.items()]
-    run.display.draw_text("Rig check\n\n" + "\n".join(lines))
-    _wait_for_duration(run.inputs, run.display, _VERDICT_S)
-    if index == max(i for i, p in enumerate(run.config.curriculum.phases)
-                    if isinstance(p, CheckPhase)):
-        _summary_screen(run)
+    rig_measurement.display.draw_text("Rig measurement\n\n" + "\n".join(lines))
+    _wait_for_duration(rig_measurement.inputs, rig_measurement.display, _VERDICT_S)
 
 
-def _summary_screen(run: Run) -> None:
-    """Every test's verdict, for :data:`_SUMMARY_S`: a check often runs unattended, so
+def _summary_screen(rig_measurement: RigMeasurement) -> None:
+    """Every test's verdict, for :data:`_SUMMARY_S`: a rig measurement often runs unattended, so
     nothing waits for a key; the report and the console keep the list."""
-    tests = {t: v for e in run.logger.manifest["phases"] if e.get("type") in CHECK_TYPES
-             for t, v in e["tests"].items()}
+    tests = {t: v for e in rig_measurement.measurements.values() for t, v in e["tests"].items()}
     failed = [t for t, v in tests.items() if v["status"] == "fail"]
     lines = [f"{t}: {v['status'].upper()}" for t, v in tests.items()]
-    head = (f"Rig check done: {len(failed)} test(s) failed, listed in the report"
-            if failed else "Rig check done: every test passed")
-    run.display.draw_text(head + "\n\n" + "\n".join(lines))
-    _wait_for_duration(run.inputs, run.display, _SUMMARY_S)
+    head = (f"Rig measurement done: {len(failed)} test(s) failed, listed in the report"
+            if failed else "Rig measurement done: every test passed")
+    rig_measurement.display.draw_text(head + "\n\n" + "\n".join(lines))
+    _wait_for_duration(rig_measurement.inputs, rig_measurement.display, _SUMMARY_S)
 
 
-def _title(run: Run, text: str) -> None:
-    run.display.draw_text(f"Rig check: {text}")
+def _title(rig_measurement: RigMeasurement, text: str) -> None:
+    rig_measurement.display.draw_text(f"Rig measurement: {text}")
 
 
-def _check_display(run: Run, phase: CheckDisplay, summary: dict, arrays: dict, tests: dict,
-                   index: int) -> None:
-    info = run.display.describe()
-    n = phase.n
-    if phase.seconds is not None:
-        n = int(phase.seconds * (info["refresh_rate"] or 60))
-    _title(run, f"display\n\n{info['refresh_rate']} Hz, vsync {info['vsync']}: timing {n} "
-                f"flips (about {n / (info['refresh_rate'] or 60):.0f} s)\nthe screen flickers "
-                "grey meanwhile")
-    _wait_for_duration(run.inputs, run.display, _VERDICT_S)
-    stats = run.display.measure_flips(n)
+def _measure_display(rig_measurement: RigMeasurement, summary: dict, arrays: dict,
+                     tests: dict) -> None:
+    info = rig_measurement.display.describe()
+    n = rig_measurement.settings.display_flips
+    if rig_measurement.settings.display_seconds is not None:
+        n = int(rig_measurement.settings.display_seconds * (info["refresh_rate"] or 60))
+    _title(rig_measurement,
+           f"display\n\n{info['refresh_rate']} Hz, vsync {info['vsync']}: timing {n} "
+                  f"flips (about {n / (info['refresh_rate'] or 60):.0f} s)\nthe screen "
+                  "flickers grey meanwhile")
+    _wait_for_duration(rig_measurement.inputs, rig_measurement.display, _VERDICT_S)
+    stats = rig_measurement.display.measure_flips(n)
     arrays["intervals_ms"] = np.asarray(stats.pop("intervals_ms"))
     locked = is_locked(info, stats)
     summary.update(display=info, flips={"n": n, **stats}, locked=locked)
@@ -319,45 +430,49 @@ def _check_display(run: Run, phase: CheckDisplay, summary: dict, arrays: dict, t
                 f"mean {stats['mean_ms']:.2f} ms, SD {stats['sd_ms']:.2f})")
 
 
-def _check_triggers(run: Run, phase: CheckTriggers, summary: dict, arrays: dict, tests: dict,
-                    index: int) -> None:
-    _title(run, "triggers")
+def _measure_triggers(rig_measurement: RigMeasurement, summary: dict, arrays: dict,
+                      tests: dict) -> None:
+    _title(rig_measurement, "triggers")
     summary["outputs"] = discover()
-    summary["triggers"] = run.triggers.describe()
-    error = run.logger.manifest.get("trigger_error")
-    if error:
-        tests["triggers"] = Verdict("fail", f"the trigger line did not open: {error}")
+    summary["triggers"] = rig_measurement.triggers.describe()
+    if rig_measurement.trigger_error:
+        tests["triggers"] = Verdict(
+            "fail", f"the trigger line did not open: {rig_measurement.trigger_error}")
         return
-    t = run.triggers
-    pulses = t.sync.mode == "wait" and not run.config.dummy_trigger
+    t = rig_measurement.triggers
+    settings = rig_measurement.settings
+    pulses = t.sync.mode == "wait"
     if not (t.enabled or pulses):
         tests["triggers"] = Verdict("not run", "this rig sends no codes and waits for no "
                                                "scanner (rig-config, Triggers step)")
         return
     if t.enabled:
         def on_send(label: str, value: int, number: int, total: int) -> None:
-            _title(run, f"triggers\n\nsending {label} = {value}   ({number} of {total})\n"
-                        f"on {t.active}")
+            _title(rig_measurement,
+                   f"triggers\n\nsending {label} = {value}   ({number} of {total})\n"
+                          f"on {t.active}")
 
-        send_and_check(t, phase.repeat, phase.hold_ms / 1000, phase.gap_ms / 1000, summary,
-                       arrays, on_send)
+        send_and_check(t, settings.trigger_repeat, settings.trigger_hold_ms / 1000,
+                       settings.trigger_gap_ms / 1000, summary, arrays, on_send)
         readback = summary["sent"]["lsl_readback"] == "ok"
-        _title(run, f"triggers\n\nsent {summary['sent']['n']} codes on {t.active}\n"
-                    + ("all read back from the network" if readback
-                       else "check each in the recording: every line alone, then every code"))
-        _wait_for_duration(run.inputs, run.display, _VERDICT_S)
+        _title(rig_measurement, f"triggers\n\nsent {summary['sent']['n']} codes on {t.active}\n"
+                      + ("all read back from the network" if readback
+                         else "check each in the recording: every line alone, then every code"))
+        _wait_for_duration(rig_measurement.inputs, rig_measurement.display, _VERDICT_S)
     if pulses:
-        _count_pulses(run, phase, summary, arrays)
+        _count_pulses(rig_measurement, summary, arrays)
     tests["triggers"] = _PASS
 
 
-def _count_pulses(run: Run, phase: CheckTriggers, summary: dict, arrays: dict) -> None:
-    """Count the scanner's pulses (the run already waited for the first).
+def _count_pulses(rig_measurement: RigMeasurement, summary: dict, arrays: dict) -> None:
+    """Count the scanner's pulses, from the first.
 
     :raises TriggerError: when none comes in time, or the train is irregular.
     """
-    times = receive_pulses(run.display, run.triggers.sync.key, phase.pulses, phase.timeout_s,
-                           phase.seconds)
+    settings = rig_measurement.settings
+    times = receive_pulses(rig_measurement.display, rig_measurement.triggers.sync.key,
+                           settings.pulses,
+                           settings.pulse_timeout_s, settings.pulse_seconds)
     arrays["pulse_time"] = times - times[0]
     if len(times) < 3:
         raise TriggerError(f"only {len(times)} scanner pulses; need 3 for intervals")
@@ -423,24 +538,27 @@ def _controls_to_ask(inputs: InputDevices) -> dict[str, str]:
             for c in (*cue_order(d.BUTTON_NAMES), *d.axis_controls())}
 
 
-def _check_controls(run: Run, phase: CheckControls, summary: dict, arrays: dict, tests: dict,
-                    index: int) -> None:
-    rig = run.config.rig
-    keys = {**_controls_to_ask(run.inputs), **rig.response_keys}
+def _measure_controls(rig_measurement: RigMeasurement, summary: dict, arrays: dict,
+                      tests: dict) -> None:
+    rig = rig_measurement.rig
+    keys = {**_controls_to_ask(rig_measurement.inputs), **rig.response_keys}
     if not keys:
         tests["controls"] = Verdict("not run", "this rig lists no controller and types no "
                                                "response keys (rig-config, Response devices step)")
         return
     summary["devices"] = input_devices()
-    summary["inputs"] = run.inputs.status()
-    calibrations = [_calibrate(run, phase, d) for d in _controllers(run.inputs)]
+    summary["inputs"] = rig_measurement.inputs.status()
+    calibrations = [_calibrate(rig_measurement, d) for d in _controllers(rig_measurement.inputs)]
     summary["pad"] = calibrations[0] if calibrations else {"present": False}
-    summary["automatic"] = {name: _round_trip(run.inputs, name) for name in rig.response_keys}
-    ignore = run.triggers.sync.key if run.triggers.sync.mode == "wait" else None
+    summary["automatic"] = {name: _round_trip(rig_measurement.inputs, name)
+                            for name in rig.response_keys}
+    sync = rig_measurement.triggers.sync
+    ignore = sync.key if sync.mode == "wait" else None
     results: dict[str, dict] = {}
+    timeout_s = rig_measurement.settings.control_timeout_s
     try:
         for name, label in keys.items():
-            results[name] = _prompt(run, name, label, keys, results, phase.timeout_s, ignore)
+            results[name] = _prompt(rig_measurement, name, label, keys, results, timeout_s, ignore)
     except _Skipped:
         pass
     summary["prompted"] = results
@@ -457,21 +575,17 @@ def _check_controls(run: Run, phase: CheckControls, summary: dict, arrays: dict,
     tests["controls"] = Verdict("fail", "; ".join(problems)) if problems else _PASS
 
 
-def _calibrate(run: Run, phase: CheckControls, device: Controller) -> dict[str, Any]:
+def _calibrate(rig_measurement: RigMeasurement, device: Controller) -> dict[str, Any]:
     """Calibrate ``device``'s stick axes before asking for any control, and read it through that.
 
     Each axis has to be measured on the rig before a threshold means anything
     (see :mod:`fmri_gym.pad_calibration`), so the calibration runs here and is
     written for the device, which every later run on this rig with it reads.
-    ``"calibrates": false`` in the phase skips it and leaves any calibration alone.
     """
     if not device.AXIS_NAMES:
         return {"present": True, "device": device.device_name, "measured": False, "why": "",
                 "note": "it has no stick"}
-    if not phase.calibrates:
-        return {"present": True, "device": device.device_name, "measured": False, "why": "",
-                "note": 'skipped ("calibrates": false)'}
-    result = calibrate(device, run.display.screen, pygame.display.flip)
+    result = calibrate(device, rig_measurement.display.screen, pygame.display.flip)
     if result is None:
         return {"present": True, "device": device.device_name, "measured": False,
                 "why": "stopped before it finished; nothing written"}
@@ -486,21 +600,22 @@ def _key_problem(name: str, result: dict | None) -> str:
     return f"{name}: never pressed{got}"
 
 
-def _prompt(run: Run, name: str, label: str, keys: dict, done: dict, timeout: float,
+def _prompt(rig_measurement: RigMeasurement, name: str, label: str, keys: dict, done: dict,
+            timeout: float,
             ignore: str | None) -> dict[str, Any]:
     """Ask for ``name`` on screen; wait for it, noting any other key that comes instead.
 
     :raises _Skipped: on ESC.
     """
     marks = "   ".join(f"{k}{' ok' if done.get(k, {}).get('pressed') else ''}" for k in keys)
-    run.display.draw_text(f"Rig check: controls\n\nPress  {name}"
-                          f"{f'  ({label})' if label and label != name else ''}\n\n{marks}"
-                          "\n\n(ESC: skip the rest; they fail)")
-    read_input_events(run.inputs)           # what was pressed before the prompt
+    _title(rig_measurement, f"controls\n\nPress  {name}"
+                  f"{f'  ({label})' if label and label != name else ''}\n\n{marks}"
+                  "\n\n(ESC: skip the rest; they fail)")
+    read_input_events(rig_measurement.inputs)           # what was pressed before the prompt
     start = time.perf_counter()
     strays: list[str] = []
     while time.perf_counter() - start < timeout:
-        events = _key_events(run.inputs, ignore)
+        events = _key_events(rig_measurement.inputs, ignore)
         for i, (down, got) in enumerate(events):
             if not down:
                 continue
@@ -509,9 +624,9 @@ def _prompt(run: Run, name: str, label: str, keys: dict, done: dict, timeout: fl
                 continue
             pressed = time.perf_counter()
             return {"pressed": True, "latency_s": pressed - start,
-                    "held_s": _held(run.inputs, name, pressed, events[i + 1:]),
+                    "held_s": _held(rig_measurement.inputs, name, pressed, events[i + 1:]),
                     "strays": strays}
-        run.display.idle(time.perf_counter() + 0.002, poll=0.001)
+        rig_measurement.display.idle(time.perf_counter() + 0.002, poll=0.001)
     return {"pressed": False, "strays": strays}
 
 
@@ -548,40 +663,42 @@ def _held(inputs: InputDevice, name: str, pressed: float, pending: list[tuple[bo
 # -- photodiode and audio --------------------------------------------------------
 
 
-def _check_photodiode(run: Run, phase: CheckPhotodiode, summary: dict, arrays: dict,
-                      tests: dict, index: int) -> None:
-    rig = run.config.rig.rig_check
+def _measure_photodiode(rig_measurement: RigMeasurement, summary: dict, arrays: dict,
+                        tests: dict) -> None:
+    rig = rig_measurement.rig.rig_measurement
+    settings = rig_measurement.settings
     readout = rig.photodiode
-    clicks = run.audio.enabled
+    clicks = rig_measurement.audio.enabled
     if not clicks:
         tests["audio"] = Verdict("not run",
                                  "the rig plays no game audio (its \"has_audio\": false)")
-    summary.update(display=run.display.describe(), readout=readout, mic=rig.has_mic,
-                   n=phase.n, on_ms=phase.on_ms, gap_ms=[phase.gap_min_ms, phase.gap_max_ms],
-                   corner=rig.corner, patch_px=rig.patch_px)
+    summary.update(display=rig_measurement.display.describe(), readout=readout, mic=rig.has_mic,
+                   n=settings.flashes, on_ms=settings.flash_on_ms,
+                   gap_ms=list(settings.flash_gap_ms), corner=rig.corner, patch_px=rig.patch_px)
     if readout == "none":
         tests["photodiode"] = Verdict("not run", "the rig has no photodiode (rig-config, "
-                                                 "Rig check equipment step)")
+                                                 "Rig measurement equipment step)")
         if not clicks:
             return
-    recorder = _recorder(rig, phase.samplerate, tests) if readout == "soundcard" else None
-    click, chunks, clicked = _clicker(run.audio) if clicks else (None, [], [])
+    recorder = _recorder(rig, settings.samplerate, tests) if readout == "soundcard" else None
+    click, chunks, clicked = _clicker(rig_measurement.audio) if clicks else (None, [], [])
     what = " + ".join(w for w, on in (("photodiode", readout != "none"), ("audio", clicks)) if on)
 
     def caption(i: int) -> str:
         sound = ", with a click" if clicks and i % 2 == 0 else ""
-        return f"Rig check: {what}, flash {i + 1} of {summary['n']}{sound}"
+        return f"Rig measurement: {what}, flash {i + 1} of {summary['n']}{sound}"
 
     try:
         arrays.update(run_flashes(
-            run.display, run.triggers, summary["n"], summary["on_ms"], tuple(summary["gap_ms"]),
-            random.Random(phase.seed), summary["corner"], summary["patch_px"], click,
-            phase.settle_ms / 1000, bracket=False, caption=caption))
+            rig_measurement.display, rig_measurement.triggers, summary["n"], summary["on_ms"],
+            tuple(summary["gap_ms"]), random.Random(settings.flash_seed), summary["corner"],
+            summary["patch_px"], click, settings.flash_settle_ms / 1000, bracket=False,
+            caption=caption))
     finally:
         if recorder is not None:
             recorder.stop()
         if clicks:
-            _log_clicks(run.audio, chunks, clicked, arrays, summary, close=False)
+            _log_clicks(rig_measurement.audio, chunks, clicked, arrays, summary, close=False)
     if recorder is not None:
         _readout(*recorder.signal(), arrays, summary)
     if "photodiode" not in tests:  # an input that did not open has failed it already
@@ -590,7 +707,7 @@ def _check_photodiode(run: Run, phase: CheckPhotodiode, summary: dict, arrays: d
         tests["audio"] = _sound_verdict(arrays, clicks, None)
 
 
-def _recorder(rig: rig_file.RigCheckConfig, samplerate: int,
+def _recorder(rig: rig_file.RigMeasurementConfig, samplerate: int,
               tests: dict) -> AudioRecorder | None:
     """The sound-card input, started; ``None`` (and the photodiode failed) if it will not open."""
     try:
@@ -604,22 +721,25 @@ def _recorder(rig: rig_file.RigCheckConfig, samplerate: int,
         return None
 
 
-# -- frames: the game loop at each rate, under each load -----------------------------
+# -- frames: a paced loop at each rate, under each load -----------------------------
 
 
-def _check_frames(run: Run, phase: CheckFrames, summary: dict, arrays: dict, tests: dict,
-                  index: int) -> None:
+def _measure_frames(rig_measurement: RigMeasurement, summary: dict, arrays: dict,
+                    tests: dict) -> None:
     blocks = []
-    rates = list(dict.fromkeys([*phase.rates, *run.config.rig.rig_check.frame_rates]))
-    for load in phase.loads:
+    rates = list(dict.fromkeys([*rig_measurement.settings.frame_rates,
+                                *rig_measurement.rig.rig_measurement.frame_rates]))
+    for load in rig_measurement.settings.frame_loads:
         for fps in rates:
             with _load(load):
-                blocks.append(_play_pattern(run, fps, load, phase, index))
+                flips, codes, pacing_resets = _play_pattern(rig_measurement, fps, load)
+            arrays[f"flip_time_{len(blocks)}"] = flips
+            blocks.append(_judge_frames(rig_measurement, fps, load, flips, codes, pacing_resets))
     summary["blocks"] = blocks
     summary["played"] = [f"{b['fps']:g}/{b['load']}" for b in blocks]
-    summary["refresh_rate"] = run.display.refresh_rate
-    summary["vsync"] = run.display.vsync
-    summary["recording_hz"] = run.config.rig.rig_check.recording_hz
+    summary["refresh_rate"] = rig_measurement.display.refresh_rate
+    summary["vsync"] = rig_measurement.display.vsync
+    summary["recording_hz"] = rig_measurement.rig.rig_measurement.recording_hz
     for key in ("late", "lost", "pacing_resets"):
         summary[f"{key}_total"] = sum(b[key] for b in blocks)
     summary["triggers_ok"] = all(b["triggers"]["ok"] for b in blocks if b["triggers"])
@@ -644,54 +764,67 @@ def _load(kind: str) -> Iterator[None]:
             p.wait()
 
 
-def _play_pattern(run: Run, fps: float, load: str, phase: CheckFrames,
-                  index: int) -> dict[str, Any]:
-    """Play the test pattern at ``fps`` as a game block of this run, and judge its frames."""
-    rate = f"{fps:g}".replace(".", "p")
-    env_id = _register_pattern(f"Frames{rate}fps{'' if load == 'none' else load.upper()}")
-    caption = f"Rig check: frames at {fps:g} fps" + ("" if load == "none" else f", {load} load")
-    # controls: the pattern takes no input; its one action is what a frame with none sends.
-    game = {"type": "game", "backend": "gym", "game": env_id, "mode": "duration",
-            "duration": phase.seconds, "fps": fps, "has_audio": False, "seed": 1000 + index,
-            "controls": {"": 0}, "env_kwargs": {"caption": caption}}
-    # The run's own game loop, not a copy: its pacing and triggers are what is measured.
-    run._game(GamePhase.from_dict(game, index), index)
-    entry = run.logger.manifest["phases"][-1]
-    flips, codes = _block_flips(os.path.join(run.outdir, entry["data_dir"]))
-    return _judge_frames(run, fps, load, phase, flips, codes, entry)
+def _play_pattern(rig_measurement: RigMeasurement, fps: float,
+                  load: str) -> tuple[np.ndarray, np.ndarray | None, int]:
+    """Play the test pattern at ``fps`` for the settings' seconds, paced as a real-time game
+    block is, with a frame trigger on the flip of each step.
+
+    :return: each step's flip time, its frame code (0: none; ``None`` when the rig sends
+        no codes), and how many times the pacing dropped a debt of over a frame.
+    :raises KeyboardInterrupt: on ESC or window close.
+    """
+    display, triggers = rig_measurement.display, rig_measurement.triggers
+    env = TestPattern(caption=f"Rig measurement: frames at {fps:g} fps"
+                              + ("" if load == "none" else f", {load} load"))
+    env.reset(seed=0)
+    dt = 1.0 / fps
+    display.call_on_flip(triggers.episode_start)
+    flip_t0 = display.draw_frame(env.render())
+    end, next_t = flip_t0 + rig_measurement.settings.frame_seconds, flip_t0 + dt
+    flips: list[float] = []
+    codes: list[int] = []
+    pacing_resets = 0
+    try:
+        while time.perf_counter() < end:
+            _wait_for_duration(rig_measurement.inputs, display, math.inf, until=next_t)
+            next_t += dt
+            env.step(0)
+            display.call_on_flip(triggers.frame)
+            flip_t = display.draw_frame(env.render())
+            if next_t + dt < flip_t:     # over a frame behind: drop the debt, as a block does
+                pacing_resets += 1
+                next_t = flip_t + dt
+            flips.append(flip_t)
+            codes.append(triggers.last_frame)
+    finally:
+        triggers.block_end()
+    return (np.asarray(flips, dtype=float),
+            np.asarray(codes, dtype=int) if triggers.enabled else None, pacing_resets)
 
 
-def _block_flips(block: str) -> tuple[np.ndarray, np.ndarray | None]:
-    """A logged block's flip times, and its frame trigger codes (0: none) if it sent any."""
-    frames = frame_arrays(block)
-    codes = frames.get("trigger")
-    return (np.asarray(frames.get("flip_time", []), dtype=float),
-            None if codes is None else np.array([c or 0 for c in codes], dtype=int))
-
-
-def _judge_frames(run: Run, fps: float, load: str, phase: CheckFrames, flips: np.ndarray,
-                  codes: np.ndarray | None, entry: dict) -> dict[str, Any]:
+def _judge_frames(rig_measurement: RigMeasurement, fps: float, load: str, flips: np.ndarray,
+                  codes: np.ndarray | None, pacing_resets: int) -> dict[str, Any]:
     """Frames lost, frames a refresh late, pacing resets, and the frame triggers."""
     dt = 1.0 / fps
-    period = 1.0 / run.display.refresh_rate if run.display.vsync and run.display.refresh_rate \
-        else None
+    display = rig_measurement.display
+    period = 1.0 / display.refresh_rate if display.vsync and display.refresh_rate else None
     iv = np.diff(flips)
     # Locked, a frame lands on the refresh after its step: dt rounded up to refreshes,
     # alternating with dt rounded down when fps does not divide the refresh.
     slack = (np.ceil(dt / period - 1e-6) + 0.5) * period if period else 1.5 * dt
-    # Expected from the frames' own span, not the block's duration: the block also
-    # holds the env's reset before its first frame, which is no frame lost.
+    # Expected from the frames' own span, not the seconds played: those also hold the
+    # reset frame before the first step, which is no frame lost.
     expected = int(round((flips[-1] - flips[0]) / dt)) + 1 if len(flips) else 0
     b = {"fps": fps, "load": load, "n": int(len(flips)), "expected": expected,
          "lost": max(0, expected - len(flips)), "late": int(np.sum(iv > slack)),
-         "pacing_resets": int(entry.get("n_pacing_resets", 0)),
+         "pacing_resets": pacing_resets,
          "interval_median_ms": float(np.median(iv) * 1000) if len(iv) else None,
          "interval_max_ms": float(np.max(iv) * 1000) if len(iv) else None,
          "interval_sd_ms": float(np.std(iv) * 1000) if len(iv) else None,
          "locked": period is not None,
          "divides_refresh": (bool(abs(dt / period - round(dt / period)) < 1e-3)
                              if period else None),
-         "data_dir": entry["data_dir"], "triggers": _frame_marks(run, codes, dt, phase)}
+         "triggers": _frame_marks(rig_measurement, codes, dt)}
     name = f"{fps:g} fps" + ("" if load == "none" else f" under {load} load")
     allowed = {"lost": 0, "late": 0, "pacing_resets": 0}
     what = {"lost": "frames lost", "late": "frames a refresh late",
@@ -702,8 +835,8 @@ def _judge_frames(run: Run, fps: float, load: str, phase: CheckFrames, flips: np
     return b
 
 
-def _frame_marks(run: Run, codes: np.ndarray | None, dt: float,
-                 phase: CheckFrames) -> dict[str, Any] | None:
+def _frame_marks(rig_measurement: RigMeasurement, codes: np.ndarray | None,
+                 dt: float) -> dict[str, Any] | None:
     """Did the frame triggers mark every frame they should, in their cycle?
 
     ``frame_every`` thins them: every k-th frame gets the next code of the
@@ -712,12 +845,12 @@ def _frame_marks(run: Run, codes: np.ndarray | None, dt: float,
     ``recording_hz``, each code must also last two samples, or a level-holding
     line (parallel) is read with codes merged.
     """
-    s = run.triggers.settings
-    if codes is None or not run.triggers.enabled or not s.on_frame:
+    s = rig_measurement.triggers.settings
+    if codes is None or not rig_measurement.triggers.enabled or not s.on_frame:
         return None
     sent = np.flatnonzero(codes > 0)
     should = np.arange(0, len(codes), s.frame_every)
-    cycle = 1 + np.arange(len(should)) % run.triggers.codes.frame_mask
+    cycle = 1 + np.arange(len(should)) % rig_measurement.triggers.codes.frame_mask
     out: dict[str, Any] = {"marked": int(len(sent)), "expected": int(len(should)),
                            "ok": True, "why": None}
     hold_ms = dt * s.frame_every * 1000
@@ -725,17 +858,17 @@ def _frame_marks(run: Run, codes: np.ndarray | None, dt: float,
     if not (np.array_equal(sent, should) and np.array_equal(codes[sent], cycle)):
         out.update(ok=False, why=f"frame triggers marked {len(sent)} of {len(should)} frames "
                                  "or broke their cycle")
-    hz = run.config.rig.rig_check.recording_hz
+    hz = rig_measurement.rig.rig_measurement.recording_hz
     if hz and hold_ms * hz / 1000 < 2:
         out.update(ok=False, why=f"a frame code lasts {hold_ms:.1f} ms, under 2 samples at "
                                  f"{hz:g} Hz: raise frame_every")
     return out
 
 
-_CHECKS: dict[type, Callable[..., None]] = {
-    CheckDisplay: _check_display, CheckTriggers: _check_triggers,
-    CheckControls: _check_controls, CheckPhotodiode: _check_photodiode,
-    CheckFrames: _check_frames}
+#: Each measurement by its name, in the order a rig measurement takes them.
+MEASUREMENTS: dict[str, Callable[[RigMeasurement, dict, dict, dict], None]] = {
+    "display": _measure_display, "frames": _measure_frames, "triggers": _measure_triggers,
+    "controls": _measure_controls, "photodiode": _measure_photodiode}
 
 
 # ---------------------------------------------------------------------------
@@ -920,7 +1053,8 @@ def receive_pulses(display: Display, key: str, n: int, timeout: float,
     :raises TriggerError: when no pulse comes within ``timeout``.
     """
     times: list[float] = []
-    display.draw_text(f"Waiting for scanner pulses (key {key!r})\n\nstart the sequence now")
+    display.draw_text(f"Waiting for scanner pulses (key {key!r})\n\nstart a sequence now, or "
+                      "switch the trigger box to its test mode")
     last = time.perf_counter()
     goal = f"{seconds:g} s" if seconds else str(n)
     while not _done(times, n, seconds):
@@ -930,9 +1064,10 @@ def receive_pulses(display: Display, key: str, n: int, timeout: float,
             last = new[-1]
             display.draw_text(f"scanner pulses: {len(times)} (of {goal})")
         if time.perf_counter() - last > timeout:
-            raise TriggerError(f"trigger check: {len(times)} of {goal} scanner pulses, then none "
-                               f"for {timeout:g} s -- is the scanner acquiring, the trigger "
-                               f"box plugged in, and does it type {key!r}?")
+            raise TriggerError(f"triggers test: {len(times)} of {goal} scanner pulses, then "
+                               f"none for {timeout:g} s -- is a sequence running (or the "
+                               f"trigger box in its test mode), the box plugged in, and does "
+                               f"it type {key!r}?")
         display.idle(time.perf_counter() + 0.002, poll=0.001)
     return np.array(times if seconds else times[:n])
 
@@ -953,14 +1088,6 @@ def pulse_summary(times: np.ndarray) -> dict[str, Any]:
             "missed": int(np.sum(iv > 1.5 * tr)), "doubles": int(np.sum(iv < 0.5 * tr))}
 
 
-
-
-
-
-
-
-
-
 def send_and_check(triggers: Triggers, repeat: int, hold_s: float, gap_s: float,
                    result: dict, arrays: dict,
                    on_send: Callable[[str, int, int, int], None] | None = None) -> None:
@@ -974,7 +1101,7 @@ def send_and_check(triggers: Triggers, repeat: int, hold_s: float, gap_s: float,
     # The session's own stream, found by the source id triggers._LSL gives it.
     inlet = _lsl_inlet(f"{s.lsl_stream_name}_markers", 3.0) if s.backend == "lsl" else None
     if s.backend == "lsl" and inlet is None:
-        raise TriggerError(f"trigger check: the LSL stream {s.lsl_stream_name!r} is not "
+        raise TriggerError(f"triggers test: the LSL stream {s.lsl_stream_name!r} is not "
                            "visible on the network: a recorder could not find it either")
     if inlet is not None:
         # An outlet drops what it pushes before the inlet's data connection
@@ -998,15 +1125,13 @@ def send_and_check(triggers: Triggers, repeat: int, hold_s: float, gap_s: float,
     inlet.close_stream()
     result["sent"]["lsl_readback"] = "ok" if got == values else "differs"
     if got != values:
-        raise TriggerError(f"trigger check: LSL read back {len(got)} codes that differ from "
+        raise TriggerError(f"triggers test: LSL read back {len(got)} codes that differ from "
                            f"the {len(values)} sent: {got[:20]}")
     print(f"LSL: all {len(got)} codes read back from the network as sent")
 
 
-
-
 # ---------------------------------------------------------------------------
-# The test pattern the frame check plays as a game
+# The test pattern the frame test plays
 # ---------------------------------------------------------------------------
 
 
@@ -1050,24 +1175,15 @@ class TestPattern(gym.Env):
         return pygame.surfarray.array3d(surface).transpose(1, 0, 2)
 
 
-def _register_pattern(name: str) -> str:
-    """Register a variant under its own id, once; returns the id."""
-    env_id = f"fmri_gym/{name}-v0"
-    if env_id not in gym.registry:
-        gym.register(id=env_id, entry_point=TestPattern)
-    return env_id
-
-
 # ---------------------------------------------------------------------------
 # The rig file, the pooling row, report.md, and the command line
 # ---------------------------------------------------------------------------
 
 
-#: The tests a check reports on, and the check phase that runs each: the flashes
-#: of the photodiode check carry the audio test's clicks too.
-TESTS = {"display": "check_display", "triggers": "check_triggers",
-         "controls": "check_controls", "photodiode": "check_photodiode",
-         "audio": "check_photodiode", "frames": "check_frames"}
+#: The tests a rig measurement reports on, and the measurement that runs each: the photodiode's
+#: flashes carry the audio test's clicks too.
+TESTS = {"display": "display", "triggers": "triggers", "controls": "controls",
+         "photodiode": "photodiode", "audio": "photodiode", "frames": "frames"}
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 #: The pooled table: ``(column, path into the manifest, description, units)``.
@@ -1076,13 +1192,14 @@ COLUMNS: list[tuple[str, tuple[str, ...], str, str | None]] = [
     ("rig", ("rig", "rig"), "Rig at the site, from the rig file", None),
     ("pi", ("rig", "pi"), "PI's initials, from the rig file", None),
     ("modality", ("rig", "modality"), "Recording modality of the rig", None),
-    ("date", ("start_time",), "When the check started, ISO 8601 with UTC offset", None),
-    ("task", ("task",), "checksrigcheck (before a session) or checksrigchecklong (measuring "
-     "the rig): the curriculum's task label", None),
-    ("subject", ("subject",), "BIDS subject the check was filed under (sub-rig: none)", None),
+    ("date", ("start_time",), "When the rig measurement started, ISO 8601 with UTC offset", None),
+    ("task", ("task",), f"{QUICK.task} (before a session) or {LONG.task} (measuring the "
+     "rig): the BIDS task label", None),
+    ("subject", ("subject",), "BIDS subject the rig measurement was filed under", None),
     ("session", ("session",), "BIDS session number", None),
-    ("label", ("run", "label"), "BIDS run label of the check", None),
-    ("attempt", ("run", "attempt"), "1, or 2, 3... for a check re-run in that session", None),
+    ("label", ("run", "label"), "BIDS run label of the rig measurement", None),
+    ("attempt", ("run", "attempt"), "1, or 2, 3... for one filed again under its label",
+     None),
     ("status", ("status",), "pass, or fail", None),
     ("failed_tests", ("failed_tests",), "The tests that failed, comma-separated", None),
     ("failure", ("failure",), "Why each failed, test: reason; ...", None),
@@ -1101,94 +1218,94 @@ COLUMNS: list[tuple[str, tuple[str, ...], str, str | None]] = [
     ("audio_path", ("rig", "audio_path"), "Sound path to the ear, from the rig file", None),
     ("trigger_hardware", ("rig", "trigger_hardware"), "Trigger hardware, from the rig file",
      None),
-    ("display_driver", ("rig_check", "display", "display", "driver"), "SDL video driver", None),
-    ("display_size", ("rig_check", "display", "display", "size"), "Window size obtained", "px"),
-    ("fullscreen", ("rig_check", "display", "display", "fullscreen"), "Fullscreen window", None),
-    ("refresh_hz", ("rig_check", "display", "display", "refresh_rate"), "Refresh rate reported", "Hz"),
-    ("vsync", ("rig_check", "display", "display", "vsync"), "Flips wait for the vertical blank", None),
-    ("flip_n", ("rig_check", "display", "flips", "n"), "Flip intervals measured", None),
-    ("flip_mean_ms", ("rig_check", "display", "flips", "mean_ms"), "Mean flip interval", "ms"),
-    ("flip_sd_ms", ("rig_check", "display", "flips", "sd_ms"), "SD of the flip intervals", "ms"),
-    ("flip_max_ms", ("rig_check", "display", "flips", "max_ms"), "Longest flip interval", "ms"),
-    ("flip_late", ("rig_check", "display", "flips", "late"), "Intervals over 1.5 periods (missed refresh)",
+    ("display_driver", ("summaries", "display", "display", "driver"), "SDL video driver", None),
+    ("display_size", ("summaries", "display", "display", "size"), "Window size obtained", "px"),
+    ("fullscreen", ("summaries", "display", "display", "fullscreen"), "Fullscreen window", None),
+    ("refresh_hz", ("summaries", "display", "display", "refresh_rate"), "Refresh rate reported", "Hz"),
+    ("vsync", ("summaries", "display", "display", "vsync"), "Flips wait for the vertical blank", None),
+    ("flip_n", ("summaries", "display", "flips", "n"), "Flip intervals measured", None),
+    ("flip_mean_ms", ("summaries", "display", "flips", "mean_ms"), "Mean flip interval", "ms"),
+    ("flip_sd_ms", ("summaries", "display", "flips", "sd_ms"), "SD of the flip intervals", "ms"),
+    ("flip_max_ms", ("summaries", "display", "flips", "max_ms"), "Longest flip interval", "ms"),
+    ("flip_late", ("summaries", "display", "flips", "late"), "Intervals over 1.5 periods (missed refresh)",
      None),
-    ("display_locked", ("rig_check", "display", "locked"), "Flips locked to the refresh", None),
-    ("trigger_backend", ("rig_check", "triggers", "triggers", "settings", "backend"),
+    ("display_locked", ("summaries", "display", "locked"), "Flips locked to the refresh", None),
+    ("trigger_backend", ("summaries", "triggers", "triggers", "settings", "backend"),
      "Trigger output of the config: null, lsl, serial, parallel", None),
-    ("sync_mode", ("rig_check", "triggers", "triggers", "settings", "sync", "mode"),
+    ("sync_mode", ("summaries", "triggers", "triggers", "settings", "sync", "mode"),
      "Run start: wait (for the scanner), send, none", None),
-    ("ports_writable", ("rig_check", "triggers", "outputs", "n_writable"),
+    ("ports_writable", ("summaries", "triggers", "outputs", "n_writable"),
      "Serial/parallel ports with hardware that this user may write", None),
-    ("lsl_probe", ("rig_check", "triggers", "outputs", "lsl"), "LSL stream found and read back: OK or why not",
+    ("lsl_probe", ("summaries", "triggers", "outputs", "lsl"), "LSL stream found and read back: OK or why not",
      None),
-    ("codes_sent", ("rig_check", "triggers", "sent", "n"), "Trigger codes sent", None),
-    ("send_median_ms", ("rig_check", "triggers", "sent", "send_median_ms"), "Median send call duration",
+    ("codes_sent", ("summaries", "triggers", "sent", "n"), "Trigger codes sent", None),
+    ("send_median_ms", ("summaries", "triggers", "sent", "send_median_ms"), "Median send call duration",
      "ms"),
-    ("send_max_ms", ("rig_check", "triggers", "sent", "send_max_ms"), "Longest send call", "ms"),
-    ("lsl_readback", ("rig_check", "triggers", "sent", "lsl_readback"),
+    ("send_max_ms", ("summaries", "triggers", "sent", "send_max_ms"), "Longest send call", "ms"),
+    ("lsl_readback", ("summaries", "triggers", "sent", "lsl_readback"),
      "LSL codes read back as sent: ok, differs, n/a (not LSL)", None),
-    ("pulses_n", ("rig_check", "triggers", "pulses", "n"), "Scanner pulses counted", None),
-    ("tr_median_s", ("rig_check", "triggers", "pulses", "tr_s"), "Median pulse interval", "s"),
-    ("tr_train_s", ("rig_check", "triggers", "pulses", "tr_train_s"),
+    ("pulses_n", ("summaries", "triggers", "pulses", "n"), "Scanner pulses counted", None),
+    ("tr_median_s", ("summaries", "triggers", "pulses", "tr_s"), "Median pulse interval", "s"),
+    ("tr_train_s", ("summaries", "triggers", "pulses", "tr_train_s"),
      "Mean pulse interval over the train, on this PC's clock", "s"),
-    ("pulse_sd_ms", ("rig_check", "triggers", "pulses", "sd_ms"), "SD of the pulse intervals", "ms"),
-    ("pulses_missed", ("rig_check", "triggers", "pulses", "missed"), "Intervals over 1.5 TR", None),
-    ("pulses_doubled", ("rig_check", "triggers", "pulses", "doubles"), "Intervals under 0.5 TR", None),
-    ("controls_keys", ("rig_check", "controls", "n_keys"), "Keys asked for", None),
-    ("controls_pressed", ("rig_check", "controls", "n_pressed"), "Keys pressed when asked",
+    ("pulse_sd_ms", ("summaries", "triggers", "pulses", "sd_ms"), "SD of the pulse intervals", "ms"),
+    ("pulses_missed", ("summaries", "triggers", "pulses", "missed"), "Intervals over 1.5 TR", None),
+    ("pulses_doubled", ("summaries", "triggers", "pulses", "doubles"), "Intervals under 0.5 TR", None),
+    ("controls_keys", ("summaries", "controls", "n_keys"), "Keys asked for", None),
+    ("controls_pressed", ("summaries", "controls", "n_pressed"), "Keys pressed when asked",
      None),
-    ("controls_latency_ms", ("rig_check", "controls", "median_latency_ms"),
+    ("controls_latency_ms", ("summaries", "controls", "median_latency_ms"),
      "Median time from the prompt to the press (a person's, not the device's)", "ms"),
-    ("pad_device", ("rig_check", "controls", "pad", "device"),
+    ("pad_device", ("summaries", "controls", "pad", "device"),
      "The controller found, whose buttons are read as keys", None),
-    ("pad_axis_on", ("rig_check", "controls", "pad", "axes", ControlNames.CONTROLLER_AXIS_LEFTX, "on"),
+    ("pad_axis_on", ("summaries", "controls", "pad", "axes", ControlNames.CONTROLLER_AXIS_LEFTX, "on"),
      "Fraction of the left stick's horizontal travel that counts as pushed", None),
-    ("pad_corrections", ("rig_check", "controls", "pad", "corrections"),
+    ("pad_corrections", ("summaries", "controls", "pad", "corrections"),
      "Wrong controls pressed, and asked again, while the calibration confirmed each", None),
-    ("input_devices", ("rig_check", "controls", "devices"),
+    ("input_devices", ("summaries", "controls", "devices"),
      "Keyboards, button boxes and joysticks plugged in", None),
-    ("frames_blocks", ("rig_check", "frames", "played"),
+    ("frames_blocks", ("summaries", "frames", "played"),
      "Frame-rate blocks played, as fps/load", None),
-    ("frames_late", ("rig_check", "frames", "late_total"),
+    ("frames_late", ("summaries", "frames", "late_total"),
      "Frames shown a refresh later than their rate allows, all blocks", None),
-    ("frames_lost", ("rig_check", "frames", "lost_total"), "Frames not played, all blocks",
+    ("frames_lost", ("summaries", "frames", "lost_total"), "Frames not played, all blocks",
      None),
-    ("frames_pacing_resets", ("rig_check", "frames", "pacing_resets_total"),
+    ("frames_pacing_resets", ("summaries", "frames", "pacing_resets_total"),
      "Stalls that restarted the frame schedule, all blocks", None),
-    ("frames_triggers_ok", ("rig_check", "frames", "triggers_ok"),
+    ("frames_triggers_ok", ("summaries", "frames", "triggers_ok"),
      "Every block's frame triggers marked every frame, in their cycle", None),
-    ("diode_readout", ("rig_check", "photodiode", "readout"),
+    ("diode_readout", ("summaries", "photodiode", "readout"),
      "Where the diode was read: soundcard (here) or recording (offline)", None),
-    ("flashes_n", ("rig_check", "photodiode", "n"), "Flashes shown", None),
-    ("photon_matched", ("rig_check", "photodiode", "offset", "n_matched"), "Flashes the diode saw", None),
-    ("photon_median_ms", ("rig_check", "photodiode", "offset", "median_ms"), "Flip to photodiode, median",
+    ("flashes_n", ("summaries", "photodiode", "n"), "Flashes shown", None),
+    ("photon_matched", ("summaries", "photodiode", "offset", "n_matched"), "Flashes the diode saw", None),
+    ("photon_median_ms", ("summaries", "photodiode", "offset", "median_ms"), "Flip to photodiode, median",
      "ms"),
-    ("photon_sd_ms", ("rig_check", "photodiode", "offset", "sd_ms"), "Flip to photodiode, SD", "ms"),
-    ("photon_min_ms", ("rig_check", "photodiode", "offset", "min_ms"), "Flip to photodiode, min", "ms"),
-    ("photon_max_ms", ("rig_check", "photodiode", "offset", "max_ms"), "Flip to photodiode, max", "ms"),
-    ("photon_drift_ms_per_min", ("rig_check", "photodiode", "offset", "drift_ms_per_min"),
+    ("photon_sd_ms", ("summaries", "photodiode", "offset", "sd_ms"), "Flip to photodiode, SD", "ms"),
+    ("photon_min_ms", ("summaries", "photodiode", "offset", "min_ms"), "Flip to photodiode, min", "ms"),
+    ("photon_max_ms", ("summaries", "photodiode", "offset", "max_ms"), "Flip to photodiode, max", "ms"),
+    ("photon_drift_ms_per_min", ("summaries", "photodiode", "offset", "drift_ms_per_min"),
      "Flip to photodiode, trend over the run (runs of a minute or more)", "ms/min"),
-    ("audio_device", ("rig_check", "photodiode", "audio_out", "device"), "Sound output device", None),
-    ("audio_delay_ms", ("rig_check", "photodiode", "audio_out", "delay_ms"),
+    ("audio_device", ("summaries", "photodiode", "audio_out", "device"), "Sound output device", None),
+    ("audio_delay_ms", ("summaries", "photodiode", "audio_out", "delay_ms"),
      "Delay from flip to DAC the audio output chose", "ms"),
-    ("click_dac_median_ms", ("rig_check", "photodiode", "click_dac_offset", "median_ms"),
+    ("click_dac_median_ms", ("summaries", "photodiode", "click_dac_offset", "median_ms"),
      "Flip to click at the DAC, median", "ms"),
-    ("sound_matched", ("rig_check", "photodiode", "sound_offset", "n_matched"), "Clicks the microphone heard",
+    ("sound_matched", ("summaries", "photodiode", "sound_offset", "n_matched"), "Clicks the microphone heard",
      None),
-    ("sound_median_ms", ("rig_check", "photodiode", "sound_offset", "median_ms"),
+    ("sound_median_ms", ("summaries", "photodiode", "sound_offset", "median_ms"),
      "Flip to sound at the microphone, median", "ms"),
-    ("sound_sd_ms", ("rig_check", "photodiode", "sound_offset", "sd_ms"), "Flip to sound, SD", "ms"),
-    ("sound_min_ms", ("rig_check", "photodiode", "sound_offset", "min_ms"), "Flip to sound, min", "ms"),
-    ("sound_max_ms", ("rig_check", "photodiode", "sound_offset", "max_ms"), "Flip to sound, max", "ms"),
-    ("sound_drift_ms_per_min", ("rig_check", "photodiode", "sound_offset", "drift_ms_per_min"),
+    ("sound_sd_ms", ("summaries", "photodiode", "sound_offset", "sd_ms"), "Flip to sound, SD", "ms"),
+    ("sound_min_ms", ("summaries", "photodiode", "sound_offset", "min_ms"), "Flip to sound, min", "ms"),
+    ("sound_max_ms", ("summaries", "photodiode", "sound_offset", "max_ms"), "Flip to sound, max", "ms"),
+    ("sound_drift_ms_per_min", ("summaries", "photodiode", "sound_offset", "drift_ms_per_min"),
      "Flip to sound, trend over the run (runs of a minute or more)", "ms/min"),
-    ("acoustic_median_ms", ("rig_check", "photodiode", "acoustic_offset", "median_ms"),
+    ("acoustic_median_ms", ("summaries", "photodiode", "acoustic_offset", "median_ms"),
      "DAC to sound at the microphone (amplifier, tubes, earphones), median", "ms"),
-    ("acoustic_sd_ms", ("rig_check", "photodiode", "acoustic_offset", "sd_ms"),
+    ("acoustic_sd_ms", ("summaries", "photodiode", "acoustic_offset", "sd_ms"),
      "DAC to sound, SD", "ms"),
-    ("av_median_ms", ("rig_check", "photodiode", "av_offset", "median_ms"),
+    ("av_median_ms", ("summaries", "photodiode", "av_offset", "median_ms"),
      "Photodiode to sound (audio behind video), median", "ms"),
-    ("av_sd_ms", ("rig_check", "photodiode", "av_offset", "sd_ms"), "Photodiode to sound, SD", "ms"),
+    ("av_sd_ms", ("summaries", "photodiode", "av_offset", "sd_ms"), "Photodiode to sound, SD", "ms"),
 ]
 #: The table's column names, in order.
 NAMES = tuple(c[0] for c in COLUMNS)
@@ -1200,7 +1317,7 @@ NAMES = tuple(c[0] for c in COLUMNS)
 
 
 def ensure_rig(path: str) -> rig_file.RigConfig:
-    """The rig a rig check plays on; when its file is missing or invalid, the form to
+    """The rig to set up; when its file is missing or invalid, the form to
     fill it in first (:func:`fmri_gym.gui.rig_config.fill_rig`), then the file.
 
     The form needs the ``gui`` extra and a screen; without them, or when it is
@@ -1214,7 +1331,7 @@ def ensure_rig(path: str) -> rig_file.RigConfig:
     except ValueError as error:
         if not can_show_form():
             raise
-        print(f"{error}\nrig check: opening the rig form", file=sys.stderr)
+        print(f"{error}\nrig measurement: opening the rig form", file=sys.stderr)
         from .gui.rig_config import fill_rig
         if fill_rig(rig_file.draft(path), path) is None:
             raise
@@ -1231,8 +1348,6 @@ def can_show_form() -> bool:
                                            or os.environ.get("WAYLAND_DISPLAY"))
 
 
-
-
 # ---------------------------------------------------------------------------
 # Filing
 # ---------------------------------------------------------------------------
@@ -1242,25 +1357,25 @@ def write_outputs(folder: str, m: dict, data_root: str | None = None) -> None:
     """The verdict from ``m["tests"]``; then the manifest, the TSV row, its sidecar, the
     reports (``report.md``, ``report.html``), and the data root's integrated table.
 
-    :param m: the run's manifest with ``tests``, ``rig`` and ``rig_check``; the
+    :param m: the rig measurement's manifest with ``tests``, ``rig`` and ``summaries``; the
         overall ``status``, ``failed_tests`` and ``failure`` are set here.
-    :param data_root: the BIDS tree the check was filed in: its ``rigchecks.tsv``
-        (every rig check under it, one row each) is rebuilt, and the HTML report
-        compares this check with the rig's previous ones.
+    :param data_root: the BIDS tree the rig measurement was filed in: its ``rigmeasurements.tsv``
+        (every rig measurement under it, one row each) is rebuilt, and the HTML report
+        compares this rig measurement with the rig's previous ones.
     """
     bad = [t for t, v in m["tests"].items() if v["status"] == "fail"]
     m["failed_tests"] = ",".join(bad) or None
     m["failure"] = "; ".join(f"{t}: {m['tests'][t]['why']}" for t in bad) or None
     m["status"] = "fail" if bad else "pass"
     _write_json(os.path.join(folder, "manifest.json"), m)
-    with open(os.path.join(folder, "rigcheck.tsv"), "w") as f:
+    with open(os.path.join(folder, "rigmeasurement.tsv"), "w") as f:
         f.write("\t".join(c[0] for c in COLUMNS) + "\n" + "\t".join(row(m)) + "\n")
-    _write_json(os.path.join(folder, "rigcheck.json"), sidecar())
+    _write_json(os.path.join(folder, "rigmeasurement.json"), sidecar())
     with open(os.path.join(folder, "report.md"), "w") as f:
         f.write(report(m))
     history = rows([data_root]) if data_root else [dict(zip(NAMES, row(m)))]
     if data_root:
-        write_table(os.path.join(data_root, "rigchecks.tsv"), history)
+        write_table(os.path.join(data_root, "rigmeasurements.tsv"), history)
     with open(os.path.join(folder, "report.html"), "w") as f:
         f.write(render_html(m, folder, history))
 
@@ -1277,18 +1392,14 @@ def _lines(table: list[dict[str, str]]) -> list[list[str]]:
 
 
 def rows(roots: list[str]) -> list[dict[str, str]]:
-    """Every rig check filed under ``roots``, one row each, oldest first.
-
-    Read from each check's ``manifest.json``, not its ``rigcheck.tsv``: a check
-    filed before a column existed gets ``n/a`` there, rather than a table that
-    no longer lines up.
-    """
+    """Every rig measurement filed under ``roots``, one row each, oldest first, read from each
+    one's ``manifest.json``."""
     out = []
     for root in roots:
         for path in sorted(glob.glob(os.path.join(root, "**", "manifest.json"), recursive=True)):
             with open(path) as f:
                 m = json.load(f)
-            if "rig_check" in m and "tests" in m:
+            if "summaries" in m:
                 out.append(dict(zip(NAMES, row(m))))
     return sorted(out, key=lambda r: r["date"])
 
@@ -1307,7 +1418,7 @@ def sidecar() -> dict[str, dict[str, str]]:
 
 
 def pool(roots: list[str]) -> list[str]:
-    """Every rig check under ``roots`` (:func:`rows`), as the lines of one TSV."""
+    """Every rig measurement under ``roots`` (:func:`rows`), as the lines of one TSV."""
     return ["\t".join(r) for r in _lines(rows(roots))]
 
 
@@ -1334,7 +1445,8 @@ def _cell(v: Any) -> str:
 
 
 def versions() -> dict[str, str]:
-    """What ran the check: fmri-gym, its git checkout, and the libraries timing depends on."""
+    """What ran the rig measurement: fmri-gym, its git checkout, and the libraries timing
+    depends on."""
     from importlib.metadata import version
 
     import numpy
@@ -1356,7 +1468,7 @@ def platform_info() -> dict[str, str]:
 
 
 def machine() -> dict[str, Any]:
-    """The machine a check ran on, and what is plugged into it: for provenance, and to
+    """The machine a rig measurement ran on, and what is plugged into it: for provenance, and to
     tell two rigs (or one rig before and after a change) apart when their numbers differ.
 
     Each part is read from the operating system without new dependencies, and is
@@ -1498,69 +1610,55 @@ def _usb_items(items: list[dict]) -> list[str]:
 
 
 def measured(m: dict, folder: str) -> dict[str, Any]:
-    """What a rig check measured on its rig, as filed beside the rig file.
+    """What a rig measurement measured on its rig, as filed beside the rig file.
 
     ``latency`` holds when what a frame shows reaches the participant, from its
-    flip: each the check's summary of its offsets (median, spread, count), and
-    ``None`` when the check could not measure it (no photodiode, no microphone,
+    flip: each the rig measurement's summary of its offsets (median, spread, count), and
+    ``None`` when the rig measurement could not measure it (no photodiode, no microphone,
     a diode read in the MEG/EEG recording) or its test did not pass. The rest is
-    how it was measured and on what: the check, its verdicts, every check's
-    summary, the rig file as it played, the machine and the software.
+    how it was measured and on what: the rig measurement, its verdicts, every
+    measurement's summary, the rig file as it played, the machine and the software.
 
-    :param m: the check's manifest, filed (:func:`write_outputs`).
-    :param folder: the check's run folder.
+    :param m: the rig measurement's manifest, filed (:func:`write_outputs`).
+    :param folder: the rig measurement's folder.
     """
-    photodiode = m["rig_check"].get("photodiode", {})
+    photodiode = m["summaries"].get("photodiode", {})
 
     def latency(test: str, key: str) -> dict | None:
         summary = photodiode.get(key)
-        passed = m["tests"].get(test, {}).get("status") == "pass"
+        passed = m["tests"][test]["status"] == "pass"
         return summary if passed and summary and "median_ms" in summary else None
 
     return {"date": m["start_time"],
-            "check": {"folder": folder, "label": m["run"]["label"], "task": m["task"],
-                      "status": m["status"], "failed_tests": m["failed_tests"],
-                      "tests": m["tests"]},
+            "rig_measurement": {"folder": folder, "label": m["run"]["label"],
+                                "task": m["task"], "status": m["status"],
+                                "failed_tests": m["failed_tests"], "tests": m["tests"]},
             "latency": {"flip_to_photon": latency("photodiode", "offset"),
                         "flip_to_dac": latency("audio", "click_dac_offset"),
                         "dac_to_ear": latency("audio", "acoustic_offset")},
-            "rig_check": m["rig_check"], "rig": m["rig"], "machine": m["machine"],
+            "summaries": m["summaries"], "rig": m["rig"], "machine": m["machine"],
             "versions": m["versions"]}
 
 
-def measured_files(rig_path: str) -> list[str]:
-    """What the rig checks measured on the rig file at ``rig_path``, in the order they
-    were filed: ``measured/<rig>-<n>.json`` beside it, by ``n``."""
-    folder = os.path.join(os.path.dirname(rig_path), "measured")
-    rig = os.path.splitext(os.path.basename(rig_path))[0]
-    numbered = {}
-    for path in glob.glob(os.path.join(folder, f"{glob.escape(rig)}-*.json")):
-        n = re.fullmatch(rf"{re.escape(rig)}-(\d+)\.json", os.path.basename(path))
-        if n:
-            numbered[int(n[1])] = path
-    return [numbered[n] for n in sorted(numbered)]
-
-
 def file_measured(m: dict, folder: str, rig_path: str) -> str | None:
-    """Write what the check measured beside the rig file, under the next free number;
-    nothing when it measured no latency.
+    """Write what the rig measurement measured beside the rig file
+    (:func:`fmri_gym.config.rig.next_measured_latency_file`); nothing when it measured
+    no latency.
 
-    :param m: the check's manifest, filed.
-    :param folder: the check's run folder.
-    :param rig_path: the rig file the check played on.
+    :param m: the rig measurement's manifest, filed.
+    :param folder: the rig measurement's folder.
+    :param rig_path: the rig file it set up.
     :return: the file written, or ``None``.
     """
     values = measured(m, folder)
     if not any(values["latency"].values()):
-        print("rig check: no latency measured (no photodiode or microphone read, or their "
+        print("rig measurement: no latency measured (no photodiode or microphone read, or their "
               "tests failed): nothing filed beside the rig", file=sys.stderr)
         return None
-    rig = os.path.splitext(os.path.basename(rig_path))[0]
-    path = os.path.join(os.path.dirname(rig_path), "measured",
-                        f"{rig}-{len(measured_files(rig_path)) + 1}.json")
+    path = rig_file.next_measured_latency_file(rig_path)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     _write_json(path, values)
-    print(f"rig check: what it measured on the rig: {path}", file=sys.stderr)
+    print(f"rig measurement: what it measured on the rig: {path}", file=sys.stderr)
     return path
 
 
@@ -1579,7 +1677,7 @@ def report(m: dict) -> str:
     """``report.md``: the verdicts, then each test's numbers, for a person to read."""
     rig = m["rig"]
     verdict = "PASS" if m["status"] == "pass" else f"FAIL ({m['failed_tests']})"
-    lines = [f"# Rig check {rig['site']}/{rig['rig']}: {verdict}", "",
+    lines = [f"# Rig measurement {rig['site']}/{rig['rig']}: {verdict}", "",
              f"{m['start_time']} · `{m['run']['label']}` "
              f"(attempt {m['run']['attempt']}) · fmri-gym {m['versions']['fmri_gym']} "
              f"(`{m['versions']['git']}`)", "",
@@ -1592,9 +1690,9 @@ def report(m: dict) -> str:
     for test, section in (("display", _md_display), ("frames", _md_frames),
                           ("triggers", _md_triggers), ("controls", _md_controls),
                           ("photodiode", _md_photodiode), ("audio", _md_audio)):
-        status = m["tests"].get(test, {"status": "not run"})["status"]  # an older check's
+        status = m["tests"][test]["status"]
         lines += ["", f"## {test.capitalize()}: {status}", ""]
-        measured = m["rig_check"].get(TESTS[test].removeprefix("check_"))
+        measured = m["summaries"].get(TESTS[test])
         if measured:
             lines += section(measured)
     lines += ["", "## This computer"]
@@ -1606,12 +1704,12 @@ def report(m: dict) -> str:
 
 
 def computer(m: dict) -> list[tuple[str, list[str], list[list[Any]]]]:
-    """The computer a check ran on and what was plugged into it, as titled tables.
+    """The computer a rig measurement ran on and what was plugged into it, as titled tables.
 
-    :param m: the check's manifest (an older one may lack ``machine``: its tables are empty).
+    :param m: the rig measurement's manifest.
     :return: ``(title, column names, rows)`` per table; a table with nothing found says so.
     """
-    mc, p = m.get("machine", {}), m.get("platform", {})
+    mc, p = m["machine"], m["platform"]
     none = [["none found"]]
     return [
         ("Computer", ["", ""], [[k, v] for k, v in (
@@ -1631,7 +1729,7 @@ def computer(m: dict) -> list[tuple[str, list[str], list[list[Any]]]]:
          [[o.get("kind"), _port_name(o), o.get("what"), o.get("writable")]
           for o in mc.get("trigger_ports", [])] or none),
         ("USB devices", ["device"], [[d] for d in mc.get("usb_devices", [])] or none),
-        ("Software", ["", "version"], [[k, v] for k, v in m.get("versions", {}).items()]),
+        ("Software", ["", "version"], [[k, v] for k, v in m["versions"].items()]),
     ]
 
 
@@ -1670,12 +1768,12 @@ def _md_triggers(t: dict) -> list[str]:
 
 
 def _md_frames(f: dict) -> list[str]:
-    lines = [f"- the test pattern played as a game at each rate, under each load; "
+    lines = [f"- the test pattern played at each rate, under each load, paced as a game; "
              f"refresh {f['refresh_rate']} Hz"
              + (f", recording at {f['recording_hz']:g} Hz" if f.get("recording_hz") else "")]
     if not f.get("vsync"):
         lines.append("- **vsync off: frames were paced by the clock alone, not the refresh "
-                     "(see the display check); late frames cannot be told from jitter**")
+                     "(see the display test); late frames cannot be told from jitter**")
     lines += ["", "| fps | load | frames | lost | late | pacing resets "
                   "| interval median / SD / max ms | frame triggers |",
               "|---|---|---|---|---|---|---|---|"]
@@ -1753,29 +1851,37 @@ def _md_offsets(p: dict, keys: tuple[tuple[str, str], ...]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def main() -> None:
-    p = argparse.ArgumentParser(description="Re-file and pool rig checks. A rig file is "
-                                            "filled in with rig-config.")
-    sub = p.add_subparsers(dest="command", required=True)
-    f = sub.add_parser("report", help="re-file checks already run: their reports and the "
-                                      "data root's rigchecks.tsv, with this version")
-    f.add_argument("folders", nargs="+", help="rig-check run folders")
+def main(argv: Sequence[str] | None = None) -> None:
+    p = argparse.ArgumentParser(
+        prog="rig-measure", description="Measure a rig, making its rig file first (a form, when "
+        "it is missing or invalid). report and pool re-file and stack the "
+        "rig measurements already filed.")
+    p.add_argument("--rig", help="the rig file to set up")
+    p.add_argument("--long", action="store_true",
+                   help=f"measure the rig at length ({LONG.about}): once per rig, and after "
+                        f"any hardware, driver or OS change; without it, {QUICK.about}")
+    sub = p.add_subparsers(dest="command")
+    f = sub.add_parser("report", help="re-file rig measurements already run: their reports and the "
+                                      "data root's rigmeasurements.tsv, with this version")
+    f.add_argument("folders", nargs="+", help="rig measurement folders")
     f.add_argument("--data-root", default="data")
-    q = sub.add_parser("pool", help="stack every rig check under the roots into one table")
+    q = sub.add_parser("pool", help="stack every rig measurement under the roots into one table")
     q.add_argument("roots", nargs="+")
     q.add_argument("--out", help="file to write (default: stdout)")
-    args = p.parse_args()
+    args = p.parse_args(argv)
+    if args.command is None:
+        if args.rig is None:
+            p.error("give --rig <rig file> to set up, or a command: report, pool")
+        sys.exit(1 if measure_rig(args.rig, LONG if args.long else QUICK) else 0)
     if args.command == "report":
         for folder in args.folders:
             with open(os.path.join(folder, "manifest.json")) as fh:
                 m = json.load(fh)
-            if not ("rig_check" in m and "tests" in m):
-                print(f"{folder}: skipped, filed by an earlier rig check without per-test "
-                      "verdicts", file=sys.stderr)
-                continue
+            if "summaries" not in m:
+                raise ValueError(f"{folder}: its manifest is not a rig measurement's")
             write_outputs(folder, m, args.data_root)
             print(f"{os.path.join(folder, 'report.html')}")
-        print(f"all checks: {os.path.join(args.data_root, 'rigchecks.tsv')}")
+        print(f"all rig measurements: {os.path.join(args.data_root, 'rigmeasurements.tsv')}")
         return
     text = "\n".join(pool(args.roots)) + "\n"
     if args.out:
@@ -2021,7 +2127,7 @@ def _html_npz(folder: str, pattern: str) -> Any:
 
 
 def _html_tiles(m: dict) -> str:
-    rc = m["rig_check"]
+    rc = m["summaries"]
     tiles = []
     d = rc.get("display")
     if d:
@@ -2062,14 +2168,14 @@ def _html_table(head: Sequence[str], rows: Sequence[Sequence[Any]], nums: Sequen
 
 
 def _html_display(m: dict, folder: str) -> str:
-    d = m["rig_check"]["display"]
+    d = m["summaries"]["display"]
     s, f = d["display"], d["flips"]
     out = [f'<p class="note">{_e(s["driver"])}, {_e("x".join(map(str, s["size"])))} px, '
            f'{"fullscreen" if s["fullscreen"] else "windowed"}, monitor {s["monitor"]}, '
            f'{s["refresh_rate"]} Hz, vsync {"on" if s["vsync"] else "off"}. {f["n"]} flips: '
            f'mean {f["mean_ms"]:.2f} ms, SD {f["sd_ms"]:.2f}, max {f["max_ms"]:.2f}; '
            f'{f["late"]} missed a refresh.</p>']
-    z = _html_npz(folder, "block-*_check_display.npz")
+    z = _html_npz(folder, "display.npz")
     if z is not None:
         out.append('<p class="note">Flip intervals: one tight column at the refresh period '
                    'is a locked screen.</p>')
@@ -2080,30 +2186,29 @@ def _html_display(m: dict, folder: str) -> str:
 
 def _html_section(section: Callable[[dict, str], str], m: dict, folder: str,
                   verdict: dict | None) -> str:
-    """A check's section; for a check that broke part-way and left its summary
-    half-written (see :func:`run_check`), a note that it stopped, and why."""
+    """A measurement's section; for one that broke part-way and left its summary
+    half-written (see :func:`_measure`), a note that it stopped, and why."""
     try:
         return section(m, folder)
     except (KeyError, IndexError, TypeError):
         why = (verdict or {}).get("why")
-        return (f'<p class="note">This check stopped before it finished'
+        return (f'<p class="note">This measurement stopped before it finished'
                 f'{": " + _e(why) if why else ""}.</p>')
 
 
 def _html_frames(m: dict, folder: str) -> str:
-    f = m["rig_check"]["frames"]
-    out = [f'<p class="note">A test pattern played as a game through the session\'s own game '
-           f'loop, at each rate and load; refresh {f["refresh_rate"]} Hz. Each line is that '
-           f'block\'s frame intervals over its duration: flat is steady, spikes are late '
-           f'frames.</p>']
+    f = m["summaries"]["frames"]
+    out = [f'<p class="note">A test pattern played at each rate and load, paced as a game '
+           f'block is; refresh {f["refresh_rate"]} Hz. Each line is that block\'s frame '
+           f'intervals over its duration: flat is steady, spikes are late frames.</p>']
     if not f.get("vsync"):
         out.append('<p class="note"><b>vsync was off:</b> frames were paced by the clock '
                    'alone; late frames cannot be told from jitter.</p>')
+    z = _html_npz(folder, "frames.npz")
     rows = []
-    for b in f["blocks"]:
-        block = os.path.join(folder, b["data_dir"])
-        line = (sparkline(np.diff(_block_flips(block)[0]) * 1000) if os.path.isdir(block)
-                else "")
+    for i, b in enumerate(f["blocks"]):
+        flips = f"flip_time_{i}"
+        line = sparkline(np.diff(z[flips]) * 1000) if z is not None and flips in z else ""
         t = b["triggers"]
         marks = "off" if t is None else (f"{t['marked']}/{t['expected']}"
                                          + ("" if t["ok"] else f" — {_e(t['why'])}"))
@@ -2120,7 +2225,7 @@ def _html_frames(m: dict, folder: str) -> str:
 
 
 def _html_triggers(m: dict, folder: str) -> str:
-    t = m["rig_check"]["triggers"]
+    t = m["summaries"]["triggers"]
     o = t["outputs"]
     ports = ", ".join(map(_port_name, o["ports"])) or "none with hardware"
     out = [f'<p class="note">This PC: {_e(ports)} ({o["n_writable"]} writable); LSL: '
@@ -2146,7 +2251,7 @@ def _html_triggers(m: dict, folder: str) -> str:
 
 
 def _html_controls(m: dict, folder: str) -> str:
-    c = m["rig_check"]["controls"]
+    c = m["summaries"]["controls"]
     devices = _e(", ".join(c["devices"]) or "none listed")
     out = [(f'<p class="note">Input devices: {devices}. '
             f'{_e(_pad_line(c.get("pad") or {}))}</p>')]
@@ -2163,7 +2268,7 @@ def _html_controls(m: dict, folder: str) -> str:
 
 
 def _pad_line(pad_out: dict) -> str:
-    """One line on what the controller check found, for either report."""
+    """One line on what the controls test found of the controller, for either report."""
     if not pad_out.get("present"):
         return "The rig lists no controller; the device in use must send the keys below itself."
     device = pad_out.get("device", "a controller")
@@ -2178,13 +2283,13 @@ def _pad_line(pad_out: dict) -> str:
 
 
 def _html_photodiode(m: dict, folder: str) -> str:
-    p = m["rig_check"]["photodiode"]
+    p = m["summaries"]["photodiode"]
     out = [f'<p class="note">{p["n"]} flashes of {p["on_ms"]:g} ms; {_diode_text(p["readout"])}; '
            f'a click on every other flash'
            + (f' through {_e(p["audio_out"].get("device"))}, delay chosen '
               f'{p["audio_out"].get("delay_ms", 0):.1f} ms' if "audio_out" in p else "")
            + (", a microphone on input 1" if p.get("mic") else "") + ".</p>"]
-    z = _html_npz(folder, "block-*_check_photodiode.npz")
+    z = _html_npz(folder, "photodiode.npz")
     series = []
     if z is not None and "offset_s" in z:
         series.append(("flip → photodiode", "--s1", np.arange(len(z["offset_s"])),
@@ -2226,13 +2331,14 @@ def _html_history(m: dict, history: list[dict[str, str]]) -> str:
     mine = [r for r in history if r.get("site") == rig["site"] and r.get("rig") == rig["rig"]]
     mine = sorted(mine, key=lambda r: r.get("date", ""))[-10:]
     if len(mine) < 2:
-        return '<p class="note">No earlier check of this rig to compare with yet.</p>'
+        return '<p class="note">No earlier rig measurement of this rig to compare with yet.</p>'
     rows = [[f'<span style="white-space:nowrap">{_e(r.get("date", "")[:16].replace("T", " "))}'
              "</span>", _e(r.get("task")), _status(r.get("status", "")),
              _cellnum(r.get("flip_sd_ms")), _e(r.get("frames_late")),
              _cellnum(r.get("photon_median_ms"), ".1f"), _cellnum(r.get("click_dac_median_ms"), ".1f"),
              _e((r.get("failed_tests") or "").replace(",", ", "))] for r in mine]
-    return (f'<p class="note">The last {len(mine)} checks of {_e(rig["site"])}/{_e(rig["rig"])} '
+    return (f'<p class="note">The last {len(mine)} rig measurements of '
+            f'{_e(rig["site"])}/{_e(rig["rig"])} '
             f'(this one last): today\'s numbers should sit with the others.</p>'
             + _html_table(["date", "task", "status", "flip SD ms", "late frames", "photodiode ms",
                       "sound out ms", "failed"], rows, nums=(3, 4, 5, 6)))
@@ -2244,17 +2350,17 @@ _html_SECTIONS = (("display", "Display", _html_display), ("frames", "Frames", _h
 
 
 def render_html(m: dict, folder: str, history: list[dict[str, str]]) -> str:
-    """The whole page for one finished rig check.
+    """The whole page for one finished rig measurement.
 
-    :param m: its manifest, with ``tests``, ``rig`` and ``rig_check``.
-    :param folder: its run folder, for the ``.npz`` the charts are drawn from.
-    :param history: pooled rows (:func:`rows`) of the checks under
+    :param m: its manifest, with ``tests``, ``rig`` and ``summaries``.
+    :param folder: its folder, for the ``.npz`` the charts are drawn from.
+    :param history: pooled rows (:func:`rows`) of the rig measurements under
         the same data root, this one included.
     """
     rig, tests = m["rig"], m["tests"]
     failed = [t for t, v in tests.items() if v["status"] == "fail"]
     verdict = "Every test passed" if not failed else f"{len(failed)} of {len(tests)} tests failed"
-    body = [f'<header><h1>Rig check · {_e(rig["site"])} / {_e(rig["rig"])}</h1>'
+    body = [f'<header><h1>Rig measurement · {_e(rig["site"])} / {_e(rig["rig"])}</h1>'
             f'<div class="meta">{_e(m["start_time"])} · {_e(m["run"]["label"])} · PI '
             f'{_e(rig.get("pi", "?"))} · {_e(rig.get("modality", "?"))} · '
             f'fmri-gym {_e(m["versions"]["fmri_gym"])} '
@@ -2269,7 +2375,7 @@ def render_html(m: dict, folder: str, history: list[dict[str, str]]) -> str:
                     + (f' {_status(tests["audio"]["status"])}' if key == "photodiode"
                        and "audio" in tests else "") + "</h2>")
         body.append('<div class="card">' + (_html_section(section, m, folder, tests.get(test))
-                                            if key in m["rig_check"]
+                                            if key in m["summaries"]
                                             else '<p class="note">Not run.</p>') + "</div>")
     body.append(f'<h2>This rig over time</h2><div class="card">{_html_history(m, history)}</div>')
     body.append('<h2>Rig</h2><div class="card">' + _html_table(["", ""], [
@@ -2281,7 +2387,7 @@ def render_html(m: dict, folder: str, history: list[dict[str, str]]) -> str:
                     + "</div>")
     return ("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-            f"<title>Rig check {_e(rig['site'])}/{_e(rig['rig'])}</title>"
+            f"<title>Rig measurement {_e(rig['site'])}/{_e(rig['rig'])}</title>"
             f"<style>{_CSS}</style></head><body><main>{''.join(body)}</main>"
             f'<div id="tip" role="tooltip"></div><script>{_JS}</script></body></html>\n')
 

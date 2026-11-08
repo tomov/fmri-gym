@@ -566,7 +566,7 @@ def _selftest() -> None:
 
     With ``--outdir``, also writes ``display.npz`` (the intervals) and
     ``display.json`` (the display and the statistics) there, and exits
-    non-zero when the flips are not locked: a rig check stops on it.
+    non-zero when the flips are not locked, so a script can stop on it.
     """
     import argparse
     p = argparse.ArgumentParser(description="Measure flip timing on this machine.")
