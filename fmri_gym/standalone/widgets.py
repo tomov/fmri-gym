@@ -212,7 +212,8 @@ class Form(QtWidgets.QWidget):
             self.write(f.key, format_value(f, values.get(f.key)))
 
     def get(self) -> dict:
-        """Read the form back as config values (see :func:`~fmri_gym.standalone.forms.field_values`)."""
+        """Read the form back as config values (see
+        :func:`~fmri_gym.standalone.forms.field_values`)."""
         values = field_values(self.fields, {f.key: self._read(f) for f in self.fields})
         for key in self.as_lines & values.keys():
             values[key] = values[key].split("\n")

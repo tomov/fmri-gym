@@ -108,7 +108,8 @@ class FakeOutputStream:
 
 
 def use_fake_sound_card() -> None:
-    """Point :mod:`fmri_gym.outputs.audio` at :class:`FakeOutputStream` (before the run opens audio)."""
+    """Point :mod:`fmri_gym.outputs.audio` at :class:`FakeOutputStream` (before the run opens
+    audio)."""
     from fmri_gym.outputs import audio
 
     stub = {"name": "fake", "index": 0, "hostapi": 0, "max_output_channels": 2,

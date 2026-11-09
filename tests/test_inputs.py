@@ -324,7 +324,8 @@ def test_an_uncalibrated_axis_presses_nothing():
 
 def test_a_controller_refuses_an_axis_the_curriculum_names_with_no_calibration(config_home):
     pad = _bare(CurrentDesignsGamepad3)
-    with pytest.raises(CalibrationError, match="no calibration of 'Scripted' in .*gamepad-calibration"):
+    with pytest.raises(CalibrationError,
+                       match="no calibration of 'Scripted' in .*gamepad-calibration"):
         pad.require_calibrated_axes_for(frozenset({ControlNames.CONTROLLER_AXIS_LEFTY_UP,
                                                    ControlNames.CONTROLLER_BUTTON_A}))
     buttons_only = frozenset({ControlNames.CONTROLLER_BUTTON_A, "SPACE"})

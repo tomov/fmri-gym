@@ -27,85 +27,17 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from typing import TYPE_CHECKING
 
-from .inputs import QUIT, ControlNames, Edge, InputEvent, is_control_of_any_input_device
+from .config.phases import MenuSettings
+from .inputs import QUIT, ControlNames, Edge, InputEvent
 
 if TYPE_CHECKING:
     from .outputs.display import Display
     from .save.logging import Logger
 
-OPTIONS = ("reset", "forfeit", "resume")
 _LABELS = {"reset": "Restart the level", "forfeit": "Give up this level", "resume": "Resume"}
-_DEFAULTS = {"hold": 5.0, "after": 15.0, "options": list(OPTIONS),
-             "move": [ControlNames.K_UP, ControlNames.K_DOWN], "confirm": ControlNames.K_RETURN}
-
-
-@dataclass(frozen=True, slots=True)
-class MenuSettings:
-    """A phase's ``menu`` field with its defaults filled in and its control names upper-cased."""
-
-    #: the control held to open the menu
-    control: str
-    #: seconds it has to be held
-    hold: float
-    #: seconds into the block before the menu is available
-    after: float
-    #: the options offered, in the order shown
-    options: tuple[str, ...]
-    #: the controls that move the choice: to the previous option, to the next
-    move: tuple[str, str]
-    #: the control that confirms the choice
-    confirm: str
-
-    @classmethod
-    def from_dict(cls, spec: dict) -> MenuSettings:
-        """Read a phase's ``menu`` dict (already validated by :func:`menu_problems`)."""
-        cfg = {**_DEFAULTS, **spec}
-        previous, following = cfg["move"]
-        return cls(control=cfg["control"].upper(), hold=float(cfg["hold"]),
-                   after=float(cfg["after"]), options=tuple(cfg["options"]),
-                   move=(previous.upper(), following.upper()),
-                   confirm=cfg["confirm"].upper())
-
-
-def menu_problems(spec: object) -> list[str]:
-    """What is wrong with a phase's ``menu`` dict, for :func:`curriculum.validate_curriculum`.
-
-    :param spec: the phase's ``"menu"`` value.
-    :return: human-readable problems, empty when the menu is usable.
-    """
-    if not isinstance(spec, dict):
-        return [f"menu: expected a dict with at least 'control', got {spec!r}"]
-    out = []
-    if not isinstance(spec.get("control"), str):
-        out.append("menu.control: the control to hold is required, e.g. \"X\"")
-    for field, names in (("control", [spec.get("control")]), ("move", spec.get("move", [])),
-                         ("confirm", [spec.get("confirm", _DEFAULTS["confirm"])])):
-        wrong = [n for n in (names if isinstance(names, list) else []) if isinstance(n, str)
-                 and (not is_control_of_any_input_device(n.upper())
-                      or n.upper() == ControlNames.K_ESCAPE)]
-        if wrong:
-            out.append(f"menu.{field}: {wrong} is no control name "
-                       f"({ControlNames.K_ESCAPE} quits the run): a value in "
-                       "fmri_gym/inputs/control_names.py")
-    for field in ("hold", "after"):
-        value = spec.get(field, _DEFAULTS[field])
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
-            out.append(f"menu.{field}: expected seconds (>= 0), got {value!r}")
-    options = spec.get("options", _DEFAULTS["options"])
-    if not isinstance(options, list) or not options or set(options) - set(OPTIONS):
-        out.append(f"menu.options: expected a non-empty list from {list(OPTIONS)}, got {options!r}")
-    move = spec.get("move", _DEFAULTS["move"])
-    if not (isinstance(move, list) and len(move) == 2 and all(isinstance(k, str) for k in move)):
-        out.append(f"menu.move: expected two control names [previous, next], got {move!r}")
-    if not isinstance(spec.get("confirm", _DEFAULTS["confirm"]), str):
-        out.append(f"menu.confirm: expected a control name, got {spec.get('confirm')!r}")
-    unknown = set(spec) - {"control"} - set(_DEFAULTS)
-    if unknown:
-        out.append(f"menu: unknown fields {sorted(unknown)}")
-    return out
 
 
 class Menu:

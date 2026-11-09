@@ -634,7 +634,8 @@ class _Editor(QtWidgets.QMainWindow):
         return box
 
     def _head(self) -> dict:
-        """The session form and the rig, as :class:`~fmri_gym.standalone.session_script.Session` fields.
+        """The session form and the rig, as
+        :class:`~fmri_gym.standalone.session_script.Session` fields.
 
         :raises ValueError: a session number that is not one.
         """

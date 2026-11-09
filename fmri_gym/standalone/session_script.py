@@ -4,9 +4,9 @@ A session is a shell script (:func:`write_session`). Its head sets three
 variables once: ``SUBJECT`` and ``RIG``, each fixed in the script or required
 from whoever starts it (``SUBJECT=sub-01 RIG=configs/<team>/rigs/<rig>.json sh
 <script>``), and ``SES``, the script's own argument or the subject's next free
-session. Each line after it plays one run with them, or is any command of
-yours. The session editor (:mod:`fmri_gym.standalone.session_editor`) writes and reads
-them; any shell plays them, so nothing in Python loops over runs.
+session (``fmri-ses``, :func:`fmri_ses_main`). Each line after it plays one run with them, or
+is any command of yours. The session editor (:mod:`fmri_gym.standalone.session_editor`) writes
+and reads them; any shell plays them, so nothing in Python loops over runs.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ import re
 import shlex
 from dataclasses import dataclass
 
+from ..config.rig import RigConfig
 from ..save import bids
 
 HEADER = ["#!/bin/sh", "# fmri-gym session: one line per run, in order.", "set -e"]
@@ -226,3 +227,20 @@ def _parse_play_line(line: str) -> tuple[str, dict[str, str], int, dict] | None:
     flags = {name: getattr(args, name) for name, _, kind in RUN_FLAGS
              if getattr(args, name) not in (None, False)}
     return args.curriculum, {"subject": args.subject, "rig": args.rig}, args.run, flags
+
+
+def fmri_ses_main() -> None:
+    """``fmri-ses``: the subject's next free session number, for a session script.
+
+    A script's first line takes the session once -- ``SES=${1:-$(fmri-ses
+    --subject sub-01)}`` -- and passes it to every run, so they land in the
+    same one; giving the script a number instead resumes that session.
+    """
+    p = argparse.ArgumentParser(
+        description="Print a subject's next free BIDS session number (001, 002, ...).")
+    p.add_argument("--subject", required=True, help="BIDS subject: sub-<letters/digits>")
+    p.add_argument("--rig", required=True, help="the rig file whose data root holds the BIDS "
+                   "tree, <root>/sub-XX/ses-NNN/")
+    args = p.parse_args()
+    root = RigConfig.open(args.rig).data_root
+    print(f"{bids.next_session(root, bids.subject_label(args.subject)):03d}")

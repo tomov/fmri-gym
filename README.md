@@ -715,11 +715,12 @@ The names follow BIDS apart from that suffix, the contents not yet (no `_beh.tsv
 ### Reconstruction (all verified bit-exact)
 
 1. **Per-frame state** (ale, retro): restore the `state` of a `frame` line → exact frame, no determinism assumption.
-2. **Seed + action replay** (any deterministic env, incl. gym): an episode's `seed` + its `action`s reproduce it frame-for-frame: `fmri_gym.save.replay.reconstruct_episode(block)`.
+2. **Seed + action replay** (any deterministic env, incl. gym): an episode's `seed` + its `action`s reproduce it frame-for-frame: `fmri_gym.save.replay.reconstruct_episode(block, adapter=...)`, on an adapter built from the block's first line.
 3. **Stored pixels**: `frames.h5` *is* what was on screen, before the HUD.
 
 ```python
 import base64, pickle, zlib, gymnasium as gym, ale_py, stable_retro as retro
+from fmri_gym.adapters import get_adapter
 from fmri_gym.save.logging import read_events
 from fmri_gym.save.replay import frame_arrays, reconstruct_episode
 gym.register_envs(ale_py)
@@ -738,8 +739,10 @@ frame10 = env.unwrapped.ale.getScreenRGB()
 r = retro.make("Airstriker-Genesis", render_mode="rgb_array"); r.reset()
 r.unwrapped.em.set_state(states[10]); r.unwrapped.data.update_ram()
 
-# any deterministic env: replay episode 0 from its seed and actions
-adapter, plan = reconstruct_episode(block, episode_id=0)
+# any deterministic env: replay episode 0 from its seed and actions, on the block's own game
+start = read_events(block)[0]
+adapter, plan = reconstruct_episode(block, episode_id=0,
+                                    adapter=get_adapter(start["backend"], start["phase"]))
 ```
 
 > ⚠️ **Storage note & `state_stride`.** Per-frame savestates are cheap for ALE (~0.4 KB/frame) but large for retro consoles: a Genesis state is ~1 MB/frame. Set **`"state_stride": K`** on a game phase to snapshot a full savestate only every K frames (always including each episode's first frame, the replay anchor); frames between anchors stay reconstructable by restoring the last anchor and replaying the logged actions (retro/ALE/VGDL are deterministic). Analysis variables (RAM, `info_*`) are always logged every frame regardless of stride. The rendered frames have their own **`"frame_stride"`**; ⚠️ **`"save_pixels": true`** (ale) additionally logs the indexed screen as a variable (`palette[screen_index] == RGB`), which `frames.h5` makes unnecessary. Prints a loud warning when enabled.

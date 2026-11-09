@@ -99,7 +99,7 @@ rig-setup = "fmri_gym.standalone.rig_setup.cli:main"
 session-editor = "fmri_gym.standalone:session_editor_main"
 # The next free session number for a subject: a session script's first line, so
 # all of its runs land in one session. Nothing else reads the disk for a number.
-fmri-ses = "fmri_gym.save.bids:main"
+fmri-ses = "fmri_gym.standalone.session_script:fmri_ses_main"
 # The game controller plugged in: calibrate it (each run with that controller reads
 # its newest calibration), see what it sends, and tune how its stick axes are read.
 gamepad-calibration = "fmri_gym.standalone.gamepad_calibration:main"

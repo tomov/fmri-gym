@@ -538,7 +538,8 @@ def _is_seconds(v: Any) -> bool:
 
 
 def trigger_problems(section: Any) -> list[str]:
-    """What :class:`~fmri_gym.sync.triggers.TriggerSettings` refuses in a ``triggers`` section, as text.
+    """What :class:`~fmri_gym.sync.triggers.TriggerSettings` refuses in a ``triggers`` section,
+    as text.
 
     Two checks are added here: the settings accept a missing port, which the
     backend refuses only on opening, and a scanner key that is no keyboard key,

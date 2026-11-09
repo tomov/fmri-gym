@@ -103,7 +103,8 @@ class AudioBlockLog:
         return replace(self, onsets=[(chunk, from_perf(t)) for chunk, t in self.onsets])
 
     def record(self) -> dict:
-        """The fields as ``audio.h5`` takes them (:meth:`~fmri_gym.save.logging.Logger.close_block`)."""
+        """The fields as ``audio.h5`` takes them
+        (:meth:`~fmri_gym.save.logging.Logger.close_block`)."""
         return asdict(self)
 
 
