@@ -13,12 +13,3 @@ import os
 # pygame, so it holds for every entry point. The versions it shows go in the
 # manifest instead.
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
-
-from .adapters import get_adapter
-from .run import Run, Clock
-from .outputs.display import Display
-from .outputs.audio import Audio
-from .sync.triggers import Triggers
-from .save.logging import Logger
-
-__all__ = ["Run", "Clock", "Display", "Audio", "Triggers", "Logger", "get_adapter"]
