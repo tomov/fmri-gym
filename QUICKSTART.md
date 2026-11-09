@@ -18,9 +18,9 @@ uv run fmri-play --help                         # check: prints usage
 ```bash
 uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/empty.json --curriculum configs/curricula/minihack/levels/room5x5.json
 uv run session-editor                           # or: design sessions and runs (the bottom line shows how to play them)
-uv run rig-config                               # pick, make or change a rig file; run its rig measurements
-uv run pad-calibration                          # calibrate the game controller plugged in, and see what it sends
-uv run rig-measure --rig configs/examples/rigs/empty.json   # measure the rig (--long: at length, once per rig)
+uv run rig-setup                                # pick, make or change a rig file; run its rig measurements
+uv run gamepad-calibration                      # calibrate the game controller plugged in, and see what it sends
+uv run rig-setup --rig configs/examples/rigs/empty.json --measure   # measure the rig (--long: at length, once per rig)
 ```
 
 Press **SPACE**, then **=** (the scanner trigger; on a laptop you press it). **ESC** quits; the data is saved under `data/`. Any other level: swap in another file from `configs/curricula/<backend>/levels/`.
@@ -130,9 +130,9 @@ uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/em
 ## Before a real session
 
 ```bash
-uv run rig-config                  # New rig... (team, rig name), fill in its six steps, Save,
+uv run rig-setup                   # New rig... (team, rig name), fill in its six steps, Save,
                                    # then run its long rig measurement from the last step (once per rig)
-uv run pad-calibration             # a game controller: calibrate it (also from rig-config, step 3)
+uv run gamepad-calibration         # a game controller: calibrate it (also from rig-setup, step 3)
 uv run session-editor --session configs/examples/sessions/pilot.sh   # adapt the example session, save it under your team
 sh configs/examples/sessions/pilot.sh  # play it: about an hour (edit SUBJECT=, SES=, RUN_DURATION=, and RIG= at the top for your team)
 ```

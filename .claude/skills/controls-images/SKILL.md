@@ -5,7 +5,7 @@ description: Make, edit or check a game's controls image (a gamepad drawing with
 
 # Controls images
 
-A screen's text shows an image where a line is only `![alt](path)`, the path from `configs/` (`fmri_gym/display.py`, `IMAGE_LINE`); a missing or unreadable image stops the run at load. The controls images are one PNG per controller curriculum's shared phase, `configs/images/controls/<backend>/<common file's name>.png`, each shown above that phase's Controls lines, which stay as text. They are drawn, never edited by hand: `configs/images/controls/labels.json` names the underlay (the Xbox 360 drawing in `configs/images/controllers/`) and, per image, each control (as a curriculum writes it, the stick as `LEFT_STICK`) with the lines beside it; `tools/controls_images.py` draws them all. A control with no label is greyed out, as are the drawing's controls no controller rig has (bumpers, D-pad, right stick, Back, Start, Guide), and the names printed on the drawing are painted over; the areas are constants at the top of the tool, in the underlay's pixels.
+A screen's text shows an image where a line is only `![alt](path)`, the path from `configs/` (`fmri_gym/outputs/display.py`, `IMAGE_LINE`); a missing or unreadable image stops the run at load. The controls images are one PNG per controller curriculum's shared phase, `configs/images/controls/<backend>/<common file's name>.png`, each shown above that phase's Controls lines, which stay as text. They are drawn, never edited by hand: `configs/images/controls/labels.json` names the underlay (the Xbox 360 drawing in `configs/images/controllers/`) and, per image, each control (as a curriculum writes it, the stick as `LEFT_STICK`) with the lines beside it; `tools/controls_images.py` draws them all. A control with no label is greyed out, as are the drawing's controls no controller rig has (bumpers, D-pad, right stick, Back, Start, Guide), and the names printed on the drawing are painted over; the areas are constants at the top of the tool, in the underlay's pixels.
 
 ## Make or change one
 
@@ -17,7 +17,7 @@ A screen's text shows an image where a line is only `![alt](path)`, the path fro
    SDL_VIDEODRIVER=dummy uv run python -c "
    import pygame, sys
    from fmri_gym.config.curriculum import Curriculum
-   from fmri_gym.display import Display
+   from fmri_gym.outputs.display import Display
    game = next(p for p in Curriculum.load(sys.argv[1]).phases if getattr(p, 'instructions', None))
    d = Display(size=(1024, 768), vsync=False); m = game.instructions.message(False)
    d.draw_text(m.text, align=m.align); pygame.image.save(d.canvas, '/tmp/screen.png')

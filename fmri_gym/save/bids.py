@@ -33,7 +33,6 @@ last block's ``block_end`` line, so the next run can carry on from there.
 
 from __future__ import annotations
 
-import argparse
 import glob
 import hashlib
 import json
@@ -41,8 +40,6 @@ import os
 import re
 from dataclasses import dataclass
 from typing import Callable, NamedTuple
-
-from .config.rig import RigConfig
 
 _LABEL = re.compile(r"[A-Za-z0-9]+")
 
@@ -268,20 +265,3 @@ def _next_free(folder: str, name: Callable[[int], str]) -> int:
     while os.path.exists(os.path.join(folder, name(n))):
         n += 1
     return n
-
-
-def main() -> None:
-    """``fmri-ses``: the subject's next free session number, for a session script.
-
-    A script's first line takes the session once -- ``SES=${1:-$(fmri-ses
-    --subject sub-01)}`` -- and passes it to every run, so they land in the
-    same one; giving the script a number instead resumes that session.
-    """
-    p = argparse.ArgumentParser(
-        description="Print a subject's next free BIDS session number (001, 002, ...).")
-    p.add_argument("--subject", required=True, help="BIDS subject: sub-<letters/digits>")
-    p.add_argument("--rig", required=True, help="the rig file whose data root holds the BIDS "
-                   "tree, <root>/sub-XX/ses-NNN/")
-    args = p.parse_args()
-    root = RigConfig.open(args.rig).data_root
-    print(f"{next_session(root, subject_label(args.subject)):03d}")

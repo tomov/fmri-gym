@@ -1,15 +1,8 @@
-"""The fmri-gym GUIs: one window per job, around ``fmri-play``, which none of them changes.
+"""What the standalone windows' forms share, and needs no Qt: a form's :class:`Field` and
+the parsing of what is typed into one.
 
-- ``rig-config`` (:mod:`.rig_config`): one rig file -- how a rig plays every run.
-- ``session-editor`` (:mod:`.session_editor`): sessions, their runs' configs and
-  the games' keys; Play hands over to ``fmri-play``.
-
-What they share is here, and needs no Qt: a form's :class:`Field` and the
-parsing of what is typed into one. The widgets they share are
-:mod:`.widgets`. The windows import PySide6 at the top, so this module imports
-them only when a command starts one, and says how to install it when it is
-missing. Field labels are the config keys and each field's tip says what it
-does, so the dialog and the file read alike.
+Field labels are the config keys and each field's tip says what it does, so the dialog and the
+file read alike. The widgets the windows share are :mod:`.widgets`.
 """
 
 from __future__ import annotations
@@ -125,29 +118,3 @@ def format_action(action: Any) -> str:
         return action
     return json.dumps(action)
 
-
-def _needs_pyside6(exc: ImportError) -> None:
-    """Re-raise a missing PySide6 with the line that installs it."""
-    if not (exc.name or "").startswith("PySide6"):
-        raise exc
-    raise ImportError("this window needs PySide6: `uv sync --extra gui` (name the other "
-                      "extras you use too, or uv removes them), or `pip install "
-                      "PySide6-Essentials`") from exc
-
-
-def rig_config_main() -> None:
-    """``rig-config``: see :func:`fmri_gym.gui.rig_config.main`."""
-    try:
-        from .rig_config import main
-    except ImportError as exc:
-        _needs_pyside6(exc)
-    main()
-
-
-def session_editor_main() -> None:
-    """``session-editor``: see :func:`fmri_gym.gui.session_editor.main`."""
-    try:
-        from .session_editor import main
-    except ImportError as exc:
-        _needs_pyside6(exc)
-    main()

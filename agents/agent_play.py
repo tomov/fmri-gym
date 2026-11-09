@@ -27,10 +27,11 @@ from collections import Counter
 
 from policies import Policy, RandomPolicy, VLMPolicy
 
-from fmri_gym import Clock, Logger, get_adapter
+from fmri_gym.adapters import get_adapter
 from fmri_gym.config.curriculum import Curriculum
 from fmri_gym.config.phases import GamePhase
-from fmri_gym.run import EpisodeResult
+from fmri_gym.run import Clock, EpisodeResult
+from fmri_gym.save.logging import Logger
 
 
 def no_key_action(adapter) -> tuple:

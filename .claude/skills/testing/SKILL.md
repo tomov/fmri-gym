@@ -21,7 +21,7 @@ Read the summary. A skip says what this machine lacks and how to get it (`uv syn
 ## Reading a failure
 
 - **playable** failed: the adapter broke the contract in `fmri_gym/adapters/base.py` (frame not uint8 RGB, variables not JSON-able, sound not `(samples, channels)`, an outcome outside the vocabulary). Fix the adapter or the env under `gym/`, never the test's expectation.
-- **recorded** failed: the log's shape changed. `fmri_gym/logging.py`'s docstring is the contract; the recorder is `agents/agent_play.py`.
+- **recorded** failed: the log's shape changed. `fmri_gym/save/logging.py`'s docstring is the contract; the recorder is `agents/agent_play.py`.
 - **replays** failed: the engine is not deterministic across processes, or `capture`/`restore`/`sound` disagree with what was logged. Run it alone for the first mismatch:
   ```bash
   uv run python -m tests.verify_replay --curriculum <config> --max-frames 200 --n-episodes 2

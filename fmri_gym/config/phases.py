@@ -19,9 +19,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, ClassVar
 
-from ..display import image_line_problems
+from ..outputs.display import image_line_problems
 from ..inputs import ControlNames, is_control_of_any_input_device
-from ..menu import menu_problems
 
 #: An episode's possible outcomes: EnvAdapter.outcome's names, and the subject's own endings.
 OUTCOMES = frozenset({"won", "lost", "terminated", "truncated", "playing", "forfeit", "reset"})
@@ -32,6 +31,12 @@ REWINDABLE = frozenset({"won", "lost", "terminated"})
 _SURVEY_CONTROLS = (ControlNames.K_1, ControlNames.K_2, ControlNames.K_3, ControlNames.K_4,
                     ControlNames.K_5, ControlNames.K_6, ControlNames.K_7)
 
+#: What a game phase's ``menu`` may offer, and its fields' defaults (:mod:`fmri_gym.menu`).
+MENU_OPTIONS = ("reset", "forfeit", "resume")
+_MENU_DEFAULTS = {"hold": 5.0, "after": 15.0, "options": list(MENU_OPTIONS),
+                  "move": [ControlNames.K_UP, ControlNames.K_DOWN],
+                  "confirm": ControlNames.K_RETURN}
+
 
 class BlockMode(str, Enum):
     """What ends a game block: its clock, or its count of episodes."""
@@ -40,6 +45,34 @@ class BlockMode(str, Enum):
     DURATION = "duration"
     #: the block lasts ``n_episodes`` episodes, or ``duration`` seconds at most
     EPISODE = "episode"
+
+
+@dataclass(frozen=True, slots=True)
+class MenuSettings:
+    """A phase's ``menu`` field with its defaults filled in and its control names upper-cased."""
+
+    #: the control held to open the menu
+    control: str
+    #: seconds it has to be held
+    hold: float
+    #: seconds into the block before the menu is available
+    after: float
+    #: the options offered, in the order shown
+    options: tuple[str, ...]
+    #: the controls that move the choice: to the previous option, to the next
+    move: tuple[str, str]
+    #: the control that confirms the choice
+    confirm: str
+
+    @classmethod
+    def from_dict(cls, spec: dict) -> MenuSettings:
+        """Read a phase's ``menu`` dict (already validated by :func:`menu_problems`)."""
+        cfg = {**_MENU_DEFAULTS, **spec}
+        previous, following = cfg["move"]
+        return cls(control=cfg["control"].upper(), hold=float(cfg["hold"]),
+                   after=float(cfg["after"]), options=tuple(cfg["options"]),
+                   move=(previous.upper(), following.upper()),
+                   confirm=cfg["confirm"].upper())
 
 
 def join_text(text: str | list | tuple) -> str:
@@ -439,4 +472,42 @@ def _rewind_problems(d: dict) -> list[str]:
                    f"game's own endings are {sorted(REWINDABLE)}")
     if isinstance(frames, bool) or not isinstance(frames, int) or frames < 1:
         out.append(f"rewind_frames: expected the frames to go back, >= 1, got {frames!r}")
+    return out
+
+
+def menu_problems(spec: object) -> list[str]:
+    """What is wrong with a phase's ``menu`` dict, for :meth:`GamePhase.problems`.
+
+    :param spec: the phase's ``"menu"`` value.
+    :return: human-readable problems, empty when the menu is usable.
+    """
+    if not isinstance(spec, dict):
+        return [f"menu: expected a dict with at least 'control', got {spec!r}"]
+    out = []
+    if not isinstance(spec.get("control"), str):
+        out.append("menu.control: the control to hold is required, e.g. \"X\"")
+    for field, names in (("control", [spec.get("control")]), ("move", spec.get("move", [])),
+                         ("confirm", [spec.get("confirm", _MENU_DEFAULTS["confirm"])])):
+        wrong = [n for n in (names if isinstance(names, list) else []) if isinstance(n, str)
+                 and (not is_control_of_any_input_device(n.upper())
+                      or n.upper() == ControlNames.K_ESCAPE)]
+        if wrong:
+            out.append(f"menu.{field}: {wrong} is no control name "
+                       f"({ControlNames.K_ESCAPE} quits the run): a value in "
+                       "fmri_gym/inputs/control_names.py")
+    for field in ("hold", "after"):
+        value = spec.get(field, _MENU_DEFAULTS[field])
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+            out.append(f"menu.{field}: expected seconds (>= 0), got {value!r}")
+    options = spec.get("options", _MENU_DEFAULTS["options"])
+    if not isinstance(options, list) or not options or set(options) - set(MENU_OPTIONS):
+        out.append(f"menu.options: expected a non-empty list from {list(MENU_OPTIONS)}, got {options!r}")
+    move = spec.get("move", _MENU_DEFAULTS["move"])
+    if not (isinstance(move, list) and len(move) == 2 and all(isinstance(k, str) for k in move)):
+        out.append(f"menu.move: expected two control names [previous, next], got {move!r}")
+    if not isinstance(spec.get("confirm", _MENU_DEFAULTS["confirm"]), str):
+        out.append(f"menu.confirm: expected a control name, got {spec.get('confirm')!r}")
+    unknown = set(spec) - {"control"} - set(_MENU_DEFAULTS)
+    if unknown:
+        out.append(f"menu: unknown fields {sorted(unknown)}")
     return out

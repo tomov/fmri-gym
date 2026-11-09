@@ -56,7 +56,7 @@ def test_settings_are_read():
 
 
 def test_a_missing_file_says_how_to_make_one():
-    with pytest.raises(ValueError, match="no such file.*rig-config --rig"):
+    with pytest.raises(ValueError, match="no such file.*rig-setup --rig"):
         RigConfig.open("site1/none.json")
 
 
@@ -120,7 +120,7 @@ class _FakeHid:
 
 
 def test_a_hid_box_is_set_to_output_zero_then_holds_each_code(monkeypatch):
-    from fmri_gym.triggers import Triggers
+    from fmri_gym.sync.triggers import Triggers
     fake = _FakeHid()
     monkeypatch.setitem(sys.modules, "hid", fake)
     triggers = Triggers.from_dict({"sync": {"mode": "send"}, "backend": "hid", "port": "B"})

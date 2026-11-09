@@ -249,7 +249,7 @@ def _pcm(wave: np.ndarray, peak: float = _PEAK) -> np.ndarray:
 
     :param wave: float samples, any scale.
     :param peak: target peak as a fraction of full scale.
-    :return: ``(n_samples, 1)`` int16, the shape :class:`~fmri_gym.audio.Audio`
+    :return: ``(n_samples, 1)`` int16, the shape :class:`~fmri_gym.outputs.audio.Audio`
         opens the output stream from.
     """
     wave = np.asarray(wave, np.float64)

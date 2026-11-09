@@ -34,7 +34,7 @@ say the same thing:
   opens on after the trigger and closes on, the modality's baseline (fMRI: 10
   each, for the haemodynamic lag); left out, the run shows none;
 - ``"triggers"``: the scanner's start sync and the trigger codes, over which
-  line (:class:`~fmri_gym.triggers.TriggerSettings`); left out, the run waits
+  line (:class:`~fmri_gym.sync.triggers.TriggerSettings`); left out, the run waits
   for ``=`` and sends no codes, and says so on the experimenter screen and in
   the manifest (``defaulted``);
 - ``"rig_measurement"``: the equipment the rig's timing is measured with
@@ -47,7 +47,7 @@ phase's ``"controls"``) are control names of the rig's input devices
 keys** are keyboard keys a device types itself; a curriculum binds them like
 any key.
 
-It is written by hand or in the rig form (``rig-config --rig <file>``). What was
+It is written by hand or in the rig form (``rig-setup --rig <file>``). What was
 measured on the rig is kept beside its file (:func:`measured_latency_files`).
 """
 
@@ -62,7 +62,7 @@ from pathlib import Path
 from typing import Any
 
 from ..inputs import INPUT_DEVICE_CLASSES_BY_NAME, Keyboard
-from ..triggers import TriggerError, TriggerSettings
+from ..sync.triggers import TriggerError, TriggerSettings
 
 MODALITIES = ("fmri", "meg", "eeg", "behav")
 #: The modalities that record the brain: their runs need a fixation baseline at each end.
@@ -132,7 +132,7 @@ TRIGGER_PRESETS: dict[str, dict] = {
 LABEL = re.compile(r"[A-Za-z0-9_-]+")
 _INITIALS = re.compile(r"[A-Z]{2,4}")
 _SIZE = re.compile(r"([1-9]\d*)x([1-9]\d*)")
-_MAKE = ("make it in the rig form, rig-config --rig <file>, or start from "
+_MAKE = ("make it in the rig form, rig-setup --rig <file>, or start from "
          "configs/examples/rigs/empty.json")
 #: The repo's ``configs/``: a folder per team, each with its ``rigs/``, and the examples.
 CONFIGS = Path(__file__).resolve().parents[2] / "configs"
@@ -248,7 +248,7 @@ class RigConfig:
                   if rig.get(k, own) != own]
         if found:
             raise ValueError(f"{path}: " + "; ".join(found) + ". Fix it by hand, or in the "
-                             f"form: rig-config --rig {path}")
+                             f"form: rig-setup --rig {path}")
         settings = {**DEFAULTS, **rig}
         fields = {"site": site, "rig": rig_name,
                   **{k: rig[k] for k in FIELDS if k in rig and k not in ("site", "rig")}}
@@ -538,7 +538,8 @@ def _is_seconds(v: Any) -> bool:
 
 
 def trigger_problems(section: Any) -> list[str]:
-    """What :class:`~fmri_gym.triggers.TriggerSettings` refuses in a ``triggers`` section, as text.
+    """What :class:`~fmri_gym.sync.triggers.TriggerSettings` refuses in a ``triggers`` section,
+    as text.
 
     Two checks are added here: the settings accept a missing port, which the
     backend refuses only on opening, and a scanner key that is no keyboard key,

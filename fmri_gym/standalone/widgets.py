@@ -4,7 +4,7 @@ Qt rather than tkinter: the Tk that ships with uv's Python has no font
 rendering to speak of (Tk 9 without Xft), and an editor people avoid is an
 editor that does not replace hand-edited JSON. PySide6 rather than PyQt6
 because it is LGPL. Only the windows import this module, and they are
-imported only when a command opens one (:mod:`fmri_gym.gui`).
+imported only when a command opens one (:mod:`fmri_gym.standalone`).
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6.QtCore import Qt
 
 from ..inputs.control_names import ControlNames
-from . import Field, field_values, format_action, format_value, parse_action
+from .forms import Field, field_values, format_action, format_value, parse_action
 
 
 #: Qt keys -> the key names used in ``keys`` (:class:`ControlNames`); letters and digits
@@ -119,7 +119,7 @@ def group(title: str, inner: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
 
 
 class Form(QtWidgets.QWidget):
-    """One labelled row per :class:`~fmri_gym.gui.Field`; the tip is the tooltip."""
+    """One labelled row per :class:`~fmri_gym.standalone.forms.Field`; the tip is the tooltip."""
 
     #: Any row edited (typed, picked, ticked) -- also when :meth:`set` fills it.
     changed = QtCore.Signal()
@@ -161,7 +161,7 @@ class Form(QtWidgets.QWidget):
         return w
 
     def write(self, key: str, raw: Any) -> None:
-        """Put a widget value (see :func:`~fmri_gym.gui.format_value`) into one row."""
+        """Put a widget value (see :func:`~fmri_gym.standalone.forms.format_value`) into one row."""
         f = next(f for f in self.fields if f.key == key)
         w = self.widgets[key]
         if f.kind == "bool":
@@ -212,7 +212,8 @@ class Form(QtWidgets.QWidget):
             self.write(f.key, format_value(f, values.get(f.key)))
 
     def get(self) -> dict:
-        """Read the form back as config values (see :func:`~fmri_gym.gui.field_values`)."""
+        """Read the form back as config values (see
+        :func:`~fmri_gym.standalone.forms.field_values`)."""
         values = field_values(self.fields, {f.key: self._read(f) for f in self.fields})
         for key in self.as_lines & values.keys():
             values[key] = values[key].split("\n")

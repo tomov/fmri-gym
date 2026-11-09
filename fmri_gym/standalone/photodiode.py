@@ -7,7 +7,7 @@ the screen can. This task, run once per rig with the same :class:`Display`
 and :class:`Triggers` a session uses, flashes a patch and records the flips,
 so the offset can be measured and then subtracted in analysis::
 
-    python -m fmri_gym.photodiode --fullscreen --rig configs/<team>/rigs/<rig>.json
+    python -m fmri_gym.standalone.photodiode --fullscreen --rig configs/<team>/rigs/<rig>.json
 
 The patch (default 120 px, bottom-right) goes white ``n`` times for
 ``--on-ms`` and black again, with a randomized gap in between so nothing
@@ -34,7 +34,7 @@ Two ways to read the diode, because how it is plugged in varies by lab:
 **Sound** (``--audio-click``): the same run also measures when sound is
 heard. On every other white flip (so that an input hearing the clicks cannot
 pass for the diode: it would see only those flashes) a 10 ms tone burst is queued through
-:class:`~fmri_gym.audio.Audio` exactly as a game frame's sound is (same
+:class:`~fmri_gym.outputs.audio.Audio` exactly as a game frame's sound is (same
 output, same delay chosen at start-up), and its DAC onset is logged. A microphone at the ear -- at the end of the scanner's
 sound tube, or inside the headphone -- gives the acoustic edge. Recorded on
 the second input channel with ``--audio --mic`` (diode on channel 0,
@@ -66,12 +66,12 @@ from typing import TYPE_CHECKING, Any, Callable, NamedTuple
 import numpy as np
 import pygame
 
-from .adapters.base import Sound
-from .display import Display
-from .triggers import TriggerSettings, Triggers
+from ..adapters.base import Sound
+from ..outputs.display import Display
+from ..sync.triggers import TriggerSettings, Triggers
 
 if TYPE_CHECKING:
-    from .audio import Audio
+    from ..outputs.audio import Audio
 
 CORNERS = ("br", "bl", "tr", "tl")
 
@@ -338,7 +338,7 @@ def _trigger_settings(args: argparse.Namespace) -> TriggerSettings:
     """Trigger settings from ``--rig`` (its rig file's ``triggers``), overridden by flags."""
     section: dict = {}
     if args.rig:
-        from .config.rig import load
+        from ..config.rig import load
         section = dict(load(args.rig).get("triggers", {}))
         section.pop("sync", None)     # the calibration has no run start to sync
     if args.trigger_backend:
@@ -463,7 +463,7 @@ def _recorder(args: argparse.Namespace) -> AudioRecorder:
 
 def _audio_output() -> Audio:
     """The session's audio output, built as a session builds it."""
-    from .audio import Audio
+    from ..outputs.audio import Audio
     audio = Audio()
     print(f"audio: {audio.status()}", file=sys.stderr)
     return audio
@@ -640,7 +640,7 @@ def _report(summary: dict, arrays: dict, outdir: str) -> None:
                   "input gain, and that it sits on the patch")
     else:
         print("no audio readout: match the trigger-channel codes to the diode edges in "
-              "your recording with fmri_gym.photodiode.match_edges()")
+              "your recording with fmri_gym.standalone.photodiode.match_edges()")
     for key, label in (("click_dac_offset", "flip -> click at the DAC"),
                        ("sound_offset", "flip -> sound at the microphone"),
                        ("acoustic_offset", "DAC -> sound at the microphone"),

@@ -162,7 +162,7 @@ class EnvAdapter:
         The session hands over what it knows -- the episode's running score
         (its cumulative reward) and the seconds left in the block -- and the
         backend decides what the subject sees of it, in a strip above the frame
-        that never covers game pixels (:meth:`~fmri_gym.display.Display
+        that never covers game pixels (:meth:`~fmri_gym.outputs.display.Display
         .draw_frame`). Whatever goes here has to be state the env already
         reports, so a model reads the same numbers off the log. The default is
         the two the session knows, time left first and the score last; a game

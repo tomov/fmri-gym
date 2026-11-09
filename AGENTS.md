@@ -15,14 +15,15 @@ fmri_gym/config/rig.py           CORE  RigConfig: one rig's file (configs/<team>
 fmri_gym/config/curriculum.py    CORE  Curriculum: the curriculum file, loaded once into typed phases; load, save, includes
 fmri_gym/config/phases.py        CORE  one frozen dataclass per phase type (Fixation, Message, GamePhase, Check*...)
 fmri_gym/run.py                  CORE  one run's experiment loop: trigger, phases, timing
-fmri_gym/display.py              CORE  one pygame window: frames, text, fixation
-fmri_gym/inputs/                 CORE  the input devices: one named control per key, button, stick direction
-fmri_gym/logging.py              CORE  manifest.json + one crash-safe JSONL/HDF5 log per game block
-fmri_gym/replay.py               CORE  replay an episode from a block's log; frame fields as arrays
 fmri_gym/menu.py                 CORE  hold-a-key pause menu: reset / forfeit / resume (opt-in per phase)
+fmri_gym/inputs/                 CORE  the input devices: one named control per key, button, stick direction
+fmri_gym/outputs/                CORE  what the participant sees and hears: display.py (the window), audio.py
+fmri_gym/sync/                   CORE  triggers.py: the scanner's start pulse and the event codes to the recorders
+fmri_gym/save/                   CORE  the data: bids.py (where), logging.py (manifest + one log per block), replay.py
 fmri_gym/adapters/base.py        CORE  EnvAdapter + FrameState: the seam
 fmri_gym/adapters/keymap.py      CORE  the phase's keys, one Keymap per action space
 fmri_gym/adapters/<BACKEND>.py   YOU   one small wrapper per game engine
+fmri_gym/standalone/                   the commands that are not a run: rig setup, session editor, calibration
 configs/curricula/<BACKEND>/     YOU   the game's curricula: levels/ one per level, the folder a sequence; common/ the phase they share
 gym/<GAME>/                      YOU   a Gymnasium env for a game that ships none, or a rough one
 gym/replay_state/                      ReplayState: a savestate by replay, for any env
@@ -32,7 +33,7 @@ tests/                                 the suite: every backend played, logged, 
 .github/workflows/tests.yml            CI: the suite on every pull request that is ready for review
 ```
 
-**Core** is every `fmri_gym/*.py`, `fmri_gym/config/*.py` and `fmri_gym/inputs/*.py`, whether the table lists it or not (`audio.py`, `triggers.py`, ...), plus the adapter seam, `adapters/base.py` and `adapters/keymap.py`. Every other file under `fmri_gym/adapters/` is a backend's.
+**Core** is every `fmri_gym/*.py` and every file under `fmri_gym/config/`, `inputs/`, `outputs/`, `sync/` and `save/`, whether the table lists it or not, plus the adapter seam, `adapters/base.py` and `adapters/keymap.py`. Every other file under `fmri_gym/adapters/` is a backend's. `fmri_gym/standalone/` is not core: it holds the tools that run on their own (Rule 5), and nothing outside it imports from it. Which module imports which, layer by layer, is drawn in `docs/DEPENDENCIES.md`.
 
 The core is engine-agnostic: `run.py` never imports a game engine, never touches `env.unwrapped`, and never mentions a game by name. Everything engine-specific goes through an `EnvAdapter`.
 
@@ -63,7 +64,7 @@ If you find yourself writing game rules, drawing a board, tracking a selection c
 
 ## Rule 2: changes to core libraries are a last resort, and stay generic
 
-Before editing a core file (any `fmri_gym/*.py`, `fmri_gym/config/*.py` or `fmri_gym/inputs/*.py`, `adapters/base.py` or `adapters/keymap.py`; see "The shape of the repo"), please try to solve the problem in your adapter. If you cannot:
+Before editing a core file (any `fmri_gym/*.py`, any file under `config/`, `inputs/`, `outputs/`, `sync/` or `save/`, `adapters/base.py` or `adapters/keymap.py`; see "The shape of the repo"), please try to solve the problem in your adapter. If you cannot:
 
 - Keep it **additive and default-off**, so no existing backend changes behaviour.
 - Keep it **nameless**: no `if backend == "rushhour"`, no game ids, no engine imports. This holds for the prose too -- a core file's comments and docstrings state the contract, they don't cite the backend that happens to use it.
@@ -104,7 +105,7 @@ The worst outcome this code can produce is not a crash. It is a session that run
 - **One mechanism per idea.** When features need the same thing -- resume, rewind and replay all start an episode from a saved state -- make one path (`initial_state`) serve them all, rather than a subsystem each with its own log lines and replay rules.
 - **Build what was asked, then stop.** Alternative units, caps, extra menu entries and configurable timings each cost validation, docs and tests for good; ask first. A feature is cheap to add later and expensive to remove.
 - **Use the seam that exists.** A new `EnvAdapter` hook or phase field is a core change (Rule 2); try `overlay()`, `block_extra()`, `info` or an env wrapper first.
-- **Keep it off the hot path.** The hot path is the code that runs while a participant plays during imaging: `fmri_play`, the `Run` and everything it calls. Every line there is one more thing that can slow a frame or break mid-session, so add to it only what the recording cannot do without. A tool that can run on its own -- measuring the rig, calibrating a controller, making a rig file, building a report from the logs -- is a command of its own that the run never imports, runs or offers (`rig-measure`, `pad-calibration`, `rig-config`); the run at most reads what such a tool filed, at start-up, and says when it is missing.
+- **Keep it off the hot path.** The hot path is the code that runs while a participant plays during imaging: `fmri_play`, the `Run` and everything it calls. Every line there is one more thing that can slow a frame or break mid-session, so add to it only what the recording cannot do without. A tool that can run on its own -- measuring the rig, calibrating a controller, making a rig file, building a report from the logs -- is a command of its own that the run never imports, runs or offers (`rig-setup`, `gamepad-calibration`); the run at most reads what such a tool filed, at start-up, and says when it is missing.
 - **Agree the design before writing it.** For a change that touches the core, write the plan in a few lines and ask the questions only a human can answer (is this ever interleaved? should finishing end the level?). A conversation is cheaper than rewriting a branch.
 - **Treat size as a warning.** If a feature passes a few hundred lines, or its docstring needs paragraphs to defend the design, stop and look for a simpler one: a long justification usually marks a design that fights the code around it.
 - **Verify against a reference.** When porting or rewriting, run the old and new side by side on the same inputs; when saving and restoring, compare bytes. Keep the result in the commit message, not a check script in the repo.

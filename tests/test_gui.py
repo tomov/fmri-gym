@@ -12,8 +12,8 @@ import pytest
 from fmri_gym.config import curriculum
 from fmri_gym.config import rig as rig_file
 from fmri_gym.inputs import ControlNames
-from fmri_gym.session_script import read_session, write_session
-from fmri_gym.triggers import TriggerSettings
+from fmri_gym.standalone.session_script import read_session, write_session
+from fmri_gym.sync.triggers import TriggerSettings
 
 RIG = "configs/examples/rigs/laptop.json"
 EXAMPLES = rig_file.CONFIGS / "examples" / "rigs"
@@ -26,7 +26,7 @@ def gui():
 
 
 def test_the_measurement_plan_follows_the_rig(gui):
-    from fmri_gym.gui.rig_config import measurement_plan
+    from fmri_gym.standalone.rig_setup.window import measurement_plan
 
     laptop = measurement_plan(rig_file.RigConfig.open(str(EXAMPLES / "laptop.json")))
     meg = measurement_plan(rig_file.RigConfig.open(str(EXAMPLES / "meg.json")))
@@ -43,12 +43,12 @@ def test_the_measurement_plan_follows_the_rig(gui):
 @pytest.fixture
 def qt(gui, monkeypatch):
     monkeypatch.setenv("QT_QPA_PLATFORM", os.environ.get("QT_QPA_PLATFORM", "offscreen"))
-    from fmri_gym.gui import widgets
+    from fmri_gym.standalone import widgets
     return widgets.app()
 
 
 def test_the_session_editor_opens_a_run_and_a_session(qt):
-    from fmri_gym.gui.session_editor import _Editor, listed_files
+    from fmri_gym.standalone.session_editor import _Editor, listed_files
 
     editor = _Editor(curriculum.new_curriculum(), None)
     assert len(editor.steps) == 1 and editor.session_path is None
@@ -63,7 +63,7 @@ def test_the_session_editor_opens_a_run_and_a_session(qt):
 
 
 def _rig_window(name: str, path: str | None = None, **kwargs):
-    from fmri_gym.gui.rig_config import _RigWindow
+    from fmri_gym.standalone.rig_setup.window import _RigWindow
 
     source = str(EXAMPLES / f"{name}.json")
     return _RigWindow(rig_file.draft(source), path or source, **kwargs), rig_file.load(source)
@@ -150,7 +150,7 @@ def test_a_new_rig_is_filled_step_by_step_then_saved_then_measured(qt, tmp_path)
 
 
 def test_flags_fmri_play_would_refuse_are_problems(gui):
-    from fmri_gym.gui.session_editor import _flag_problems
+    from fmri_gym.standalone.session_editor import _flag_problems
 
     assert _flag_problems({}) == [] and _flag_problems({"duration": 60.0, "loop": True}) == []
     assert _flag_problems({"duration": 0.0})  # no length at all
@@ -162,7 +162,7 @@ CARTPOLE = {"curriculum": [{"type": "game", "backend": "gym", "game": "CartPole-
 
 
 def test_check_reports_a_game_key_none_of_the_rigs_inputs_has(qt):
-    from fmri_gym.gui.session_editor import _Editor
+    from fmri_gym.standalone.session_editor import _Editor
 
     a = ControlNames.CONTROLLER_BUTTON_A
     pad = {"curriculum": [{**CARTPOLE["curriculum"][0], "controls": {"": 0, a: 1}}]}
@@ -176,7 +176,7 @@ def test_check_reports_a_game_key_none_of_the_rigs_inputs_has(qt):
 
 
 def test_a_game_phase_shows_and_keeps_only_what_its_mode_uses(qt):
-    from fmri_gym.gui.session_editor import _Editor
+    from fmri_gym.standalone.session_editor import _Editor
 
     editor = _Editor({"curriculum": [{**CARTPOLE["curriculum"][0], "mode": "episode",
                                       "n_episodes": 3}]}, None)
@@ -190,7 +190,7 @@ def test_a_game_phase_shows_and_keeps_only_what_its_mode_uses(qt):
 
 
 def test_an_edit_is_known_until_it_is_saved(qt):
-    from fmri_gym.gui.session_editor import _Editor
+    from fmri_gym.standalone.session_editor import _Editor
 
     editor = _Editor(CARTPOLE, None)
     clean = editor._state()
@@ -199,7 +199,7 @@ def test_an_edit_is_known_until_it_is_saved(qt):
 
 
 def test_the_controller_line_says_what_to_do(gui):
-    from fmri_gym.gui.rig_config import _controller_line
+    from fmri_gym.standalone.rig_setup.window import _controller_line
 
     xbox = {"index": 0, "device_name": "Xbox Wireless Controller", "input": "xbox_controller",
             "calibration": None, "calibrated": None}
@@ -221,7 +221,7 @@ def test_the_inputs_ticked_are_the_rigs(qt):
 
 
 def test_a_games_keys_are_edited_in_its_phase(qt):
-    from fmri_gym.gui.session_editor import _Editor
+    from fmri_gym.standalone.session_editor import _Editor
 
     editor = _Editor(CARTPOLE, None)
     editor._show_phase(0)
@@ -233,14 +233,14 @@ def test_a_games_keys_are_edited_in_its_phase(qt):
 
 
 def test_a_new_rig_has_the_keyboard_alone(qt, tmp_path):
-    from fmri_gym.gui.rig_config import _RigWindow
+    from fmri_gym.standalone.rig_setup.window import _RigWindow
 
     window = _RigWindow({}, str(tmp_path / "site" / "rig.json"))
     assert window.rig["inputs"] == ["keyboard"]
 
 
 def test_a_run_opens_on_its_game(qt):
-    from fmri_gym.gui.session_editor import _Editor
+    from fmri_gym.standalone.session_editor import _Editor
 
     editor = _Editor({"curriculum": [{"type": "fixation", "duration": 1.0},
                                      CARTPOLE["curriculum"][0]]}, None)

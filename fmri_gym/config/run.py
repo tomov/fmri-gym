@@ -20,9 +20,8 @@ from dataclasses import dataclass
 from importlib import metadata
 
 from ..inputs import controls_of_input_devices
-from ..menu import MenuSettings
 from .curriculum import Curriculum
-from .phases import GamePhase, Message, Phase, Survey
+from .phases import GamePhase, MenuSettings, Message, Phase, Survey
 from .rig import RigConfig
 
 

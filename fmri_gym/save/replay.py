@@ -1,8 +1,8 @@
-"""Reconstruction and analysis on top of a logged block (:mod:`fmri_gym.logging`).
+"""Reconstruction and analysis on top of a logged block (:mod:`fmri_gym.save.logging`).
 
-An episode is replayed from its seed and its actions through a fresh adapter
-built from the block's own ``block_start`` line, so a block's log is enough to
-recreate the game the subject saw, frame for frame, on a deterministic engine.
+An episode is replayed from its seed and its actions through a fresh adapter, built by the
+caller from the block's own ``block_start`` line (its ``backend`` and ``phase``), so a block's
+log is enough to recreate the game the subject saw, frame for frame, on a deterministic engine.
 An episode that carried on from an earlier run starts from the savestate its
 ``episode_start`` line holds (``initial_state``), restored over the reset.
 """
@@ -51,24 +51,21 @@ def reconstruction_plan(block: str, episode_id: int | None = None) -> EpisodeRec
 
 
 def reconstruct_episode(
-    block: str, episode_id: int | None = None, adapter: Any = None,
+    block: str, episode_id: int | None = None, *, adapter: Any,
     n_actions: int | None = None,
 ) -> tuple[Any, EpisodeReconstructionPlan]:
     """Replay one episode through an adapter, leaving it at the episode's last frame.
 
     :param block: the block's folder.
     :param episode_id: which episode (see :func:`reconstruction_plan`).
-    :param adapter: the adapter to drive; built from the block's ``phase`` if omitted.
+    :param adapter: the adapter to drive, fresh: ``get_adapter(start["backend"], start["phase"])``
+        for the block's first line ``start``.
     :param n_actions: replay only the first this many of the episode's actions
         (``0``: the reset alone), leaving the adapter at the logged frame
         ``ep_frame == n_actions - 1``; ``None`` replays them all.
     :return: ``(adapter, plan)``; the caller owns the adapter's ``close()``.
     """
     plan = reconstruction_plan(block, episode_id)
-    if adapter is None:
-        from .adapters import get_adapter
-        start = read_events(block)[0]
-        adapter = get_adapter(start["backend"], start["phase"])
     adapter.reset(plan.seed)
     if plan.initial_state is not None:
         adapter.restore(plan.initial_state)
