@@ -75,7 +75,7 @@ shimmy = ["shimmy"]  # old-`gym` envs via "legacy_gym": true
 tilematch = ["tile-match-gym"]  # display + logging only
 # MEG/EEG trigger backends (README "Triggers"): `triggers.backend` lsl / serial / parallel / hid.
 triggers = ["pylsl", "pyserial", "pyparallel", "hidapi"]
-# The windows: rig-config and session-editor. Essentials is the widgets half of PySide6 (LGPL),
+# The windows: rig-setup and session-editor. Essentials is the widgets half of PySide6 (LGPL),
 # without the WebEngine/3D add-ons, which would triple the download.
 gui = ["PySide6-Essentials>=6.6"]
 
