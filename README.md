@@ -351,6 +351,8 @@ A game reaches the scanner through up to three layers, each its own directory:
 
 Most games need only the last: a pip package already provides the env. Nothing about fMRI leaks below the adapter, so the env an agent is trained on is the one the subject plays.
 
+The package is in layers, drawn in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md): the leaves (`inputs/`, `outputs/`, `sync/`, `save/`, `adapters/`) import nothing outside their own folder, the run (`config/`, `menu.py`, `run.py`) puts them together, and the tools in `standalone/` sit on top, imported by nothing else.
+
 ```
 fmri_gym/
   run.py        # trigger, clock, curriculum loop, phases  — 100% engine-agnostic

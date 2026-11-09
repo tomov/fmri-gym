@@ -33,7 +33,7 @@ tests/                                 the suite: every backend played, logged, 
 .github/workflows/tests.yml            CI: the suite on every pull request that is ready for review
 ```
 
-**Core** is every `fmri_gym/*.py` and every file under `fmri_gym/config/`, `inputs/`, `outputs/`, `sync/` and `save/`, whether the table lists it or not, plus the adapter seam, `adapters/base.py` and `adapters/keymap.py`. Every other file under `fmri_gym/adapters/` is a backend's. `fmri_gym/standalone/` is not core: it holds the tools that run on their own (Rule 5), and nothing outside it imports from it.
+**Core** is every `fmri_gym/*.py` and every file under `fmri_gym/config/`, `inputs/`, `outputs/`, `sync/` and `save/`, whether the table lists it or not, plus the adapter seam, `adapters/base.py` and `adapters/keymap.py`. Every other file under `fmri_gym/adapters/` is a backend's. `fmri_gym/standalone/` is not core: it holds the tools that run on their own (Rule 5), and nothing outside it imports from it. Which module imports which, layer by layer, is drawn in `docs/DEPENDENCIES.md`.
 
 The core is engine-agnostic: `run.py` never imports a game engine, never touches `env.unwrapped`, and never mentions a game by name. Everything engine-specific goes through an `EnvAdapter`.
 
