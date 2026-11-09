@@ -1,7 +1,7 @@
 """Streaming PCM output via a PortAudio callback (sounddevice).
 
 Two layers. :class:`Audio` is what the experiment loop holds -- the speakers,
-exactly as :class:`~fmri_gym.display.Display` is the monitor -- and it takes
+exactly as :class:`~fmri_gym.outputs.display.Display` is the monitor -- and it takes
 whatever :meth:`~fmri_gym.adapters.base.EnvAdapter.sound` produced, engine
 unseen. :class:`SoundDeviceGameBlockStream` below it is the PortAudio plumbing;
 another way of getting sound out (a different library, a file writer, a
@@ -39,7 +39,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 if TYPE_CHECKING:
-    from .adapters.base import Sound
+    from ..adapters.base import Sound
 
 # conda's bundled alsa-lib only ships raw-hardware PCM definitions, so
 # PortAudio enumerates `hw:*` cards and nothing else -- its "default" then
@@ -103,7 +103,7 @@ class AudioBlockLog:
         return replace(self, onsets=[(chunk, from_perf(t)) for chunk, t in self.onsets])
 
     def record(self) -> dict:
-        """The fields as ``audio.h5`` takes them (:meth:`~fmri_gym.logging.Logger.close_block`)."""
+        """The fields as ``audio.h5`` takes them (:meth:`~fmri_gym.save.logging.Logger.close_block`)."""
         return asdict(self)
 
 
@@ -378,7 +378,7 @@ class SoundDeviceGameBlockStream:
 class Audio:
     """The session's speakers: plays whatever an adapter's ``sound`` returns.
 
-    Engine-agnostic in the same way :class:`~fmri_gym.display.Display` is: it
+    Engine-agnostic in the same way :class:`~fmri_gym.outputs.display.Display` is: it
     receives PCM chunks and never learns which game made them. The output
     stream is opened on the first chunk, because only the chunk says what
     format to open it in, and is reopened if a later block plays at a different

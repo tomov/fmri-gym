@@ -14,17 +14,17 @@ import pytest
 from gymnasium import spaces
 
 from fmri_gym.adapters.base import Sound
-from fmri_gym.audio import AudioBlockLog
-from fmri_gym.bids import task_label
+from fmri_gym.outputs.audio import AudioBlockLog
+from fmri_gym.save.bids import task_label
 from fmri_gym.adapters.keymap import make_keymap
 from fmri_gym.config.curriculum import (
     check_shape, game_changes, is_common_file, load_curriculum, save_curriculum,
     shared_overrides, validate_curriculum,
 )
-from fmri_gym.logging import (
+from fmri_gym.save.logging import (
     AUDIO_FILENAME, FRAMES_FILENAME, Logger, read_audio, read_events, read_frames, read_state,
 )
-from fmri_gym.replay import frame_arrays, reconstruction_plan
+from fmri_gym.save.replay import frame_arrays, reconstruction_plan
 from fmri_gym.run import Clock
 from tests.changed import select
 
@@ -143,7 +143,7 @@ def test_validate_config_accepts_a_plain_game_phase():
 
 def test_an_image_line_is_drawn_as_its_image_between_the_text(monkeypatch):
     monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
-    from fmri_gym.display import Display
+    from fmri_gym.outputs.display import Display
     import pygame
     display = Display(size=(400, 300), vsync=False)
     try:
@@ -329,14 +329,14 @@ def test_every_phase_type_is_a_phase():
 
 
 def test_a_measurement_that_broke_part_way_is_reported_not_crashed_on():
-    from fmri_gym.rig_measure import _html_frames, _html_section
+    from fmri_gym.standalone.rig_setup.measure import _html_frames, _html_section
     half = {"summaries": {"frames": {"blocks": []}}}      # it broke before refresh_rate
     note = _html_section(_html_frames, half, ".", {"status": "fail", "why": "KeyError: 'keys'"})
     assert "stopped before it finished" in note and "KeyError" in note
 
 
 def test_each_rig_measurement_files_its_latencies_beside_the_rig_under_a_new_number(tmp_path):
-    from fmri_gym.rig_measure import file_measured
+    from fmri_gym.standalone.rig_setup.measure import file_measured
     offset = {"median_ms": 12.0, "sd_ms": 0.3, "n_matched": 10, "n": 10}
     m = {"start_time": "2026-10-20T10:00:00", "task": "rigMeasurement", "status": "fail",
          "failed_tests": "audio", "run": {"label": "sub-rig_ses-001_task-rigMeasurement_run-001"},
@@ -362,7 +362,7 @@ def test_a_quick_rig_measurement_runs_on_its_own_and_files_its_report(tmp_path, 
 
     import pygame
 
-    from fmri_gym import rig_measure
+    from fmri_gym.standalone.rig_setup import measure as rig_measure
     from fmri_gym.config.rig import RigConfig
     rig_path = tmp_path / "laptop.json"
     rig_path.write_text(json.dumps({"data_root": str(tmp_path / "data"), "has_audio": False,
@@ -397,7 +397,7 @@ def test_a_quick_rig_measurement_runs_on_its_own_and_files_its_report(tmp_path, 
 def test_the_machine_is_described_and_pygame_left_as_it_was():
     import pygame
 
-    from fmri_gym.rig_measure import machine
+    from fmri_gym.standalone.rig_setup.measure import machine
     pygame.quit()
     m = machine()
     assert {"cpu", "memory_gb", "displays", "gpus", "audio_devices", "input_devices",

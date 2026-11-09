@@ -33,8 +33,8 @@ from typing import TYPE_CHECKING
 from .inputs import QUIT, ControlNames, Edge, InputEvent, is_control_of_any_input_device
 
 if TYPE_CHECKING:
-    from .display import Display
-    from .logging import Logger
+    from .outputs.display import Display
+    from .save.logging import Logger
 
 OPTIONS = ("reset", "forfeit", "resume")
 _LABELS = {"reset": "Restart the level", "forfeit": "Give up this level", "resume": "Resume"}

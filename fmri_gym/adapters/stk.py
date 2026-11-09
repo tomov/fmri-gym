@@ -28,7 +28,7 @@ No savestate, so no ``--resume`` of an episode a run stopped: the game keeps
 none of its own, and one by replay (``replay_state_gym.ReplayState``) is a
 fresh launch and the whole episode played again, about 6 s plus a third of
 the time already played -- minutes of a frozen screen, charged to the block,
-after a long race. A run that tries refuses to start (:func:`fmri_gym.bids
+after a long race. A run that tries refuses to start (:func:`fmri_gym.save.bids
 .last_position`).
 
 Timing: the game is lock-stepped, one ``step`` per fmri-gym frame, so

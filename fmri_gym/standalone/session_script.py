@@ -5,7 +5,7 @@ variables once: ``SUBJECT`` and ``RIG``, each fixed in the script or required
 from whoever starts it (``SUBJECT=sub-01 RIG=configs/<team>/rigs/<rig>.json sh
 <script>``), and ``SES``, the script's own argument or the subject's next free
 session. Each line after it plays one run with them, or is any command of
-yours. The session editor (:mod:`fmri_gym.gui.session_editor`) writes and reads
+yours. The session editor (:mod:`fmri_gym.standalone.session_editor`) writes and reads
 them; any shell plays them, so nothing in Python loops over runs.
 """
 
@@ -16,7 +16,7 @@ import re
 import shlex
 from dataclasses import dataclass
 
-from . import bids
+from ..save import bids
 
 HEADER = ["#!/bin/sh", "# fmri-gym session: one line per run, in order.", "set -e"]
 PLAY = "uv run fmri-play"

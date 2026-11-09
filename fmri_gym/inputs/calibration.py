@@ -4,7 +4,7 @@ how far it must be pushed.
 One file per controller per measurement in :func:`calibrations_dir`, outside the
 checkout since it describes this machine's controller, found by the name SDL
 gives the device (:func:`newest`), and never rewritten (:func:`write`). It is
-made by :mod:`fmri_gym.pad_calibration`. Nothing here knows which axes a
+made by :mod:`fmri_gym.standalone.pad_calibration`. Nothing here knows which axes a
 controller has; each axis is read on its own (:meth:`AxisCalibration.normalise`).
 """
 

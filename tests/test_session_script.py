@@ -7,7 +7,7 @@ import subprocess
 
 import pytest
 
-from fmri_gym.session_script import Session, play_command, read_session, run_number, write_session
+from fmri_gym.standalone.session_script import Session, play_command, read_session, run_number, write_session
 
 PONG, MARIO = "configs/curricula/pong.json", "configs/curricula/mario.json"
 RIG = "configs/examples/rigs/laptop.json"

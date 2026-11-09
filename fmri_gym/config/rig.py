@@ -34,7 +34,7 @@ say the same thing:
   opens on after the trigger and closes on, the modality's baseline (fMRI: 10
   each, for the haemodynamic lag); left out, the run shows none;
 - ``"triggers"``: the scanner's start sync and the trigger codes, over which
-  line (:class:`~fmri_gym.triggers.TriggerSettings`); left out, the run waits
+  line (:class:`~fmri_gym.sync.triggers.TriggerSettings`); left out, the run waits
   for ``=`` and sends no codes, and says so on the experimenter screen and in
   the manifest (``defaulted``);
 - ``"rig_measurement"``: the equipment the rig's timing is measured with
@@ -62,7 +62,7 @@ from pathlib import Path
 from typing import Any
 
 from ..inputs import INPUT_DEVICE_CLASSES_BY_NAME, Keyboard
-from ..triggers import TriggerError, TriggerSettings
+from ..sync.triggers import TriggerError, TriggerSettings
 
 MODALITIES = ("fmri", "meg", "eeg", "behav")
 #: The modalities that record the brain: their runs need a fixation baseline at each end.
@@ -538,7 +538,7 @@ def _is_seconds(v: Any) -> bool:
 
 
 def trigger_problems(section: Any) -> list[str]:
-    """What :class:`~fmri_gym.triggers.TriggerSettings` refuses in a ``triggers`` section, as text.
+    """What :class:`~fmri_gym.sync.triggers.TriggerSettings` refuses in a ``triggers`` section, as text.
 
     Two checks are added here: the settings accept a missing port, which the
     backend refuses only on opening, and a scanner key that is no keyboard key,

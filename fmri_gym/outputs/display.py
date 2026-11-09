@@ -23,7 +23,7 @@ what the flip reported.
 
 The remaining unknown is any constant offset between the flip returning and
 photons (swap-chain depth, panel latency); that is what a photodiode is for.
-``python -m fmri_gym.display`` reports what a given machine achieves, on the
+``python -m fmri_gym.outputs.display`` reports what a given machine achieves, on the
 ``monitor`` the session uses (:func:`list_monitors`).
 """
 
@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 #: A line of a screen's text that is only Markdown's ``![alt](path)`` shows the image at
 #: ``path``, from :data:`IMAGES_ROOT`, in its place. Transparent pixels show the black screen.
 IMAGE_LINE = re.compile(r"^\s*!\[[^\]]*\]\((?P<path>[^)]+)\)\s*$")
-IMAGES_ROOT = Path(__file__).resolve().parents[1] / "configs"
+IMAGES_ROOT = Path(__file__).resolve().parents[2] / "configs"
 IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg")
 
 BG_COLOR = (0, 0, 0)
@@ -103,7 +103,7 @@ class Display:
         self.vsync = bool(pygame.display.is_vsync()) and self._flips_block()
         if self._want_vsync and not self.vsync:
             print("display: flips do not lock to the refresh here -- frame onsets are "
-                  "what the flip reports (run `python -m fmri_gym.display` to check)",
+                  "what the flip reports (run `python -m fmri_gym.outputs.display` to check)",
                   file=sys.stderr)
         self.font = pygame.font.Font(pygame.font.get_default_font(), 28)
         self.fix_font = pygame.font.Font(pygame.font.get_default_font(), 80)
@@ -562,7 +562,7 @@ def is_locked(info: dict[str, Any], stats: dict[str, Any]) -> bool:
 
 
 def _selftest() -> None:
-    """``python -m fmri_gym.display``: report whether flips lock to the refresh.
+    """``python -m fmri_gym.outputs.display``: report whether flips lock to the refresh.
 
     With ``--outdir``, also writes ``display.npz`` (the intervals) and
     ``display.json`` (the display and the statistics) there, and exits

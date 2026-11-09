@@ -18,9 +18,9 @@ from typing import Any, Callable, NamedTuple
 
 import pygame
 
-from .inputs.calibration import AxisCalibration, ControllerCalibration, write
-from .inputs.control_names import ControlNames
-from .inputs.controller import AXIS_CONTROLS, FACE_BUTTONS, Controller, short_name
+from ..inputs.calibration import AxisCalibration, ControllerCalibration, write
+from ..inputs.control_names import ControlNames
+from ..inputs.controller import AXIS_CONTROLS, FACE_BUTTONS, Controller, short_name
 
 #: The procedure's colours: the face buttons in the colour they are printed in,
 #: so a cue can be matched by colour without reading it.

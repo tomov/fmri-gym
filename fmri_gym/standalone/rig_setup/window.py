@@ -6,7 +6,7 @@ its triggers, and the equipment its rig measurement measures with. The window wa
 through these in order; each step must be complete before the next, and a rig
 measurement can only be run on the file once it is saved. The rig measurement opens the
 same window on a rig whose file is missing or incomplete
-(:func:`fmri_gym.rig_measure.ensure_rig`).
+(:func:`fmri_gym.standalone.rig_setup.measure.ensure_rig`).
 """
 
 from __future__ import annotations
@@ -25,16 +25,16 @@ from typing import TYPE_CHECKING, Any, Callable
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import Qt
 
-from ..config import rig as rig_file
-from ..display import list_monitors, monitor_label
-from ..inputs import CONTROLLER_CLASSES_BY_NAME, INPUT_DEVICE_CLASSES_BY_NAME
-from ..triggers import (HID_DEVICES, SYNC_MODES, TRIGGER_BACKENDS, Codes, SyncSettings,
+from ...config import rig as rig_file
+from ...outputs.display import list_monitors, monitor_label
+from ...inputs import CONTROLLER_CLASSES_BY_NAME, INPUT_DEVICE_CLASSES_BY_NAME
+from ...sync.triggers import (HID_DEVICES, SYNC_MODES, TRIGGER_BACKENDS, Codes, SyncSettings,
                         TriggerError, Triggers, TriggerSettings)
-from . import Field
-from . import widgets as ui
+from ..forms import Field
+from .. import widgets as ui
 
 if TYPE_CHECKING:
-    from ..rig_measure import RigMeasurementSettings
+    from .measure import RigMeasurementSettings
 
 SYNC_FIELDS = [
     Field("mode", "how a run starts", "choice", SYNC_MODES,
@@ -231,7 +231,7 @@ def _describe(rig: rig_file.RigConfig, triggers: dict | None) -> str:
 
 def measurement_plan(rig: rig_file.RigConfig) -> str:
     """What a rig measurement tests on ``rig``, and what it leaves out and why, in plain lines."""
-    from ..rig_measure import LONG, QUICK  # pygame and numpy: only once a rig is shown
+    from .measure import LONG, QUICK  # pygame and numpy: only once a rig is shown
 
     def rates(settings: RigMeasurementSettings) -> str:
         found = [*settings.frame_rates, *rig.rig_measurement.frame_rates]
@@ -277,12 +277,12 @@ def run_rig_measurement(path: str, is_long: bool) -> str:
     :param is_long: the long rig measurement; otherwise the quick one.
     :return: a few lines for the person who started it: the verdict and the report's path.
     """
-    from ..bids import next_session
-    from ..rig_measure import SUBJECT
+    from ...save.bids import next_session
+    from .measure import SUBJECT
 
     rig = rig_file.RigConfig.open(path)
     ses = next_session(rig.data_root, SUBJECT)
-    command = [sys.executable, "-m", "fmri_gym.rig_measure", "--rig", path,
+    command = [sys.executable, "-m", "fmri_gym.standalone.rig_setup.measure", "--rig", path,
                *(["--long"] if is_long else [])]
     print("rig-config: " + " ".join(command), file=sys.stderr)
     status = subprocess.run(command, check=False).returncode
@@ -370,7 +370,7 @@ def _device_line(d: dict[str, Any]) -> str:
 
 def _trigger_ports() -> list[str]:
     """The serial and parallel ports found on this computer, and its USB boxes' ports."""
-    from ..rig_measure import detect_outputs
+    from .measure import detect_outputs
     return list(dict.fromkeys(p["port"] for p in detect_outputs()))
 
 
@@ -675,7 +675,7 @@ class _RigWindow(QtWidgets.QDialog):
         form.addRow("vsync", self._switch(
             "has_vsync", screen["has_vsync"],
             "Show each image exactly on the screen's refresh. Leave it on, unless the display "
-            "test (python -m fmri_gym.display) says this computer cannot do it."))
+            "test (python -m fmri_gym.outputs.display) says this computer cannot do it."))
         form.addRow("game sound", self._switch(
             "has_audio", values.get("has_audio", rig_file.DEFAULTS["has_audio"]),
             "Play the games' sound to the participant. Off: every game is silent on this rig."))
@@ -854,7 +854,7 @@ class _RigWindow(QtWidgets.QDialog):
     def _calibrate(self) -> None:
         """Run pad-calibration in its own window, on this rig's input devices; then look
         again, so the new calibration shows here."""
-        command = [sys.executable, "-m", "fmri_gym.pad_scope"]
+        command = [sys.executable, "-m", "fmri_gym.standalone.pad_scope"]
         if os.path.isfile(self.path) and self.saved is not None:
             command += ["--rig", self.path]
         self.hide()

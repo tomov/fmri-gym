@@ -15,14 +15,15 @@ fmri_gym/config/rig.py           CORE  RigConfig: one rig's file (configs/<team>
 fmri_gym/config/curriculum.py    CORE  Curriculum: the curriculum file, loaded once into typed phases; load, save, includes
 fmri_gym/config/phases.py        CORE  one frozen dataclass per phase type (Fixation, Message, GamePhase, Check*...)
 fmri_gym/run.py                  CORE  one run's experiment loop: trigger, phases, timing
-fmri_gym/display.py              CORE  one pygame window: frames, text, fixation
-fmri_gym/inputs/                 CORE  the input devices: one named control per key, button, stick direction
-fmri_gym/logging.py              CORE  manifest.json + one crash-safe JSONL/HDF5 log per game block
-fmri_gym/replay.py               CORE  replay an episode from a block's log; frame fields as arrays
 fmri_gym/menu.py                 CORE  hold-a-key pause menu: reset / forfeit / resume (opt-in per phase)
+fmri_gym/inputs/                 CORE  the input devices: one named control per key, button, stick direction
+fmri_gym/outputs/                CORE  what the participant sees and hears: display.py (the window), audio.py
+fmri_gym/sync/                   CORE  triggers.py: the scanner's start pulse and the event codes to the recorders
+fmri_gym/save/                   CORE  the data: bids.py (where), logging.py (manifest + one log per block), replay.py
 fmri_gym/adapters/base.py        CORE  EnvAdapter + FrameState: the seam
 fmri_gym/adapters/keymap.py      CORE  the phase's keys, one Keymap per action space
 fmri_gym/adapters/<BACKEND>.py   YOU   one small wrapper per game engine
+fmri_gym/standalone/                   the commands that are not a run: rig setup, session editor, calibration
 configs/curricula/<BACKEND>/     YOU   the game's curricula: levels/ one per level, the folder a sequence; common/ the phase they share
 gym/<GAME>/                      YOU   a Gymnasium env for a game that ships none, or a rough one
 gym/replay_state/                      ReplayState: a savestate by replay, for any env
@@ -32,7 +33,7 @@ tests/                                 the suite: every backend played, logged, 
 .github/workflows/tests.yml            CI: the suite on every pull request that is ready for review
 ```
 
-**Core** is every `fmri_gym/*.py`, `fmri_gym/config/*.py` and `fmri_gym/inputs/*.py`, whether the table lists it or not (`audio.py`, `triggers.py`, ...), plus the adapter seam, `adapters/base.py` and `adapters/keymap.py`. Every other file under `fmri_gym/adapters/` is a backend's.
+**Core** is every `fmri_gym/*.py` and every file under `fmri_gym/config/`, `inputs/`, `outputs/`, `sync/` and `save/`, whether the table lists it or not, plus the adapter seam, `adapters/base.py` and `adapters/keymap.py`. Every other file under `fmri_gym/adapters/` is a backend's. `fmri_gym/standalone/` is not core: it holds the tools that run on their own (Rule 5), and nothing outside it imports from it.
 
 The core is engine-agnostic: `run.py` never imports a game engine, never touches `env.unwrapped`, and never mentions a game by name. Everything engine-specific goes through an `EnvAdapter`.
 
@@ -63,7 +64,7 @@ If you find yourself writing game rules, drawing a board, tracking a selection c
 
 ## Rule 2: changes to core libraries are a last resort, and stay generic
 
-Before editing a core file (any `fmri_gym/*.py`, `fmri_gym/config/*.py` or `fmri_gym/inputs/*.py`, `adapters/base.py` or `adapters/keymap.py`; see "The shape of the repo"), please try to solve the problem in your adapter. If you cannot:
+Before editing a core file (any `fmri_gym/*.py`, any file under `config/`, `inputs/`, `outputs/`, `sync/` or `save/`, `adapters/base.py` or `adapters/keymap.py`; see "The shape of the repo"), please try to solve the problem in your adapter. If you cannot:
 
 - Keep it **additive and default-off**, so no existing backend changes behaviour.
 - Keep it **nameless**: no `if backend == "rushhour"`, no game ids, no engine imports. This holds for the prose too -- a core file's comments and docstrings state the contract, they don't cite the backend that happens to use it.

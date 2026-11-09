@@ -23,7 +23,7 @@ A test the rig gives no reason to run is recorded as "not run", with why. In ord
   write that succeeds says nothing of where it went.
 * ``controls`` -- the response devices: what the rig's participant can press, i.e.
   each control of the devices its ``"inputs"`` list (each stick axis calibrated
-  first, :mod:`fmri_gym.pad_calibration`) and each of its ``"response_keys"``. Every
+  first, :mod:`fmri_gym.standalone.pad_calibration`) and each of its ``"response_keys"``. Every
   response key is first checked automatically -- one that comes back through the
   event queue as itself -- and the input devices plugged in are listed; then each
   control is asked for on screen and pressed on the real device.
@@ -89,18 +89,18 @@ import numpy as np
 import pygame
 from gymnasium import spaces
 
-from .audio import Audio
-from .bids import next_session, run_output
-from .config import rig as rig_file
-from .display import Display, check_monitor, is_locked, quit_like_esc
-from .inputs import (QUIT, ControlNames, Controller, Edge, InputDevice, InputDevices,
+from ...outputs.audio import Audio
+from ...save.bids import next_session, run_output
+from ...config import rig as rig_file
+from ...outputs.display import Display, check_monitor, is_locked, quit_like_esc
+from ...inputs import (QUIT, ControlNames, Controller, Edge, InputDevice, InputDevices,
                      open_input_devices)
-from .inputs.keyboard import KEYCODES
-from .pad_calibration import calibrate, cue_order
-from .photodiode import (AudioRecorder, Verdict, _clicker, _light_verdict,
+from ...inputs.keyboard import KEYCODES
+from ..pad_calibration import calibrate, cue_order
+from ..photodiode import (AudioRecorder, Verdict, _clicker, _light_verdict,
                          _log_clicks, _readout, _sound_verdict, run_flashes)
-from .run import EXPERIMENTER_KEY, _wait_for_control, _wait_for_duration, read_input_events
-from .triggers import HID_DEVICES, LIFECYCLE_EVENTS, Codes, TriggerError, Triggers
+from ...run import EXPERIMENTER_KEY, _wait_for_control, _wait_for_duration, read_input_events
+from ...sync.triggers import HID_DEVICES, LIFECYCLE_EVENTS, Codes, TriggerError, Triggers
 
 #: The subject every rig measurement is filed under in the data root.
 SUBJECT = "sub-rig"
@@ -275,7 +275,7 @@ def _ask_triggers(rig: rig_file.RigConfig) -> rig_file.RigConfig:
            "file, or in the form a rig measurement opens")
     if not can_show_form():
         raise ValueError(f"rig measurement: {fix}; there is no screen here for the form")
-    from .gui.rig_config import fill_rig
+    from .window import fill_rig
     if fill_rig(rig_file.load(where), where, need_triggers=True) is None:
         raise ValueError(f"rig measurement: {fix}; it was cancelled")
     print(f"rig measurement: trigger settings saved in {where}", file=sys.stderr)
@@ -579,7 +579,7 @@ def _calibrate(rig_measurement: RigMeasurement, device: Controller) -> dict[str,
     """Calibrate ``device``'s stick axes before asking for any control, and read it through that.
 
     Each axis has to be measured on the rig before a threshold means anything
-    (see :mod:`fmri_gym.pad_calibration`), so the calibration runs here and is
+    (see :mod:`fmri_gym.standalone.pad_calibration`), so the calibration runs here and is
     written for the device, which every later run on this rig with it reads.
     """
     if not device.AXIS_NAMES:
@@ -909,7 +909,7 @@ def send_codes(triggers: Triggers, repeat: int, hold_s: float, gap_s: float,
 
 def detect_outputs() -> list[dict[str, Any]]:
     """The serial ports with hardware behind them, the parallel ports and the HID trigger
-    boxes of :data:`~fmri_gym.triggers.HID_DEVICES`; nothing is opened.
+    boxes of :data:`~fmri_gym.sync.triggers.HID_DEVICES`; nothing is opened.
 
     Linux lists a ``ttyS`` for every slot its driver reserves, most with no
     UART behind them (``hwid`` ``n/a``); writes to those succeed and go
@@ -1184,7 +1184,7 @@ class TestPattern(gym.Env):
 #: flashes carry the audio test's clicks too.
 TESTS = {"display": "display", "triggers": "triggers", "controls": "controls",
          "photodiode": "photodiode", "audio": "photodiode", "frames": "frames"}
-_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 #: The pooled table: ``(column, path into the manifest, description, units)``.
 COLUMNS: list[tuple[str, tuple[str, ...], str, str | None]] = [
@@ -1318,7 +1318,7 @@ NAMES = tuple(c[0] for c in COLUMNS)
 
 def ensure_rig(path: str) -> rig_file.RigConfig:
     """The rig to set up; when its file is missing or invalid, the form to
-    fill it in first (:func:`fmri_gym.gui.rig_config.fill_rig`), then the file.
+    fill it in first (:func:`fmri_gym.standalone.rig_setup.window.fill_rig`), then the file.
 
     The form needs the ``gui`` extra and a screen; without them, or when it is
     cancelled, the rig file's own error is raised.
@@ -1332,7 +1332,7 @@ def ensure_rig(path: str) -> rig_file.RigConfig:
         if not can_show_form():
             raise
         print(f"{error}\nrig measurement: opening the rig form", file=sys.stderr)
-        from .gui.rig_config import fill_rig
+        from .window import fill_rig
         if fill_rig(rig_file.draft(path), path) is None:
             raise
     return rig_file.RigConfig.open(path)

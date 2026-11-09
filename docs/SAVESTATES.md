@@ -5,7 +5,7 @@ code. Line numbers refer to the tree at that date and will drift.
 
 ## How it works generally
 
-Everything goes through one `Logger` per run (`fmri_gym/logging.py:62`). The
+Everything goes through one `Logger` per run (`fmri_gym/save/logging.py:62`). The
 game loop never touches a file. It puts small dicts on an unbounded
 `multiprocessing.Queue` (`logging.py:85`), and a separate **writer process**
 (`_writer_main`, `logging.py:210`) owns every file handle, does the expensive

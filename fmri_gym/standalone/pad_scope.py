@@ -2,7 +2,7 @@
 
 It shows what the controller plugged in sends and what its device
 (:mod:`fmri_gym.inputs`) makes of it, through its newest calibration
-(:mod:`fmri_gym.pad_calibration`), and runs the calibration in its own window.
+(:mod:`fmri_gym.standalone.pad_calibration`), and runs the calibration in its own window.
 Only its buttons act: the keyboard does nothing but ESC, since a program that
 turns a pad into keystrokes would otherwise retune or save as the pad is
 pushed, and its keys cannot be told from a person's. A tuning saved is a new
@@ -22,11 +22,11 @@ from typing import Callable, NamedTuple
 import pygame
 
 from . import pad_calibration as calibration
-from .config.rig import RigConfig
-from .inputs import (CONTROLLER_CLASSES_BY_NAME, CalibrationError, Controller,
+from ..config.rig import RigConfig
+from ..inputs import (CONTROLLER_CLASSES_BY_NAME, CalibrationError, Controller,
                      first_controller_class_plugged_in)
-from .inputs.calibration import AxisCalibration, ControllerCalibration, calibrations_dir, write
-from .inputs.controller import AXIS_CONTROLS, short_name
+from ..inputs.calibration import AxisCalibration, ControllerCalibration, calibrations_dir, write
+from ..inputs.controller import AXIS_CONTROLS, short_name
 from .pad_calibration import (FACE, GRID, INK, INK2, INK3, LIVE, PANEL, SURFACE, WARN,
                               draw_button)
 

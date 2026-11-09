@@ -5,7 +5,7 @@ its one interesting piece -- the callback that splices queued chunks into
 PortAudio's slots -- is exactly the piece that only misbehaves under a producer
 that goes quiet. Doom queues a chunk every frame and never exposes it; crafter
 queues one only when something happened, and did. This runs with the core
-tests, so a change to fmri_gym/audio.py meets it on every PR.
+tests, so a change to fmri_gym/outputs/audio.py meets it on every PR.
 
 No PortAudio is needed. ``sounddevice.OutputStream`` is replaced by a stand-in
 that records how the stream was opened, and this file plays the part
@@ -38,7 +38,7 @@ import types
 import numpy as np
 import pytest
 
-from fmri_gym import audio as _audio
+from fmri_gym.outputs import audio as _audio
 
 RATE = 44100
 DTYPE = np.int32

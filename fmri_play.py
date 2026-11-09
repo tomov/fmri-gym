@@ -33,7 +33,7 @@ import sys
 
 from fmri_gym import Run
 from fmri_gym.config.curriculum import EXIT_QUIT, Curriculum
-from fmri_gym.display import quit_like_esc
+from fmri_gym.outputs.display import quit_like_esc
 from fmri_gym.config.rig import RigConfig
 from fmri_gym.config.run import RunConfig
 

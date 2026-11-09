@@ -12,7 +12,7 @@ goes through an EnvAdapter, so this file never imports ale_py / stable_retro
 and never touches env.unwrapped.
 
 Recording-device concerns (waiting for or sending the scanner start, trigger
-codes for MEG/EEG) go through :mod:`fmri_gym.triggers`; with no ``triggers``
+codes for MEG/EEG) go through :mod:`fmri_gym.sync.triggers`; with no ``triggers``
 config the loop behaves as the fMRI default and sends nothing. What the
 participant presses comes through the run's :class:`~fmri_gym.inputs.InputDevice`
 as named controls; :func:`read_input_events`, here, is the one reader of
@@ -24,7 +24,7 @@ fMRI, the haemodynamic response to the last thing played. A run is the
 scanner's and a curriculum the subject's, so a run can stop part-way through
 one: given a duration, the run stops whatever phase is on screen in time for
 its closing fixation. A later run started with ``--resume`` carries on from
-there (:func:`~fmri_gym.bids.last_position`).
+there (:func:`~fmri_gym.save.bids.last_position`).
 """
 
 from __future__ import annotations
@@ -39,18 +39,18 @@ from typing import TYPE_CHECKING, Any
 
 import pygame
 
-from . import bids
+from .save import bids
 from .adapters import get_adapter
-from .audio import Audio
-from .bids import BlockProgress, RunProgress
+from .outputs.audio import Audio
+from .save.bids import BlockProgress, RunProgress
 from .config.curriculum import Curriculum, game_changes
 from .config.phases import BlockMode, Fixation, GamePhase, Message, Phase, Survey
 from .config.run import RunConfig
-from .display import Display, check_monitor
+from .outputs.display import Display, check_monitor
 from .inputs import QUIT, ControlNames, Edge, InputDevice, InputEvent, open_input_devices
 from .menu import Menu
-from .logging import Logger
-from .triggers import Triggers
+from .save.logging import Logger
+from .sync.triggers import Triggers
 
 if TYPE_CHECKING:
     from .adapters.base import EnvAdapter
@@ -307,13 +307,13 @@ def _run_progress(data_root: str, subject: str, curriculum: Curriculum,
     :param subject: ``sub-<label>``.
     :param curriculum: the curriculum; its file's name is the task label.
     :param loop: a curriculum played to its end starts again (``--loop``).
-    :return: :func:`~fmri_gym.bids.last_position`, or ``None`` (said on stderr)
+    :return: :func:`~fmri_gym.save.bids.last_position`, or ``None`` (said on stderr)
         when no earlier run of this curriculum got past its opening phases, or
         with ``loop``, when it played it to its end.
     :raises ValueError: if that run played the curriculum to its end (without ``loop``), or its
         last game phase is another game in this curriculum
         (:func:`~fmri_gym.config.curriculum.game_changes`), or it stopped an
-        episode its backend keeps no savestate of (:func:`~fmri_gym.bids.last_position`).
+        episode its backend keeps no savestate of (:func:`~fmri_gym.save.bids.last_position`).
     """
     phases = curriculum.phases
     progress = bids.last_position(data_root, subject, curriculum.path)
@@ -365,10 +365,10 @@ class Run:
         :param outdir: the run's folder, for its manifest and block logs.
         :param audio: shared audio output used by all phases.
         :param triggers: shared trigger output (start sync + codes; see
-            :mod:`fmri_gym.triggers`), opened on the rig's line.
+            :mod:`fmri_gym.sync.triggers`), opened on the rig's line.
         :param inputs: the input devices every phase reads, the rig's.
         :param resume_from: where to start in the curriculum, and what the block
-            there has left (:func:`~fmri_gym.bids.last_position`); ``None``
+            there has left (:func:`~fmri_gym.save.bids.last_position`); ``None``
             starts at its beginning.
         """
         self.config = config

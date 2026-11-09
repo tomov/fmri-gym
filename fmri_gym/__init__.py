@@ -16,9 +16,9 @@ os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 
 from .adapters import get_adapter
 from .run import Run, Clock
-from .display import Display
-from .audio import Audio
-from .triggers import Triggers
-from .logging import Logger
+from .outputs.display import Display
+from .outputs.audio import Audio
+from .sync.triggers import Triggers
+from .save.logging import Logger
 
 __all__ = ["Run", "Clock", "Display", "Audio", "Triggers", "Logger", "get_adapter"]

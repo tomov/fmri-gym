@@ -11,7 +11,7 @@ import argparse
 import json
 from typing import Any
 
-from fmri_gym.logging import read_events, read_frame, read_frames
+from fmri_gym.save.logging import read_events, read_frame, read_frames
 from vlm.conversation import Conversation
 from vlm.observation import frame_content
 

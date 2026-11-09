@@ -54,7 +54,7 @@ from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from .run import Clock
+    from ..run import Clock
 
 log = logging.getLogger(__name__)
 
@@ -398,8 +398,8 @@ def _open_backend(s: TriggerSettings) -> tuple[_Backend, str]:
 class Triggers:
     """Sends trigger codes for one session and remembers the lifecycle ones.
 
-    Built once per run, next to the :class:`~fmri_gym.display.Display` and
-    the :class:`~fmri_gym.audio.Audio`, and passed to the
+    Built once per run, next to the :class:`~fmri_gym.outputs.display.Display` and
+    the :class:`~fmri_gym.outputs.audio.Audio`, and passed to the
     :class:`~fmri_gym.run.Run`; :meth:`from_dict` on ``None`` gives
     the ``null`` no-op, so the session loop calls these methods
     unconditionally. Events are stamped with ``perf_counter``;

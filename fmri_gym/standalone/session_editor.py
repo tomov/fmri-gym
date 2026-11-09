@@ -1,6 +1,6 @@
 """``session-editor``: design a session -- its runs and their curricula -- without JSON.
 
-Two tabs. **Session** is the session script (:mod:`fmri_gym.session_script`):
+Two tabs. **Session** is the session script (:mod:`fmri_gym.standalone.session_script`):
 who it is for and on which rig (each fixed here, or given when it is started),
 then its lines -- each a run (a curriculum file) or an external command; add,
 repeat, remove, reorder, skip -- as a list or as the script itself. **Run** is
@@ -8,7 +8,7 @@ one run: how it is played (its ``fmri-play`` flags), and its curriculum
 (:mod:`fmri_gym.config.curriculum`) as a phase list with one form per phase
 type -- a game's keys among them -- or as its JSON. How a rig plays it --
 window, controller, audio, data folder, triggers -- is the rig file's
-(:mod:`fmri_gym.gui.rig_config`). File > New / Open / Save / Save As.
+(:mod:`fmri_gym.standalone.rig_setup.window`). File > New / Open / Save / Save As.
 
 Nothing is played from here: a session is played by its script (``sh
 <script>``), a lone run by ``fmri-play``, and the bottom bar shows the command.
@@ -40,13 +40,15 @@ from typing import Any, Callable, Sequence
 from PySide6 import QtGui, QtWidgets
 from PySide6.QtCore import Qt
 
-from .. import bids, session_script
+from ..save import bids
 from ..config import curriculum
 from ..config import rig as rig_file
 from ..config.curriculum import Curriculum
 from ..config.run import RunConfig
-from . import Field, rig_config
+from . import session_script
 from . import widgets as ui
+from .forms import Field
+from .rig_setup import window as rig_window
 
 
 #: Suggestions for a game phase's ``backend`` (free text is accepted too; the
@@ -91,7 +93,7 @@ SESSION_FIELDS = [
 
 
 #: How one run is played: the ``fmri-play`` flags a run's line carries
-#: (:data:`fmri_gym.session_script.RUN_FLAGS`).
+#: (:data:`fmri_gym.standalone.session_script.RUN_FLAGS`).
 RUN_FLAG_FIELDS = [
     Field("duration", "run length (s)", "float",
           tip="How long the run lasts, in seconds from its start, the rig's fixations "
@@ -615,7 +617,7 @@ class _Editor(QtWidgets.QMainWindow):
         layout.addWidget(hint)
         self.session_form = ui.Form(SESSION_FIELDS)
         self.session_form.changed.connect(self._head_edited)
-        self.rig_pick = rig_config.RigPick()
+        self.rig_pick = rig_window.RigPick()
         self.rig_pick.setToolTip("The rig every run plays on: its window, controller, audio, "
                                  "triggers and data folder. Blank: given when the session is "
                                  "started (RIG=<rig file> sh <script>).")
@@ -632,7 +634,7 @@ class _Editor(QtWidgets.QMainWindow):
         return box
 
     def _head(self) -> dict:
-        """The session form and the rig, as :class:`~fmri_gym.session_script.Session` fields.
+        """The session form and the rig, as :class:`~fmri_gym.standalone.session_script.Session` fields.
 
         :raises ValueError: a session number that is not one.
         """
@@ -657,7 +659,7 @@ class _Editor(QtWidgets.QMainWindow):
             self._error("Pick a rig file first, or type the path of a new one "
                         "(configs/<team>/rigs/<rig>.json) to make it.")
             return
-        if rig_config.fill_rig(rig_file.draft(path), path) is None:
+        if rig_window.fill_rig(rig_file.draft(path), path) is None:
             return
         self.rig_pick.set_path(path)
         self._show_rig()
@@ -674,7 +676,7 @@ class _Editor(QtWidgets.QMainWindow):
         except ValueError as exc:
             line = f"A run would refuse this rig file: {exc}"
         self.rig_summary.setText(line)
-        self.rig_summary.setToolTip(rig_config.rig_summary(path))
+        self.rig_summary.setToolTip(rig_window.rig_summary(path))
 
     def _refresh_play_hint(self) -> None:
         """Say how what is shown is played: nothing is played from the editor."""
@@ -1220,7 +1222,7 @@ class _Editor(QtWidgets.QMainWindow):
     def _add_curated_row(self, body: QtWidgets.QVBoxLayout) -> None:
         """Under a game phase's form: where its game is already set up, and a button to copy that.
 
-        The ``game`` list follows ``backend`` (see :func:`fmri_gym.gui.curated_games`).
+        The ``game`` list follows ``backend`` (see :func:`curated_games`).
         """
         self.curated_label = QtWidgets.QLabel()
         self.curated_label.setObjectName("hint")
@@ -1301,7 +1303,7 @@ class _Editor(QtWidgets.QMainWindow):
         """The base seed this game phase will get, and the run it is for.
 
         The design says the run: which line of the session plays this task
-        (:func:`fmri_gym.session_script.run_number`), in the session given or, blank,
+        (:func:`fmri_gym.standalone.session_script.run_number`), in the session given or, blank,
         the subject's next free session. A re-acquisition of a run replays
         these same episodes -- the attempt is no part of the label.
 
@@ -1714,7 +1716,7 @@ def _engine_rate(phase: dict) -> float | None:
     """Build the phase's adapter (which checks its keys against the env) and read its own rate.
 
     :return: the native fps; ``None`` for an engine with no clock of its own.
-    :raises Exception: whatever the engine or the :mod:`~.adapters.keymap` refuses.
+    :raises Exception: whatever the engine or the :mod:`~fmri_gym.adapters.keymap` refuses.
     """
     from ..adapters import get_adapter
 

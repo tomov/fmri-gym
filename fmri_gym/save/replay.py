@@ -1,4 +1,4 @@
-"""Reconstruction and analysis on top of a logged block (:mod:`fmri_gym.logging`).
+"""Reconstruction and analysis on top of a logged block (:mod:`fmri_gym.save.logging`).
 
 An episode is replayed from its seed and its actions through a fresh adapter
 built from the block's own ``block_start`` line, so a block's log is enough to
@@ -66,7 +66,7 @@ def reconstruct_episode(
     """
     plan = reconstruction_plan(block, episode_id)
     if adapter is None:
-        from .adapters import get_adapter
+        from ..adapters import get_adapter
         start = read_events(block)[0]
         adapter = get_adapter(start["backend"], start["phase"])
     adapter.reset(plan.seed)

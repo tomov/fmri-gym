@@ -1,7 +1,7 @@
 """``--resume`` of a run whose clock stopped it between two game blocks, in a message.
 
 ``tests/test_backends.py`` resumes a block the run stopped mid-episode. This
-is the other side of :func:`fmri_gym.bids.last_position`: the run's clock
+is the other side of :func:`fmri_gym.save.bids.last_position`: the run's clock
 runs out in a phase that is not a game, after a game block that finished. The
 next run must start at that phase, from its beginning, with the curriculum's
 ``include_on_resume`` opening phases first, and must not play the finished
@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from fmri_gym.logging import read_events
+from fmri_gym.save.logging import read_events
 from tests.backends import REPO
 from tests.conftest import write_curriculum
 

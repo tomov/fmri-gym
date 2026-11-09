@@ -23,7 +23,7 @@ Check a run folder that already exists (a subject's, say)::
 
 Recording uses ``agents/agent_play.py`` with the random policy, so it needs
 no window; the check builds each block's adapter from its ``block_start``
-line, exactly as :mod:`fmri_gym.replay` does. Exit status is 0 only when every
+line, exactly as :mod:`fmri_gym.save.replay` does. Exit status is 0 only when every
 frame and every anchor of every block matched. The test suite runs the same
 two steps on every backend it selects (``tests/test_backends.py``).
 """
@@ -60,7 +60,7 @@ def record(curriculum: str, outdir: str, max_frames: int, n_episodes: int) -> No
 
 def _game_blocks(outdir: str) -> list[Path]:
     """The block folders of a run, in order."""
-    from fmri_gym.logging import EVENTS_FILENAME
+    from fmri_gym.save.logging import EVENTS_FILENAME
 
     return sorted(p.parent for p in Path(outdir).glob(f"block-*/{EVENTS_FILENAME}"))
 
@@ -85,8 +85,8 @@ def check_block(block: str) -> dict[str, Any]:
         mismatch's whereabouts, and ``pass``.
     """
     from fmri_gym.adapters import get_adapter
-    from fmri_gym.logging import read_events, read_frames
-    from fmri_gym.replay import reconstruct_episode
+    from fmri_gym.save.logging import read_events, read_frames
+    from fmri_gym.save.replay import reconstruct_episode
 
     events = read_events(block)
     start = events[0]
@@ -132,8 +132,8 @@ def check_resumed(stopped: str, resumed: str) -> dict[str, Any]:
     :return: the same counts as :func:`check_block`.
     """
     from fmri_gym.adapters import get_adapter
-    from fmri_gym.logging import read_events, read_frames
-    from fmri_gym.replay import reconstruct_episode
+    from fmri_gym.save.logging import read_events, read_frames
+    from fmri_gym.save.replay import reconstruct_episode
 
     events = read_events(resumed)
     first = [e for e in events if e["type"] == "frame" and e["episode_id"] == 0]
@@ -161,7 +161,7 @@ def check_resumed(stopped: str, resumed: str) -> dict[str, Any]:
 
 def _read_audio(block: str) -> dict[int, np.ndarray] | None:
     """The block's logged PCM by chunk number, or ``None`` when it logged no sound."""
-    from fmri_gym.logging import AUDIO_FILENAME, read_audio
+    from fmri_gym.save.logging import AUDIO_FILENAME, read_audio
 
     if not os.path.exists(os.path.join(block, AUDIO_FILENAME)):
         return None
@@ -196,7 +196,7 @@ def _check_end_state(block: str, adapter: Any, state: str, events: list[dict], p
     That is its last frame, or, when the block ran out between an episode's
     reset and its first step, that episode's reset.
     """
-    from fmri_gym.replay import reconstruct_episode
+    from fmri_gym.save.replay import reconstruct_episode
 
     last = [e for e in events if e["type"] in ("episode_start", "frame")][-1]
     if last["type"] == "frame":
@@ -260,7 +260,7 @@ def _action(logged: Any) -> Any:
 
 def _jsonable(variables: dict) -> Any:
     """``variables`` as they read back from the log (numpy to lists, the rest to str)."""
-    from fmri_gym.logging import _json_default
+    from fmri_gym.save.logging import _json_default
 
     return json.loads(json.dumps(variables, default=_json_default))
 

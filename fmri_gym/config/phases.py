@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, ClassVar
 
-from ..display import image_line_problems
+from ..outputs.display import image_line_problems
 from ..inputs import ControlNames, is_control_of_any_input_device
 from ..menu import menu_problems
 

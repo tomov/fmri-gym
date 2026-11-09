@@ -34,9 +34,9 @@ concatenated, and ``chunk_len`` ``(n_chunks,)``, so a chunk's offset into
 ``samples`` is a running sum of the ones before it. ``onset_chunk``/
 ``onset_time``, ``stretched_chunk``/``stretched_len`` and the
 ``delay_ms``/``resyncs``/``trimmed_samples`` attrs land at
-:meth:`Logger.close_block`, from :meth:`~.audio.Audio.block_log`. A chunk in
+:meth:`Logger.close_block`, from :meth:`~fmri_gym.outputs.audio.Audio.block_log`. A chunk in
 ``stretched_chunk`` was played resampled to its ``stretched_len`` samples
-(:func:`~.audio._resample`), to keep the sound on the display's clock; every
+(:func:`~fmri_gym.outputs.audio._resample`), to keep the sound on the display's clock; every
 other chunk played as it is stored.
 """
 
@@ -55,8 +55,8 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 if TYPE_CHECKING:
-    from .audio import AudioBlockLog
-    from .run import Clock
+    from ..outputs.audio import AudioBlockLog
+    from ..run import Clock
 
 FORMAT = "fmri-gym-log"
 VERSION = 1
@@ -193,7 +193,7 @@ class Logger:
     def close_block(self, audio: AudioBlockLog | None = None, **summary: Any) -> None:
         """Append the ``block_end`` line and release the block's files.
 
-        :param audio: the block's sound timing (:meth:`~.audio.Audio.block_log`),
+        :param audio: the block's sound timing (:meth:`~fmri_gym.outputs.audio.Audio.block_log`),
             written to ``audio.h5`` rather than the line; ``None`` for a block
             that played none.
         :param summary: the line's fields (episode and frame counts, totals, …).

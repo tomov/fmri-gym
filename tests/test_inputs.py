@@ -19,7 +19,7 @@ import pygame
 import pytest
 
 import fmri_gym.inputs as inputs
-from fmri_gym import pad_calibration as cal
+from fmri_gym.standalone import pad_calibration as cal
 from fmri_gym.inputs import (QUIT, CalibrationError, ControlNames, CurrentDesignsGamepad3, Edge,
                              InputDevices, InputEvent, Keyboard, XBoxController)
 from fmri_gym.inputs import calibration as files
@@ -255,7 +255,7 @@ def test_a_calibration_measures_each_axis_and_confirms_each_control(config_home,
     assert files.newest("Scripted") == (result.path, result.calibration)
     assert result.path.with_suffix(".csv").exists() and "Scripted_" in result.path.name
     assert d.calibration is None                    # the caller applies what was written
-    from fmri_gym.rig_measure import _pad_line
+    from fmri_gym.standalone.rig_setup.measure import _pad_line
     line = _pad_line({"present": True, "device": "Scripted", **result.record()})
     assert f"{LX} on past 0.50" in line and "10 controls confirmed, 1 wrong" in line
 
@@ -502,7 +502,7 @@ def test_a_rigs_inputs_open_its_devices_and_say_which_joysticks_they_ignore(sdl,
 @pytest.fixture
 def scope(config_home, screen, monkeypatch):
     """The tool's window on the dummy display, with the scripted controller plugged in."""
-    from fmri_gym import pad_scope
+    from fmri_gym.standalone import pad_scope
     monkeypatch.setattr(pad_scope, "first_controller_class_plugged_in",
                         lambda kinds: _ScriptedController)
     monkeypatch.setattr(_ScriptedController, "open",
@@ -528,7 +528,7 @@ def test_the_keyboard_does_nothing_in_the_tool_but_esc(scope):
 
 @pytest.mark.parametrize("action", ["on-", "on+", "off-", "off+"])
 def test_each_tuning_button_moves_one_field_within_bounds(action):
-    from fmri_gym import pad_scope
+    from fmri_gym.standalone import pad_scope
     for start in (AxisCalibration.from_dict(AXIS, ""), AxisCalibration(0, -1, 1, 0, 0.99, 0.99),
                   AxisCalibration(0, -1, 1, 0, 0.5, 0.01)):
         moved = pad_scope._retuned(start, action)
@@ -539,7 +539,7 @@ def test_each_tuning_button_moves_one_field_within_bounds(action):
 
 
 def test_save_writes_a_new_newest_file_of_the_retuned_axis_and_leaves_its_source(scope):
-    from fmri_gym import pad_scope
+    from fmri_gym.standalone import pad_scope
     source = files.write(files.ControllerCalibration.from_dict(copy.deepcopy(FILE)))
     os.utime(source, (1000, 1000))
     was = source.read_bytes()
@@ -568,7 +568,7 @@ def test_the_watch_reloads_only_on_its_one_second_tick(scope, monkeypatch):
 
 
 def test_a_click_is_mapped_back_to_the_picture_at_any_window_size(scope):
-    from fmri_gym import pad_scope
+    from fmri_gym.standalone import pad_scope
     canvas = scope.canvas
     canvas.window.size = (900, 1200)                              # bars above and below
     assert canvas.window.size == (900, 1200)

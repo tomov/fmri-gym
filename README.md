@@ -359,13 +359,23 @@ fmri_gym/
     phases.py       # one dataclass per phase type (Fixation, Message, Survey, GamePhase, Check*), its checks
     rig.py          # the rig files (configs/<team>/rigs/<rig>.json): what it is, screen, pad, audio, data root
     run.py          # RunConfig: one run's command line and the rig it is played on
-  display.py        # pygame: fixed window, aspect-fit frame, fixation, text; vsync-locked flip + call_on_flip
-  logging.py        # manifest.json + one crash-safe JSONL/HDF5 log per game block
-  replay.py         # replay an episode from a block's log; its frame fields as arrays
   menu.py           # the hold-a-key pause menu (reset / forfeit / resume), opt-in per game phase
-  triggers.py       # run-start sync (wait/send/none) + MEG/EEG trigger codes over lsl/serial/parallel/hid
-  photodiode.py     # `python -m fmri_gym.photodiode`: flash a patch to measure the flip-to-photon offset
-  rig_measure.py    # `rig-measure`: make a rig file, measure the rig; report.html/.md, rigmeasurements.tsv, `pool`
+  inputs/           # the input devices: one named control per key, button, stick direction
+  outputs/
+    display.py      # pygame: fixed window, aspect-fit frame, fixation, text; vsync-locked flip + call_on_flip
+    audio.py        # streaming PCM to the speakers, each chunk timed to its frame's flip
+  sync/
+    triggers.py     # run-start sync (wait/send/none) + MEG/EEG trigger codes over lsl/serial/parallel/hid
+  save/
+    bids.py         # where a run's data goes, BIDS-style, and the numbers in its name
+    logging.py      # manifest.json + one crash-safe JSONL/HDF5 log per game block
+    replay.py       # replay an episode from a block's log; its frame fields as arrays
+  standalone/       # the commands that are not a run; nothing outside imports them
+    rig_setup/      # `rig-config` (window.py): a rig file in a form; `rig-measure` (measure.py): measure the rig
+    session_editor.py  # `session-editor`: sessions and their runs' curricula, without JSON
+    session_script.py  # the session's .sh script, one fmri-play line per run
+    pad_scope.py    # `pad-calibration`: calibrate a controller (pad_calibration.py), see what it sends
+    photodiode.py   # `python -m fmri_gym.standalone.photodiode`: flash a patch to measure the flip-to-photon offset
   adapters/
     base.py         # EnvAdapter + FrameState (the seam)
     keymap.py       # the phase's keys -> actions, one Keymap per action space
@@ -586,7 +596,7 @@ uv run fmri-play --subject sub-01 --ses "$SES" --run 2 --rig configs/examples/ri
 
 `--loop` plays the curriculum again from its first phase when it ends before `--duration`, and again, until `--duration` stops it; it needs `--duration`. Each pass plays the same phases with the same seeds; a block played again writes `block-NN_<backend>_<game>_2`, `_3`.... With `--resume`, a curriculum the last run played to its end starts again from its beginning instead of being refused. The manifest says `"loop"`.
 
-A resumed episode starts from that savestate rather than from its seed alone, so its `episode_start` line carries it as `initial_state`, and `fmri_gym.replay.reconstruct_episode` restores it over the reset. Without `--duration` and `--resume` a run plays its config from start to end, as before.
+A resumed episode starts from that savestate rather than from its seed alone, so its `episode_start` line carries it as `initial_state`, and `fmri_gym.save.replay.reconstruct_episode` restores it over the reset. Without `--duration` and `--resume` a run plays its config from start to end, as before.
 
 ## Triggers: fMRI vs MEG/EEG
 
@@ -625,17 +635,17 @@ What is sent: `task_start` when the clock anchors, `episode_start` at each reset
 Frames are shown with a vsync-locked flip and each frame's onset is logged as `flip_time`; message/fixation onsets in the manifest are flip times too. Key presses and releases are logged as they arrive (`key_time`, `key_name`, `key_down`), independent of the frame grid. The manifest records the display actually obtained (`vsync`, measured at start-up; `refresh_rate`).
 
 - A frame is shown at the next refresh after its step, so an `fps` that divides the refresh rate (30 or 60 on a 60 Hz screen) shows every frame for the same number of refreshes; otherwise frames alternate between one and two and each onset can be up to one refresh late. `flip_time` records what happened either way. Some cores' own rate is 59.92: close enough to 60 Hz that one frame in ~800 is shown twice.
-- Check that the rig locks to the refresh before a session: `python -m fmri_gym.display --fullscreen` (verdict LOCKED / NOT locked; if not, use fullscreen and disable the desktop compositor). `--no-vsync` turns the request off. Pass the rig's monitor (its `"screen"` `"monitor"`) here and to the photodiode as `--monitor`: refresh, vsync and the photon offset belong to the monitor.
+- Check that the rig locks to the refresh before a session: `python -m fmri_gym.outputs.display --fullscreen` (verdict LOCKED / NOT locked; if not, use fullscreen and disable the desktop compositor). `--no-vsync` turns the request off. Pass the rig's monitor (its `"screen"` `"monitor"`) here and to the photodiode as `--monitor`: refresh, vsync and the photon offset belong to the monitor.
 - Once per rig, measure the constant flip-to-photon offset with a photodiode on the screen, then subtract it from `flip_time` and the frame triggers:
 
   ```bash
-  python -m fmri_gym.photodiode --fullscreen --rig configs/<team>/rigs/<rig>.json     # diode into the MEG/EEG amp, codes on the rig's line
-  python -m fmri_gym.photodiode --fullscreen --audio                          # diode into this PC's sound card
-  python -m fmri_gym.photodiode --fullscreen --audio --audio-click --mic       # + mic on input 1: when sound is heard
+  python -m fmri_gym.standalone.photodiode --fullscreen --rig configs/<team>/rigs/<rig>.json     # diode into the MEG/EEG amp, codes on the rig's line
+  python -m fmri_gym.standalone.photodiode --fullscreen --audio                          # diode into this PC's sound card
+  python -m fmri_gym.standalone.photodiode --fullscreen --audio --audio-click --mic       # + mic on input 1: when sound is heard
   ```
 
-  The first flashes a patch with the frame trigger on each white flip; match the triggers to the diode edges in your recording with `fmri_gym.photodiode.match_edges(trigger_times, edge_times)`. The second records the diode on the sound-card input and prints the offsets itself (`--list-audio-devices` to pick the input). `--audio-click` also plays a tone burst on each white flip through the session's audio output and reports when it reaches the DAC; with `--mic`, when a microphone on input channel 1 hears it.
-- **The rig measurement** runs all of these at once: `uv run rig-measure --rig configs/<team>/rigs/<rig>.json`, or from `rig-config`'s last step once the rig file is saved. It is not a run: no participant plays, `fmri-play` has no part in it, and it plays no curriculum. It opens the window, trigger line, audio output and input devices the rig's runs open, shows a screen that says it is a rig measurement and what to have ready, and starts on SPACE. How long and how many is fixed in `fmri_gym/rig_measure.py`; **what is tested, and with what, is the rig file's**: its triggers (codes are tested when it sends some, pulses when it waits for the scanner), its inputs and response keys, its `"rig_measurement"` (photodiode, microphone, recording rate, more frame rates) and `has_audio`. A test the rig gives no reason to run is reported as *not run*, with why, and `rig-config`'s Rig measurement equipment step lists what a setup will test. A failed test does not stop the setup: it is listed, with why, on screen, on the console and in the report. ESC stops it, and what it measured so far is filed. A setup is filed under `sub-rig`, as MEG-BIDS files empty-room recordings under `sub-emptyroom`.
+  The first flashes a patch with the frame trigger on each white flip; match the triggers to the diode edges in your recording with `fmri_gym.standalone.photodiode.match_edges(trigger_times, edge_times)`. The second records the diode on the sound-card input and prints the offsets itself (`--list-audio-devices` to pick the input). `--audio-click` also plays a tone burst on each white flip through the session's audio output and reports when it reaches the DAC; with `--mic`, when a microphone on input channel 1 hears it.
+- **The rig measurement** runs all of these at once: `uv run rig-measure --rig configs/<team>/rigs/<rig>.json`, or from `rig-config`'s last step once the rig file is saved. It is not a run: no participant plays, `fmri-play` has no part in it, and it plays no curriculum. It opens the window, trigger line, audio output and input devices the rig's runs open, shows a screen that says it is a rig measurement and what to have ready, and starts on SPACE. How long and how many is fixed in `fmri_gym/standalone/rig_setup/measure.py`; **what is tested, and with what, is the rig file's**: its triggers (codes are tested when it sends some, pulses when it waits for the scanner), its inputs and response keys, its `"rig_measurement"` (photodiode, microphone, recording rate, more frame rates) and `has_audio`. A test the rig gives no reason to run is reported as *not run*, with why, and `rig-config`'s Rig measurement equipment step lists what a setup will test. A failed test does not stop the setup: it is listed, with why, on screen, on the console and in the report. ESC stops it, and what it measured so far is filed. A setup is filed under `sub-rig`, as MEG-BIDS files empty-room recordings under `sub-emptyroom`.
 
   | measurement | test | fails when |
   |---|---|---|
@@ -698,20 +708,20 @@ The names follow BIDS apart from that suffix, the contents not yet (no `_beh.tsv
     | `episode_end` | `episode_id`, `outcome` (`won`, `lost`, `terminated`, `truncated`, `playing` for the block's clock; `quit`, `reset`, `forfeit` for the subject's) , `terminated`, `truncated`, `score`, `n_pacing_resets` |
     | `block_end` | last line: `n_episodes`, `n_frames`, `outcomes`, `n_pacing_resets`, `total_reward`, `block_time_elapsed` and `num_completed_episodes` (earlier runs' included, for a block carried on), `block_did_not_finish` (stopped by the run's clock or ESC before its own end) (the manifest entry's summary), `audio` (when the block played sound: `onsets`, `[chunk, run_time]` when each chunk reached the DAC, so a frame's sound onset is the entry for its `audio_chunk` and `onset - flip_time` the audio delay achieved; `delay_ms`, `resyncs`, `trimmed_samples`), `extra` (the adapter's block extras, e.g. an ALE palette, and `state`, the savestate the block ended in) |
 
-  - **`frames.h5`** — the rendered frames, `frames` `(N, H, W, C)` gzip'd one chunk per frame plus `frame_index` `(N,)`, the `frame` of each row: every `frame_stride`-th frame (default every one; `0` keeps none). `fmri_gym.logging.read_frames` / `read_frame` read them.
+  - **`frames.h5`** — the rendered frames, `frames` `(N, H, W, C)` gzip'd one chunk per frame plus `frame_index` `(N,)`, the `frame` of each row: every `frame_stride`-th frame (default every one; `0` keeps none). `fmri_gym.save.logging.read_frames` / `read_frame` read them.
 
   The manifest's phase entry carries the same summary and names the folder (`data_dir`).
 
 ### Reconstruction (all verified bit-exact)
 
 1. **Per-frame state** (ale, retro): restore the `state` of a `frame` line → exact frame, no determinism assumption.
-2. **Seed + action replay** (any deterministic env, incl. gym): an episode's `seed` + its `action`s reproduce it frame-for-frame: `fmri_gym.replay.reconstruct_episode(block)`.
+2. **Seed + action replay** (any deterministic env, incl. gym): an episode's `seed` + its `action`s reproduce it frame-for-frame: `fmri_gym.save.replay.reconstruct_episode(block)`.
 3. **Stored pixels**: `frames.h5` *is* what was on screen, before the HUD.
 
 ```python
 import base64, pickle, zlib, gymnasium as gym, ale_py, stable_retro as retro
-from fmri_gym.logging import read_events
-from fmri_gym.replay import frame_arrays, reconstruct_episode
+from fmri_gym.save.logging import read_events
+from fmri_gym.save.replay import frame_arrays, reconstruct_episode
 gym.register_envs(ale_py)
 
 block = "data/sub-01/ses-001/beh/sub-01_ses-001_task-pong_run-001/block-00_ale_Pong-v5"
@@ -783,7 +793,7 @@ Many games already expose a Gymnasium API and drop straight into the `gym` backe
 - [x] **VGDL backend** ([tomov/language_and_experience @ dbp](https://github.com/tomov/language_and_experience/tree/dbp)), ported to gymnasium so it runs in the same env as the other backends — done.
 - [ ] Finish the **old-`gym` / shimmy** path against a real game (Sokoban, chess) — either port its source (VGDL recipe above) or run via shimmy in a `numpy<2` env; code path exists but is untested end-to-end.
 - [x] **LSL / serial / parallel-port / HID triggers** and a send-mode start signal for MEG/EEG (`"triggers"` section) -- done.
-- [x] **Photodiode calibration task** (`python -m fmri_gym.photodiode`) to measure the flip-to-photon offset of a rig -- done; an always-on sync square in the corner of every frame remains an option if a lab wants per-frame verification.
+- [x] **Photodiode calibration task** (`python -m fmri_gym.standalone.photodiode`) to measure the flip-to-photon offset of a rig -- done; an always-on sync square in the corner of every frame remains an option if a lab wants per-frame verification.
 - [ ] **retro `.bk2` movie logging** as an alternative to per-frame states (frame-exact, tiny).
 - [ ] Per-subject deterministic curriculum generation; multi-run structure with one trigger per fMRI run.
 - [ ] More adapters: ViZDoom/COOM, MiniHack, crafter, MuJoCo (`qpos/qvel` as state vars) — each a small `EnvAdapter`.

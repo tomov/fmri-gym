@@ -42,7 +42,7 @@ import re
 from dataclasses import dataclass
 from typing import Callable, NamedTuple
 
-from .config.rig import RigConfig
+from ..config.rig import RigConfig
 
 _LABEL = re.compile(r"[A-Za-z0-9]+")
 
