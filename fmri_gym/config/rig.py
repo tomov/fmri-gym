@@ -47,7 +47,7 @@ phase's ``"controls"``) are control names of the rig's input devices
 keys** are keyboard keys a device types itself; a curriculum binds them like
 any key.
 
-It is written by hand or in the rig form (``rig-config --rig <file>``). What was
+It is written by hand or in the rig form (``rig-setup --rig <file>``). What was
 measured on the rig is kept beside its file (:func:`measured_latency_files`).
 """
 
@@ -132,7 +132,7 @@ TRIGGER_PRESETS: dict[str, dict] = {
 LABEL = re.compile(r"[A-Za-z0-9_-]+")
 _INITIALS = re.compile(r"[A-Z]{2,4}")
 _SIZE = re.compile(r"([1-9]\d*)x([1-9]\d*)")
-_MAKE = ("make it in the rig form, rig-config --rig <file>, or start from "
+_MAKE = ("make it in the rig form, rig-setup --rig <file>, or start from "
          "configs/examples/rigs/empty.json")
 #: The repo's ``configs/``: a folder per team, each with its ``rigs/``, and the examples.
 CONFIGS = Path(__file__).resolve().parents[2] / "configs"
@@ -248,7 +248,7 @@ class RigConfig:
                   if rig.get(k, own) != own]
         if found:
             raise ValueError(f"{path}: " + "; ".join(found) + ". Fix it by hand, or in the "
-                             f"form: rig-config --rig {path}")
+                             f"form: rig-setup --rig {path}")
         settings = {**DEFAULTS, **rig}
         fields = {"site": site, "rig": rig_name,
                   **{k: rig[k] for k in FIELDS if k in rig and k not in ("site", "rig")}}

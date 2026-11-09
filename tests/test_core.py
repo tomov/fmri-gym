@@ -329,14 +329,14 @@ def test_every_phase_type_is_a_phase():
 
 
 def test_a_measurement_that_broke_part_way_is_reported_not_crashed_on():
-    from fmri_gym.standalone.rig_setup.measure import _html_frames, _html_section
+    from fmri_gym.standalone.rig_setup.report import _html_frames, _html_section
     half = {"summaries": {"frames": {"blocks": []}}}      # it broke before refresh_rate
     note = _html_section(_html_frames, half, ".", {"status": "fail", "why": "KeyError: 'keys'"})
     assert "stopped before it finished" in note and "KeyError" in note
 
 
 def test_each_rig_measurement_files_its_latencies_beside_the_rig_under_a_new_number(tmp_path):
-    from fmri_gym.standalone.rig_setup.measure import file_measured
+    from fmri_gym.standalone.rig_setup.report import file_measured
     offset = {"median_ms": 12.0, "sd_ms": 0.3, "n_matched": 10, "n": 10}
     m = {"start_time": "2026-10-20T10:00:00", "task": "rigMeasurement", "status": "fail",
          "failed_tests": "audio", "run": {"label": "sub-rig_ses-001_task-rigMeasurement_run-001"},
@@ -362,8 +362,9 @@ def test_a_quick_rig_measurement_runs_on_its_own_and_files_its_report(tmp_path, 
 
     import pygame
 
-    from fmri_gym.standalone.rig_setup import measure as rig_measure
     from fmri_gym.config.rig import RigConfig
+    from fmri_gym.standalone.rig_setup import cli, report
+    from fmri_gym.standalone.rig_setup import measure as rig_measure
     rig_path = tmp_path / "laptop.json"
     rig_path.write_text(json.dumps({"data_root": str(tmp_path / "data"), "has_audio": False,
                                     "triggers": {"sync": {"mode": "none"}}}))
@@ -376,11 +377,11 @@ def test_a_quick_rig_measurement_runs_on_its_own_and_files_its_report(tmp_path, 
 
     monkeypatch.setattr(rig_measure, "_wait_for_control", press_space_then_wait)
     monkeypatch.setattr(rig_measure, "lsl_probe", lambda: "not probed in the test")
-    monkeypatch.setattr(rig_measure, "machine", lambda: {})
+    monkeypatch.setattr(report, "machine", lambda: {})
     monkeypatch.setattr(rig_measure, "_VERDICT_S", 0.0)
     monkeypatch.setattr(rig_measure, "_SUMMARY_S", 0.0)
     settings = replace(rig_measure.QUICK, display_flips=10, frame_seconds=0.2)
-    rig_measure.measure_rig(str(rig_path), settings)
+    cli.measure_rig(str(rig_path), settings)
     folder, = (tmp_path / "data" / "sub-rig" / "ses-001" / "beh").iterdir()
     m = json.loads((folder / "manifest.json").read_text())
     assert m["task"] == "rigMeasurement" and set(m["tests"]) == set(rig_measure.TESTS)
@@ -397,7 +398,7 @@ def test_a_quick_rig_measurement_runs_on_its_own_and_files_its_report(tmp_path, 
 def test_the_machine_is_described_and_pygame_left_as_it_was():
     import pygame
 
-    from fmri_gym.standalone.rig_setup.measure import machine
+    from fmri_gym.standalone.rig_setup.report import machine
     pygame.quit()
     m = machine()
     assert {"cpu", "memory_gb", "displays", "gpus", "audio_devices", "input_devices",

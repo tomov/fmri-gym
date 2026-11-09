@@ -17,7 +17,7 @@ configs/
   <team>/subjects/sub-<label>/ses-<NNN>/<name>.sh   which runs one subject plays in one session
 ```
 
-A team's folder is made the first time one of its rigs is made with `rig-config` (New rig... asks for the team and the rig's name) or one of its sessions is saved with `session-editor`. A team with several places names each rig after its place: `MT/rigs/mgh-prisma.json`, `MT/rigs/mit-desk.json`.
+A team's folder is made the first time one of its rigs is made with `rig-setup` (New rig... asks for the team and the rig's name) or one of its sessions is saved with `session-editor`. A team with several places names each rig after its place: `MT/rigs/mgh-prisma.json`, `MT/rigs/mit-desk.json`.
 
 ## curricula/
 
@@ -29,7 +29,7 @@ Every file here is played by the test suite (`tests/test_configs.py` validates e
 
 ## Rigs: `<team>/rigs/`
 
-One file per rig, `<team>/rigs/<rig>.json`: the screen, how the participant responds, the sound, the data folder, the triggers, and the equipment its rig measurement measures with (README, "Rigs"). Make and change them with `uv run rig-config`, and commit them. Every run names its rig file (`fmri-play --rig configs/<team>/rigs/<rig>.json`); the data records the team as the rig's site, and the file's name as the rig. Beside the rig files, `measured/<rig>-<n>.json` holds what each rig measurement measured on this computer; git ignores them. The example rigs are described in `examples/rigs/README.md`.
+One file per rig, `<team>/rigs/<rig>.json`: the screen, how the participant responds, the sound, the data folder, the triggers, and the equipment its rig measurement measures with (README, "Rigs"). Make and change them with `uv run rig-setup`, and commit them. Every run names its rig file (`fmri-play --rig configs/<team>/rigs/<rig>.json`); the data records the team as the rig's site, and the file's name as the rig. Beside the rig files, `measured/<rig>-<n>.json` holds what each rig measurement measured on this computer; git ignores them. The example rigs are described in `examples/rigs/README.md`.
 
 ## Sessions: `<team>/subjects/`
 

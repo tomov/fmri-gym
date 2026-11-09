@@ -66,7 +66,7 @@ _GAME_CONTROLS_HINT = (
     "Controls: which control does what in this game. Write control names, joined with + "
     "for a combo: the keyboard's (UP, DOWN, LEFT, RIGHT, SPACE, RETURN, A-Z, 0-9, ...) or an "
     "input device's (fmri_gym/inputs/<device>.py); a rig plays the curriculum only if its "
-    "inputs (set in rig-config) have every control named, and a button box types its keys "
+    "inputs (set in rig-setup) have every control named, and a button box types its keys "
     "itself (its response keys). There is no default map. The action is what the game takes: "
     "a Discrete index, or for a MultiBinary game the index of the button the control holds "
     "down. A real-time Discrete game also needs a row with a blank control: the action sent "
@@ -625,7 +625,7 @@ class _Editor(QtWidgets.QMainWindow):
         self.session_form.layout().addRow("rig", self.rig_pick)
         layout.addWidget(self.session_form)
         edit = ui.button("Edit rig...", self._edit_rig)
-        edit.setToolTip("Open this rig file in rig-config: see or change it, or make it.")
+        edit.setToolTip("Open this rig file in rig-setup: see or change it, or make it.")
         self.rig_summary = QtWidgets.QLabel()
         self.rig_summary.setObjectName("hint")
         self.rig_summary.setWordWrap(True)

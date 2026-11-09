@@ -4,7 +4,7 @@ how far it must be pushed.
 One file per controller per measurement in :func:`calibrations_dir`, outside the
 checkout since it describes this machine's controller, found by the name SDL
 gives the device (:func:`newest`), and never rewritten (:func:`write`). It is
-made by :mod:`fmri_gym.standalone.pad_calibration`. Nothing here knows which axes a
+made by :mod:`fmri_gym.standalone.gamepad_calibration`. Nothing here knows which axes a
 controller has; each axis is read on its own (:meth:`AxisCalibration.normalise`).
 """
 
@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 #: What to do about a controller with no calibration, for the messages that say so.
-HOW_TO_CALIBRATE = "run pad-calibration (or Calibrate controller... in rig-config)"
+HOW_TO_CALIBRATE = "run gamepad-calibration (or Calibrate controller... in rig-setup)"
 
 
 class CalibrationError(ValueError):

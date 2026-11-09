@@ -91,8 +91,9 @@ all = [
 
 [project.scripts]
 fmri-play = "fmri_play:main"
-# A rig file, in a form (the `gui` extra): how this rig plays every run.
-rig-config = "fmri_gym.standalone:rig_config_main"
+# A rig file, in a form (the `gui` extra): how this rig plays every run; with --measure,
+# measure the rig, making its rig file first if it has none. Not a run: it plays no curriculum.
+rig-setup = "fmri_gym.standalone.rig_setup.cli:main"
 # Sessions and their runs' configs (the `gui` extra). Separate from fmri-play, which
 # only ever plays one run: a session is played by running its script.
 session-editor = "fmri_gym.standalone:session_editor_main"
@@ -101,9 +102,7 @@ session-editor = "fmri_gym.standalone:session_editor_main"
 fmri-ses = "fmri_gym.save.bids:main"
 # The game controller plugged in: calibrate it (each run with that controller reads
 # its newest calibration), see what it sends, and tune how its stick axes are read.
-pad-calibration = "fmri_gym.standalone.pad_scope:main"
-# Measure a rig, making its rig file first if it has none. Not a run: it plays no curriculum.
-rig-measure = "fmri_gym.standalone.rig_setup.measure:main"
+gamepad-calibration = "fmri_gym.standalone.gamepad_calibration:main"
 
 [tool.setuptools]
 packages = ["fmri_gym", "fmri_gym.adapters", "fmri_gym.config", "fmri_gym.inputs",

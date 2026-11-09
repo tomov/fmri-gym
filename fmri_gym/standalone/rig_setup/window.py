@@ -1,4 +1,5 @@
-"""``rig-config``: make, check and change a rig file, one step at a time, and measure the rig.
+"""The rig form of ``rig-setup``: make, check and change a rig file, one step at a time, and
+measure the rig.
 
 A rig file (:mod:`fmri_gym.config.rig`) says how one rig plays every run: what
 the rig is, its screen, sound and data folder, how the participant responds,
@@ -6,12 +7,11 @@ its triggers, and the equipment its rig measurement measures with. The window wa
 through these in order; each step must be complete before the next, and a rig
 measurement can only be run on the file once it is saved. The rig measurement opens the
 same window on a rig whose file is missing or incomplete
-(:func:`fmri_gym.standalone.rig_setup.measure.ensure_rig`).
+(:func:`fmri_gym.standalone.rig_setup.cli.ensure_rig`).
 """
 
 from __future__ import annotations
 
-import argparse
 import copy
 import glob
 import json
@@ -272,7 +272,7 @@ def measurement_plan(rig: rig_file.RigConfig) -> str:
 
 
 def run_rig_measurement(path: str, is_long: bool) -> str:
-    """Measure the rig whose file is at ``path``, as ``rig-measure`` would; say how it went.
+    """Measure the rig whose file is at ``path``, as ``rig-setup --measure`` does; say how it went.
 
     :param is_long: the long rig measurement; otherwise the quick one.
     :return: a few lines for the person who started it: the verdict and the report's path.
@@ -282,9 +282,9 @@ def run_rig_measurement(path: str, is_long: bool) -> str:
 
     rig = rig_file.RigConfig.open(path)
     ses = next_session(rig.data_root, SUBJECT)
-    command = [sys.executable, "-m", "fmri_gym.standalone.rig_setup.measure", "--rig", path,
+    command = [sys.executable, "-m", "fmri_gym.standalone.rig_setup", "--rig", path, "--measure",
                *(["--long"] if is_long else [])]
-    print("rig-config: " + " ".join(command), file=sys.stderr)
+    print("rig-setup: " + " ".join(command), file=sys.stderr)
     status = subprocess.run(command, check=False).returncode
     reports = glob.glob(os.path.join(rig.data_root, SUBJECT, f"ses-{ses:03d}", "*", "*",
                                      "report.html"))
@@ -462,7 +462,7 @@ class _RigWindow(QtWidgets.QDialog):
         self.has_triggers = "triggers" in values
         #: the controller plugged in (:func:`controller_status`); ``None`` until looked for
         self.controller: dict[str, Any] | None = None
-        self.setWindowTitle(f"rig-config: {path}")
+        self.setWindowTitle(f"rig-setup: {path}")
         self.setMinimumSize(800, 700)
         self.title = QtWidgets.QLabel()
         self.title.setStyleSheet("font-size: 16px; font-weight: 600")
@@ -806,7 +806,7 @@ class _RigWindow(QtWidgets.QDialog):
         self.controller_text = QtWidgets.QLabel()
         self.controller_text.setWordWrap(True)
         self.calibrate = ui.button("Calibrate controller...", self._calibrate)
-        self.calibrate.setToolTip("Open pad-calibration on the controller plugged in: measure "
+        self.calibrate.setToolTip("Open gamepad-calibration on the controller plugged in: measure "
                                   "each stick axis and check every control, and "
                                   "see what it sends.")
         look = ui.button("Look again", self._look_for_controller)
@@ -852,9 +852,9 @@ class _RigWindow(QtWidgets.QDialog):
         self._check()
 
     def _calibrate(self) -> None:
-        """Run pad-calibration in its own window, on this rig's input devices; then look
+        """Run gamepad-calibration in its own window, on this rig's input devices; then look
         again, so the new calibration shows here."""
-        command = [sys.executable, "-m", "fmri_gym.standalone.pad_scope"]
+        command = [sys.executable, "-m", "fmri_gym.standalone.gamepad_calibration"]
         if os.path.isfile(self.path) and self.saved is not None:
             command += ["--rig", self.path]
         self.hide()
@@ -1138,7 +1138,7 @@ class _RigWindow(QtWidgets.QDialog):
         try:
             rig_file.save(rig, self.path)
         except OSError as exc:
-            QtWidgets.QMessageBox.critical(self, "rig-config", f"Could not save: {exc}")
+            QtWidgets.QMessageBox.critical(self, "rig-setup", f"Could not save: {exc}")
             return
         self.saved = rig
         self._refresh_saved()
@@ -1175,7 +1175,7 @@ class _RigWindow(QtWidgets.QDialog):
         """Close, after asking when there are changes not saved."""
         if self._current() != (self.saved if self.saved is not None else self._opened):
             answer = QtWidgets.QMessageBox.question(
-                self, "rig-config", "Close without saving your changes to the rig file?")
+                self, "rig-setup", "Close without saving your changes to the rig file?")
             if answer != QtWidgets.QMessageBox.StandardButton.Yes:
                 return
         super().reject()
@@ -1208,7 +1208,7 @@ class _RigChooser(QtWidgets.QDialog):
         super().__init__()
         #: the rig file to open: the one picked, or a new one (not on disk until its Save)
         self.chosen = ""
-        self.setWindowTitle("rig-config: pick a rig")
+        self.setWindowTitle("rig-setup: pick a rig")
         self.setMinimumWidth(680)
         layout = QtWidgets.QVBoxLayout(self)
         intro = QtWidgets.QLabel(_CHOOSER_INTRO)
@@ -1304,15 +1304,14 @@ def ask_new_rig(parent: QtWidgets.QWidget) -> str | None:
     return path()
 
 
-def main() -> None:
-    """``rig-config [--rig <file>]``: pick a rig file (or make one), then go through it."""
-    p = argparse.ArgumentParser(description="Make, check or change a rig file, and run its rig "
-                                            "measurements. Without --rig, a window asks which rig.")
-    p.add_argument("--rig", help="the rig file, e.g. configs/<team>/rigs/<rig>.json; made when "
-                                 "missing")
-    args = p.parse_args()
-    if args.rig:
-        _edit(args.rig)
+def edit_rigs(rig_path: str | None) -> None:
+    """Go through the rig file at ``rig_path``; without one, pick a rig file (or make one), as
+    many times as the experimenter likes.
+
+    :param rig_path: the rig file, made when missing; ``None`` to pick one in a window.
+    """
+    if rig_path:
+        _edit(rig_path)
         return
     ui.app()
     chooser = _RigChooser()
@@ -1326,6 +1325,6 @@ def main() -> None:
 def _edit(path: str) -> None:
     """The rig window on ``path``; says on the console what became of the file."""
     if fill_rig(rig_file.draft(path), path) is None:
-        print(f"rig-config: {path} not saved", file=sys.stderr)
+        print(f"rig-setup: {path} not saved", file=sys.stderr)
         return
     print(f"saved: {path} ({time.strftime('%H:%M')})")
