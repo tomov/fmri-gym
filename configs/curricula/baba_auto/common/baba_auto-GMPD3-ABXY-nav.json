@@ -20,5 +20,6 @@
   },
   "controls": {"CONTROLLER_AXIS_TRIGGERRIGHT": 0, "CONTROLLER_BUTTON_Y": 1, "CONTROLLER_BUTTON_A": 2, "CONTROLLER_BUTTON_X": 3, "CONTROLLER_BUTTON_B": 4},
   "menu": {"control": "CONTROLLER_AXIS_TRIGGERLEFT", "hold": 3.0, "after": 480.0, "options": ["reset", "forfeit", "resume"], "move": ["CONTROLLER_BUTTON_Y", "CONTROLLER_BUTTON_A"], "confirm": "CONTROLLER_AXIS_TRIGGERRIGHT"},
+  "hud": {"show_score": false, "show_time_remaining": false},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 900.0, "fps": 15, "is_turn_based": true
 }
