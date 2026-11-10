@@ -468,3 +468,22 @@ def test_claude_md_imports_agents_md():
     """Claude Code reads AGENTS.md on its own only while no CLAUDE.md exists: the import keeps it."""
     lines = (Path(__file__).resolve().parents[1] / "CLAUDE.md").read_text().splitlines()
     assert lines[0] == "@AGENTS.md", "CLAUDE.md must start with the line @AGENTS.md"
+
+
+def test_the_controls_a_calibration_asked_for_are_not_asked_for_again():
+    import types
+
+    from humans.inputs import ControlNames
+    from humans.standalone.rig_setup.measure import _controls_to_ask
+
+    def pad(name, buttons, sticks=()):
+        return types.SimpleNamespace(name=name, BUTTON_NAMES=buttons, axis_controls=lambda: sticks)
+
+    button_a, up = ControlNames.CONTROLLER_BUTTON_A, ControlNames.CONTROLLER_AXIS_LEFTY_UP
+    calibrated = pad("calibrated", (button_a,), (up,))
+    stopped = pad("stopped", (button_a,), (up,))
+    no_stick = pad("no_stick", (ControlNames.CONTROLLER_BUTTON_B,))
+    assert _controls_to_ask([(calibrated, {"measured": True})]) == {}
+    assert _controls_to_ask([(stopped, {"measured": False}), (no_stick, {"measured": False})]) == {
+        button_a: "on the stopped", up: "on the stopped",
+        ControlNames.CONTROLLER_BUTTON_B: "on the no_stick"}

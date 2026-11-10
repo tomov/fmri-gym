@@ -21,11 +21,12 @@ A test the rig gives no reason to run is recorded as "not run", with why. In ord
   port is written to: another may be wired to a response box or an eye tracker, and a
   write that succeeds says nothing of where it went.
 * ``controls`` -- the response devices: what the rig's participant can press, i.e.
-  each control of the devices its ``"inputs"`` list (each stick axis calibrated
-  first, :mod:`humans.standalone.gamepad_calibration`) and each of its ``"response_keys"``. Every
-  response key is first checked automatically -- one that comes back through the
-  event queue as itself -- and the input devices plugged in are listed; then each
-  control is asked for on screen and pressed on the real device.
+  each control of the devices its ``"inputs"`` list and each of its ``"response_keys"``.
+  A controller is calibrated first (:mod:`humans.standalone.gamepad_calibration`), which
+  asks for each of its controls twice in a row. Every response key is checked
+  automatically -- one that comes back through the event queue as itself -- and the
+  input devices plugged in are listed; then each control no calibration asked for is
+  asked for on screen and pressed on the real device.
 * ``photodiode`` -- the flip-to-photon offset, read as the rig's
   ``rig_measurement.photodiode`` says, and on the same flashes the ``audio`` test when the
   rig plays audio: a tone burst on every other flash, timed at the DAC, and at a
@@ -436,24 +437,28 @@ def _controllers(inputs: InputDevices) -> list[Controller]:
     return [d for d in inputs.devices if isinstance(d, Controller)]
 
 
-def _controls_to_ask(inputs: InputDevices) -> dict[str, str]:
-    """Each control of the controllers to press, buttons then stick directions: what it is on."""
-    return {c: f"on the {d.name}" for d in _controllers(inputs)
+def _controls_to_ask(calibrated: list[tuple[Controller, dict]]) -> dict[str, str]:
+    """Each control, buttons then stick directions, of the controllers whose calibration did
+    not ask for every control (:func:`_calibrate`'s ``measured``): what it is on."""
+    return {c: f"on the {d.name}" for d, calibration in calibrated
+            if not calibration["measured"]
             for c in (*cue_order(d.BUTTON_NAMES), *d.axis_controls())}
 
 
 def _measure_controls(rig_measurement: RigMeasurement, summary: dict, arrays: dict,
                       tests: dict) -> None:
     rig = rig_measurement.rig
-    keys = {**_controls_to_ask(rig_measurement.inputs), **rig.response_keys}
-    if not keys:
+    controllers = _controllers(rig_measurement.inputs)
+    if not controllers and not rig.response_keys:
         tests["controls"] = Verdict("not run", "this rig lists no controller and types no "
                                                "response keys (rig-setup, Response devices step)")
         return
     summary["devices"] = input_devices()
     summary["inputs"] = rig_measurement.inputs.status()
-    calibrations = [_calibrate(rig_measurement, d) for d in _controllers(rig_measurement.inputs)]
+    calibrated = [(d, _calibrate(rig_measurement, d)) for d in controllers]
+    calibrations = [calibration for _, calibration in calibrated]
     summary["pad"] = calibrations[0] if calibrations else {"present": False}
+    keys = {**_controls_to_ask(calibrated), **rig.response_keys}
     summary["automatic"] = {name: _round_trip(rig_measurement.inputs, name)
                             for name in rig.response_keys}
     sync = rig_measurement.triggers.sync
