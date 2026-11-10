@@ -61,7 +61,7 @@ def test_loop_resumes_a_curriculum_played_to_its_end(tmp_path):
     first, _, _ = _run(config, tmp_path / "data", 1)
     assert [p["index"] for p in first["phases"] if p["type"] == "game"] == [1]
     second, _, stderr = _run(config, tmp_path / "data", 2, "--loop", "--resume")
-    assert "--loop starts it again" in stderr
+    assert "loop starts it again" in stderr
     assert second["resumed_from"] is None
     assert second["phases"][0]["index"] == 0, "the new pass did not start at the beginning"
 
@@ -75,4 +75,4 @@ def test_loop_without_duration_is_refused(tmp_path):
         cwd=REPO, capture_output=True, text=True, timeout=60,
         env={**os.environ, "SDL_VIDEODRIVER": "dummy"})
     assert done.returncode != 0
-    assert "--loop plays the curriculum until --duration" in done.stderr
+    assert "plays the curriculum until the run's duration" in done.stderr

@@ -31,8 +31,7 @@ from gymnasium import spaces
 class Keymap(ABC):
     """The combos and what they resolve to; subclasses say what a value means.
 
-    :param controls: the phase's ``controls`` (``validate_curriculum`` has already
-        checked that its names are real controls).
+    :param controls: the phase's ``controls``, whose names are real controls.
     :param space: the env's action space, which the values are checked against.
     :raises ValueError: a value that is not an action of the space.
     """
@@ -74,7 +73,7 @@ class MultiBinaryKeymap(Keymap):
         if combo == "":
             raise ValueError(f'controls: "": {value!r}: the env\'s action is '
                              f"MultiBinary({self.n}), whose no-control action is every button "
-                             "up; remove it")
+                             "up")
         if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value < self.n:
             raise ValueError(f"controls: {combo!r}: {value!r}: the env's action is "
                              f"MultiBinary({self.n}), so each value is the index "
@@ -131,7 +130,7 @@ def make_keymap(spec: dict, space: gym.Space) -> Keymap:
         raise TypeError(f"controls: the env's action space is {space}; a keymap drives "
                         "MultiBinary, Discrete or Box only")
     if "" not in controls and not spec.get("is_turn_based", False):
-        raise ValueError(f'controls: "" missing; the env\'s action space is {space}, so name the '
-                         'action sent on a frame with no control held ("": 0, say), or set '
-                         '"is_turn_based": true to step only on presses')
+        raise ValueError(f'controls: "" missing: the env\'s action space is {space}, and a '
+                         "phase that is not turn-based needs the action sent on a frame with "
+                         "no control held")
     return cls(controls, space)

@@ -1,12 +1,12 @@
-"""The seam between the input devices and the run: named controls, their edges, one device.
+"""What every input device is: named controls, their edges, and the devices as one.
 
 Every key, button and stick direction a participant can touch has one name,
-unique across devices, and a curriculum names it by its value in
+unique across devices: its value in
 :class:`~fmri_gym.inputs.control_names.ControlNames`. A device lists its names at
 the top of its own file, and its :meth:`InputDevice.handle` turns the pygame
 events that are its own into :class:`InputEvent` edges; it never reads pygame's
 queue itself. As in a game engine, a control is read two ways: an edge the frame
-it happens, and held state (:meth:`InputDevice.held`) at the tick. A run's
+it happens, and held state (:meth:`InputDevice.held`) at the tick. Several
 devices together are one :class:`InputDevices`, which is itself a device.
 """
 
@@ -43,7 +43,7 @@ class InputDevice(ABC):
     and presses and releases them with :meth:`_press` from its :meth:`handle`.
     """
 
-    #: the name a rig file lists it by (``"inputs"``)
+    #: the name the kind of device goes by
     name: ClassVar[str]
     #: every control the class has, known before any device is opened
     CONTROLS: ClassVar[frozenset[str]]
@@ -83,7 +83,7 @@ class InputDevice(ABC):
         """
 
     def status(self) -> str:
-        """One line for the console and the manifest: the device, and how it is read."""
+        """One line naming the device and how it is read."""
         return self.name
 
     def close(self) -> None:
@@ -141,7 +141,7 @@ class InputDevices(InputDevice):
     def status(self) -> str:
         """Each device's line, and the joysticks ignored."""
         lines = [d.status() for d in self.devices]
-        lines += [f"IGNORED {name!r}: not in the rig's \"inputs\""
+        lines += [f"IGNORED {name!r}: not among the devices opened"
                   for name in self.ignored_joysticks]
         return "; ".join(lines)
 

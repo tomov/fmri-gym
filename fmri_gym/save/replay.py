@@ -1,7 +1,7 @@
 """Reconstruction and analysis on top of a logged block (:mod:`fmri_gym.save.logging`).
 
-An episode is replayed from its seed and its actions through a fresh adapter, built by the
-caller from the block's own ``block_start`` line (its ``backend`` and ``phase``), so a block's
+An episode is replayed from its seed and its actions through a fresh adapter, one for the
+backend and phase of the block's own ``block_start`` line, so a block's
 log is enough to recreate the game the subject saw, frame for frame, on a deterministic engine.
 An episode that carried on from an earlier run starts from the savestate its
 ``episode_start`` line holds (``initial_state``), restored over the reset.
@@ -58,8 +58,8 @@ def reconstruct_episode(
 
     :param block: the block's folder.
     :param episode_id: which episode (see :func:`reconstruction_plan`).
-    :param adapter: the adapter to drive, fresh: ``get_adapter(start["backend"], start["phase"])``
-        for the block's first line ``start``.
+    :param adapter: the adapter to drive, fresh, for the ``backend`` and ``phase`` of the
+        block's first line.
     :param n_actions: replay only the first this many of the episode's actions
         (``0``: the reset alone), leaving the adapter at the logged frame
         ``ep_frame == n_actions - 1``; ``None`` replays them all.

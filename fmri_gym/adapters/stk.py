@@ -24,19 +24,17 @@ launch (``reset``), about half a second of track loading between races, and an
 episode is then exact from its launch ``seed``, its episode seed and its
 actions alone.
 
-No savestate, so no ``--resume`` of an episode a run stopped: the game keeps
+No savestate, so an episode a run stopped cannot be resumed: the game keeps
 none of its own, and one by replay (``replay_state_gym.ReplayState``) is a
 fresh launch and the whole episode played again, about 6 s plus a third of
 the time already played -- minutes of a frozen screen, charged to the block,
-after a long race. A run that tries refuses to start (:func:`fmri_gym.save.bids
-.last_position`).
+after a long race. :func:`fmri_gym.save.bids.last_position` refuses to carry one on.
 
 Timing: the game is lock-stepped, one ``step`` per fmri-gym frame, so
 ``fps`` here must equal the game's physics rate divided by ``frame_skip``
 (120 / 2 = 60 by default); ``_make`` refuses a config where they disagree.
 Measured on an Intel Arc laptop at 640x360 with four karts: 2.5 ms per step
-mean, 2.9 ms p95 -- well inside 16.7 ms. If steps did run long, run.py
-catches up rather than drops frames, and ``run_time`` records it.
+mean, 2.9 ms p95 -- well inside 16.7 ms.
 
 Needs a real OpenGL display (the frame is the game's own rendering) and the
 game itself, which ``pip install supertuxkart-gym`` brings: the wheel fetches a
@@ -77,7 +75,7 @@ class STKAdapter(EnvAdapter):
             seed=spec.get("seed"),
             binary=spec.get("binary"),
         )
-        # run.py paces the loop at fps; the game advances frame_skip ticks
+        # Steps come at fps; the game advances frame_skip ticks
         # per step. If the two disagree the race runs in slow or fast motion
         # relative to the scanner clock, silently.
         fps = int(spec.get("fps", 30))

@@ -322,10 +322,10 @@ def test_an_uncalibrated_axis_presses_nothing():
     assert d.calibrated_value(LX) is None
 
 
-def test_a_controller_refuses_an_axis_the_curriculum_names_with_no_calibration(config_home):
+def test_a_controller_refuses_a_required_axis_with_no_calibration(config_home):
     pad = _bare(CurrentDesignsGamepad3)
     with pytest.raises(CalibrationError,
-                       match="no calibration of 'Scripted' in .*gamepad-calibration"):
+                       match="no calibration of 'Scripted' in .*stick controls are required"):
         pad.require_calibrated_axes_for(frozenset({ControlNames.CONTROLLER_AXIS_LEFTY_UP,
                                                    ControlNames.CONTROLLER_BUTTON_A}))
     buttons_only = frozenset({ControlNames.CONTROLLER_BUTTON_A, "SPACE"})
@@ -477,7 +477,7 @@ def test_a_tap_inside_one_frame_counts_for_that_frame(screen):
 @pytest.mark.parametrize("names, says", [
     (["keyboard", "keyboard"], "expected distinct names"),
     (["gmpd3"], "expected distinct names"),
-    (["xbox_controller"], 'lists "xbox_controller" under "inputs", but none is plugged in'),
+    (["xbox_controller"], 'no "xbox_controller" is plugged in'),
 ])
 def test_a_rigs_inputs_that_cannot_be_opened_stop_the_run(sdl, config_home, names, says):
     with pytest.raises(ValueError, match=re.escape(says)):

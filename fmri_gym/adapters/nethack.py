@@ -79,7 +79,7 @@ class NetHackAdapter(EnvAdapter):
                 if k in ("tty_chars", "tty_colors"):
                     continue
                 # NLE reuses its observation buffers, and the logger pickles a
-                # line after the loop has moved on: a view here logs the next frame.
+                # line after the next step: a view here logs the next frame.
                 variables[k] = np.asarray(v).copy()
         variables.update(info or {})
         return FrameState(variables=variables)

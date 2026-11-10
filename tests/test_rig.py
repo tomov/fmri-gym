@@ -55,8 +55,8 @@ def test_settings_are_read():
                                                              False, "/data")
 
 
-def test_a_missing_file_says_how_to_make_one():
-    with pytest.raises(ValueError, match="no such file.*rig-setup --rig"):
+def test_a_missing_file_is_refused():
+    with pytest.raises(ValueError, match="no such rig file"):
         RigConfig.open("site1/none.json")
 
 
