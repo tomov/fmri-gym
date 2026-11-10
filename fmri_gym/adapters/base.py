@@ -1,8 +1,8 @@
-"""FrameState and the EnvAdapter base class."""
+"""FrameState, HudSettings and the EnvAdapter base class."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Any
 
 import gymnasium as gym
@@ -29,6 +29,38 @@ class FrameState:
     variables: dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass(frozen=True, slots=True)
+class HudSettings:
+    """A game phase's ``hud`` field: which of the strip's corner lines are shown."""
+
+    #: the score, in the strip's right corner
+    show_score: bool = True
+    #: the seconds left in the block, in the strip's left corner
+    show_time_remaining: bool = True
+
+    @classmethod
+    def from_dict(cls, spec: dict) -> HudSettings:
+        """Read a phase's ``hud`` dict (already validated by :func:`hud_problems`)."""
+        return cls(**spec)
+
+
+def hud_problems(spec: object) -> list[str]:
+    """What is wrong with a phase's ``hud`` dict, for the curriculum's validation.
+
+    :param spec: the phase's ``"hud"`` value.
+    :return: human-readable problems, empty when the settings are usable.
+    """
+    names = [f.name for f in fields(HudSettings)]
+    if not isinstance(spec, dict):
+        return [f"hud: expected a dict with any of {names}, got {spec!r}"]
+    out = [f"hud.{name}: expected true or false, got {value!r}"
+           for name, value in spec.items() if name in names and not isinstance(value, bool)]
+    unknown = sorted(set(spec) - set(names))
+    if unknown:
+        out.append(f"hud: unknown fields {unknown}, expected any of {names}")
+    return out
+
+
 class EnvAdapter:
     """One game environment behind an engine-agnostic interface.
 
@@ -45,6 +77,7 @@ class EnvAdapter:
     :ivar spec: the game-phase config dict this env was built from.
     :ivar env: the underlying ``gymnasium.Env``.
     :ivar keymap: the phase's ``controls`` as a :class:`~.keymap.Keymap`.
+    :ivar hud_settings: the phase's ``hud`` as :class:`HudSettings`.
     """
 
     env: gym.Env
@@ -61,6 +94,7 @@ class EnvAdapter:
             (see :func:`~.keymap.make_keymap`).
         """
         self.spec = spec
+        self.hud_settings = HudSettings.from_dict(spec.get("hud", {}))
         self.env = self._make(spec)
         self.keymap = make_keymap(spec, self.env.action_space)
         #: the last step's ``info`` and reward, for :meth:`outcome`
@@ -142,16 +176,22 @@ class EnvAdapter:
         that never covers game pixels (:meth:`~fmri_gym.outputs.display.Display
         .draw_frame`). Whatever goes here has to be state the env already
         reports, so a model reads the same numbers off the log. The default is
-        those two, time left first and the score last; a game
-        with a HUD of its own may return ``None`` to draw nothing, and one
-        with more to say may extend the list (lines are laid out left to right
-        along the strip, the first flush left and the last flush right).
+        those two, time left first and the score last, each shown as the
+        phase's ``hud`` settings (:attr:`hud_settings`) say; an override reads
+        them the same way. A game with a HUD of its own may return ``None`` to
+        draw nothing, and one with more to say may extend the list (lines are
+        laid out left to right along the strip, the first flush left and the
+        last flush right).
 
         :param score: the episode's cumulative reward so far.
         :param time_remaining: seconds until the block ends.
-        :return: the lines, or ``None``.
+        :return: the lines, or ``None`` when none is shown.
         """
-        return [f"{max(0, int(time_remaining))} s", f"Score: {score:g}"]
+        # A hidden line is "" rather than dropped: a lone line sits flush left.
+        settings = self.hud_settings
+        lines = [f"{max(0, int(time_remaining))} s" if settings.show_time_remaining else "",
+                 f"Score: {score:g}" if settings.show_score else ""]
+        return lines if any(lines) else None
 
     def overlay(self) -> tuple[list[str], float] | None:
         """The lines drawn *on* the frame every step, or ``None`` for none.

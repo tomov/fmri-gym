@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, ClassVar
 
+from ..adapters.base import hud_problems
 from ..outputs.display import image_line_problems
 from ..inputs import ControlNames, is_control_of_any_input_device
 
@@ -354,6 +355,10 @@ class GamePhase(Phase):
             out.append(f"show_outcome_duration: expected seconds >= 0, got {seconds!r}")
         if "menu" in d:
             out.extend(menu_problems(d["menu"]))
+        if "hud" in d:
+            out.extend(hud_problems(d["hud"]))
+        if "show_score" in d:
+            out.append('"show_score" is a field of "hud": write "hud": {"show_score": ...}')
         if "instructions" in d:
             out.extend(Instructions.problems(d["instructions"]))
         return out
