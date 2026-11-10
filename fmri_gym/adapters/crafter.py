@@ -161,7 +161,8 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 
-from .base import EnvAdapter, FrameState, Sound
+from ..outputs.sound import Sound
+from .base import EnvAdapter, FrameState
 
 #: The two envs ``crafter_gym`` registers, and what a phase's ``game`` picks
 #: between: the sixteen-key game, and the same game behind eight buttons.
@@ -342,7 +343,7 @@ class CrafterAdapter(EnvAdapter):
         self._cues = bool(spec.get("cues", False))
         self._cue_overlay = bool(spec.get("cue_overlay", False))
         # Synthesized once per block rather than per frame: each is a few tens
-        # of thousands of samples, and the loop wants them at 2.5 Hz.
+        # of thousands of samples, and they are wanted at up to 2.5 Hz.
         self._cue_sounds = {
             "score": _score_cue(), "hit": _hit_cue(), "blocked": _blocked_cue(),
         } if self._cues else {}
@@ -540,7 +541,7 @@ class CrafterAdapter(EnvAdapter):
         subject to supply the crank.
 
         The wake is what the subject needs to see, so it is drawn like any
-        other frame and the loop stops on it: waking from a blow clears
+        other frame and autoplay stops on it: waking from a blow clears
         ``sleeping`` (``_wake_up_when_hurt``), so the last autoplayed frame is
         the one with the zombie next to them and the health bar already down.
         A frame is logged for every one of these steps, with ``noop`` as its
@@ -637,14 +638,14 @@ class CrafterAdapter(EnvAdapter):
             "cue": self._cue,
             "target": self._outcome["target"],
             # True on every frame the player spent asleep, which under
-            # is_turn_based are the frames the loop stepped itself (see
+            # is_turn_based are the frames stepped without a press (see
             # `autoplay`): without it a run of noops is indistinguishable from
             # a subject who pressed nothing.
             "sleeping": bool(info.get("sleeping", False)),
         }
         if self._menu_mode:
-            # What the engine was given is `info["env_action"]`, which the run
-            # logs beside the button `action` holds. Menu state is read after
+            # What the engine was given is `info["env_action"]`, logged beside
+            # the button `action` holds. Menu state is read after
             # the press, so a cycle row names where the cursor landed, which is
             # what the frame shows.
             variables["menu_idx"] = info["menu_idx"]

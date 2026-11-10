@@ -12,7 +12,6 @@ shared differently:
   things only the run says -- who plays, which run of which session, how long,
   the test switches.
 
-A setting goes in the kind it is shared like. ``fmri_play`` reads the three
-into a :class:`~.run.RunConfig` and hands it to :class:`fmri_gym.run.Run`
-(``Run.from_config``), which plays the curriculum on the rig.
+A setting goes in the kind it is shared like; a :class:`~.run.RunConfig` holds
+the three together.
 """

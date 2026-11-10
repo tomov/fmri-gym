@@ -257,7 +257,7 @@ def test_muted_output_numbers_chunks_for_the_log():
 
     An empty chunk is no chunk: it gets no number, as it gets no row in ``audio.h5``.
     """
-    from fmri_gym.adapters.base import Sound
+    from fmri_gym.outputs.sound import Sound
 
     out = _audio.Audio(enabled=False)
     out.start(frame_period=1 / 35, flip_period=None)

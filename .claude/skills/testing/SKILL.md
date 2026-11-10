@@ -12,6 +12,7 @@ The suite is `tests/` (`tests/README.md` has the full map). It plays each select
 ```bash
 uv run pytest --changed            # the backends your branch touches, against origin/main
 uv run ruff check fmri_gym fmri_play.py agents tests gym/*/tests
+PYTHONPATH="$(printf '%s:' gym/*/)" uv run lint-imports   # who imports whom: pyproject.toml's contracts
 ```
 
 Read the summary. A skip says what this machine lacks and how to get it (`uv sync --extra X`, `git submodule update --init`, install Chrome, fetch game files). A backend whose own files you changed does not skip: it fails until you can play it. If you cannot install it here, say so in the PR and let CI play it.
@@ -34,7 +35,7 @@ Read the summary. A skip says what this machine lacks and how to get it (`uv syn
 
 ## What CI runs
 
-`.github/workflows/tests.yml` runs on a PR when it is opened, marked ready for review or pushed to; a draft runs nothing. A `core` job lints and runs the engine-free tests plus the `gym` backend; then one job per backend a Linux runner can play, with only that backend's extra synced and `--strict-backends --thorough --no-audio`: every config of the backend, and no skipping. Watch it with `gh pr checks <number> --watch`; a failed backend job keeps its run folders as an artifact.
+`.github/workflows/tests.yml` runs on a PR when it is opened, marked ready for review or pushed to; a draft runs nothing. A `core` job lints, checks who imports whom (`lint-imports`), and runs the engine-free tests plus the `gym` backend; then one job per backend a Linux runner can play, with only that backend's extra synced and `--strict-backends --thorough --no-audio`: every config of the backend, and no skipping. Watch it with `gh pr checks <number> --watch`; a failed backend job keeps its run folders as an artifact.
 
 ## When you add a backend or a config
 

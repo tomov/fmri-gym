@@ -30,8 +30,9 @@ from policies import Policy, RandomPolicy, VLMPolicy
 from fmri_gym.adapters import get_adapter
 from fmri_gym.config.curriculum import Curriculum
 from fmri_gym.config.phases import GamePhase
-from fmri_gym.run import Clock, EpisodeResult
+from fmri_gym.run import EpisodeResult
 from fmri_gym.save.logging import Logger
+from fmri_gym.sync.clock import Clock
 
 
 def no_key_action(adapter) -> tuple:

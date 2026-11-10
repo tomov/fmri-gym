@@ -1,9 +1,8 @@
 """Streaming PCM output via a PortAudio callback (sounddevice).
 
-Two layers. :class:`Audio` is what the experiment loop holds -- the speakers,
-exactly as :class:`~fmri_gym.outputs.display.Display` is the monitor -- and it takes
-whatever :meth:`~fmri_gym.adapters.base.EnvAdapter.sound` produced, engine
-unseen. :class:`SoundDeviceGameBlockStream` below it is the PortAudio plumbing;
+Two layers. :class:`Audio` is the speakers, exactly as
+:class:`~fmri_gym.outputs.display.Display` is the monitor, and it takes any
+:class:`~fmri_gym.outputs.sound.Sound`, engine unseen. :class:`SoundDeviceGameBlockStream` below it is the PortAudio plumbing;
 another way of getting sound out (a different library, a file writer, a
 scanner-safe device) is another class with the same ``play``/``stop``.
 
@@ -32,14 +31,13 @@ import platform
 import sys
 import time
 from collections import deque
-from collections.abc import Callable
-from dataclasses import asdict, dataclass, replace
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
 
-if TYPE_CHECKING:
-    from ..adapters.base import Sound
+from ..save.logging import AudioBlockLog
+from .sound import Sound
+
 
 # conda's bundled alsa-lib only ships raw-hardware PCM definitions, so
 # PortAudio enumerates `hw:*` cards and nothing else -- its "default" then
@@ -78,36 +76,6 @@ _BLOCKSIZE = 256                        # samples per callback
 _DELAY_STEP = 0.010                     # the audio delay is rounded up to this
 
 
-@dataclass(frozen=True, slots=True)
-class AudioBlockLog:
-    """One block's sound timing, for its log (:meth:`Audio.block_log`)."""
-
-    #: ``(chunk, time)``: when each queued chunk started playing, on the
-    #: ``perf_counter`` clock (the run's after :meth:`in_run_time`); a chunk
-    #: that never played has no entry
-    onsets: list[tuple[int, float]]
-    #: milliseconds from a frame's flip to its sound's first sample at the DAC
-    delay_ms: float
-    #: chunks placed at their onset rather than gaplessly, after a stall
-    resyncs: int
-    #: samples cut from chunks that were already late when placed
-    trimmed_samples: int
-    #: ``(chunk, samples)``: each chunk the stream resampled to follow the
-    #: display's clock, and how many samples it played instead of the ones
-    #: logged (:func:`_resample` of the logged PCM to that length is what
-    #: played); every other chunk played as logged
-    stretched: list[tuple[int, int]]
-
-    def in_run_time(self, from_perf: Callable[[float], float]) -> AudioBlockLog:
-        """The same log with every onset converted by ``from_perf`` (the run's clock)."""
-        return replace(self, onsets=[(chunk, from_perf(t)) for chunk, t in self.onsets])
-
-    def record(self) -> dict:
-        """The fields as ``audio.h5`` takes them
-        (:meth:`~fmri_gym.save.logging.Logger.close_block`)."""
-        return asdict(self)
-
-
 def _resample(pcm: np.ndarray, n: int) -> np.ndarray:
     """Linearly resample ``pcm`` to ``n`` samples, keeping its dtype.
 
@@ -131,7 +99,7 @@ def _device_lead(device: int | str | None, blocksize: int, seconds: float = 0.5)
     so the delay is chosen from what the callbacks report.
 
     :param device: PortAudio output device.
-    :param blocksize: samples per callback, as the session will use.
+    :param blocksize: samples per callback, as the stream will use.
     :param seconds: how long to run.
     :return: the longest ``outputBufferDacTime - currentTime`` seen, in seconds.
     :raises RuntimeError: if the device reports no DAC times, so sound cannot
@@ -151,9 +119,7 @@ def _device_lead(device: int | str | None, blocksize: int, seconds: float = 0.5)
     settled = leads[len(leads) // 4:]       # skip the start-up transient
     if not settled or np.isnan(settled).any():
         raise RuntimeError("audio: this output reports no DAC timestamps, so sound cannot "
-                           "be placed against the flips; make another output the system "
-                           "default (python -m sounddevice lists them), or set "
-                           '"has_audio": false in the rig file')
+                           "be placed against the flips")
     return max(settled)
 
 
@@ -377,7 +343,7 @@ class SoundDeviceGameBlockStream:
 
 
 class Audio:
-    """The session's speakers: plays whatever an adapter's ``sound`` returns.
+    """The speakers: plays any :class:`~fmri_gym.outputs.sound.Sound` it is given.
 
     Engine-agnostic in the same way :class:`~fmri_gym.outputs.display.Display` is: it
     receives PCM chunks and never learns which game made them. The output
@@ -390,12 +356,12 @@ class Audio:
         """Open the system's output, measure its delay and choose the audio delay.
 
         No stream is opened until :meth:`play`. The output is the desktop mixer
-        (:func:`_preferred_output_device`), i.e. wherever the system plays sound:
-        pick the rig's output there, as for any other program.
+        (:func:`_preferred_output_device`), i.e. wherever the system plays sound,
+        as for any other program.
 
-        :param enabled: ``False`` (the rig's ``"has_audio": false``) never touches a sound device,
-            so a machine without one can run; a block's sound is still numbered
-            and logged, and played nowhere.
+        :param enabled: ``False`` never touches a sound device, so a machine
+            without one works; a block's sound is still numbered and logged,
+            and played nowhere.
         :raises RuntimeError: if there is no usable output, or it reports no
             DAC timestamps.
         """
@@ -404,7 +370,7 @@ class Audio:
         self.stream: SoundDeviceGameBlockStream | None = None
         self.format: tuple | None = None
         self._period: float | None = None   # seconds per step, while being checked
-        #: number of the chunk queued by the latest :meth:`play` (-1: none), for the log.
+        #: number of the chunk queued by the latest :meth:`play` (-1: none).
         self.last_chunk = -1
         self._queued = 0                    # chunks queued in this block
         self._log: dict[str, Any] = {"onsets": [], "resyncs": 0, "trimmed": 0, "stretched": []}
@@ -423,8 +389,7 @@ class Audio:
         try:
             info = sounddevice.query_devices(self.device, "output")
         except (ValueError, sounddevice.PortAudioError) as e:
-            raise RuntimeError(f"audio: no usable output device ({e}); "
-                               'set "has_audio": false in the rig file for a silent session') from e
+            raise RuntimeError(f"audio: no usable output device ({e})") from e
         self.device_name = info["name"]
         self.samplerate = info["default_samplerate"]
         self.hostapi = sounddevice.query_hostapis(info["hostapi"])["name"]
@@ -434,19 +399,19 @@ class Audio:
         self.delay = float((np.ceil(needed / _DELAY_STEP) + 1) * _DELAY_STEP)
 
     def status(self) -> str:
-        """One line for the experimenter screen and the console.
+        """One line naming the output and the delay it got.
 
         :return: e.g. ``"out: default (ALSA) | sound at flip + 40 ms (device
             delay 16.4 ms)"``.
         """
         if not self.enabled:
-            return ('off (the rig\'s "has_audio": false): playback muted in every game block, no '
-                    "output opened; logged game audio is unchanged")
+            return ("off: playback muted in every game block, no output opened; "
+                    "logged game audio is unchanged")
         return (f"out: {self.device_name} ({self.hostapi}) | sound at flip + "
                 f"{self.delay * 1000:.0f} ms (device delay {self.lead * 1000:.1f} ms)")
 
     def describe(self) -> dict[str, Any]:
-        """The output and the delay it got, for the manifest.
+        """The output and the delay it got.
 
         :return: a JSON-serializable dict.
         """
@@ -506,18 +471,16 @@ class Audio:
             raise ValueError(
                 f"audio: the game makes {per_step * 1000:.3f} ms of sound per step but "
                 f"steps every {period * 1000:.3f} ms ({per_step / period - 1:+.2%}); "
-                f"sound can follow the flips only within {_MAX_STRETCH:.1%}. "
-                "Leave this block's fps out to play at the engine's own rate, or set "
-                '"has_audio": false on the phase')
+                f"sound can follow the flips only within {_MAX_STRETCH:.1%}")
 
     def play(self, sound: Sound | None, flip_t: float) -> None:
         """Queue one chunk to start :attr:`delay` after its frame's flip.
 
-        With the output off (the rig's ``"has_audio": false``) the chunk is
+        With the output off (``enabled`` false) the chunk is
         numbered as if it had been queued, so the log keeps the game's sound,
         and goes nowhere.
 
-        :param sound: a :class:`~fmri_gym.adapters.base.Sound`, or ``None`` for
+        :param sound: a :class:`~fmri_gym.outputs.sound.Sound`, or ``None`` for
             a frame with nothing to play (which leaves playback alone, rather
             than cutting off what is still queued).
         :param flip_t: ``perf_counter`` of the flip that showed the frame.
@@ -559,7 +522,7 @@ class Audio:
             self.stream.stop()
 
     def close(self) -> None:
-        """Release the output device (the audio half of a session teardown)."""
+        """Release the output device."""
         if self.stream is not None:
             self.stream.close()
         self.stream = None

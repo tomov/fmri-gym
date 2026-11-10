@@ -1,10 +1,9 @@
-"""The input devices a participant answers with, one class per kind, and a run's set of them.
+"""The input devices a participant answers with, one class per kind, and a set of them.
 
-A rig file lists its devices under ``"inputs"``, the keyboard among them, by
-the names in :data:`INPUT_DEVICE_CLASSES_BY_NAME`; a curriculum names the
-controls it maps as each device's file writes them. What a rig can press is
-known before anything is plugged in (:func:`controls_of_input_devices`), and
-a run opens its devices once (:func:`open_input_devices`), before its window.
+Each kind goes by its name in :data:`INPUT_DEVICE_CLASSES_BY_NAME`, the keyboard
+among them, and each control by the name its device's file gives it. What a set
+of kinds can press is known before anything is plugged in
+(:func:`controls_of_input_devices`); :func:`open_input_devices` opens them.
 """
 
 from __future__ import annotations
@@ -26,7 +25,7 @@ __all__ = ["INPUT_DEVICE_CLASSES_BY_NAME", "QUIT", "CalibrationError", "ControlN
            "first_controller_class_plugged_in", "is_control_of_any_input_device",
            "open_input_devices"]
 
-#: Each kind of input device, by the name a rig file lists it by.
+#: Each kind of input device, by its name.
 INPUT_DEVICE_CLASSES_BY_NAME: dict[str, type[InputDevice]] = {
     cls.name: cls for cls in (Keyboard, XBoxController, CurrentDesignsGamepad3)}
 #: The kinds that are controllers, by the same names.
@@ -36,7 +35,7 @@ CONTROLLER_CLASSES_BY_NAME: dict[str, type[Controller]] = {
 
 
 def controls_of_input_devices(input_device_names: Iterable[str]) -> frozenset[str]:
-    """Every control a rig with the devices ``input_device_names`` can have."""
+    """Every control the kinds of device ``input_device_names`` have between them."""
     return frozenset().union(*(INPUT_DEVICE_CLASSES_BY_NAME[n].CONTROLS
                                for n in input_device_names))
 
@@ -75,16 +74,16 @@ def open_input_devices(input_device_names: Sequence[str],
                        required_controls: frozenset[str] = frozenset()) -> InputDevices:
     """A device of each kind ``input_device_names`` lists, each controller on one plugged in.
 
-    :param input_device_names: a rig's ``"inputs"``.
-    :param required_controls: the controls the curriculum names; a stick direction
+    :param input_device_names: the kinds of device, by name.
+    :param required_controls: controls that must be readable; a stick direction
         among them needs its controller calibrated. Empty: none needs it.
     :raises ValueError: for a kind that is not one, listed twice, or not plugged in.
     :raises CalibrationError: for a malformed calibration, or a needed axis without one.
     """
     unknown = [n for n in input_device_names if n not in INPUT_DEVICE_CLASSES_BY_NAME]
     if unknown or len(set(input_device_names)) < len(input_device_names):
-        raise ValueError(f'"inputs": {list(input_device_names)}: expected distinct names from '
-                         f"{sorted(INPUT_DEVICE_CLASSES_BY_NAME)}")
+        raise ValueError(f"input devices {list(input_device_names)}: expected distinct names "
+                         f"from {sorted(INPUT_DEVICE_CLASSES_BY_NAME)}")
     classes = [INPUT_DEVICE_CLASSES_BY_NAME[n] for n in input_device_names]
     start_sdl_joysticks_and_wait_for(sum(issubclass(c, Controller) for c in classes))
     devices = [cls.open() for cls in classes]

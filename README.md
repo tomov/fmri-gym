@@ -52,7 +52,7 @@ Atari ROMs ship with `ale-py`. For the `retro` backend you must supply and impor
 
 ## Quick start
 
-Every command here plays on a laptop as it is: `--rig configs/examples/rigs/laptop.json` (`configs/examples/rigs/laptop.json`) is a 1024x768 window with the game's sound on the laptop's speakers, the keyboard, and no scanner, so the run starts at the experimenter screen's SPACE. `--dummy-trigger` skips that screen too, and every key wait after it: drop it to read the instructions and play at your own pace.
+Every command here plays on a laptop as it is: `--rig configs/examples/rigs/laptop.json` (`configs/examples/rigs/laptop.json`) is a 1024x768 window with the game's sound on the laptop's speakers, the keyboard, and no scanner, so the run starts at the experimenter screen's SPACE. `--dummy-trigger` skips that screen too, and every key wait after it: drop it to read the instructions and play at your own pace. A run that stops before it starts says what is wrong; what to do about each message is in [.claude/skills/troubleshooting/SKILL.md](.claude/skills/troubleshooting/SKILL.md).
 
 ```bash
 # --- per-family demo curricula (all tested end-to-end; ~15 s per block) ---
@@ -351,11 +351,11 @@ A game reaches the scanner through up to three layers, each its own directory:
 
 Most games need only the last: a pip package already provides the env. Nothing about fMRI leaks below the adapter, so the env an agent is trained on is the one the subject plays.
 
-The package is in layers, drawn in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md): the leaves (`inputs/`, `outputs/`, `sync/`, `save/`, `adapters/`) import nothing outside their own folder, the run (`config/`, `menu.py`, `run.py`) puts them together, and the tools in `standalone/` sit on top, imported by nothing else.
+The package is a stack of layers, drawn in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) and checked by `uv run lint-imports`: each imports only from the layers below it -- `adapters/` over `outputs/` over `save/` over `sync/` and `inputs/` -- the run (`config/`, `menu.py`, `run.py`) puts them together, game engines and the `gym/` envs are imported only by `adapters/`, and the tools in `standalone/` sit on top, imported by nothing else.
 
 ```
 fmri_gym/
-  run.py        # trigger, clock, curriculum loop, phases  — 100% engine-agnostic
+  run.py        # trigger, curriculum loop, phases  — 100% engine-agnostic
   config/
     curriculum.py   # Curriculum: the curriculum file, loaded once into typed phases; load, save, includes
     phases.py       # one dataclass per phase type (Fixation, Message, Survey, GamePhase, Check*), its checks
@@ -366,7 +366,9 @@ fmri_gym/
   outputs/
     display.py      # pygame: fixed window, aspect-fit frame, fixation, text; vsync-locked flip + call_on_flip
     audio.py        # streaming PCM to the speakers, each chunk timed to its frame's flip
+    sound.py        # Sound: one frame's PCM and its sample rate, as an adapter hands it over
   sync/
+    clock.py        # Clock: seconds since the scanner trigger, and the wall clock
     triggers.py     # run-start sync (wait/send/none) + MEG/EEG trigger codes over lsl/serial/parallel/hid
   save/
     bids.py         # where a run's data goes, BIDS-style, and the numbers in its name

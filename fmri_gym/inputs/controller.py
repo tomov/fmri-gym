@@ -1,9 +1,8 @@
 """A game controller: buttons, triggers and stick axes, under the names every kind of controller
 shares.
 
-A curriculum names a controller's controls by :class:`ControlNames`, whatever
-the controller, so one written for a controller plays on any other that has
-those controls. A kind of controller is a subclass that maps what SDL sends to
+A controller's controls go by :class:`ControlNames`, whatever the controller,
+so the same name means the same place on any controller that has it. A kind of controller is a subclass that maps what SDL sends to
 these names. Each stick axis is two controls, one per side of rest, read like a
 trigger through the axis's own calibration (:mod:`fmri_gym.inputs.calibration`),
 and independent of every other axis. SDL's joystick subsystem is started here,
@@ -22,7 +21,7 @@ import pygame
 from pygame._sdl2 import controller as sdl_controller
 
 from .base import InputDevice, InputEvent
-from .calibration import (HOW_TO_CALIBRATE, AxisCalibration, CalibrationError,
+from .calibration import (AxisCalibration, CalibrationError,
                           ControllerCalibration, calibrations_dir, newest)
 from .control_names import ControlNames
 
@@ -138,9 +137,8 @@ class Controller(InputDevice):
         """
         indices = cls.plugged_in_indices()
         if not indices:
-            raise ValueError(f'the rig lists "{cls.name}" under "inputs", but none is plugged '
-                             f"in (joysticks SDL sees: {sdl_joystick_names() or 'none'}): plug "
-                             'it in, or take it out of the rig\'s "inputs"')
+            raise ValueError(f'no "{cls.name}" is plugged in '
+                             f"(joysticks SDL sees: {sdl_joystick_names() or 'none'})")
         return cls(cls.HANDLE(indices[0]), calibrated)
 
     @abstractmethod
@@ -191,19 +189,18 @@ class Controller(InputDevice):
         path, calibration = calibration_file
         if set(calibration.axes) != set(self.AXIS_NAMES):
             raise CalibrationError(f"{path}: calibrates the axes {sorted(calibration.axes)}, but "
-                                   f"{self.device_name!r} has {sorted(self.AXIS_NAMES)}: "
-                                   f"{HOW_TO_CALIBRATE}")
+                                   f"{self.device_name!r} has {sorted(self.AXIS_NAMES)}")
         self.calibration_path, self.calibration = path, calibration
 
     def require_calibrated_axes_for(self, required_controls: frozenset[str]) -> None:
-        """Refuse to play a curriculum that names a control of an axis with no calibration.
+        """Refuse ``required_controls`` that include a control of an axis with no calibration.
 
-        :raises CalibrationError: naming the controller and how to calibrate it.
+        :raises CalibrationError: naming the controller and the folder its calibration is read from.
         """
         if self.calibration is not None or not required_controls & set(self.axis_controls()):
             return
         raise CalibrationError(f"no calibration of {self.device_name!r} in {calibrations_dir()}, "
-                               f"and the curriculum names its stick controls: {HOW_TO_CALIBRATE}")
+                               "and its stick controls are required")
 
     def calibrated_value(self, axis_name: str) -> float | None:
         """Where an axis is, as a fraction of its travel that way, -1..1; None uncalibrated."""

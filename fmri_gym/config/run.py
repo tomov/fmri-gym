@@ -6,8 +6,8 @@ curriculum; a run is one of each, played for one subject, so what needs both
 -- a game key the rig's scanner types at every volume, or a control none of
 its input devices has -- is checked here
 (:meth:`RunConfig.problems`), and so, on request, is whether each game starts on
-this machine. ``fmri_play`` owns the flags and their
-spellings; :meth:`RunConfig.from_args` is the one place the command line is read.
+this machine. :meth:`RunConfig.from_args` is the one place the parsed command
+line is read.
 """
 
 from __future__ import annotations
@@ -58,11 +58,11 @@ class RunConfig:
     @classmethod
     def from_args(cls, args: argparse.Namespace, curriculum: Curriculum,
                   rig: RigConfig) -> RunConfig:
-        """Read ``fmri_play``'s parsed flags.
+        """Read a parsed command line.
 
-        :param args: the namespace of ``fmri_play``'s parser, one attribute per flag.
-        :param curriculum: the curriculum ``--curriculum`` names, loaded.
-        :param rig: the rig ``--rig`` picked.
+        :param args: the parsed flags, one attribute per field read here.
+        :param curriculum: the run's curriculum, loaded.
+        :param rig: the run's rig.
         """
         return cls(curriculum=curriculum, rig=rig, subject=args.subject, ses=args.ses,
                    run=args.run, duration=args.duration, resume=args.resume, loop=args.loop,
@@ -135,7 +135,7 @@ class RunConfig:
         if sync.mode != "wait":
             return []
         return [f"phase {i}: controls: {combo} uses {sync.key!r}, the key {self.rig.path}'s "
-                "scanner types at every volume (its triggers.sync.key): bind another control"
+                "scanner types at every volume (its triggers.sync.key)"
                 for i, phase in enumerate(self.curriculum.phases) if isinstance(phase, GamePhase)
                 for combo in phase.spec["controls"] if sync.key in combo.split("+")]
 
@@ -143,8 +143,7 @@ class RunConfig:
         """The controls a phase names that none of the rig's input devices has."""
         provided = controls_of_input_devices(self.rig.inputs)
         return [f"phase {i}: needs {sorted(missing)}, which none of {self.rig.path}'s inputs "
-                f"has ({', '.join(self.rig.inputs)}): add the device to its \"inputs\", or play "
-                "this curriculum on a rig that has it"
+                f"has ({', '.join(self.rig.inputs)})"
                 for i, phase in enumerate(self.curriculum.phases)
                 if (missing := get_all_required_controls_for(phase) - provided)]
 

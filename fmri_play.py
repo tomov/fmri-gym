@@ -32,11 +32,14 @@ import signal
 import sys
 
 from fmri_gym.run import Run
-from fmri_gym.config.curriculum import EXIT_QUIT, Curriculum
+from fmri_gym.config.curriculum import Curriculum
 from fmri_gym.outputs.display import quit_like_esc
 from fmri_gym.config.rig import RigConfig
 from fmri_gym.config.run import RunConfig
 
+#: Exit status when the run was quit (ESC) before its end; a session script
+#: (``set -e``) stops on it instead of starting the next run.
+EXIT_QUIT = 3
 
 
 class _Parser(argparse.ArgumentParser):

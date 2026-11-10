@@ -1,8 +1,7 @@
-"""The keyboard: every key a curriculum may name, by pygame's constant without its ``K_``.
+"""The keyboard: every key, named by pygame's constant without its ``K_``.
 
-A rig lists it like any device. Escape is a control but no curriculum's: it
-ends a run. What it holds is read from the key events it handles, so a press
-posted to the queue (a test, the rig measurement) is held like a typed one.
+Escape is a control like any key. What the keyboard holds is read from the key
+events it handles, so a press posted to pygame's queue is held like a typed one.
 """
 
 from __future__ import annotations

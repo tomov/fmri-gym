@@ -5,21 +5,18 @@
     data/sub-01/ses-001/beh/sub-01_ses-001_task-pong_run-002_02/   ... re-acquired
     data/sub-01/ses-001/beh/sub-01_ses-001_task-crafter_run-001/
 
-**The numbers come from the session design, not from the disk.** ``--ses`` and
-``--run`` are required: a run's number is which line of the session script it
-is, so it is the same however the session went -- skip a line on a resumed
-session and the runs after it keep the numbers they were designed with. A
-session script picks its session once, in its first line (``fmri-ses``), and
-passes it to every run; it takes the session number as its own argument, so a
-stopped session is resumed into the one it started.
+**The numbers come from the session design, not from the disk.** The session
+and run numbers are given, never counted from the folders already there, so a
+run's number is the same however the session went: a run skipped on a resumed
+session leaves the runs after it with the numbers they were designed with.
 
 Data is never overwritten. A run whose folder is already there is a
 re-acquisition and writes to ``..._02`` (then ``_03``); the aborted attempt
 stays where it is. The suffix names the folder only: the run's **label** is
 the canonical ``sub-01_ses-001_task-pong_run-002``, and that is what keys its
 seeds (:func:`phase_seed`), so a re-acquisition replays the episodes of the
-run it replaces and a session's stimuli can still be regenerated from its
-script alone. No two runs -- of a participant, or of two participants --
+run it replaces and a run's stimuli can be regenerated from its label
+alone. No two runs -- of a participant, or of two participants --
 replay each other's episodes unless a phase pins its ``"seed"``.
 
 The names follow BIDS, apart from that attempt suffix; the contents do not yet
@@ -113,7 +110,7 @@ def subject_label(subject: str) -> str:
     :raises ValueError: if it is not ``sub-`` and letters or digits (BIDS allows no other).
     """
     if not (subject.startswith("sub-") and _LABEL.fullmatch(subject[4:])):
-        raise ValueError(f"--subject {subject!r}: BIDS needs sub-<letters or digits>, "
+        raise ValueError(f"subject {subject!r}: BIDS needs sub-<letters or digits>, "
                          "such as sub-01 or sub-pilot3")
     return subject
 
@@ -131,7 +128,7 @@ def task_label(curriculum_path: str) -> str:
     label = "".join(parts[:1] + [p[0].upper() + p[1:] for p in parts[1:]])
     if not label:
         raise ValueError(f"{curriculum_path}: no letter or digit in its name to make a BIDS "
-                         "task label from; rename the file")
+                         "task label from")
     return label
 
 
@@ -159,11 +156,11 @@ def run_output(root: str, subject: str, task: str, session: int, run: int) -> Ru
     Nothing is ever overwritten: the folder of a run that already has data
     goes to the next free attempt beside it, and the caller is told which.
 
-    :param root: the BIDS tree's root (``--data-root``).
+    :param root: the BIDS tree's root.
     :param subject: ``sub-<label>``.
     :param task: the BIDS task label (:func:`task_label` of a curriculum).
-    :param session: the BIDS session number (``--ses``), from 1.
-    :param run: this task's run number in the session (``--run``), from 1.
+    :param session: the BIDS session number, from 1.
+    :param run: this task's run number in the session, from 1.
     :raises ValueError: on a subject name BIDS refuses, or a session or run number below 1.
     """
     subject = subject_label(subject)
@@ -247,9 +244,8 @@ def last_position(root: str, subject: str, curriculum_path: str) -> RunProgress 
     state = (end["extra"] or {}).get("state")
     going = bool(episode_ends) and episode_ends[-1]["outcome"] in ("playing", "quit")
     if going and state is None:
-        raise ValueError(f"--resume: {run} stopped phase {last['index']} mid-episode, and the "
-                         f"{last['backend']} backend keeps no savestate to carry it on. Start "
-                         "the curriculum over without --resume, or at a later phase")
+        raise ValueError(f"{run} stopped phase {last['index']} mid-episode, and the "
+                         f"{last['backend']} backend keeps no savestate to carry it on")
     block_progress = BlockProgress(
         end["block_time_elapsed"], end["num_completed_episodes"],
         read_state(state) if going and state is not None else None)

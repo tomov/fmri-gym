@@ -7,9 +7,9 @@ file, kept in the repo as ``configs/<team>/rigs/<rig>.json`` (the examples in
 curriculum says what is played and plays the same on every rig; the rig file
 says how this rig plays it, and every run played on the rig reads it.
 
-``fmri-play --rig <file>`` names the rig file, as ``--curriculum`` names the
-curriculum's (:meth:`RigConfig.open`); it is required, since which window,
-controller and data folder a session gets is not something to guess.
+A run names its rig file (:meth:`RigConfig.open`) as it names its curriculum;
+there is no default, since which window, controller and data folder a session
+gets is not something to guess.
 
 Every key of a rig file is optional: an empty ``{}`` plays on the defaults. A
 rig's ``site`` and ``rig`` are the team's folder (:func:`site_of`) and the
@@ -35,8 +35,7 @@ say the same thing:
   each, for the haemodynamic lag); left out, the run shows none;
 - ``"triggers"``: the scanner's start sync and the trigger codes, over which
   line (:class:`~fmri_gym.sync.triggers.TriggerSettings`); left out, the run waits
-  for ``=`` and sends no codes, and says so on the experimenter screen and in
-  the manifest (``defaulted``);
+  for ``=`` and sends no codes, and the settings mark it (``defaulted``);
 - ``"rig_measurement"``: the equipment the rig's timing is measured with
   (:class:`RigMeasurementConfig`): the photodiode, a microphone, the recording's rate,
   more frame rates.
@@ -47,8 +46,7 @@ phase's ``"controls"``) are control names of the rig's input devices
 keys** are keyboard keys a device types itself; a curriculum binds them like
 any key.
 
-It is written by hand or in the rig form (``rig-setup --rig <file>``). What was
-measured on the rig is kept beside its file (:func:`measured_latency_files`).
+What was measured on the rig is kept beside its file (:func:`measured_latency_files`).
 """
 
 from __future__ import annotations
@@ -132,8 +130,6 @@ TRIGGER_PRESETS: dict[str, dict] = {
 LABEL = re.compile(r"[A-Za-z0-9_-]+")
 _INITIALS = re.compile(r"[A-Z]{2,4}")
 _SIZE = re.compile(r"([1-9]\d*)x([1-9]\d*)")
-_MAKE = ("make it in the rig form, rig-setup --rig <file>, or start from "
-         "configs/examples/rigs/empty.json")
 #: The repo's ``configs/``: a folder per team, each with its ``rigs/``, and the examples.
 CONFIGS = Path(__file__).resolve().parents[2] / "configs"
 #: The folder a team keeps its rig files in.
@@ -247,8 +243,7 @@ class RigConfig:
                   f"folder, the rig its name" for k, own in (("site", site), ("rig", rig_name))
                   if rig.get(k, own) != own]
         if found:
-            raise ValueError(f"{path}: " + "; ".join(found) + ". Fix it by hand, or in the "
-                             f"form: rig-setup --rig {path}")
+            raise ValueError(f"{path}: " + "; ".join(found))
         settings = {**DEFAULTS, **rig}
         fields = {"site": site, "rig": rig_name,
                   **{k: rig[k] for k in FIELDS if k in rig and k not in ("site", "rig")}}
@@ -268,10 +263,10 @@ class RigConfig:
         """The rig file at ``path``, checked.
 
         :raises ValueError: a file that is missing, not a JSON object, or that
-            :meth:`from_dict` refuses; the message says how to make one.
+            :meth:`from_dict` refuses.
         """
         if not os.path.isfile(path):
-            raise ValueError(f"--rig {path}: no such file; {_MAKE}")
+            raise ValueError(f"{path}: no such rig file")
         return cls.from_dict(load(path), path)
 
     @property

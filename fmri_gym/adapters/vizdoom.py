@@ -28,9 +28,9 @@ the delta axes are hidden and leaves the keyboard
 buttons: the subject turns with TURN_LEFT/TURN_RIGHT, as in every other
 scenario. ``vizdoom_gym.KeyboardOnlyAction`` does that.
 
-Sound is opt-in per curriculum: `env_kwargs.audio_buffer_enabled` puts one tic
+Sound is opt-in per phase: `env_kwargs.audio_buffer_enabled` puts one tic
 of stereo PCM in `obs["audio"]` (so a model sees the same observation a subject
-hears), which `sound()` hands to the session's speakers and `capture()` logs.
+hears), which `sound()` hands to the speakers and `capture()` logs.
 The phase's `"audio": false` mutes the speakers; the PCM is still logged.
 Doom produces 1/35 s of sound per step whatever the frame rate, so audio only
 runs in real time when `fps * env_kwargs.frame_skip == 35`; below that it plays
@@ -52,7 +52,8 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 
-from .base import EnvAdapter, FrameState, Sound
+from ..outputs.sound import Sound
+from .base import EnvAdapter, FrameState
 
 
 class VizDoomAdapter(EnvAdapter):
@@ -61,7 +62,7 @@ class VizDoomAdapter(EnvAdapter):
     def _make(self, spec: dict) -> gym.Env:
         """Create a ViZDoom Gymnasium environment for one game block.
 
-        :param spec: game-phase config dict from the curriculum.
+        :param spec: the game phase's dict.
         :return: a ViZDoom Gymnasium environment.
         :raises RuntimeError: sound is on, on a Mac without OpenAL Soft.
         """

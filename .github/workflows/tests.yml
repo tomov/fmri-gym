@@ -53,6 +53,8 @@ jobs:
         run: uv sync --extra gui
       - name: Lint
         run: uv run ruff check fmri_gym fmri_play.py agents tests gym/*/tests
+      - name: Who imports whom (the contracts in pyproject.toml)
+        run: PYTHONPATH="$(printf '%s:' gym/*/)" uv run lint-imports
       - name: Engine-free tests and the gym backend
         run: uv run pytest --backend gym --strict-backends --thorough --no-audio --run-seconds 25
 

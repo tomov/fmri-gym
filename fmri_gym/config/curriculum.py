@@ -47,9 +47,6 @@ COMMON_DIRNAME = "common"
 RESUMABLE_CHANGES = frozenset({"duration", "n_episodes", "advance_on", "show_outcome_duration",
                                "instructions", "controls", "menu", "seed", "has_audio",
                                "rewind_on", "rewind_frames"})
-#: Exit status of ``fmri_play`` when the run was quit (ESC) before its end; a
-#: session script (``set -e``) stops on it instead of starting the next run.
-EXIT_QUIT = 3
 
 def check_shape(curriculum: Any, where: str) -> dict:
     """Enforce the one curriculum shape.
@@ -265,9 +262,9 @@ def new_curriculum() -> dict:
 
 
 def validate_curriculum(curriculum: dict) -> list[str]:
-    """Problems that would stop ``fmri_play`` before the first phase.
+    """Problems that would stop a run before the first phase.
 
-    Cheap checks only (no env is built), for the editor's Check and the load:
+    Cheap checks only (no env is built):
     each phase as its class has it (:func:`~fmri_gym.config.phases.phase_problems`),
     and the phases a resumed run plays first.
 

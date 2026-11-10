@@ -9,12 +9,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import h5py
 import numpy as np
 import pytest
 from gymnasium import spaces
 
-from fmri_gym.adapters.base import Sound
-from fmri_gym.outputs.audio import AudioBlockLog
+from fmri_gym.outputs.sound import Sound
 from fmri_gym.save.bids import task_label
 from fmri_gym.adapters.keymap import make_keymap
 from fmri_gym.config.curriculum import (
@@ -22,10 +22,11 @@ from fmri_gym.config.curriculum import (
     shared_overrides, validate_curriculum,
 )
 from fmri_gym.save.logging import (
-    AUDIO_FILENAME, FRAMES_FILENAME, Logger, read_audio, read_events, read_frames, read_state,
+    AUDIO_FILENAME, FRAMES_FILENAME, AudioBlockLog, Logger, read_audio, read_events, read_frames,
+    read_state,
 )
 from fmri_gym.save.replay import frame_arrays, reconstruction_plan
-from fmri_gym.run import Clock
+from fmri_gym.sync.clock import Clock
 from tests.changed import select
 
 PHASE = {"type": "game", "backend": "gym", "game": "CartPole-v1", "fps": 30,
@@ -54,8 +55,8 @@ def test_logger_round_trip(tmp_path):
         logger.log_audio(Sound(chunks[i], 44100.0) if i < 2 else None)
     logger.log(type="episode_end", episode_id=0, outcome="truncated", score=1.5)
     logger.close_block(n_episodes=1, n_frames=3, extra=None,
-                       audio=AudioBlockLog(onsets=[], delay_ms=0.0, resyncs=0, trimmed_samples=0,
-                                         stretched=[]))
+                       audio=AudioBlockLog(onsets=[(0, clock.t0_perf + 1.5)], delay_ms=0.0,
+                                           resyncs=0, trimmed_samples=0, stretched=[]))
     logger.log_phase({"index": 0, "type": "game", "data_dir": name})
     manifest = json.loads(Path(logger.save_manifest()).read_text())
     logger.close()
@@ -77,6 +78,9 @@ def test_logger_round_trip(tmp_path):
     samples, rate, offsets = read_audio(block)
     assert rate == 44100.0 and list(offsets) == [0, 5]
     assert np.array_equal(samples, np.concatenate(chunks))
+    with h5py.File(Path(block) / AUDIO_FILENAME, "r") as f:
+        assert list(f["onset_chunk"][:]) == [0] and list(f["onset_time"][:]) == pytest.approx([1.5]), \
+            "the onsets are written in run time, seconds after the trigger"
 
     arrays = frame_arrays(block)
     assert list(arrays["action"]) == [0, 1, 0] and arrays["obs"].shape == (3, 2)

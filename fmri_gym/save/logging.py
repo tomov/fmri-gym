@@ -7,7 +7,7 @@
     <outdir>/block-NN_<backend>_<game>/frames.h5      the rendered frames, when the phase keeps them
     <outdir>/block-NN_<backend>_<game>/audio.h5       the queued PCM, when the block played any
 
-A phase played again in the same run (``--loop``) writes ``block-NN_<backend>_<game>_2``, ``_3``...
+A phase played again in the same run writes ``block-NN_<backend>_<game>_2``, ``_3``...
 
 There is one :class:`Logger` per run and it writes all three. The manifest is
 rewritten (atomically) whenever a phase entry or a run-level field lands, so
@@ -22,7 +22,7 @@ and last itself -- ``block_start`` (``format``, ``version``, ``subject``,
 ``block_index``, ``backend``, ``game``, ``phase``: the config, ``base_seed``)
 and ``block_end`` (whatever summary :meth:`Logger.close_block` is given) --
 and stamps each ``frame`` with its index in the block, also ``frame``. The
-other lines are the run's, verbatim (:mod:`fmri_gym.run`).
+other lines are written as given (:meth:`Logger.log`).
 
 ``frames.h5`` holds ``frames`` ``(N, H, W, C)``, one gzip'd chunk per frame
 so any one reads alone, and ``frame_index`` ``(N,)``, the ``frame`` of each
@@ -34,10 +34,9 @@ concatenated, and ``chunk_len`` ``(n_chunks,)``, so a chunk's offset into
 ``samples`` is a running sum of the ones before it. ``onset_chunk``/
 ``onset_time``, ``stretched_chunk``/``stretched_len`` and the
 ``delay_ms``/``resyncs``/``trimmed_samples`` attrs land at
-:meth:`Logger.close_block`, from :meth:`~fmri_gym.outputs.audio.Audio.block_log`. A chunk in
-``stretched_chunk`` was played resampled to its ``stretched_len`` samples
-(:func:`~fmri_gym.outputs.audio._resample`), to keep the sound on the display's clock; every
-other chunk played as it is stored.
+:meth:`Logger.close_block`, from the block's :class:`AudioBlockLog`. A chunk in
+``stretched_chunk`` was played linearly resampled to its ``stretched_len`` samples, to keep
+the sound on the display's clock; every other chunk played as it is stored.
 """
 
 from __future__ import annotations
@@ -50,13 +49,13 @@ import queue as queue_mod
 import time
 import zlib
 from collections import Counter
+from dataclasses import asdict, dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 if TYPE_CHECKING:
-    from ..outputs.audio import AudioBlockLog
-    from ..run import Clock
+    from ..sync.clock import Clock
 
 FORMAT = "fmri-gym-log"
 VERSION = 1
@@ -65,6 +64,31 @@ FRAMES_FILENAME = "frames.h5"
 AUDIO_FILENAME = "audio.h5"
 #: Seconds between flushes of a block's files to the OS (not every frame).
 FLUSH_INTERVAL = 1.0
+
+
+@dataclass(frozen=True, slots=True)
+class AudioBlockLog:
+    """One block's sound timing: what ``audio.h5`` keeps besides the samples."""
+
+    #: ``(chunk, time)``: when each queued chunk started playing, on the
+    #: ``perf_counter`` clock; a chunk that never played has no entry.
+    #: :meth:`Logger.close_block` writes them in run time.
+    onsets: list[tuple[int, float]]
+    #: milliseconds from a frame's flip to its sound's first sample at the DAC
+    delay_ms: float
+    #: chunks placed at their onset rather than gaplessly, after a stall
+    resyncs: int
+    #: samples cut from chunks that were already late when placed
+    trimmed_samples: int
+    #: ``(chunk, samples)``: each chunk resampled to follow the display's clock,
+    #: and how many samples it played instead of the ones logged (a linear
+    #: resampling of the logged PCM to that length is what played); every other
+    #: chunk played as logged
+    stretched: list[tuple[int, int]]
+
+    def record(self) -> dict:
+        """The fields as ``audio.h5`` takes them."""
+        return asdict(self)
 
 
 class Logger:
@@ -193,15 +217,16 @@ class Logger:
     def close_block(self, audio: AudioBlockLog | None = None, **summary: Any) -> None:
         """Append the ``block_end`` line and release the block's files.
 
-        :param audio: the block's sound timing (:meth:`~fmri_gym.outputs.audio.Audio.block_log`),
-            written to ``audio.h5`` rather than the line; ``None`` for a block
-            that played none.
+        :param audio: the block's sound timing, its onsets on ``perf_counter``; written to
+            ``audio.h5`` in run time rather than to the line; ``None`` for a block that
+            played none.
         :param summary: the line's fields (episode and frame counts, totals, …).
         """
         self.log(type="block_end", **summary)
         if audio is not None:
+            in_run_time = [(chunk, self.clock.from_perf(t)) for chunk, t in audio.onsets]
             self._queue.put({"op": "audio_summary", "block": self._block,
-                             "audio": audio.record()})
+                             "audio": replace(audio, onsets=in_run_time).record()})
         self._queue.put({"op": "close", "block": self._block})
         self._block = None
 

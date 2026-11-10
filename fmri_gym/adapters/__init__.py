@@ -13,8 +13,8 @@ def get_adapter(backend: str, spec: dict) -> EnvAdapter:
 
     A fresh instance is built for every game block (it wraps the underlying
     engine env), so per-block state never leaks between blocks. Lazy imports
-    keep optional deps (ale_py, stable_retro, ...) from being required unless a
-    curriculum actually uses that backend.
+    keep optional deps (ale_py, stable_retro, ...) from being required unless
+    that backend is built.
 
     :param backend: backend id from the game phase (``"ale"``, ``"retro"``, ...).
     :param spec: the game-phase config dict, passed to the env's constructor.

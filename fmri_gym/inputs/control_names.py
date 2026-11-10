@@ -1,4 +1,4 @@
-"""Every control an input device has, under the name a curriculum writes it by.
+"""Every control an input device has, under one name each.
 
 Each member is named as pygame's constant for it. A key's name is its constant
 without ``K_``, upper-cased; a controller's is its constant whole, a stick axis's
@@ -20,7 +20,7 @@ except ImportError:                               # Python 3.10
 class ControlNames(StrEnum):
     """The name of each key, button, trigger, stick axis and stick direction."""
 
-    #: a name reads as the string a curriculum writes, in messages and lists too
+    #: a name reads as its string, in messages and lists too
     __repr__ = str.__repr__
 
     # Keyboard

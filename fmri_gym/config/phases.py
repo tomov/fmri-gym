@@ -9,7 +9,7 @@ a wrong value is refused before the window opens and never read as a default.
 Every phase keeps the JSON it was read from as ``spec``: the manifest records
 it, a resumed run compares it, and a game phase's adapter reads its backend's
 own keys from it (``env_kwargs``, ``level``, ...), which are the adapter's
-business, not the loop's. Nothing here reads a rig.
+business. Nothing here reads a rig.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ REWINDABLE = frozenset({"won", "lost", "terminated"})
 _SURVEY_CONTROLS = (ControlNames.K_1, ControlNames.K_2, ControlNames.K_3, ControlNames.K_4,
                     ControlNames.K_5, ControlNames.K_6, ControlNames.K_7)
 
-#: What a game phase's ``menu`` may offer, and its fields' defaults (:mod:`fmri_gym.menu`).
+#: What a game phase's ``menu`` may offer, and its fields' defaults.
 MENU_OPTIONS = ("reset", "forfeit", "resume")
 _MENU_DEFAULTS = {"hold": 5.0, "after": 15.0, "options": list(MENU_OPTIONS),
                   "move": [ControlNames.K_UP, ControlNames.K_DOWN],
@@ -255,9 +255,9 @@ class Survey(Phase):
 class GamePhase(Phase):
     """A game block: the env it plays, how long, at what rate, and what ends it.
 
-    The controls a block maps (``controls``) and its menu are its spec's, read
-    by the adapter's keymap and :class:`~fmri_gym.menu.Menu`; the backend's own
-    keys stay in ``spec`` for the adapter.
+    The controls a block maps (``controls``) and its menu are its spec's, the
+    controls read by the adapter's keymap; the backend's own keys stay in
+    ``spec`` for the adapter.
     """
 
     type: ClassVar[str] = "game"

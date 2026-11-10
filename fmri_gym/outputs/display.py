@@ -14,7 +14,7 @@ new image starts scanning out. The stamp taken right after it
 queued with :meth:`call_on_flip` run at it -- where frame triggers are sent.
 
 A flip only blocks when the swap chain is full, so :meth:`idle` re-presents
-the current canvas every refresh while the session waits, keeping the chain
+the current canvas every refresh while nothing new is drawn, keeping the chain
 primed. :attr:`vsync` is measured at start-up, not read from a flag: a burst
 of flips is timed, and the flag is set only if they block for about a refresh
 period (SDL's headless driver and some compositors claim vsync and never
@@ -23,8 +23,8 @@ what the flip reported.
 
 The remaining unknown is any constant offset between the flip returning and
 photons (swap-chain depth, panel latency); that is what a photodiode is for.
-``python -m fmri_gym.outputs.display`` reports what a given machine achieves, on the
-``monitor`` the session uses (:func:`list_monitors`).
+``python -m fmri_gym.outputs.display`` reports what a given machine achieves, on a
+given ``monitor`` (:func:`list_monitors`).
 """
 
 from __future__ import annotations
@@ -75,7 +75,7 @@ class Display:
     ) -> None:
         """Create and show the display window.
 
-        :param size: ``(width, height)`` of the canvas every phase draws on; in
+        :param size: ``(width, height)`` of the canvas everything is drawn on; in
             fullscreen the GPU scales it to fill the screen, aspect kept.
         :param fullscreen: if ``True``, open in fullscreen mode.
         :param caption: window title string.
@@ -116,7 +116,7 @@ class Display:
         Fullscreen keeps the monitor's own mode (and refresh rate) and has SDL's
         renderer (pygame's ``SCALED``) scale the requested size up to it, with
         black bars where the aspects differ, so the screen geometry is the
-        rig's on any monitor. A window is a plain surface first; some drivers
+        same on any monitor. A window is a plain surface first; some drivers
         only honour vsync through the renderer path, which is its fallback, and
         a plain unsynced window the last resort.
 
@@ -221,10 +221,9 @@ class Display:
         the frame itself (see :meth:`_draw_overlay`).
 
         :param rgb: frame array shaped ``(H, W, 3)``.
-        :param hud: status lines from the adapter's
-            :meth:`~fmri_gym.adapters.base.EnvAdapter.hud`, or ``None`` for none.
-        :param overlay: ``(lines, y_frac)`` from the adapter's
-            :meth:`~fmri_gym.adapters.base.EnvAdapter.overlay`, or ``None``.
+        :param hud: status lines for the strip, or ``None`` for none.
+        :param overlay: ``(lines, y_frac)`` to draw over the frame (see
+            :meth:`_draw_overlay`), or ``None``.
         :return: ``perf_counter`` of the flip that showed it.
         """
         self.canvas.fill(BG_COLOR)
@@ -287,12 +286,12 @@ class Display:
         The counterpart of :meth:`_draw_hud`, and the opposite trade: the strip
         is the right place for something the subject reads now and then, and
         the wrong place for something they are acting on, which has to be where
-        they are already looking. Covering game pixels is the cost, so an
-        adapter should put a line here only while it is in use.
+        they are already looking. Covering game pixels is the cost, so a line
+        belongs here only while it is in use.
 
         Drawn at display resolution over the scaled frame, not into the array,
         so the text is not magnified by the same unfiltered scale as the art --
-        and so the frame the adapter logged stays the frame the engine made.
+        and so the array stays the frame the engine made.
 
         :param overlay: ``(lines, y_frac)``, where ``y_frac`` is the fraction
             of the frame's height the lines are centered on (0.5 = middle).
@@ -316,7 +315,7 @@ class Display:
     def _hud_rows(self, lines: list[str], width: int) -> list[list[pygame.Surface]]:
         """Render the HUD lines and pack them into rows no wider than the frame.
 
-        :param lines: the adapter's status lines.
+        :param lines: the status lines.
         :param width: the width they have to fit, in pixels.
         :return: rows of rendered lines, in order.
         """
@@ -438,7 +437,7 @@ class Display:
         return self.draw_text("+", color=FIX_COLOR, font=self.fix_font)
 
     def describe(self) -> dict[str, Any]:
-        """What was actually opened, for the manifest.
+        """What was actually opened.
 
         :return: size, the window it is scaled to, fullscreen, monitor, measured vsync,
             refresh rate, SDL driver.
