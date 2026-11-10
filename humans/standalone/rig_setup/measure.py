@@ -57,8 +57,8 @@ import pygame
 from gymnasium import spaces
 
 from ...config import rig as rig_file
-from ...inputs import (QUIT, ControlNames, Controller, Edge, InputDevice, InputDevices,
-                      open_input_devices)
+from ...inputs import (CONTROLLER_CLASSES_BY_NAME, QUIT, ControlNames, Controller, Edge,
+                      InputDevice, InputDevices, open_input_devices)
 from ...inputs.keyboard import KEYCODES
 from ...outputs.audio import Audio
 from ...outputs.display import Display, check_monitor, is_locked, quit_like_esc
@@ -78,6 +78,8 @@ _VERDICT_S = 1.5
 #: Seconds the list of every test's verdict stays up at the end.
 _SUMMARY_S = 5.0
 _PASS = Verdict("pass", None)
+#: Why a measurement left out by the experimenter was not run.
+UNTICKED = "unticked before the rig measurement"
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,6 +161,8 @@ class RigMeasurement:
     attempt: int
     #: why the trigger line did not open (:func:`~.cli.prepare`); ``None`` when it did
     trigger_error: str | None
+    #: the measurements to take, by their :data:`MEASUREMENTS` names; the others are not run
+    measurement_names: tuple[str, ...]
     #: each measurement's record, by its name, in the order taken
     measurements: dict[str, dict] = field(default_factory=dict)
     start_epoch: float = field(default_factory=time.time)
@@ -166,9 +170,10 @@ class RigMeasurement:
 
     @classmethod
     def open(cls, rig: rig_file.RigConfig, settings: RigMeasurementSettings,
-             trigger_error: str | None) -> RigMeasurement:
+             trigger_error: str | None, measurement_names: tuple[str, ...]) -> RigMeasurement:
         """Make its folder, then open the trigger line, the audio output, the input devices
-        and the window, saying on stderr what each got.
+        and the window, saying on stderr what each got. Without the controls measurement,
+        the rig's controllers are not opened, so one not plugged in stops nothing.
 
         :raises ValueError: on a monitor this machine does not have, or an input device
             that is not plugged in.
@@ -182,13 +187,15 @@ class RigMeasurement:
         print(f"triggers: {triggers.status()}", file=sys.stderr)
         audio = Audio(enabled=rig.has_audio)
         print(f"audio: {audio.status()}", file=sys.stderr)
-        inputs = open_input_devices(rig.inputs, frozenset())
+        inputs = open_input_devices(
+            rig.inputs if "controls" in measurement_names else
+            tuple(n for n in rig.inputs if n not in CONTROLLER_CLASSES_BY_NAME), frozenset())
         print(f"inputs: {inputs.status()}", file=sys.stderr)
         screen = rig.screen
         display = Display(size=screen.size, fullscreen=screen.is_fullscreen,
                           vsync=screen.has_vsync, monitor=screen.monitor)
         return cls(rig, settings, display, triggers, audio, inputs, out.folder, session,
-                   out.label, out.attempt, trigger_error)
+                   out.label, out.attempt, trigger_error, measurement_names)
 
     def now(self) -> float:
         """Seconds since the rig measurement opened."""
@@ -203,12 +210,16 @@ class RigMeasurement:
 
 
 def take_measurements(rig_measurement: RigMeasurement) -> None:
-    """The start screen, each measurement and its verdict, every verdict; then close the
-    devices. ESC or Ctrl+C stops the measurements, and what they measured stays recorded."""
+    """The start screen, each measurement it takes and its verdict, every verdict; then close
+    the devices. A measurement it does not take is recorded as not run. ESC or Ctrl+C stops the
+    measurements, and what they measured stays recorded."""
     previous_handler = signal.signal(signal.SIGINT, quit_like_esc)
     try:
         _start_screen(rig_measurement)
         for name, measure in MEASUREMENTS.items():
+            if name not in rig_measurement.measurement_names:
+                _leave_out(rig_measurement, name)
+                continue
             _measure(rig_measurement, name, measure)
         _summary_screen(rig_measurement)
     except KeyboardInterrupt:
@@ -224,14 +235,20 @@ def take_measurements(rig_measurement: RigMeasurement) -> None:
 
 
 def _start_screen(rig_measurement: RigMeasurement) -> None:
-    """Say what this is and what to have ready; wait for the experimenter's key.
+    """Say what this is and what to have ready for the measurements it takes; wait for the
+    experimenter's key.
 
     :raises KeyboardInterrupt: on ESC or window close.
     """
-    rig = rig_measurement.rig
-    ready = ["Photodiode on the patch, bottom-right; microphone at the ear if there is one.",
-             "The controls test asks for each button: press it on the participant's device."]
-    if rig.triggers.sync.mode == "wait":
+    rig, measurement_names = rig_measurement.rig, rig_measurement.measurement_names
+    ready = []
+    if "photodiode" in measurement_names:
+        ready.append("Photodiode on the patch, bottom-right; microphone at the ear if there is "
+                     "one.")
+    if "controls" in measurement_names:
+        ready.append("The controls test asks for each button: press it on the participant's "
+                     "device.")
+    if "triggers" in measurement_names and rig.triggers.sync.mode == "wait":
         ready.append("The triggers test counts scanner pulses: start a sequence, or switch "
                      "the trigger box to its test mode, when it asks.")
     rig_measurement.display.draw_text(
@@ -269,6 +286,16 @@ def _measure(rig_measurement: RigMeasurement, name: str, measure: Callable[..., 
              for t, v in tests.items()]
     rig_measurement.display.draw_text("Rig measurement\n\n" + "\n".join(lines))
     _wait_for_duration(rig_measurement.inputs, rig_measurement.display, _VERDICT_S)
+
+
+def _leave_out(rig_measurement: RigMeasurement, name: str) -> None:
+    """Record each test of the measurement ``name`` as not run, unticked."""
+    now = rig_measurement.now()
+    rig_measurement.measurements[name] = {
+        "onset": now, "offset": now, "summary": {},
+        "tests": {t: Verdict("not run", UNTICKED)._asdict() for t, m in TESTS.items()
+                  if m == name}}
+    print(f"rig measurement: {name}: not run -- {UNTICKED}", file=sys.stderr)
 
 
 def _summary_screen(rig_measurement: RigMeasurement) -> None:

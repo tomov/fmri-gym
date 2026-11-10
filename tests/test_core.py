@@ -378,7 +378,9 @@ def test_each_rig_measurement_files_its_latencies_beside_the_rig_under_a_new_num
     assert len(list((tmp_path / "measured").iterdir())) == 2
 
 
-def test_a_quick_rig_measurement_runs_on_its_own_and_files_its_report(tmp_path, monkeypatch):
+def _measure_laptop_rig(tmp_path, monkeypatch, measurement_names, **rig) -> dict:
+    """A quick rig measurement of a laptop rig (``rig``: more of its file), headless, taking
+    ``measurement_names``; its manifest, once its files are checked."""
     monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
     from dataclasses import replace
 
@@ -389,7 +391,7 @@ def test_a_quick_rig_measurement_runs_on_its_own_and_files_its_report(tmp_path, 
     from humans.standalone.rig_setup import measure as rig_measure
     rig_path = tmp_path / "laptop.json"
     rig_path.write_text(json.dumps({"data_root": str(tmp_path / "data"), "has_audio": False,
-                                    "triggers": {"sync": {"mode": "none"}}}))
+                                    "triggers": {"sync": {"mode": "none"}}, **rig}))
     wait_for_control = rig_measure._wait_for_control
 
     def press_space_then_wait(inputs, display, control):
@@ -403,18 +405,37 @@ def test_a_quick_rig_measurement_runs_on_its_own_and_files_its_report(tmp_path, 
     monkeypatch.setattr(rig_measure, "_VERDICT_S", 0.0)
     monkeypatch.setattr(rig_measure, "_SUMMARY_S", 0.0)
     settings = replace(rig_measure.QUICK, display_flips=10, frame_seconds=0.2)
-    cli.measure_rig(str(rig_path), settings)
+    cli.measure_rig(str(rig_path), settings, measurement_names)
     folder, = (tmp_path / "data" / "sub-rig" / "ses-001" / "beh").iterdir()
     m = json.loads((folder / "manifest.json").read_text())
     assert m["task"] == "rigMeasurement" and set(m["tests"]) == set(rig_measure.TESTS)
     assert list(m["summaries"]) == list(rig_measure.MEASUREMENTS)
-    assert all(m["tests"][t]["status"] == "not run" for t in ("triggers", "controls",
-                                                              "photodiode", "audio"))
-    assert len(m["summaries"]["frames"]["blocks"]) == 2
-    for name in ("report.html", "report.md", "rigmeasurement.tsv", "display.npz", "frames.npz"):
+    for name in ("report.html", "report.md", "rigmeasurement.tsv", "display.npz"):
         assert (folder / name).exists(), name
     assert (tmp_path / "data" / "rigmeasurements.tsv").exists()
     assert RigConfig.open(str(rig_path)).measured_latency_warning   # no latency measured
+    return m
+
+
+def test_a_quick_rig_measurement_runs_on_its_own_and_files_its_report(tmp_path, monkeypatch):
+    from humans.standalone.rig_setup.measure import MEASUREMENTS
+
+    m = _measure_laptop_rig(tmp_path, monkeypatch, tuple(MEASUREMENTS))
+    assert all(m["tests"][t]["status"] == "not run" for t in ("triggers", "controls",
+                                                              "photodiode", "audio"))
+    assert len(m["summaries"]["frames"]["blocks"]) == 2
+
+
+def test_a_measurement_unticked_is_not_run_and_fails_nothing(tmp_path, monkeypatch):
+    from humans.standalone.rig_setup.measure import UNTICKED
+
+    # the rig's controller is not plugged in: with its test unticked, it is not looked for
+    m = _measure_laptop_rig(tmp_path, monkeypatch, ("display",),
+                            inputs=["keyboard", "xbox_controller"])
+    assert m["tests"]["frames"] == {"status": "not run", "why": UNTICKED}
+    assert m["tests"]["controls"] == {"status": "not run", "why": UNTICKED}
+    assert m["summaries"]["frames"] == {} and m["tests"]["display"]["status"] != "not run"
+    assert "frames" not in (m["failed_tests"] or "")
 
 
 def test_the_machine_is_described_and_pygame_left_as_it_was():

@@ -279,3 +279,28 @@ def test_the_rig_window_stays_open_after_a_calibration(qt, monkeypatch):
     QtCore.QTimer.singleShot(0, window._calibrate)
     QtCore.QTimer.singleShot(50, close_if_still_open)
     assert window.exec() == 7 and still_open == [True]
+
+
+def test_the_measurements_unticked_are_left_out_and_one_must_stay(qt):
+    from PySide6 import QtCore, QtWidgets
+
+    from humans.standalone.rig_setup.measure import MEASUREMENTS
+    from humans.standalone.rig_setup.window import pick_measurements
+
+    rig = rig_file.RigConfig.open(str(EXAMPLES / "meg.json"))
+    could_start_with_none = []
+
+    def untick_then_start():
+        dialog = QtWidgets.QApplication.activeModalWidget()
+        boxes = dialog.findChildren(QtWidgets.QCheckBox)
+        start, = (b for b in dialog.findChildren(QtWidgets.QPushButton) if b.text() == "Start")
+        for box in boxes:
+            box.setChecked(False)
+        could_start_with_none.append(start.isEnabled())
+        for box in boxes[:-1]:
+            box.setChecked(True)
+        start.click()
+
+    QtCore.QTimer.singleShot(0, untick_then_start)
+    assert pick_measurements(rig, is_long=False) == tuple(MEASUREMENTS)[:-1]
+    assert could_start_with_none == [False]
