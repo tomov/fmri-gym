@@ -14,9 +14,10 @@ Work on a branch off `main`, in a git worktree when the main checkout is in use 
 ```bash
 uv run pytest --changed
 uv run ruff check fmri_gym fmri_play.py agents tests gym/*/tests
+PYTHONPATH="$(printf '%s:' gym/*/)" uv run lint-imports   # who imports whom: pyproject.toml's contracts
 ```
 
-Both clean, or the PR says which backend you could not play here and why (the summary's skip line is the sentence to quote). The `testing` skill explains the options and how to read a failure. Commit messages carry the reasoning behind a change; the code, the docstrings and the configs describe the present only (AGENTS.md, rule 3).
+All clean, or the PR says which backend you could not play here and why (the summary's skip line is the sentence to quote). The `testing` skill explains the options and how to read a failure. Commit messages carry the reasoning behind a change; the code, the docstrings and the configs describe the present only (AGENTS.md, rule 3).
 
 Then read every curriculum the branch touches, including each `common/` file the touched ones `__include`, and check by eye that what the subject is told matches what the phase binds: the Controls lines of the instructions' `text` name the same controls as the game phase's `controls` map, each with the action the adapter's docstring gives that index (a line saying "Y shoot" needs `"CONTROLLER_BUTTON_Y"` bound to the shoot action, and a bound control with no line, or a line with no binding, is a mismatch); the "Press X to start" line names a control in `controls_to_dismiss`; a menu's hint names its `control`, `move` and `confirm`; a survey's text names its `controls`. No test checks this, so the agent does, and says in the PR which files it read. When one of those curricula shows a controls image (`rg -l images/controls configs/curricula`), check the image against the bindings too and redraw it (the `controls-images` skill, "Check they are up to date"), and say in the PR which images were checked and which were redrawn.
 

@@ -113,7 +113,12 @@ py-modules = ["fmri_play"]
 # `uv sync` installs the `dev` group by default, so every checkout can run the
 # tests and the linter without naming an extra; `--no-dev` leaves them out.
 [dependency-groups]
-dev = ["pytest>=8", "pytest-timeout", "ruff"]
+dev = [
+    "import-linter>=2.15",
+    "pytest>=8",
+    "pytest-timeout",
+    "ruff",
+]
 
 [tool.pytest.ini_options]
 # tests/ is the suite; a gym/<pkg>/tests/ folder is that package's own tests,
@@ -142,6 +147,57 @@ vgdl-gym = { path = "gym/vgdl", editable = true }
 arc3-gym = { path = "gym/arc3", editable = true }
 replay-state-gym = { path = "gym/replay_state", editable = true }
 vizdoom-gym = { path = "gym/vizdoom", editable = true }
+
+# Who may import whom (docs/DEPENDENCIES.md), checked by `lint-imports` in CI. The gym/
+# packages are read from their folders, so run it as
+# PYTHONPATH="$(printf '%s:' gym/*/)" uv run lint-imports
+# Type-hint imports count like any other.
+[tool.importlinter]
+root_packages = [
+    "fmri_gym",
+    "aigamestore_gym", "arc3_gym", "baba_gym", "baba_auto_gym", "coom_gym", "crafter_gym",
+    "minihack_levels", "replay_state_gym", "vgdl_gym", "vizdoom_gym",
+]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "fmri_gym's layers: each imports only the ones below it"
+type = "layers"
+containers = ["fmri_gym"]
+layers = ["standalone", "run", "menu", "config", "adapters", "outputs", "save", "sync | inputs"]
+
+[[tool.importlinter.contracts]]
+name = "Only the adapters import a game engine or a gym/ package"
+type = "forbidden"
+source_modules = [
+    "fmri_gym.standalone", "fmri_gym.run", "fmri_gym.menu", "fmri_gym.config",
+    "fmri_gym.outputs", "fmri_gym.save", "fmri_gym.sync", "fmri_gym.inputs",
+]
+forbidden_modules = [
+    "ale_py", "stable_retro", "vizdoom", "minihack", "nle", "crafter", "stk_gym",
+    "rushhour_gym", "shimmy", "Box2D", "mujoco",
+    "aigamestore_gym", "arc3_gym", "baba_gym", "baba_auto_gym", "coom_gym", "crafter_gym",
+    "minihack_levels", "replay_state_gym", "vgdl_gym", "vizdoom_gym",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "A gym/ package imports no fmri_gym"
+type = "forbidden"
+source_modules = [
+    "aigamestore_gym", "arc3_gym", "baba_gym", "baba_auto_gym", "coom_gym", "crafter_gym",
+    "minihack_levels", "replay_state_gym", "vgdl_gym", "vizdoom_gym",
+]
+forbidden_modules = ["fmri_gym"]
+
+[[tool.importlinter.contracts]]
+name = "A gym/ package imports no other, but the one it is built on and depends on"
+type = "independence"
+modules = [
+    "aigamestore_gym", "arc3_gym", "baba_gym", "baba_auto_gym", "coom_gym", "crafter_gym",
+    "minihack_levels", "replay_state_gym", "vgdl_gym", "vizdoom_gym",
+]
+ignore_imports = ["coom_gym.env -> vizdoom_gym"]
 
 [tool.ruff]
 line-length = 100
