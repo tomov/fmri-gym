@@ -357,8 +357,6 @@ class GamePhase(Phase):
             out.extend(menu_problems(d["menu"]))
         if "hud" in d:
             out.extend(hud_problems(d["hud"]))
-        if "show_score" in d:
-            out.append('"show_score" is a field of "hud": write "hud": {"show_score": ...}')
         if "instructions" in d:
             out.extend(Instructions.problems(d["instructions"]))
         return out

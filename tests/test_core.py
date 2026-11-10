@@ -139,7 +139,6 @@ def test_keymap_refuses_an_action_outside_the_space():
     ({**PHASE, "hud": {"show_score": "no"}}, "hud.show_score"),
     ({**PHASE, "hud": {"show_clock": False}}, "show_clock"),
     ({**PHASE, "hud": False}, "hud"),
-    ({**PHASE, "show_score": True}, "show_score"),
 ])
 def test_validate_config_refuses(phase, problem):
     problems = validate_curriculum({"curriculum": [phase]})
