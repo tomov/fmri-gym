@@ -581,3 +581,27 @@ def test_a_click_is_mapped_back_to_the_picture_at_any_window_size(scope):
     scope.log.append((0.0, "a press", None))
     scope.click(canvas.to_canvas((int(clear.rect.centerx * s), top + int(clear.rect.centery * s))))
     assert not scope.log
+
+
+def _closers(*names: str) -> tuple[list[str], dict[str, types.SimpleNamespace]]:
+    """Stand-ins for a run's devices that note the order they are closed in."""
+    closed: list[str] = []
+    return closed, {n: types.SimpleNamespace(close=lambda n=n: closed.append(n)) for n in names}
+
+
+def test_a_run_lets_go_of_its_inputs_before_it_shuts_sdl_down():
+    from humans.run import Run
+
+    closed, devices = _closers("inputs", "display", "audio", "triggers", "logger")
+    run = Run.__new__(Run)
+    vars(run).update(devices)
+    run.close()
+    assert closed.index("inputs") < closed.index("display")
+
+
+def test_a_rig_measurement_lets_go_of_its_inputs_before_it_shuts_sdl_down():
+    from humans.standalone.rig_setup.measure import RigMeasurement
+
+    closed, devices = _closers("inputs", "display", "audio", "triggers")
+    RigMeasurement.close(types.SimpleNamespace(**devices))
+    assert closed.index("inputs") < closed.index("display")

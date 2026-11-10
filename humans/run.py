@@ -411,11 +411,15 @@ class Run:
         return run
 
     def close(self) -> None:
-        """Close the window, the audio output, the trigger line, the inputs and the logger."""
+        """Close the inputs, the window, the audio output, the trigger line and the logger.
+
+        The inputs go first: closing the window shuts SDL down, and a controller let go of
+        after that raises.
+        """
+        self.inputs.close()
         self.display.close()
         self.audio.close()
         self.triggers.close()
-        self.inputs.close()
         self.logger.close()
 
     def _trigger(self) -> None:
