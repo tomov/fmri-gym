@@ -15,6 +15,7 @@
     ]
   },
   "controls": {"CONTROLLER_BUTTON_A": 0, "CONTROLLER_AXIS_LEFTY_UP": 1},
+  "hud": {"show_score": false, "show_time_remaining": false},
   "mode": "episode", "n_episodes": 10, "duration": 300.0,
   "fps": 30, "frame_skip": 2
 }

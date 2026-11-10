@@ -17,6 +17,7 @@
     ]
   },
   "controls": {"CONTROLLER_AXIS_LEFTX_LEFT": 0, "CONTROLLER_AXIS_LEFTX_RIGHT": 1, "CONTROLLER_AXIS_TRIGGERRIGHT": 2, "CONTROLLER_BUTTON_Y": 3},
+  "hud": {"show_score": false, "show_time_remaining": false},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 120.0,
   "fps": 30, "frame_skip": 2
 }
