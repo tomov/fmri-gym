@@ -79,7 +79,7 @@ dataset with **one chunk per frame, gzip level 1** (`_open_h5`,
 appends by `resize` then item assignment (`logging.py:270-274`). Compression
 happens per frame as it arrives, spread across the block.
 
-**Audio (audio.h5).** Each frame's `Sound` (`adapters/base.py:32-49`) is what
+**Audio (audio.h5).** Each frame's `Sound` (`outputs/sound.py`) is what
 the adapter produced, whether or not it was played; muting does not change what
 is logged (`run.py:483-484`). `log_audio` copies the PCM and queues it
 (`logging.py:169-178`). The writer appends to a `samples (N, channels)`

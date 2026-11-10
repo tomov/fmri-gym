@@ -15,8 +15,8 @@ Notes verified against stable_retro 1.0.1:
 - The emulator object is env.unwrapped.em; the libretro RAM view must be
   refreshed with data.update_ram() before get_ram() after a bare set_state.
 - Named levels load via env.unwrapped.load_state(name) then reset().
-- retro allows only ONE emulator per process; the session opens/closes one env
-  per block, so this is respected as long as blocks don't overlap.
+- retro allows only ONE emulator per process: one adapter at a time, closed
+  before the next is built.
 """
 
 from __future__ import annotations
@@ -27,7 +27,8 @@ import gymnasium as gym
 import numpy as np
 import stable_retro as retro
 
-from .base import EnvAdapter, FrameState, Sound
+from ..outputs.sound import Sound
+from .base import EnvAdapter, FrameState
 
 
 class RetroAdapter(EnvAdapter):
@@ -65,7 +66,7 @@ class RetroAdapter(EnvAdapter):
         return self.env.unwrapped.em.get_screen_rate()
 
     def sound(self) -> Sound | None:
-        """Return native emulator PCM for the session's audio output.
+        """Return native emulator PCM for the speakers.
 
         :return: stereo PCM with its unrounded sample rate, or ``None``.
         """

@@ -1,4 +1,4 @@
-"""FrameState, Sound, and the EnvAdapter base class."""
+"""FrameState and the EnvAdapter base class."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 
+from ..outputs.sound import Sound
 from .keymap import make_keymap
 
 
@@ -20,7 +21,7 @@ class FrameState:
         ``em.get_state()``). ``None`` if the backend has no in-memory savestate
         -- then reconstruction relies on seed + action replay instead.
     :ivar variables: named, analysis-friendly scalars/arrays surfaced uniformly
-        via ``info``, so the loop never calls ``getRAM()``/``get_ram()`` itself.
+        via ``info``, so nothing outside the adapter calls ``getRAM()``/``get_ram()``.
         Keys are backend-defined but SHOULD include ``"ram"`` when available.
     """
 
@@ -28,41 +29,18 @@ class FrameState:
     variables: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass
-class Sound:
-    """One chunk of PCM an adapter wants played right now.
-
-    The audio counterpart of the RGB frame :meth:`EnvAdapter.render` returns:
-    the samples, plus the one thing an array cannot carry -- the rate they have
-    to be played at, which is engine-specific (44100 Hz for Doom, 31440 for the
-    ALE).
-
-    :ivar pcm: samples shaped ``(n_samples, n_channels)``; the dtype is the
-        sample format (``int16`` for most engines).
-    :ivar sample_rate: samples per second at which ``pcm`` must be played.
-    """
-
-    pcm: np.ndarray
-    sample_rate: float
-
-
 class EnvAdapter:
-    """The seam that makes the fMRI loop engine-agnostic.
+    """One game environment behind an engine-agnostic interface.
 
     An EnvAdapter WRAPS one game environment for one game block: it builds the
     underlying engine env in ``__init__`` and keeps it (and any per-block state)
-    private, exposing only the small interface the experiment loop needs. The
-    loop (run.py) never sees the raw env, ``env.unwrapped``, or any
-    engine-specific API -- it just calls the methods below on the wrapper.
-
-    A fresh EnvAdapter is constructed per game block (see
-    :func:`fmri_gym.adapters.get_adapter`), so per-block state lives naturally
-    on ``self`` with no risk of leaking between blocks.
+    private, exposing only the methods below; the raw env, ``env.unwrapped``
+    and any engine-specific API stay inside it. One adapter serves one block,
+    so per-block state lives on ``self`` with no risk of leaking between blocks.
 
     Subclasses override :meth:`_make` (build the engine env) plus whichever of
     the hooks below they need; state is returned in a STANDARD shape (a
-    :class:`FrameState`) so the logger and any downstream analysis code are
-    identical across ALE / stable-retro / plain gym.
+    :class:`FrameState`), the same across ALE / stable-retro / plain gym.
 
     :ivar spec: the game-phase config dict this env was built from.
     :ivar env: the underlying ``gymnasium.Env``.
@@ -71,14 +49,14 @@ class EnvAdapter:
 
     env: gym.Env
 
-    #: short id used in filenames / manifest, e.g. "ale", "retro", "gym"
+    #: the backend's short id, e.g. "ale", "retro", "gym"
     name: str = "base"
 
     def __init__(self, spec: dict) -> None:
         """Build the underlying env for one game block.
 
-        :param spec: game-phase config dict from the curriculum (already
-            validated for the keys this backend cares about).
+        :param spec: the game phase's dict (already validated for the keys this
+            backend cares about).
         :raises ValueError: ``controls`` that do not fit the env's action space
             (see :func:`~.keymap.make_keymap`).
         """
@@ -98,7 +76,7 @@ class EnvAdapter:
         first; the adapter never papers over that itself. May also initialise
         per-block state on ``self``.
 
-        :param spec: game-phase config dict from the curriculum.
+        :param spec: the game phase's dict.
         :return: the underlying environment, stored as ``self.env``.
         :raises NotImplementedError: always in the base class.
         """
@@ -141,8 +119,8 @@ class EnvAdapter:
         press, so it would ask the subject for presses the env throws away, and
         the number of them is a property of the game rather than of the
         decision. Returning an action here says "step with this and do not
-        wait", and the loop keeps doing so, at the phase's fps and logging
-        every frame, until this returns ``None`` again. The subject still sees
+        wait", and the block keeps doing so, at its fps and logging every
+        frame, until this returns ``None`` again. The subject still sees
         what happened, because every one of those steps is a drawn frame.
 
         It is the action and not a flag so that the choice of what a
@@ -159,13 +137,12 @@ class EnvAdapter:
     def hud(self, score: float, time_remaining: float) -> list[str] | None:
         """The status lines drawn above the frame every step, or ``None`` for none.
 
-        The session hands over what it knows -- the episode's running score
-        (its cumulative reward) and the seconds left in the block -- and the
-        backend decides what the subject sees of it, in a strip above the frame
+        Given the episode's running score (its cumulative reward) and the
+        seconds left in the block, the backend decides what the subject sees of it, in a strip above the frame
         that never covers game pixels (:meth:`~fmri_gym.outputs.display.Display
         .draw_frame`). Whatever goes here has to be state the env already
         reports, so a model reads the same numbers off the log. The default is
-        the two the session knows, time left first and the score last; a game
+        those two, time left first and the score last; a game
         with a HUD of its own may return ``None`` to draw nothing, and one
         with more to say may extend the list (lines are laid out left to right
         along the strip, the first flush left and the last flush right).
@@ -179,8 +156,7 @@ class EnvAdapter:
     def overlay(self) -> tuple[list[str], float] | None:
         """The lines drawn *on* the frame every step, or ``None`` for none.
 
-        :meth:`hud` is the session's strip above the frame, the same for every
-        game; this is the backend's own, drawn inside the picture at a place
+        :meth:`hud` is the strip above the frame, the same for every game; this is the backend's own, drawn inside the picture at a place
         only the game knows is empty -- a selection the game itself does not
         render, a cue the subject has to read where they are already looking.
         It costs game pixels, so the default is ``None`` and a backend that
@@ -204,8 +180,7 @@ class EnvAdapter:
         "you lost", and the subject expects to hear which. This is where a
         backend adds that reading, from the flags and whatever its env left in
         :attr:`last_info` / :attr:`last_reward`. The names are a fixed
-        vocabulary the session logs per episode and a phase's
-        ``advance_on`` picks from:
+        vocabulary, logged per episode:
 
         - ``"playing"`` -- neither flag: the block's clock cut the episode off.
         - ``"terminated"`` -- the env ended it and this backend cannot say more.
@@ -213,7 +188,7 @@ class EnvAdapter:
         - ``"won"`` / ``"lost"`` -- terminated, with the game's verdict.
 
         The default is the flags alone. Overrides return the same names with
-        their own message; the loop never interprets the message.
+        their own message, which is for the subject alone.
 
         :param terminated: the last step's ``terminated``.
         :param truncated: the last step's ``truncated``.
@@ -280,19 +255,18 @@ class EnvAdapter:
     def sound(self) -> Sound | None:
         """Return the sound to play for the current frame, or ``None``.
 
-        The audio counterpart of :meth:`render`: the loop calls it once per
-        frame and hands the result to the session's audio output, exactly as it
-        hands :meth:`render` to the display. Default is ``None`` -- a silent
+        The audio counterpart of :meth:`render`: what the speakers play with
+        the frame :meth:`render` shows. Default is ``None`` -- a silent
         backend, which is most of them.
 
         Return the PCM the engine produced during the last step, at its native
-        rate: no resampling, no copying, no timing -- the session places it
-        against the flip. It should last about one frame period (``1 / fps``);
+        rate: no resampling, no copying, no timing -- placing it against the
+        flip is the speakers' job. It should last about one frame period (``1 / fps``);
         a block where it does not stops with the fps that would fit. Playback
         does not store it: to log the sound as well, return it from
         :meth:`capture` too.
 
-        :return: a :class:`Sound`, or ``None`` if there is nothing to play.
+        :return: a :class:`~fmri_gym.outputs.sound.Sound`, or ``None`` if there is nothing to play.
         """
         return None
 
@@ -302,9 +276,8 @@ class EnvAdapter:
         An engine with a clock of its own (an emulator core's frame rate, a
         tic rate) advances a fixed amount of game time per step, so the block's
         ``fps`` decides how fast the game is, and people and models should meet
-        the same game. The session does not enforce it -- ``fps`` has to suit
-        the display, and a slowed-down block can be a choice -- it reports
-        ``fps / native_fps`` in the manifest and says so when they differ.
+        the same game. Nothing enforces it -- ``fps`` has to suit the display,
+        and a slowed-down block can be a choice.
         Default is ``None``: no clock of its own (a grid world, a turn-based
         puzzle), where ``fps`` is only how often the screen is redrawn.
 

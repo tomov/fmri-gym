@@ -38,7 +38,8 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 
-from .base import EnvAdapter, FrameState, Sound
+from ..outputs.sound import Sound
+from .base import EnvAdapter, FrameState
 
 
 class COOMAdapter(EnvAdapter):
@@ -49,7 +50,7 @@ class COOMAdapter(EnvAdapter):
     def _make(self, spec: dict) -> gym.Env:
         """Build one COOM scenario env for this block.
 
-        :param spec: game-phase config dict; ``game`` is the scenario name
+        :param spec: the game phase's dict; ``game`` is the scenario name
             (e.g. "pitfall"), ``env_kwargs.task`` picks the WAD variant
             (default "default").
         :return: a :class:`coom_gym.COOMEnv`.

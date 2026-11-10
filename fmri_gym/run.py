@@ -1,9 +1,8 @@
 """One run: the engine-agnostic experiment loop that plays one curriculum.
 
-A run is what one curriculum file describes and one ``fmri-play`` plays (the
-BIDS ``run-NNN`` of its folder). A session -- ``ses-NNN``, several runs -- is
-a shell script of those commands and never a Python loop, so nothing here
-knows about more than the curriculum it was given.
+A run is what one curriculum file describes (the BIDS ``run-NNN`` of its
+folder). A session -- ``ses-NNN``, several runs -- is never a Python loop, so
+nothing here knows about more than the curriculum it was given.
 
 Everything here is independent of which game engine is used: trigger wait,
 clock anchoring, the curriculum of phases (fixation / message / game / survey),
@@ -23,7 +22,7 @@ A rig may give every run a fixation cross after the trigger and one at its end
 fMRI, the haemodynamic response to the last thing played. A run is the
 scanner's and a curriculum the subject's, so a run can stop part-way through
 one: given a duration, the run stops whatever phase is on screen in time for
-its closing fixation. A later run started with ``--resume`` carries on from
+its closing fixation. A later run that resumes carries on from
 there (:func:`~fmri_gym.save.bids.last_position`).
 """
 
@@ -50,6 +49,7 @@ from .outputs.display import Display, check_monitor
 from .inputs import QUIT, ControlNames, Edge, InputDevice, InputEvent, open_input_devices
 from .menu import Menu
 from .save.logging import Logger
+from .sync.clock import Clock
 from .sync.triggers import Triggers
 
 if TYPE_CHECKING:
@@ -88,42 +88,6 @@ class EpisodeResult:
     def record(self) -> dict:
         """The ``episode_end`` line's fields."""
         return asdict(self)
-
-
-class Clock:
-    """Anchored at the scanner trigger; gives run + wall-clock time."""
-
-    def __init__(self) -> None:
-        """Create an untriggered clock (``t0_*`` are ``None`` until :meth:`trigger`)."""
-        self.t0_perf = None
-        self.t0_epoch = None
-
-    def trigger(self) -> None:
-        """Anchor the clock at the current time (call on scanner trigger)."""
-        self.t0_perf = time.perf_counter()
-        self.t0_epoch = time.time()
-
-    def run_time(self) -> float:
-        """Seconds since the scanner trigger (``perf_counter`` based).
-
-        :return: seconds since this run's trigger.
-        """
-        return time.perf_counter() - self.t0_perf
-
-    def from_perf(self, t_perf: float) -> float:
-        """Convert a ``perf_counter`` stamp (e.g. a flip time) to run time.
-
-        :param t_perf: a ``time.perf_counter()`` value.
-        :return: seconds since the scanner trigger.
-        """
-        return t_perf - self.t0_perf
-
-    def wall_time(self) -> float:
-        """Current wall-clock epoch time.
-
-        :return: ``time.time()`` seconds since the Unix epoch.
-        """
-        return time.time()
 
 
 def _is_quit(event: InputEvent) -> bool:
@@ -301,12 +265,12 @@ def _final_outcome(
 
 def _run_progress(data_root: str, subject: str, curriculum: Curriculum,
                   loop: bool) -> RunProgress | None:
-    """Where ``--resume`` starts: the subject's progress in this curriculum, checked against it.
+    """Where a resumed run starts: the subject's progress in this curriculum, checked against it.
 
     :param data_root: the BIDS tree's root.
     :param subject: ``sub-<label>``.
     :param curriculum: the curriculum; its file's name is the task label.
-    :param loop: a curriculum played to its end starts again (``--loop``).
+    :param loop: a curriculum played to its end starts again.
     :return: :func:`~fmri_gym.save.bids.last_position`, or ``None`` (said on stderr)
         when no earlier run of this curriculum got past its opening phases, or
         with ``loop``, when it played it to its end.
@@ -323,22 +287,20 @@ def _run_progress(data_root: str, subject: str, curriculum: Curriculum,
         return None
     run_label, last_game = progress.run_label, progress.last_game
     if progress.phase_index >= len(phases) and loop:
-        print(f"resume: {run_label} played this curriculum to its end; --loop starts it again",
+        print(f"resume: {run_label} played this curriculum to its end; loop starts it again",
               file=sys.stderr)
         return None
     if progress.phase_index >= len(phases):
-        raise ValueError(f"--resume: {run_label} played this curriculum to its end; start it "
-                         "over without --resume")
+        raise ValueError(f"resume: {run_label} played this curriculum to its end")
     if last_game is not None:
         then = last_game.phase
         now = (phases[last_game.phase_index].spec if last_game.phase_index < len(phases)
                else {})
         changed = game_changes(then, now)
         if changed:
-            raise ValueError(f"--resume: phase {last_game.phase_index}, the last game "
+            raise ValueError(f"resume: phase {last_game.phase_index}, the last game "
                              f"{run_label} played, is not the same game in this curriculum "
-                             f"({', '.join(changed)} changed). Put it back, or start over "
-                             "without --resume")
+                             f"({', '.join(changed)} changed)")
     print(f"resume: carrying on from {run_label} at phase {progress.phase_index}"
           + (" mid-block" if progress.block_progress is not None else ""), file=sys.stderr)
     return progress
@@ -409,7 +371,7 @@ class Run:
             from that this curriculum cannot carry on (see :func:`_run_progress`).
         """
         if config.loop and config.duration is None:
-            raise ValueError("--loop plays the curriculum until --duration: give a --duration")
+            raise ValueError("loop: plays the curriculum until the run's duration, and it has none")
         out = bids.run_output(config.rig.data_root, config.subject,
                               bids.task_label(config.curriculum.path),
                               config.ses, config.run)
@@ -431,7 +393,7 @@ class Run:
         triggers = Triggers(config.rig.triggers)
         print(f"triggers: {triggers.status()}", file=sys.stderr)
         if config.dummy_trigger:
-            print("triggers: --dummy-trigger: the experimenter and scanner waits are skipped; "
+            print("triggers: dummy trigger: the experimenter and scanner waits are skipped; "
                   "this is a test run, not a session", file=sys.stderr)
         audio = Audio(enabled=config.rig.has_audio)
         print(f"audio: {audio.status()}", file=sys.stderr)
@@ -867,8 +829,6 @@ class Run:
         # Logging
         block_extra = adapter.block_extra() # run before closing the adapter to get the last state
         audio_log = self.audio.block_log()
-        if audio_log is not None:
-            audio_log = audio_log.in_run_time(self.clock.from_perf)
         summary = {
             "n_episodes": len(episodes), "n_frames": self.logger.n_frames,
             "outcomes": dict(Counter(e.outcome for e in episodes)),

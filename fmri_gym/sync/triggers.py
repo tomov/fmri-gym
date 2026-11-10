@@ -1,26 +1,24 @@
 """Recording-device triggers: run-start sync and per-event trigger codes.
 
 fMRI needs one thing from the stimulus PC: to *wait* for the scanner's first
-volume (a key the trigger box types, ``EQUALS``) and anchor the session clock on
-it. MEG/EEG need the opposite direction: the stimulus PC *sends* trigger codes
-onto a trigger line -- often also to start the acquisition -- and the analyst
-realigns the recording to the frame log by those codes. Both live under one
-optional ``"triggers"`` section of the rig file (:mod:`fmri_gym.config.rig`),
-since they are the site's hardware, so a single curriculum runs at either
-scanner; without the section, a run waits for the fMRI ``=`` and sends no codes.
+volume (a key the trigger box types, ``EQUALS``) and anchor the clock on it.
+MEG/EEG need the opposite direction: the stimulus PC *sends* trigger codes onto
+a trigger line -- often also to start the acquisition -- and the analyst
+realigns the recording to the frame log by those codes. Both are one optional
+``"triggers"`` section, the site's hardware; without it, the start waits for
+the fMRI ``=`` and no codes are sent.
 
 One section, two concerns:
 
-* ``sync`` (:class:`SyncSettings`) -- what gates the start of the session:
+* ``sync`` (:class:`SyncSettings`) -- what gates the start of the run:
   ``wait`` for a key, ``send`` a start code over the trigger backend (some MEG
   systems start recording on it), or ``none``.
 * the rest (:class:`TriggerSettings`) -- which codes go out, over what.
   Backends: ``null`` (default, sends nothing), ``lsl``, ``serial``,
   ``parallel``, ``hid`` (a USB DAQ's digital port, :data:`HID_DEVICES`). A
   backend that cannot be opened raises :class:`TriggerError` when
-  :class:`Triggers` is built -- in ``fmri_play.py`` that is before the window
-  even opens: better a clear stop at the desk than a silent recording without
-  triggers.
+  :class:`Triggers` is built, so it can be built before anything is shown:
+  better a clear stop at the desk than a silent recording without triggers.
 
 Code scheme -- disjoint bit fields, so coincident triggers stay decodable
 -----------------------------------------------------------------------
@@ -39,7 +37,7 @@ OR'd together. The scheme therefore never shares bits between events:
   where two codes overlap.
 
 Action triggers are deliberately absent: every action is already logged per
-frame with its session time, which is enough to realign it to the frame
+frame with its run time, which is enough to realign it to the frame
 triggers and the emulator state.
 
 Backend deps (pylsl, pyserial, pyparallel, hidapi) are imported lazily, in the
@@ -51,10 +49,10 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import asdict, dataclass, field
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import Any, Protocol
 
-if TYPE_CHECKING:
-    from ..run import Clock
+from .clock import Clock
+
 
 log = logging.getLogger(__name__)
 
@@ -89,7 +87,7 @@ HID_DEVICES = {
 
 
 class TriggerError(RuntimeError):
-    """A trigger setting or backend that cannot be used; raised before the session starts."""
+    """A trigger setting or backend that cannot be used."""
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +140,7 @@ class Codes:
                 raise ValueError(f"triggers: code {name}={code} must be in 1..255")
             if code & self.frame_mask:
                 raise ValueError(f"triggers: code {name}={code} overlaps the frame bits "
-                                 f"(mask {self.frame_mask}); use a higher bit")
+                                 f"(mask {self.frame_mask})")
         names = list(codes)
         for i, a in enumerate(names):
             for b in names[i + 1:]:
@@ -153,7 +151,7 @@ class Codes:
 
 @dataclass(frozen=True)
 class SyncSettings:
-    """The ``triggers.sync`` section: what gates the start of the session."""
+    """The ``triggers.sync`` section: what gates the start of the run."""
 
     #: ``wait`` for ``key`` (fMRI trigger box), ``send`` the ``scanner_start``
     #: code over the trigger backend (MEG started from the trigger line), or
@@ -198,9 +196,8 @@ class TriggerSettings:
     on_episode_start: bool = True
     codes: Codes = field(default_factory=Codes)
     #: The two settings that decide what the recording gets and that the
-    #: config left unset (``"sync.mode"``, ``"backend"``). Defaulting them is
-    #: allowed, silently is not: the session shows them on the experimenter
-    #: screen and the manifest keeps them.
+    #: section left unset (``"sync.mode"``, ``"backend"``); :meth:`Triggers.status`
+    #: names them.
     defaulted: tuple[str, ...] = ()
 
     @classmethod
@@ -357,21 +354,17 @@ def _open_backend(s: TriggerSettings) -> tuple[_Backend, str]:
     """Open the configured transport.
 
     :param s: trigger settings.
-    :return: ``(backend, description)``; the description names what is open,
-        for the manifest and the console.
+    :return: ``(backend, description)``; the description names what is open.
     :raises TriggerError: if the backend's package is missing, no port is
-        configured, or the device cannot be opened -- with the fix in the
-        message.
+        set, or the device cannot be opened.
     """
     if s.backend == "null":
         return _Null(), "null"
-    hint = 'set triggers.backend to "null" to run without trigger codes'
     target = {"lsl": s.lsl_stream_name, "hid": f"{s.hid_device}:{s.port}"}.get(s.backend, s.port)
     if s.backend != "lsl" and not s.port:
         example = ("A or B, the box's digital port" if s.backend == "hid"
                    else "/dev/ttyUSB0 or /dev/parport0")
-        raise TriggerError(f"triggers: backend {s.backend!r} needs a port "
-                           f"(e.g. {example}); {hint}")
+        raise TriggerError(f"triggers: backend {s.backend!r} needs a port (e.g. {example})")
     try:
         if s.backend == "lsl":
             return _LSL(s.lsl_stream_name), f"lsl:{target}"
@@ -384,10 +377,10 @@ def _open_backend(s: TriggerSettings) -> tuple[_Backend, str]:
         pkg = {"lsl": "pylsl", "serial": "pyserial", "parallel": "pyparallel",
                "hid": "hidapi"}[s.backend]
         raise TriggerError(f"triggers: the {s.backend} backend needs the {pkg} "
-                           f"package (pip install {pkg}); {hint}") from exc
-    except Exception as exc:  # noqa: BLE001 -- any device failure, reworded with the fix
-        raise TriggerError(f"triggers: cannot open {s.backend} triggers on {target}: {exc}; "
-                           f"check the device and permissions, or {hint}") from exc
+                           f"package (pip install {pkg})") from exc
+    except Exception as exc:  # noqa: BLE001 -- any device failure, as a TriggerError
+        raise TriggerError(f"triggers: cannot open {s.backend} triggers on {target}: {exc}") \
+            from exc
 
 
 # ---------------------------------------------------------------------------
@@ -396,18 +389,15 @@ def _open_backend(s: TriggerSettings) -> tuple[_Backend, str]:
 
 
 class Triggers:
-    """Sends trigger codes for one session and remembers the lifecycle ones.
+    """Sends trigger codes for one run and remembers the lifecycle ones.
 
-    Built once per run, next to the :class:`~fmri_gym.outputs.display.Display` and
-    the :class:`~fmri_gym.outputs.audio.Audio`, and passed to the
-    :class:`~fmri_gym.run.Run`; :meth:`from_dict` on ``None`` gives
-    the ``null`` no-op, so the session loop calls these methods
-    unconditionally. Events are stamped with ``perf_counter``;
-    :meth:`describe` converts them to session time once given the clock.
+    :meth:`from_dict` on ``None`` gives the ``null`` backend, whose methods
+    send nothing, so they are safe to call unconditionally. Events are stamped
+    with ``perf_counter``; :meth:`describe` converts them to run time once
+    given the clock.
 
-    :ivar sync: the start-sync settings, for the session's trigger screen.
-    :ivar enabled: ``False`` for the ``null`` backend -- the session then skips
-        logging a per-frame ``trigger`` column.
+    :ivar sync: the start-sync settings.
+    :ivar enabled: ``False`` for the ``null`` backend, which sends no codes.
     :ivar events: every lifecycle trigger sent, with its value and times.
     """
 
@@ -423,14 +413,14 @@ class Triggers:
         self._backend, self.active = _open_backend(settings)
         self.enabled = settings.backend != "null"
         self.events: list[dict[str, Any]] = []
-        #: value sent by the latest :meth:`frame` call (0 if none), for the log.
+        #: value sent by the latest :meth:`frame` call (0 if none).
         self.last_frame = 0
         self._level = 0     # frame code currently on the lines (0 between blocks)
         self._n_sent = 0    # frame triggers sent in the current block
 
     @classmethod
     def from_dict(cls, section: dict | None) -> Triggers:
-        """Build from a rig file's ``triggers`` section.
+        """Build from a ``triggers`` section.
 
         :param section: the dict, or ``None`` for the defaults (``null``
             backend, wait for the scanner key).
@@ -497,8 +487,8 @@ class Triggers:
     def pulse(self, value: int, hold_s: float) -> float:
         """Put an arbitrary ``value`` on the line for ``hold_s``, then clear it.
 
-        For testing the lines outside a session; a session sends only through
-        :meth:`frame` and :meth:`lifecycle`, which keep the code scheme.
+        For testing the lines; only :meth:`frame` and :meth:`lifecycle` keep the
+        code scheme.
 
         :param value: the byte to send.
         :param hold_s: seconds before the lines are cleared.
@@ -512,14 +502,14 @@ class Triggers:
         return took
 
     def status(self) -> str:
-        """One line saying what this run will do, for the experimenter screen and the console.
+        """One line saying what the triggers will do.
 
         Names the start sync, the transport (or that nothing is sent) and any
-        setting the config left to its default -- the run should never end
-        with someone discovering the recording got no triggers.
+        setting the section left to its default, so that a recording without
+        triggers is known before it starts.
 
         :return: e.g. ``"wait for scanner key 'EQUALS' | no trigger codes sent
-            (backend null) | NOT SET in the rig file: sync.mode, backend"``.
+            (backend null) | NOT SET: sync.mode, backend"``.
         """
         sync = self.sync
         start = {"wait": f"wait for scanner key {sync.key!r}",
@@ -529,16 +519,16 @@ class Triggers:
                else "no trigger codes sent (backend null)")
         parts = [start, out]
         if self.settings.defaulted:
-            parts.append("NOT SET in the rig file: " + ", ".join(self.settings.defaulted))
+            parts.append("NOT SET: " + ", ".join(self.settings.defaulted))
         return " | ".join(parts)
 
     def describe(self, clock: Clock | None = None) -> dict[str, Any]:
         """Settings, the open transport, and the lifecycle events sent.
 
-        :param clock: a triggered session clock; each event then also gets a
+        :param clock: a triggered clock; each event then also gets a
             ``run_time`` (negative for ``scanner_start``, which precedes
             the anchor).
-        :return: a JSON-serializable dict for the manifest.
+        :return: a JSON-serializable dict.
         """
         events = [dict(e) for e in self.events]
         if clock is not None and clock.t0_perf is not None:

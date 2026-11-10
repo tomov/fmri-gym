@@ -66,7 +66,7 @@ from typing import TYPE_CHECKING, Any, Callable, NamedTuple
 import numpy as np
 import pygame
 
-from ..adapters.base import Sound
+from ..outputs.sound import Sound
 from ..outputs.display import Display
 from ..sync.triggers import TriggerSettings, Triggers
 
