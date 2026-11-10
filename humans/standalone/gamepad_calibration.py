@@ -149,9 +149,11 @@ class _Task:
         self.controller, self.screen, self.present = controller, screen, present
         self.to_canvas = to_canvas
         w, self.h = screen.get_size()
-        self.mx, scale = w // 2, min(2.0, max(0.8, self.h / 600))
+        #: the screen is laid out for a height of 600, fonts and places scaled by this
+        self.scale = min(2.0, max(0.8, self.h / 600))
+        self.mx = w // 2
         font = "Menlo,Monaco,monospace"
-        self.big, self.mid, self.sml = (pygame.font.SysFont(font, int(n * scale))
+        self.big, self.mid, self.sml = (pygame.font.SysFont(font, int(n * self.scale))
                                         for n in (62, 25, 15))
         self.cancel = None if to_canvas is None else pygame.Rect(w - 150, self.h - 60, 130, 40)
         self.clock = _FrameClock()
@@ -192,14 +194,15 @@ class _Task:
         """One screen: arrows side by side (a direction and its colour each), a word or two,
         a line under."""
         self.screen.fill(SURFACE)
+        s = self.scale
         for k, (direction, arrow_colour) in enumerate(arrows):
-            at = (int(self.mx + (k - (len(arrows) - 1) / 2) * 200), 235)
-            draw_arrow(self.screen, direction, at, 74, arrow_colour)
-        top = 300 if arrows else 235
+            at = (int(self.mx + (k - (len(arrows) - 1) / 2) * 200 * s), int(235 * s))
+            draw_arrow(self.screen, direction, at, int(74 * s), arrow_colour)
+        top = (300 if arrows else 235) * s
         for k, line in enumerate(lines):
             font, ink = (self.big, colour) if k == 0 else (self.mid, INK2)
             surf = font.render(line, True, ink)
-            self.screen.blit(surf, surf.get_rect(center=(self.mx, top + k * 66)))
+            self.screen.blit(surf, surf.get_rect(center=(self.mx, int(top + k * 66 * s))))
         s = self.sml.render(sub or ("Cancel or ESC stops; nothing is written" if self.cancel
                                     else "ESC stops; nothing is written"), True, INK2)
         self.screen.blit(s, s.get_rect(center=(self.mx, self.h - 40)))
