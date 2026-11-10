@@ -128,9 +128,9 @@ class Keyboard(InputDevice):
         out: list[InputEvent] = []
         for event in events:
             if event.type == pygame.KEYDOWN and event.key in NAMES:
-                out += self._press(NAMES[event.key], True)
+                out += self._press(NAMES[event.key])
             elif event.type == pygame.KEYUP and event.key in NAMES:
-                out += self._press(NAMES[event.key], False)
+                out += self._release(NAMES[event.key])
             elif event.type == pygame.WINDOWFOCUSLOST:  # its key-ups go to the window in focus
-                out += [e for name in sorted(self._held) for e in self._press(name, False)]
+                out += [e for name in sorted(self._held) for e in self._release(name)]
         return out

@@ -83,9 +83,9 @@ class XBoxController(Controller):
             if getattr(event, "instance_id", None) != self.instance_id:
                 continue
             if event.type == pygame.CONTROLLERBUTTONDOWN and event.button in BUTTONS:
-                out += self._press(BUTTONS[event.button], True)
+                out += self._press(BUTTONS[event.button])
             elif event.type == pygame.CONTROLLERBUTTONUP and event.button in BUTTONS:
-                out += self._press(BUTTONS[event.button], False)
+                out += self._release(BUTTONS[event.button])
             elif event.type == pygame.CONTROLLERAXISMOTION and event.axis in TRIGGERS:
                 out += self._pull(TRIGGERS[event.axis], _scaled(event.value),
                                   _TRIGGER_ON, _TRIGGER_OFF)

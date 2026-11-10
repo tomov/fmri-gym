@@ -40,7 +40,8 @@ class InputDevice(ABC):
     """One input device: its controls, and which of them it holds.
 
     A subclass names itself (:attr:`name`), lists its controls (:attr:`CONTROLS`)
-    and presses and releases them with :meth:`_press` from its :meth:`handle`.
+    and presses and releases them with :meth:`_press` and :meth:`_release` from its
+    :meth:`handle`.
     """
 
     #: the name the kind of device goes by
@@ -89,12 +90,19 @@ class InputDevice(ABC):
     def close(self) -> None:
         """Let go of the device."""
 
-    def _press(self, name: str, down: bool) -> list[InputEvent]:
-        """Press or release ``name``: its edge, or nothing when it already is so."""
-        if down == (name in self._held):
+    def _press(self, name: str) -> list[InputEvent]:
+        """Press ``name``: its down edge, or nothing when it is already down."""
+        if name in self._held:
             return []
-        (self._held.add if down else self._held.discard)(name)
-        return [InputEvent(name, Edge.DOWN if down else Edge.UP)]
+        self._held.add(name)
+        return [InputEvent(name, Edge.DOWN)]
+
+    def _release(self, name: str) -> list[InputEvent]:
+        """Release ``name``: its up edge, or nothing when it is already up."""
+        if name not in self._held:
+            return []
+        self._held.discard(name)
+        return [InputEvent(name, Edge.UP)]
 
 
 class InputDevices(InputDevice):
