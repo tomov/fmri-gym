@@ -87,7 +87,7 @@ The score, the task, and the cursor
 -----------------------------------
 
 The env's HUD covers inventory and the four status bars but not the achievement
-count, so ``show_score`` puts it in the strip above the frame, out of what the
+count, so ``show_achievements`` puts it in the strip above the frame, out of what the
 level can reach (two of crafter's 22 are hostiles a peaceful level never has).
 On a level with a task chain the strip names the current task in its middle and
 the count is the chain's closed entries out of its length instead; the "+1" cue
@@ -339,7 +339,7 @@ class CrafterAdapter(EnvAdapter):
         # root, and `crafter_gym.import_crafter` is where that is dealt with.
         crafter_gym.import_crafter()
 
-        self._show_score = bool(spec.get("show_score", False))
+        self._show_achievements = bool(spec.get("show_achievements", False))
         self._cues = bool(spec.get("cues", False))
         self._cue_overlay = bool(spec.get("cue_overlay", False))
         # Synthesized once per block rather than per frame: each is a few tens
@@ -554,7 +554,7 @@ class CrafterAdapter(EnvAdapter):
         """
         return 0 if info.get("sleeping") else None
 
-    def hud(self, score: float, time_remaining: float) -> list[str]:
+    def hud(self, score: float, time_remaining: float) -> list[str] | None:
         """Time left, the task on a level with a chain, then the count.
 
         Crafter draws its own HUD -- four status bars and the inventory -- but
@@ -567,14 +567,18 @@ class CrafterAdapter(EnvAdapter):
         The cue field is the same bit of information the subject just heard,
         written down, so a policy reading these lines as text is told what a
         human in the bore is told and no more. It has its own flag because the
-        two players receive it differently (see ``cue_overlay`` above).
+        two players receive it differently (see ``cue_overlay`` above). The
+        time and the score corners follow the phase's ``hud`` settings, as in
+        :meth:`EnvAdapter.hud`: a hidden one is ``""``, so it keeps its corner.
 
-        :param score: the episode's cumulative reward, shown only when
-            ``show_score`` is off and the count is therefore not.
+        :param score: the episode's cumulative reward, shown when
+            ``show_achievements`` is off and the count is therefore not.
         :param time_remaining: seconds until the block ends.
-        :return: the fields, laid out left to right above the frame.
+        :return: the fields, laid out left to right above the frame, or
+            ``None`` when none is shown.
         """
-        lines = [f"{max(0, int(time_remaining))} s"]
+        settings = self.hud_settings
+        lines = [f"{max(0, int(time_remaining))} s" if settings.show_time_remaining else ""]
         if self._cue_overlay and self._cue:
             cue = _CUE_LINES[self._cue]
             if self._cue == "hit" and self._outcome["target"]:
@@ -584,10 +588,15 @@ class CrafterAdapter(EnvAdapter):
         if tasks is not None:
             import crafter_gym
             lines.append(crafter_gym.task_text(tasks.task))
-        if not self._show_score:
-            return [*lines, f"Score: {score:g}"]
-        earned, offered = self._fraction()
-        return [*lines, f"{earned} / {offered}"]
+        if not settings.show_score:
+            score_line = ""
+        elif self._show_achievements:
+            earned, offered = self._fraction()
+            score_line = f"{earned} / {offered}"
+        else:
+            score_line = f"Score: {score:g}"
+        lines.append(score_line)
+        return lines if any(lines) else None
 
     def overlay(self) -> tuple[list[str], float] | None:
         """A change of task, and the menu cursor while it is used, drawn over the player.

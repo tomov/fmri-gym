@@ -39,7 +39,7 @@ Sleep is where `is_turn_based` and stock crafter meet, and it is settled in the 
 
 ## HUD
 
-`show_score` draws the achievement count in the HUD strip above the frame, which crafter's own HUD does not show. It covers no game pixel and reports only values already in `info['achievements']`, so the model harness can be given the same scalar; a model evaluated without it sees less than the subject did, and that should be said. The count is shown rather than the block's cumulative reward, which is the same quantity written less legibly: crafter pays +1 per first unlock and (health - last_health)/10 per step, and the health terms telescope to at most -0.9 over an episode.
+`show_achievements` makes the achievement count the score in the HUD strip above the frame, which crafter's own HUD does not show; `hud.show_score` hides it, as it hides any game's score. It covers no game pixel and reports only values already in `info['achievements']`, so the model harness can be given the same scalar; a model evaluated without it sees less than the subject did, and that should be said. The count is shown rather than the block's cumulative reward, which is the same quantity written less legibly: crafter pays +1 per first unlock and (health - last_health)/10 per step, and the health terms telescope to at most -0.9 over an episode.
 
 ## Cues
 

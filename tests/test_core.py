@@ -16,6 +16,7 @@ from gymnasium import spaces
 
 from fmri_gym.outputs.sound import Sound
 from fmri_gym.save.bids import task_label
+from fmri_gym.adapters.base import EnvAdapter, HudSettings
 from fmri_gym.adapters.keymap import make_keymap
 from fmri_gym.config.curriculum import (
     check_shape, game_changes, is_common_file, load_curriculum, save_curriculum,
@@ -135,6 +136,9 @@ def test_keymap_refuses_an_action_outside_the_space():
     ({**PHASE, "instructions": {"title": "T", "controls_to_dismiss": ["SPACE"],
                                 "text": ["a", "![pad](images/no-such.png)"]}}, "no-such.png"),
     ({"type": "message", "text": "![pad](README.md)"}, "README.md"),
+    ({**PHASE, "hud": {"show_score": "no"}}, "hud.show_score"),
+    ({**PHASE, "hud": {"show_clock": False}}, "show_clock"),
+    ({**PHASE, "hud": False}, "hud"),
 ])
 def test_validate_config_refuses(phase, problem):
     problems = validate_curriculum({"curriculum": [phase]})
@@ -143,6 +147,20 @@ def test_validate_config_refuses(phase, problem):
 
 def test_validate_config_accepts_a_plain_game_phase():
     assert validate_curriculum({"curriculum": [PHASE]}) == []
+    hud = {"show_score": False, "show_time_remaining": True}
+    assert validate_curriculum({"curriculum": [{**PHASE, "hud": hud}]}) == []
+
+
+@pytest.mark.parametrize("hud, lines", [
+    ({}, ["12 s", "Score: 3"]),
+    ({"show_score": False}, ["12 s", ""]),
+    ({"show_time_remaining": False}, ["", "Score: 3"]),
+    ({"show_score": False, "show_time_remaining": False}, None),
+])
+def test_the_hud_keeps_time_left_and_score_right_whichever_is_hidden(hud, lines):
+    adapter = EnvAdapter.__new__(EnvAdapter)
+    adapter.hud_settings = HudSettings.from_dict(hud)
+    assert adapter.hud(3.0, 12.4) == lines
 
 
 def test_an_image_line_is_drawn_as_its_image_between_the_text(monkeypatch):

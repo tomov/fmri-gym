@@ -532,7 +532,8 @@ The `MT` team's sessions are in `configs/MT/subjects/`: three of about an hour f
  "controls": {"": 0, "LEFT": 0, "RIGHT": 1}, // REQUIRED: control -> env action, the whole map;
                                 //   "" is the action sent with no key held (see below)
  "save_pixels": false,          // also store lossless pixels, where the backend can
- "show_score": false}           // crafter: draw the achievement count beside the frame
+ "hud": {"show_score": true, "show_time_remaining": true}, // the strip above the frame (see below)
+ "show_achievements": false}    // crafter: its score is the achievement count, not the reward
 ```
 
 ### Shared phases (the `__include` field)
@@ -588,6 +589,10 @@ A subject can get stuck (a Baba Is You puzzle with its rules pushed into a corne
 ```
 
 Holding `control` for `hold` seconds -- even if that control does something in the game -- pauses the game and shows the options; `move` steps through them and `confirm` picks one. `reset` starts the episode over -- a new `reset()` of the env with the same seed, so the very same level instance -- `forfeit` ends the block and moves on to the next phase, `resume` continues. The menu is unavailable for the first `after` seconds of the block (0 = always), and a hold plus a two-press choice is hard to do by accident -- the point is that this is possible but never done lightly. Only `control` is required; the rest default to the values shown, and `options` may list any subset, in the order to show them. The manifest's phase entry records the settings and every pop-up (`menu.events`: when, and what was chosen); a reset or forfeited episode's `episode_outcome` is `reset` / `forfeit` (the env's own `terminated` / `truncated` flags are never touched), and a reset one does not count towards `n_episodes`. `configs/curricula/baba/levels/make_win.json` uses it.
+
+### The status strip (the `hud` field)
+
+Above the frame, a strip shows the seconds left in the block in its left corner and the episode's score in its right, without covering a game pixel. A game phase can hide either with `"hud": {"show_score": false}` or `"hud": {"show_time_remaining": false}`; both are shown by default. A hidden line leaves its corner empty, so the other stays where it was, and with both hidden the strip is gone and the frame gets the whole screen. A game may add fields of its own between the two corners (crafter's task and cue).
 
 ### Resuming a curriculum (`--duration`, `--resume`)
 

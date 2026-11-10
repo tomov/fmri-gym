@@ -15,10 +15,11 @@ business. Nothing here reads a rig.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from enum import Enum
 from typing import Any, ClassVar
 
+from ..adapters.base import HudSettings
 from ..outputs.display import image_line_problems
 from ..inputs import ControlNames, is_control_of_any_input_device
 
@@ -354,6 +355,8 @@ class GamePhase(Phase):
             out.append(f"show_outcome_duration: expected seconds >= 0, got {seconds!r}")
         if "menu" in d:
             out.extend(menu_problems(d["menu"]))
+        if "hud" in d:
+            out.extend(hud_problems(d["hud"]))
         if "instructions" in d:
             out.extend(Instructions.problems(d["instructions"]))
         return out
@@ -510,4 +513,21 @@ def menu_problems(spec: object) -> list[str]:
     unknown = set(spec) - {"control"} - set(_MENU_DEFAULTS)
     if unknown:
         out.append(f"menu: unknown fields {sorted(unknown)}")
+    return out
+
+
+def hud_problems(spec: object) -> list[str]:
+    """What is wrong with a phase's ``hud`` dict, for :meth:`GamePhase.problems`.
+
+    :param spec: the phase's ``"hud"`` value.
+    :return: human-readable problems, empty when the settings are usable.
+    """
+    names = [f.name for f in fields(HudSettings)]
+    if not isinstance(spec, dict):
+        return [f"hud: expected a dict with any of {names}, got {spec!r}"]
+    out = [f"hud.{name}: expected true or false, got {value!r}"
+           for name, value in spec.items() if name in names and not isinstance(value, bool)]
+    unknown = sorted(set(spec) - set(names))
+    if unknown:
+        out.append(f"hud: unknown fields {unknown}, expected any of {names}")
     return out
