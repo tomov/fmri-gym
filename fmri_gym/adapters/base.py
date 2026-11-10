@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field
 from typing import Any
 
 import gymnasium as gym
@@ -40,25 +40,8 @@ class HudSettings:
 
     @classmethod
     def from_dict(cls, spec: dict) -> HudSettings:
-        """Read a phase's ``hud`` dict (already validated by :func:`hud_problems`)."""
+        """Read a phase's ``hud`` dict, already validated with the phase."""
         return cls(**spec)
-
-
-def hud_problems(spec: object) -> list[str]:
-    """What is wrong with a phase's ``hud`` dict, for the curriculum's validation.
-
-    :param spec: the phase's ``"hud"`` value.
-    :return: human-readable problems, empty when the settings are usable.
-    """
-    names = [f.name for f in fields(HudSettings)]
-    if not isinstance(spec, dict):
-        return [f"hud: expected a dict with any of {names}, got {spec!r}"]
-    out = [f"hud.{name}: expected true or false, got {value!r}"
-           for name, value in spec.items() if name in names and not isinstance(value, bool)]
-    unknown = sorted(set(spec) - set(names))
-    if unknown:
-        out.append(f"hud: unknown fields {unknown}, expected any of {names}")
-    return out
 
 
 class EnvAdapter:
