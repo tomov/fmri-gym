@@ -260,3 +260,22 @@ def test_a_usb_box_trigger_line_shows_its_box_and_port(qt):
     assert (triggers["backend"], triggers["hid_device"], triggers["port"]) == ("hid", "mcc-1208fs",
                                                                                "A")
     assert "mcc-1208fs port A" in window.trigger_text.text()
+
+
+def test_the_rig_window_stays_open_after_a_calibration(qt, monkeypatch):
+    from PySide6 import QtCore
+
+    from fmri_gym.standalone.rig_setup import window as rig_window
+
+    monkeypatch.setattr(rig_window.subprocess, "run", lambda *_a, **_k: None)
+    monkeypatch.setattr(rig_window, "controller_status", lambda: {"devices": [], "error": None})
+    window, _ = _rig_window("xbox")
+    still_open = []
+
+    def close_if_still_open():
+        still_open.append(window.isVisible())
+        window.done(7)
+
+    QtCore.QTimer.singleShot(0, window._calibrate)
+    QtCore.QTimer.singleShot(50, close_if_still_open)
+    assert window.exec() == 7 and still_open == [True]

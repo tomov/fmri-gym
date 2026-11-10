@@ -19,8 +19,9 @@ import os
 import subprocess
 import sys
 import time
+from contextlib import contextmanager
 from dataclasses import asdict
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Iterator
 
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import Qt
@@ -857,11 +858,8 @@ class _RigWindow(QtWidgets.QDialog):
         command = [sys.executable, "-m", "fmri_gym.standalone.gamepad_calibration"]
         if os.path.isfile(self.path) and self.saved is not None:
             command += ["--rig", self.path]
-        self.hide()
-        try:
+        with self._set_aside():
             subprocess.run(command, check=False)
-        finally:
-            self.show()
         self._look_for_controller()
 
     def _response_keys_box(self, given: Any) -> QtWidgets.QGroupBox:
@@ -1145,12 +1143,24 @@ class _RigWindow(QtWidgets.QDialog):
 
     def _run_measurement(self, is_long: bool) -> None:
         """Run a rig measurement on the saved file in its own window; say how it went."""
-        self.hide()
-        try:
+        with self._set_aside():
             outcome = run_rig_measurement(self.path, is_long)
-        finally:
-            self.show()
         QtWidgets.QMessageBox.information(self, "Rig measurement", outcome)
+
+    @contextmanager
+    def _set_aside(self) -> Iterator[None]:
+        """Minimise the window while another program has the screen, then bring it back.
+
+        Hiding it instead would end the dialog's ``exec()``: the window would come back with
+        nothing behind it, and its caller would go on as if it had been closed.
+        """
+        self.showMinimized()
+        try:
+            yield
+        finally:
+            self.showNormal()
+            self.raise_()
+            self.activateWindow()
 
     # -- the file --------------------------------------------------------------
 
