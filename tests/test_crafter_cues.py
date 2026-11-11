@@ -49,7 +49,7 @@ def _load_engine() -> None:
     global crafter, co, CrafterAdapter
     import crafter_gym
 
-    from fmri_gym.adapters.crafter import CrafterAdapter
+    from humans.adapters.crafter import CrafterAdapter
     # Not `import crafter`: with the repo root on sys.path, crafter's optional
     # `import gym` finds fmri-gym's own gym/ directory instead of old gym and dies
     # on it. `crafter_gym.import_crafter` is the env package's answer to that, and

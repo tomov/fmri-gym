@@ -13,7 +13,7 @@ Work on a branch off `main`, in a git worktree when the main checkout is in use 
 
 ```bash
 uv run pytest --changed
-uv run ruff check fmri_gym fmri_play.py agents tests gym/*/tests
+uv run ruff check humans fmri_play.py agents tests gym/*/tests
 PYTHONPATH="$(printf '%s:' gym/*/)" uv run lint-imports   # who imports whom: pyproject.toml's contracts
 ```
 
@@ -31,7 +31,7 @@ A reviewer has to be able to follow the change without reading the diff first, a
 
 1. **Before.** What the code did, observably: what a run wrote, showed or played. Use concrete facts (a file that is missing, a frame that is wrong, a number), not adjectives.
 2. **Why that was a problem.** What it costs a session or an analysis: data lost, a subject shown the wrong thing, a log that cannot be trusted. Name the rule it broke if there is one (AGENTS.md rule 4, say).
-3. **Now.** What the code does after this branch, observably, in the same terms as *Before*, so the two can be read side by side. Then the files changed and how. List core changes (any `fmri_gym/*.py`, any file under `config/`, `inputs/`, `outputs/`, `sync/` or `save/`, `adapters/base.py`, `adapters/keymap.py`), and say whether each is additive and default-off and names no backend (AGENTS.md, rule 2).
+3. **Now.** What the code does after this branch, observably, in the same terms as *Before*, so the two can be read side by side. Then the files changed and how. List core changes (any `humans/*.py`, any file under `config/`, `inputs/`, `outputs/`, `sync/` or `save/`, `adapters/base.py`, `adapters/keymap.py`), and say whether each is additive and default-off and names no backend (AGENTS.md, rule 2).
 4. **Why that solves it.** The causal link from the change to the problem going away, in a few sentences, including what it deliberately leaves alone.
 5. **How it was verified.** What you ran and what came out: the tests added, the backends the suite played and skipped (with the reason), the runs made by hand, with their numbers.
 6. **See it yourself.** Steps a person can paste, for the before and for the after, each producing the output that shows the difference:

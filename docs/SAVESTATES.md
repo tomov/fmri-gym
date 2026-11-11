@@ -5,7 +5,7 @@ code. Line numbers refer to the tree at that date and will drift.
 
 ## How it works generally
 
-Everything goes through one `Logger` per run (`fmri_gym/save/logging.py:62`). The
+Everything goes through one `Logger` per run (`humans/save/logging.py:62`). The
 game loop never touches a file. It puts small dicts on an unbounded
 `multiprocessing.Queue` (`logging.py:85`), and a separate **writer process**
 (`_writer_main`, `logging.py:210`) owns every file handle, does the expensive
@@ -24,7 +24,7 @@ Per block, the output is one folder with up to three files (`logging.py:5-8`):
 Plus `manifest.json` at the run level, rewritten atomically on every phase
 boundary (`logging.py:114-121`, `_atomic_write` at `logging.py:332`).
 
-The per-frame producer side is in `Run._episode` (`fmri_gym/run.py:570-613`):
+The per-frame producer side is in `Run._episode` (`humans/run.py:570-613`):
 
 1. `adapter.step(action)`, then
    `adapter.capture(obs, info, want_blob=save_state)` returns a `FrameState`

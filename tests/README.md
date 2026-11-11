@@ -38,7 +38,7 @@ uv run python -m tests.changed                                                  
 
 ## Selecting backends
 
-- `--changed [BASE]` (default base `origin/main`): the backends the branch's files touch, committed or not. An adapter, a `gym/<pkg>` package, a config or an `external/` checkout selects its backend *directly*; a change to the core (`fmri_gym/` outside the adapters, `fmri_play.py`, `agents/`, the dependencies, the tests) selects every backend.
+- `--changed [BASE]` (default base `origin/main`): the backends the branch's files touch, committed or not. An adapter, a `gym/<pkg>` package, a config or an `external/` checkout selects its backend *directly*; a change to the core (`humans/` outside the adapters, `fmri_play.py`, `agents/`, the dependencies, the tests) selects every backend.
 - `--backend NAME[,NAME]` / `--backend all` / `--backend none`.
 - Neither: every backend.
 

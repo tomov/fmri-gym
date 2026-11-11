@@ -14,20 +14,20 @@ import numpy as np
 import pytest
 from gymnasium import spaces
 
-from fmri_gym.outputs.sound import Sound
-from fmri_gym.save.bids import task_label
-from fmri_gym.adapters.base import EnvAdapter, HudSettings
-from fmri_gym.adapters.keymap import make_keymap
-from fmri_gym.config.curriculum import (
+from humans.outputs.sound import Sound
+from humans.save.bids import task_label
+from humans.adapters.base import EnvAdapter, HudSettings
+from humans.adapters.keymap import make_keymap
+from humans.config.curriculum import (
     check_shape, game_changes, is_common_file, load_curriculum, save_curriculum,
     shared_overrides, validate_curriculum,
 )
-from fmri_gym.save.logging import (
+from humans.save.logging import (
     AUDIO_FILENAME, FRAMES_FILENAME, AudioBlockLog, Logger, read_audio, read_events, read_frames,
     read_state,
 )
-from fmri_gym.save.replay import frame_arrays, reconstruction_plan
-from fmri_gym.sync.clock import Clock
+from humans.save.replay import frame_arrays, reconstruction_plan
+from humans.sync.clock import Clock
 from tests.changed import select
 
 PHASE = {"type": "game", "backend": "gym", "game": "CartPole-v1", "fps": 30,
@@ -165,7 +165,7 @@ def test_the_hud_keeps_time_left_and_score_right_whichever_is_hidden(hud, lines)
 
 def test_an_image_line_is_drawn_as_its_image_between_the_text(monkeypatch):
     monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
-    from fmri_gym.outputs.display import Display
+    from humans.outputs.display import Display
     import pygame
     display = Display(size=(400, 300), vsync=False)
     try:
@@ -305,10 +305,10 @@ def test_include_refuses(tmp_path, include, shared, problem):
 
 
 @pytest.mark.parametrize("paths, direct, core", [
-    (["fmri_gym/adapters/crafter.py"], {"crafter"}, False),
-    (["fmri_gym/adapters/default.py"], {"gym"}, False),
-    (["fmri_gym/adapters/base.py"], set(), True),
-    (["fmri_gym/run.py"], set(), True),
+    (["humans/adapters/crafter.py"], {"crafter"}, False),
+    (["humans/adapters/default.py"], {"gym"}, False),
+    (["humans/adapters/base.py"], set(), True),
+    (["humans/run.py"], set(), True),
     (["agents/agent_play.py", "README.md"], set(), True),
     (["gym/replay_state/replay_state_gym/wrappers.py"],
      {"minihack", "nethack", "vizdoom", "coom", "baba_auto", "rushhour", "aigamestore"},
@@ -327,8 +327,8 @@ def test_changed_files_select_backends(paths, direct, core):
 
 
 def test_a_curriculum_loads_once_into_typed_phases(tmp_path):
-    from fmri_gym.config.curriculum import Curriculum
-    from fmri_gym.config.phases import Fixation, GamePhase, Message
+    from humans.config.curriculum import Curriculum
+    from humans.config.phases import Fixation, GamePhase, Message
     path = _write(tmp_path / "run.json", {"curriculum": [
         {"type": "message", "text": ["a", "b"], "control": "any"},
         {"type": "fixation", "duration": 1.5},
@@ -344,21 +344,21 @@ def test_a_curriculum_loads_once_into_typed_phases(tmp_path):
 
 
 def test_every_phase_type_is_a_phase():
-    from fmri_gym.config.phases import PHASE_CLASSES, Phase
+    from humans.config.phases import PHASE_CLASSES, Phase
     assert all(issubclass(cls, Phase) and cls.type == name for name, cls in PHASE_CLASSES.items())
     with pytest.raises(TypeError):
         Phase(spec={}, include_on_resume=False)  # abstract: only a phase type is read
 
 
 def test_a_measurement_that_broke_part_way_is_reported_not_crashed_on():
-    from fmri_gym.standalone.rig_setup.report import _html_frames, _html_section
+    from humans.standalone.rig_setup.report import _html_frames, _html_section
     half = {"summaries": {"frames": {"blocks": []}}}      # it broke before refresh_rate
     note = _html_section(_html_frames, half, ".", {"status": "fail", "why": "KeyError: 'keys'"})
     assert "stopped before it finished" in note and "KeyError" in note
 
 
 def test_each_rig_measurement_files_its_latencies_beside_the_rig_under_a_new_number(tmp_path):
-    from fmri_gym.standalone.rig_setup.report import file_measured
+    from humans.standalone.rig_setup.report import file_measured
     offset = {"median_ms": 12.0, "sd_ms": 0.3, "n_matched": 10, "n": 10}
     m = {"start_time": "2026-10-20T10:00:00", "task": "rigMeasurement", "status": "fail",
          "failed_tests": "audio", "run": {"label": "sub-rig_ses-001_task-rigMeasurement_run-001"},
@@ -384,9 +384,9 @@ def test_a_quick_rig_measurement_runs_on_its_own_and_files_its_report(tmp_path, 
 
     import pygame
 
-    from fmri_gym.config.rig import RigConfig
-    from fmri_gym.standalone.rig_setup import cli, report
-    from fmri_gym.standalone.rig_setup import measure as rig_measure
+    from humans.config.rig import RigConfig
+    from humans.standalone.rig_setup import cli, report
+    from humans.standalone.rig_setup import measure as rig_measure
     rig_path = tmp_path / "laptop.json"
     rig_path.write_text(json.dumps({"data_root": str(tmp_path / "data"), "has_audio": False,
                                     "triggers": {"sync": {"mode": "none"}}}))
@@ -420,7 +420,7 @@ def test_a_quick_rig_measurement_runs_on_its_own_and_files_its_report(tmp_path, 
 def test_the_machine_is_described_and_pygame_left_as_it_was():
     import pygame
 
-    from fmri_gym.standalone.rig_setup.report import machine
+    from humans.standalone.rig_setup.report import machine
     pygame.quit()
     m = machine()
     assert {"cpu", "memory_gb", "displays", "gpus", "audio_devices", "input_devices",
@@ -429,7 +429,7 @@ def test_the_machine_is_described_and_pygame_left_as_it_was():
 
 
 def test_a_rig_with_no_measured_latencies_says_so_until_one_is_filed(tmp_path):
-    from fmri_gym.config.rig import RigConfig, next_measured_latency_file
+    from humans.config.rig import RigConfig, next_measured_latency_file
     rig_path = tmp_path / "laptop.json"
     rig_path.write_text(json.dumps({"data_root": str(tmp_path / "data")}))
     rig = RigConfig.open(str(rig_path))

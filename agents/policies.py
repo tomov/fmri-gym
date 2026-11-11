@@ -44,8 +44,8 @@ class Policy:
 
         :param frame: the RGB frame the display would have shown.
         :param status: the lines the subject would have read beside and over
-            the frame (:meth:`~fmri_gym.adapters.base.EnvAdapter.hud` and
-            :meth:`~fmri_gym.adapters.base.EnvAdapter.overlay`).
+            the frame (:meth:`~humans.adapters.base.EnvAdapter.hud` and
+            :meth:`~humans.adapters.base.EnvAdapter.overlay`).
         :return: an action of the env's action space, or ``None`` for no key
             at all, which a turn-based block answers by not stepping.
         """

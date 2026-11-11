@@ -162,15 +162,15 @@ Runtime flow: experimenter screen (**SPACE**) → "Waiting for scanner..." → s
 
 **Controls and response keys.** A curriculum's **controls** (a game phase's `"controls"`, and every other control it names: a menu's, a screen's `controls_to_dismiss`, a survey's) are the names of the controls of the rig's input devices -- a keyboard key, a button, a stick direction -- mapped to the game's actions; a rig plays the curricula whose controls its inputs have. A rig's **response keys** are keys a device types by itself (a button box, a fORP in a key mode); the games respond only to the controls their curricula name, so a box whose keys are not among them does not play them yet ([#170](https://github.com/tomov/fmri-gym/issues/170)). The rig measurement asks for each control of the rig's controllers and each response key: what this rig's participant can press.
 
-**Input devices.** Some button boxes and gamepads (a Current Designs interface with a controller on it, say) report HID *joystick* buttons rather than keystrokes, so a keyboard curriculum never sees them pressed. Each such device is read directly (`fmri_gym/inputs/`), and each of its buttons, triggers and stick directions has a name of its own that a curriculum maps to an action, just as it maps a keyboard key. The rig file lists every device it has under `"inputs"`, the keyboard among them (`rig-setup` ticks it by default); a rig that lists no keyboard reads none. **A rig and its curricula go together**: a curriculum plays on the rigs whose inputs have every control it names. A run on a rig without one does not start, and names it -- a game action, a menu control, a control that dismisses a screen; so does a run whose rig lists a controller that is not plugged in. A joystick plugged in that the rig does not list is ignored, and said so on the console and in the manifest's `inputs` status.
+**Input devices.** Some button boxes and gamepads (a Current Designs interface with a controller on it, say) report HID *joystick* buttons rather than keystrokes, so a keyboard curriculum never sees them pressed. Each such device is read directly (`humans/inputs/`), and each of its buttons, triggers and stick directions has a name of its own that a curriculum maps to an action, just as it maps a keyboard key. The rig file lists every device it has under `"inputs"`, the keyboard among them (`rig-setup` ticks it by default); a rig that lists no keyboard reads none. **A rig and its curricula go together**: a curriculum plays on the rigs whose inputs have every control it names. A run on a rig without one does not start, and names it -- a game action, a menu control, a control that dismisses a screen; so does a run whose rig lists a controller that is not plugged in. A joystick plugged in that the rig does not list is ignored, and said so on the console and in the manifest's `inputs` status.
 
 | `"inputs"` | the device | its controls (named in its file) |
 |---|---|---|
-| `"keyboard"` | the keyboard, and anything that types keys | `UP`, `SPACE`, `A`-`Z`, `0`-`9`, ... (`fmri_gym/inputs/control_names.py`) |
-| `"current_designs_gamepad3"` | a Current Designs GMPD3 on its 932 interface in joystick mode | `CONTROLLER_BUTTON_A` `CONTROLLER_BUTTON_B` `CONTROLLER_BUTTON_X` `CONTROLLER_BUTTON_Y` `CONTROLLER_AXIS_TRIGGERLEFT` `CONTROLLER_AXIS_TRIGGERRIGHT`, the stick's `CONTROLLER_AXIS_LEFTY_UP` `CONTROLLER_AXIS_LEFTY_DOWN` `CONTROLLER_AXIS_LEFTX_LEFT` `CONTROLLER_AXIS_LEFTX_RIGHT` (`fmri_gym/inputs/current_designs_gamepad3.py`) |
-| `"xbox_controller"` | a gamepad SDL has a mapping for (Xbox, PlayStation, 8BitDo...) | the GMPD3's, and `CONTROLLER_BUTTON_BACK` `CONTROLLER_BUTTON_GUIDE` `CONTROLLER_BUTTON_START`, `CONTROLLER_BUTTON_LEFTSHOULDER` `CONTROLLER_BUTTON_RIGHTSHOULDER`, `CONTROLLER_BUTTON_LEFTSTICK` `CONTROLLER_BUTTON_RIGHTSTICK`, `CONTROLLER_BUTTON_DPAD_UP` `CONTROLLER_BUTTON_DPAD_DOWN` `CONTROLLER_BUTTON_DPAD_LEFT` `CONTROLLER_BUTTON_DPAD_RIGHT`, `CONTROLLER_AXIS_RIGHTY_UP` `CONTROLLER_AXIS_RIGHTY_DOWN` `CONTROLLER_AXIS_RIGHTX_LEFT` `CONTROLLER_AXIS_RIGHTX_RIGHT` (`fmri_gym/inputs/xbox_controller.py`) |
+| `"keyboard"` | the keyboard, and anything that types keys | `UP`, `SPACE`, `A`-`Z`, `0`-`9`, ... (`humans/inputs/control_names.py`) |
+| `"current_designs_gamepad3"` | a Current Designs GMPD3 on its 932 interface in joystick mode | `CONTROLLER_BUTTON_A` `CONTROLLER_BUTTON_B` `CONTROLLER_BUTTON_X` `CONTROLLER_BUTTON_Y` `CONTROLLER_AXIS_TRIGGERLEFT` `CONTROLLER_AXIS_TRIGGERRIGHT`, the stick's `CONTROLLER_AXIS_LEFTY_UP` `CONTROLLER_AXIS_LEFTY_DOWN` `CONTROLLER_AXIS_LEFTX_LEFT` `CONTROLLER_AXIS_LEFTX_RIGHT` (`humans/inputs/current_designs_gamepad3.py`) |
+| `"xbox_controller"` | a gamepad SDL has a mapping for (Xbox, PlayStation, 8BitDo...) | the GMPD3's, and `CONTROLLER_BUTTON_BACK` `CONTROLLER_BUTTON_GUIDE` `CONTROLLER_BUTTON_START`, `CONTROLLER_BUTTON_LEFTSHOULDER` `CONTROLLER_BUTTON_RIGHTSHOULDER`, `CONTROLLER_BUTTON_LEFTSTICK` `CONTROLLER_BUTTON_RIGHTSTICK`, `CONTROLLER_BUTTON_DPAD_UP` `CONTROLLER_BUTTON_DPAD_DOWN` `CONTROLLER_BUTTON_DPAD_LEFT` `CONTROLLER_BUTTON_DPAD_RIGHT`, `CONTROLLER_AXIS_RIGHTY_UP` `CONTROLLER_AXIS_RIGHTY_DOWN` `CONTROLLER_AXIS_RIGHTX_LEFT` `CONTROLLER_AXIS_RIGHTX_RIGHT` (`humans/inputs/xbox_controller.py`) |
 
-Every controller names its controls the same way (`fmri_gym/inputs/control_names.py`, after pygame's constants), so a curriculum written for the GMPD3 plays as it is on an Xbox controller, whose controls are a superset. The curricula here are keyboard curricula, but for the ones whose name says which device they are written for: the `*-GMPD3-ABXY-nav` AI GameStore, Rush Hour and Baba Is You curricula move on the face buttons, and each has a `*-GMPD3-stick-nav` twin that moves on the left stick. A gamepad SDL knows is read by SDL's mapping of it, since its raw button numbers change with the OS and the connection; the GMPD3, which SDL has no mapping for, by its own button numbers. `gamepad-calibration` names each control as it is pressed.
+Every controller names its controls the same way (`humans/inputs/control_names.py`, after pygame's constants), so a curriculum written for the GMPD3 plays as it is on an Xbox controller, whose controls are a superset. The curricula here are keyboard curricula, but for the ones whose name says which device they are written for: the `*-GMPD3-ABXY-nav` AI GameStore, Rush Hour and Baba Is You curricula move on the face buttons, and each has a `*-GMPD3-stick-nav` twin that moves on the left stick. A gamepad SDL knows is read by SDL's mapping of it, since its raw button numbers change with the OS and the connection; the GMPD3, which SDL has no mapping for, by its own button numbers. `gamepad-calibration` names each control as it is pressed.
 
 **Each stick axis is two controls, read on its own.** A stick's horizontal axis is `CONTROLLER_AXIS_LEFTX_LEFT` on one side of rest and `CONTROLLER_AXIS_LEFTX_RIGHT` on the other, its vertical axis `CONTROLLER_AXIS_LEFTY_UP` and `CONTROLLER_AXIS_LEFTY_DOWN`, each read like a trigger: pressed once the axis reaches its `on` fraction of the travel that way, released under its `off`. Nothing ties one axis to another, so a push between two directions holds both, exactly as two arrow keys held together do, and the curriculum's keymap decides what the pair means (both buttons of a `MultiBinary` game; the most specific combo of a `Discrete` one, `"CONTROLLER_AXIS_LEFTX_LEFT+CONTROLLER_AXIS_LEFTY_DOWN"` say). An axis with no calibration presses nothing.
 
@@ -347,14 +347,14 @@ A game reaches the scanner through up to three layers, each its own directory:
 |---|---|---|
 | `external/<backend>` | the game's own repo, a submodule pinned to a commit | its files or sources are read from a checkout (VGDL, COOM, Baba Is Auto) |
 | `gym/<game>` | a small package with a `gymnasium.Env` for the game | the game ships no Gymnasium env, or a rough one |
-| `fmri_gym/adapters/<backend>.py` | the fMRI adapter: build the env, map keys, log frames | always, one per engine |
+| `humans/adapters/<backend>.py` | the fMRI adapter: build the env, map keys, log frames | always, one per engine |
 
 Most games need only the last: a pip package already provides the env. Nothing about fMRI leaks below the adapter, so the env an agent is trained on is the one the subject plays.
 
 The package is a stack of layers, drawn in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) and checked by `uv run lint-imports`: each imports only from the layers below it -- `adapters/` over `outputs/` over `save/` over `sync/` and `inputs/` -- the run (`config/`, `menu.py`, `run.py`) puts them together, game engines and the `gym/` envs are imported only by `adapters/`, and the tools in `standalone/` sit on top, imported by nothing else.
 
 ```
-fmri_gym/
+humans/
   run.py        # trigger, curriculum loop, phases  — 100% engine-agnostic
   config/
     curriculum.py   # Curriculum: the curriculum file, loaded once into typed phases; load, save, includes
@@ -379,7 +379,7 @@ fmri_gym/
     session_editor.py  # `session-editor`: sessions and their runs' curricula, without JSON
     session_script.py  # the session's .sh script, one fmri-play line per run
     gamepad_calibration.py  # `gamepad-calibration`: calibrate a controller, see what it sends
-    photodiode.py   # `python -m fmri_gym.standalone.photodiode`: flash a patch to measure the flip-to-photon offset
+    photodiode.py   # `python -m humans.standalone.photodiode`: flash a patch to measure the flip-to-photon offset
   adapters/
     base.py         # EnvAdapter + FrameState (the seam)
     keymap.py       # the phase's keys -> actions, one Keymap per action space
@@ -554,8 +554,8 @@ Includes are resolved when the file is read, so everything after that sees each 
 
 Every game phase states its whole map of controls. **There is no default**: the file says which key or button does what, and a phase without `controls` is refused before the window opens. These are the names of controls of the rig's input devices (see *Rigs*); a curriculum plays on the rigs whose inputs have them. `controls` is a dict of `"<control(s)>": <action>`:
 
-- The control is a value from `fmri_gym/inputs/control_names.py` (the keyboard's `UP`, `DOWN`, `LEFT`, `RIGHT`, `SPACE`, `RETURN`, `LSHIFT`, `A`–`Z`, `0`–`9`, `F1`–`F12`, `KP0`–`KP9`, …; a controller's `CONTROLLER_BUTTON_A`, `CONTROLLER_AXIS_LEFTY_UP`, …); a name no device has is refused, since it could never be pressed. Join controls with `+` for a combo (`"UP+SPACE"`).
-- The action is what the env's `step` takes, as JSON, and the rule is the env's action space (`fmri_gym/adapters/keymap.py`, one class per space):
+- The control is a value from `humans/inputs/control_names.py` (the keyboard's `UP`, `DOWN`, `LEFT`, `RIGHT`, `SPACE`, `RETURN`, `LSHIFT`, `A`–`Z`, `0`–`9`, `F1`–`F12`, `KP0`–`KP9`, …; a controller's `CONTROLLER_BUTTON_A`, `CONTROLLER_AXIS_LEFTY_UP`, …); a name no device has is refused, since it could never be pressed. Join controls with `+` for a combo (`"UP+SPACE"`).
+- The action is what the env's `step` takes, as JSON, and the rule is the env's action space (`humans/adapters/keymap.py`, one class per space):
   - **`MultiBinary`** (retro, vizdoom, stk, aigamestore): the value is the **index of the button** the key holds down; every held control sets its bit, so controls combine as on a controller, and nothing held is every button up. An index outside the space is refused when the env is built, and so is a `""` entry (nothing held already means no button).
   - **`Discrete`** (ale, coom, vgdl, crafter, minihack, baba, rushhour, gym) or **`Box`** (gym): the value is the action itself, an index or a list (`"LEFT": [-1.0, 0.0]`). The most specific combo whose controls are all held wins (`"UP+SPACE"` over `"UP"`), and the **`""`** entry is what a frame with nothing held sends. `""` is required unless the phase is `is_turn_based`, where nothing is sent between presses: these spaces have no action that means "do nothing" everywhere (FrozenLake's 0 is LEFT, MiniHack's is "move N"). A value outside the space is refused when the env is built.
   - Any other action space is refused when the env is built.
@@ -605,7 +605,7 @@ uv run fmri-play --subject sub-01 --ses "$SES" --run 2 --rig configs/examples/ri
 
 `--loop` plays the curriculum again from its first phase when it ends before `--duration`, and again, until `--duration` stops it; it needs `--duration`. Each pass plays the same phases with the same seeds; a block played again writes `block-NN_<backend>_<game>_2`, `_3`.... With `--resume`, a curriculum the last run played to its end starts again from its beginning instead of being refused. The manifest says `"loop"`.
 
-A resumed episode starts from that savestate rather than from its seed alone, so its `episode_start` line carries it as `initial_state`, and `fmri_gym.save.replay.reconstruct_episode` restores it over the reset. Without `--duration` and `--resume` a run plays its config from start to end, as before.
+A resumed episode starts from that savestate rather than from its seed alone, so its `episode_start` line carries it as `initial_state`, and `humans.save.replay.reconstruct_episode` restores it over the reset. Without `--duration` and `--resume` a run plays its config from start to end, as before.
 
 ## Triggers: fMRI vs MEG/EEG
 
@@ -644,17 +644,17 @@ What is sent: `task_start` when the clock anchors, `episode_start` at each reset
 Frames are shown with a vsync-locked flip and each frame's onset is logged as `flip_time`; message/fixation onsets in the manifest are flip times too. Key presses and releases are logged as they arrive (`key_time`, `key_name`, `key_down`), independent of the frame grid. The manifest records the display actually obtained (`vsync`, measured at start-up; `refresh_rate`).
 
 - A frame is shown at the next refresh after its step, so an `fps` that divides the refresh rate (30 or 60 on a 60 Hz screen) shows every frame for the same number of refreshes; otherwise frames alternate between one and two and each onset can be up to one refresh late. `flip_time` records what happened either way. Some cores' own rate is 59.92: close enough to 60 Hz that one frame in ~800 is shown twice.
-- Check that the rig locks to the refresh before a session: `python -m fmri_gym.outputs.display --fullscreen` (verdict LOCKED / NOT locked; if not, use fullscreen and disable the desktop compositor). `--no-vsync` turns the request off. Pass the rig's monitor (its `"screen"` `"monitor"`) here and to the photodiode as `--monitor`: refresh, vsync and the photon offset belong to the monitor.
+- Check that the rig locks to the refresh before a session: `python -m humans.outputs.display --fullscreen` (verdict LOCKED / NOT locked; if not, use fullscreen and disable the desktop compositor). `--no-vsync` turns the request off. Pass the rig's monitor (its `"screen"` `"monitor"`) here and to the photodiode as `--monitor`: refresh, vsync and the photon offset belong to the monitor.
 - Once per rig, measure the constant flip-to-photon offset with a photodiode on the screen, then subtract it from `flip_time` and the frame triggers:
 
   ```bash
-  python -m fmri_gym.standalone.photodiode --fullscreen --rig configs/<team>/rigs/<rig>.json     # diode into the MEG/EEG amp, codes on the rig's line
-  python -m fmri_gym.standalone.photodiode --fullscreen --audio                          # diode into this PC's sound card
-  python -m fmri_gym.standalone.photodiode --fullscreen --audio --audio-click --mic       # + mic on input 1: when sound is heard
+  python -m humans.standalone.photodiode --fullscreen --rig configs/<team>/rigs/<rig>.json     # diode into the MEG/EEG amp, codes on the rig's line
+  python -m humans.standalone.photodiode --fullscreen --audio                          # diode into this PC's sound card
+  python -m humans.standalone.photodiode --fullscreen --audio --audio-click --mic       # + mic on input 1: when sound is heard
   ```
 
-  The first flashes a patch with the frame trigger on each white flip; match the triggers to the diode edges in your recording with `fmri_gym.standalone.photodiode.match_edges(trigger_times, edge_times)`. The second records the diode on the sound-card input and prints the offsets itself (`--list-audio-devices` to pick the input). `--audio-click` also plays a tone burst on each white flip through the session's audio output and reports when it reaches the DAC; with `--mic`, when a microphone on input channel 1 hears it.
-- **The rig measurement** runs all of these at once: `uv run rig-setup --rig configs/<team>/rigs/<rig>.json --measure`, or from `rig-setup`'s last step once the rig file is saved. It is not a run: no participant plays, `fmri-play` has no part in it, and it plays no curriculum. It opens the window, trigger line, audio output and input devices the rig's runs open, shows a screen that says it is a rig measurement and what to have ready, and starts on SPACE. How long and how many is fixed in `fmri_gym/standalone/rig_setup/measure.py`; **what is tested, and with what, is the rig file's**: its triggers (codes are tested when it sends some, pulses when it waits for the scanner), its inputs and response keys, its `"rig_measurement"` (photodiode, microphone, recording rate, more frame rates) and `has_audio`. A test the rig gives no reason to run is reported as *not run*, with why, and `rig-setup`'s Rig measurement equipment step lists what a setup will test. A failed test does not stop the setup: it is listed, with why, on screen, on the console and in the report. ESC stops it, and what it measured so far is filed. A setup is filed under `sub-rig`, as MEG-BIDS files empty-room recordings under `sub-emptyroom`.
+  The first flashes a patch with the frame trigger on each white flip; match the triggers to the diode edges in your recording with `humans.standalone.photodiode.match_edges(trigger_times, edge_times)`. The second records the diode on the sound-card input and prints the offsets itself (`--list-audio-devices` to pick the input). `--audio-click` also plays a tone burst on each white flip through the session's audio output and reports when it reaches the DAC; with `--mic`, when a microphone on input channel 1 hears it.
+- **The rig measurement** runs all of these at once: `uv run rig-setup --rig configs/<team>/rigs/<rig>.json --measure`, or from `rig-setup`'s last step once the rig file is saved. It is not a run: no participant plays, `fmri-play` has no part in it, and it plays no curriculum. It opens the window, trigger line, audio output and input devices the rig's runs open, shows a screen that says it is a rig measurement and what to have ready, and starts on SPACE. How long and how many is fixed in `humans/standalone/rig_setup/measure.py`; **what is tested, and with what, is the rig file's**: its triggers (codes are tested when it sends some, pulses when it waits for the scanner), its inputs and response keys, its `"rig_measurement"` (photodiode, microphone, recording rate, more frame rates) and `has_audio`. A test the rig gives no reason to run is reported as *not run*, with why, and `rig-setup`'s Rig measurement equipment step lists what a setup will test. A failed test does not stop the setup: it is listed, with why, on screen, on the console and in the report. ESC stops it, and what it measured so far is filed. A setup is filed under `sub-rig`, as MEG-BIDS files empty-room recordings under `sub-emptyroom`.
 
   | measurement | test | fails when |
   |---|---|---|
@@ -717,21 +717,21 @@ The names follow BIDS apart from that suffix, the contents not yet (no `_beh.tsv
     | `episode_end` | `episode_id`, `outcome` (`won`, `lost`, `terminated`, `truncated`, `playing` for the block's clock; `quit`, `reset`, `forfeit` for the subject's) , `terminated`, `truncated`, `score`, `n_pacing_resets` |
     | `block_end` | last line: `n_episodes`, `n_frames`, `outcomes`, `n_pacing_resets`, `total_reward`, `block_time_elapsed` and `num_completed_episodes` (earlier runs' included, for a block carried on), `block_did_not_finish` (stopped by the run's clock or ESC before its own end) (the manifest entry's summary), `audio` (when the block played sound: `onsets`, `[chunk, run_time]` when each chunk reached the DAC, so a frame's sound onset is the entry for its `audio_chunk` and `onset - flip_time` the audio delay achieved; `delay_ms`, `resyncs`, `trimmed_samples`), `extra` (the adapter's block extras, e.g. an ALE palette, and `state`, the savestate the block ended in) |
 
-  - **`frames.h5`** — the rendered frames, `frames` `(N, H, W, C)` gzip'd one chunk per frame plus `frame_index` `(N,)`, the `frame` of each row: every `frame_stride`-th frame (default every one; `0` keeps none). `fmri_gym.save.logging.read_frames` / `read_frame` read them.
+  - **`frames.h5`** — the rendered frames, `frames` `(N, H, W, C)` gzip'd one chunk per frame plus `frame_index` `(N,)`, the `frame` of each row: every `frame_stride`-th frame (default every one; `0` keeps none). `humans.save.logging.read_frames` / `read_frame` read them.
 
   The manifest's phase entry carries the same summary and names the folder (`data_dir`).
 
 ### Reconstruction (all verified bit-exact)
 
 1. **Per-frame state** (ale, retro): restore the `state` of a `frame` line → exact frame, no determinism assumption.
-2. **Seed + action replay** (any deterministic env, incl. gym): an episode's `seed` + its `action`s reproduce it frame-for-frame: `fmri_gym.save.replay.reconstruct_episode(block, adapter=...)`, on an adapter built from the block's first line.
+2. **Seed + action replay** (any deterministic env, incl. gym): an episode's `seed` + its `action`s reproduce it frame-for-frame: `humans.save.replay.reconstruct_episode(block, adapter=...)`, on an adapter built from the block's first line.
 3. **Stored pixels**: `frames.h5` *is* what was on screen, before the HUD.
 
 ```python
 import base64, pickle, zlib, gymnasium as gym, ale_py, stable_retro as retro
-from fmri_gym.adapters import get_adapter
-from fmri_gym.save.logging import read_events
-from fmri_gym.save.replay import frame_arrays, reconstruct_episode
+from humans.adapters import get_adapter
+from humans.save.logging import read_events
+from humans.save.replay import frame_arrays, reconstruct_episode
 gym.register_envs(ale_py)
 
 block = "data/sub-01/ses-001/beh/sub-01_ses-001_task-pong_run-001/block-00_ale_Pong-v5"
@@ -805,7 +805,7 @@ Many games already expose a Gymnasium API and drop straight into the `gym` backe
 - [x] **VGDL backend** ([tomov/language_and_experience @ dbp](https://github.com/tomov/language_and_experience/tree/dbp)), ported to gymnasium so it runs in the same env as the other backends — done.
 - [ ] Finish the **old-`gym` / shimmy** path against a real game (Sokoban, chess) — either port its source (VGDL recipe above) or run via shimmy in a `numpy<2` env; code path exists but is untested end-to-end.
 - [x] **LSL / serial / parallel-port / HID triggers** and a send-mode start signal for MEG/EEG (`"triggers"` section) -- done.
-- [x] **Photodiode calibration task** (`python -m fmri_gym.standalone.photodiode`) to measure the flip-to-photon offset of a rig -- done; an always-on sync square in the corner of every frame remains an option if a lab wants per-frame verification.
+- [x] **Photodiode calibration task** (`python -m humans.standalone.photodiode`) to measure the flip-to-photon offset of a rig -- done; an always-on sync square in the corner of every frame remains an option if a lab wants per-frame verification.
 - [ ] **retro `.bk2` movie logging** as an alternative to per-frame states (frame-exact, tiny).
 - [ ] Per-subject deterministic curriculum generation; multi-run structure with one trigger per fMRI run.
 - [ ] More adapters: ViZDoom/COOM, MiniHack, crafter, MuJoCo (`qpos/qvel` as state vars) — each a small `EnvAdapter`.

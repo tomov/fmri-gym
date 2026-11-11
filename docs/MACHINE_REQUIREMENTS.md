@@ -29,7 +29,7 @@ Integrated graphics may use shared system memory. The graphics-memory figures do
 
 ## Audio output
 
-The machine needs a **PortAudio library** present before any backend will start, plus an output device the subject can hear. `sounddevice` ships a pure-Python wheel on Linux and loads the system library at import time, and `fmri_gym/__init__.py` imports the audio layer unconditionally, so without it `import fmri_gym` raises `OSError: PortAudio library not found` for every backend, not only the games with sound. On Debian/Ubuntu the package is `libportaudio2`. It is worth confirming that the desktop's own output device is the one PortAudio selects, since its default otherwise lands on whichever card it enumerates first.
+The machine needs a **PortAudio library** present before any backend will start, plus an output device the subject can hear. `sounddevice` ships a pure-Python wheel on Linux and loads the system library at import time, and `humans/__init__.py` imports the audio layer unconditionally, so without it `import humans` raises `OSError: PortAudio library not found` for every backend, not only the games with sound. On Debian/Ubuntu the package is `libportaudio2`. It is worth confirming that the desktop's own output device is the one PortAudio selects, since its default otherwise lands on whichever card it enumerates first.
 
 ## Which games need 3D graphics?
 

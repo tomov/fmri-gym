@@ -27,18 +27,18 @@ from collections import Counter
 
 from policies import Policy, RandomPolicy, VLMPolicy
 
-from fmri_gym.adapters import get_adapter
-from fmri_gym.config.curriculum import Curriculum
-from fmri_gym.config.phases import GamePhase
-from fmri_gym.run import EpisodeResult
-from fmri_gym.save.logging import Logger
-from fmri_gym.sync.clock import Clock
+from humans.adapters import get_adapter
+from humans.config.curriculum import Curriculum
+from humans.config.phases import GamePhase
+from humans.run import EpisodeResult
+from humans.save.logging import Logger
+from humans.sync.clock import Clock
 
 
 def no_key_action(adapter) -> tuple:
     """The action for "no key held", if the block's keys define one.
 
-    A real-time phase must map ``""`` (see :mod:`fmri_gym.adapters.keymap`), so
+    A real-time phase must map ``""`` (see :mod:`humans.adapters.keymap`), so
     standing still is an action like any other. A turn-based phase has no such
     entry, on purpose: nothing happens until a key is pressed, and
     ``resolve(frozenset())`` raises rather than invent a step. A policy in that
@@ -94,7 +94,7 @@ def play_episode(adapter, policy: Policy, logger: Logger, clock: Clock, *,
     :param fps: the phase's frames per second, for the HUD's countdown only.
     :param is_turn_based: the phase's, so the same stretches the run loop steps
         by itself are not put to the policy either
-        (:meth:`~fmri_gym.adapters.base.EnvAdapter.autoplay`).
+        (:meth:`~humans.adapters.base.EnvAdapter.autoplay`).
     :param max_frames: stop the episode after this many frames.
     :param n_chunks: sound chunks the block has logged so far, so this
         episode's ``audio_chunk`` numbers carry on from them.

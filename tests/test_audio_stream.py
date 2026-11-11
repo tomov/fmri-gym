@@ -5,7 +5,7 @@ its one interesting piece -- the callback that splices queued chunks into
 PortAudio's slots -- is exactly the piece that only misbehaves under a producer
 that goes quiet. Doom queues a chunk every frame and never exposes it; crafter
 queues one only when something happened, and did. This runs with the core
-tests, so a change to fmri_gym/outputs/audio.py meets it on every PR.
+tests, so a change to humans/outputs/audio.py meets it on every PR.
 
 No PortAudio is needed. ``sounddevice.OutputStream`` is replaced by a stand-in
 that records how the stream was opened, and this file plays the part
@@ -38,7 +38,7 @@ import types
 import numpy as np
 import pytest
 
-from fmri_gym.outputs import audio as _audio
+from humans.outputs import audio as _audio
 
 RATE = 44100
 DTYPE = np.int32
@@ -257,7 +257,7 @@ def test_muted_output_numbers_chunks_for_the_log():
 
     An empty chunk is no chunk: it gets no number, as it gets no row in ``audio.h5``.
     """
-    from fmri_gym.outputs.sound import Sound
+    from humans.outputs.sound import Sound
 
     out = _audio.Audio(enabled=False)
     out.start(frame_period=1 / 35, flip_period=None)

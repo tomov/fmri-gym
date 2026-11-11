@@ -19,7 +19,7 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from fmri_gym.config.curriculum import is_common_file, load_curriculum
+from humans.config.curriculum import is_common_file, load_curriculum
 
 REPO = Path(__file__).resolve().parents[1]
 CURRICULA = REPO / "configs" / "curricula"

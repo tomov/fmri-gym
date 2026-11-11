@@ -44,8 +44,8 @@ import gymnasium
 import numpy as np
 import pytest
 
-from fmri_gym.adapters import get_adapter
-from fmri_gym.save.logging import (
+from humans.adapters import get_adapter
+from humans.save.logging import (
     AUDIO_FILENAME, EVENTS_FILENAME, FRAMES_FILENAME, _json_default, read_audio, read_events,
     read_frames,
 )

@@ -11,7 +11,7 @@ The suite is `tests/` (`tests/README.md` has the full map). It plays each select
 
 ```bash
 uv run pytest --changed            # the backends your branch touches, against origin/main
-uv run ruff check fmri_gym fmri_play.py agents tests gym/*/tests
+uv run ruff check humans fmri_play.py agents tests gym/*/tests
 PYTHONPATH="$(printf '%s:' gym/*/)" uv run lint-imports   # who imports whom: pyproject.toml's contracts
 ```
 
@@ -21,8 +21,8 @@ Read the summary. A skip says what this machine lacks and how to get it (`uv syn
 
 ## Reading a failure
 
-- **playable** failed: the adapter broke the contract in `fmri_gym/adapters/base.py` (frame not uint8 RGB, variables not JSON-able, sound not `(samples, channels)`, an outcome outside the vocabulary). Fix the adapter or the env under `gym/`, never the test's expectation.
-- **recorded** failed: the log's shape changed. `fmri_gym/save/logging.py`'s docstring is the contract; the recorder is `agents/agent_play.py`.
+- **playable** failed: the adapter broke the contract in `humans/adapters/base.py` (frame not uint8 RGB, variables not JSON-able, sound not `(samples, channels)`, an outcome outside the vocabulary). Fix the adapter or the env under `gym/`, never the test's expectation.
+- **recorded** failed: the log's shape changed. `humans/save/logging.py`'s docstring is the contract; the recorder is `agents/agent_play.py`.
 - **replays** failed: the engine is not deterministic across processes, or `capture`/`restore`/`sound` disagree with what was logged. Run it alone for the first mismatch:
   ```bash
   uv run python -m tests.verify_replay --curriculum <config> --max-frames 200 --n-episodes 2

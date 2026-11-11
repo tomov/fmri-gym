@@ -8,11 +8,11 @@ The `arc3` backend's curricula: six [ARC-AGI-3](https://arcprize.org) games, tur
 
 ## Keys
 
-A game's `controls` index its simple actions in ascending order (`fmri_gym/adapters/arc3.py`): 0=ACTION1 (up), 1=ACTION2 (down), 2=ACTION3 (left), 3=ACTION4 (right), and, in a game that offers it, 4=ACTION5 (the game's interact action). g50t, re86 and wa30 offer ACTION1-5; ls20, tr87 and tu93 offer ACTION1-4. The instructions' Controls text is kept in sync with `controls` by hand.
+A game's `controls` index its simple actions in ascending order (`humans/adapters/arc3.py`): 0=ACTION1 (up), 1=ACTION2 (down), 2=ACTION3 (left), 3=ACTION4 (right), and, in a game that offers it, 4=ACTION5 (the game's interact action). g50t, re86 and wa30 offer ACTION1-5; ls20, tr87 and tu93 offer ACTION1-4. The instructions' Controls text is kept in sync with `controls` by hand.
 
 ## Blocking and the menu
 
-The block is the whole game played until won (mode `episode`, `n_episodes` 1, `advance_on` `["won"]`, `duration` 600 s); a GAME_OVER restarts it from level 1. A level can be a dead end (the game can end before it is solved; in ls20, when its energy runs out), so after 15 s of play, holding X for 5 s pauses the game and offers Restart / Give up / Resume (UP/DOWN to choose, SPACE to select; `fmri_gym/menu.py`).
+The block is the whole game played until won (mode `episode`, `n_episodes` 1, `advance_on` `["won"]`, `duration` 600 s); a GAME_OVER restarts it from level 1. A level can be a dead end (the game can end before it is solved; in ls20, when its energy runs out), so after 15 s of play, holding X for 5 s pauses the game and offers Restart / Give up / Resume (UP/DOWN to choose, SPACE to select; `humans/menu.py`).
 
 ## Curricula
 
