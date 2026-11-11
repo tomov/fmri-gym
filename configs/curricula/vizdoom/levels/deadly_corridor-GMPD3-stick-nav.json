@@ -1,0 +1,29 @@
+{
+  "curriculum": [
+    {
+      "type": "game", "backend": "vizdoom", "game": "VizdoomDeadlyCorridor-v1",
+      "instructions": {
+        "title": "Deadly Corridor", "align": "left", "controls_to_dismiss": ["CONTROLLER_BUTTON_A"],
+        "text": [
+          "Fight your way down the corridor to the green",
+          "vest at the far end. Enemies attack from alcoves",
+          "on both sides.",
+          "",
+          "![controls](images/controls/vizdoom/deadly_corridor-GMPD3-stick-nav.png)",
+          "",
+          "Controls:",
+          "   stick up / down      move forward / back",
+          "   stick left / right   turn left / right",
+          "   X / B                move left / right",
+          "   RT                   shoot",
+          "",
+          "Press A to start."
+        ]
+      },
+      "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
+      "controls": {"CONTROLLER_AXIS_LEFTY_UP": 3, "CONTROLLER_AXIS_LEFTY_DOWN": 4, "CONTROLLER_AXIS_LEFTX_LEFT": 5, "CONTROLLER_AXIS_LEFTX_RIGHT": 6, "CONTROLLER_BUTTON_X": 0, "CONTROLLER_BUTTON_B": 1, "CONTROLLER_AXIS_TRIGGERRIGHT": 2},
+      "hud": {"show_score": false, "show_time_remaining": false},
+      "mode": "duration", "duration": 300.0, "fps": 35
+    }
+  ]
+}

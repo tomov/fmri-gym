@@ -1,0 +1,27 @@
+{
+  "curriculum": [
+    {
+      "type": "game", "backend": "vizdoom", "game": "VizdoomDefendLine-v1",
+      "instructions": {
+        "title": "Defend the Line", "align": "left", "controls_to_dismiss": ["CONTROLLER_BUTTON_A"],
+        "text": [
+          "Monsters advance on you from the far side of the",
+          "hall, and more keep coming. Turn to aim and shoot",
+          "them before they reach you.",
+          "",
+          "![controls](images/controls/vizdoom/defend_line-GMPD3-stick-nav.png)",
+          "",
+          "Controls:",
+          "   stick left / right   turn left / right",
+          "   RT                   shoot",
+          "",
+          "Press A to start."
+        ]
+      },
+      "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
+      "controls": {"CONTROLLER_AXIS_LEFTX_LEFT": 0, "CONTROLLER_AXIS_LEFTX_RIGHT": 1, "CONTROLLER_AXIS_TRIGGERRIGHT": 2},
+      "hud": {"show_score": false, "show_time_remaining": false},
+      "mode": "duration", "duration": 300.0, "fps": 35
+    }
+  ]
+}

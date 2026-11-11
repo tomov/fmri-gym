@@ -38,9 +38,7 @@ uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/em
 uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/empty.json --curriculum configs/curricula/vizdoom/levels/health_gathering_supreme.json   # acid-floor maze; find medikits
 uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/empty.json --curriculum configs/curricula/vizdoom/levels/my_way_home.json                # navigate a 9-room maze to the vest
 uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/empty.json --curriculum configs/curricula/vizdoom/levels/predict_position.json           # lead a moving target with a rocket
-uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/empty.json --curriculum configs/curricula/vizdoom/levels/take_cover.json                 # no weapon; dodge fireballs
-uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/empty.json --curriculum configs/curricula/vizdoom/take_cover_defend_line.json     # those last two back to back, 150 s each
-```
+uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/empty.json --curriculum configs/curricula/vizdoom/levels/take_cover.json                 # no weapon; dodge fireballs```
 
 ### COOM
 

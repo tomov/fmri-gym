@@ -8,7 +8,7 @@ The `vizdoom` backend's curricula: ViZDoom's stock scenarios, one each, and ever
 
 ## Keys
 
-The env's action is MultiBinary over the scenario's buttons (`env_kwargs.max_buttons_pressed` 0), so `controls` values are button indices in the scenario's `available_buttons` order, and held keys combine (turn while shooting). The controls the subject sees are the phase's `instructions`; keep their text in sync with `controls` by hand. The keys are the rig's ten (README, "Rigs") but for the Freedoom maps, whose seven button actions are more than a controller's six: they are played on a keyboard, and a rig with a controller refuses them.
+The env's action is MultiBinary over the scenario's buttons (`env_kwargs.max_buttons_pressed` 0), so `controls` values are button indices in the scenario's `available_buttons` order, and held keys combine (turn while shooting). The controls the subject sees are the phase's `instructions`; keep their text in sync with `controls` by hand. The keys are the rig's ten (README, "Rigs") but for the Freedoom maps, whose seven button actions are more than a controller's six: they are played on a keyboard, and a rig with a controller refuses them. Basic, Deadly Corridor, Deathmatch, Defend the Center and Defend the Line also come in a `*-GMPD3-stick-nav` version for a Current Designs GMPD3 (README, "Rigs"), which moves and turns on the left stick and shoots on RT; it plays on a rig whose `"inputs"` list the GMPD3 or an Xbox controller.
 
 | scenario | buttons, by index | reference |
 |---|---|---|
@@ -38,8 +38,7 @@ The env's action is MultiBinary over the scenario's buttons (`env_kwargs.max_but
 | `my_way_home.json` | A nine-room maze with a green armour vest in one fixed room; the player starts in a random room facing a random direction. Sparse reward (the vest) minus a small per-tic cost: spatial navigation, no attack button. |
 | `predict_position.json` | A rocket launcher against a monster moving across a hall. The rocket takes time to fly, so fire where the monster is going to be. One rocket per episode; the episode ends when it lands (or at the timeout). |
 | `take_cover.json` | Dodge fireballs from monsters on the far wall, more of them over time, by strafing only. One point per tic survived; no weapon. |
-| `take_cover_defend_line.json` | Take Cover, then Defend the Line, as two game blocks of 150 s each (so logs, seeds and keymaps stay per scenario): about 5 min, like one single-scenario curriculum. Raise both `duration`s for 300 s each. |
-
+| `<scenario>-GMPD3-stick-nav.json` | Basic, Deadly Corridor, Deathmatch, Defend the Center or Defend the Line on a controller, moving and turning on its left stick. |
 ## Freedoom maps
 
 | file | map | title |

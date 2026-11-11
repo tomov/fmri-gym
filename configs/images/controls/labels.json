@@ -73,6 +73,40 @@
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["next car"],
       "LEFT_STICK": ["left / right: slide", "a horizontal car", "up / down: slide", "a vertical car"],
       "CONTROLLER_BUTTON_X": ["hold: pause menu"]
+    },
+    "vizdoom/basic-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["left / right:", "move left / right"],
+      "CONTROLLER_AXIS_TRIGGERRIGHT": ["shoot"]
+    },
+    "vizdoom/deadly_corridor-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["up / down:", "forward / back", "left / right:", "turn"],
+      "CONTROLLER_BUTTON_X": ["move left"],
+      "CONTROLLER_BUTTON_B": ["move right"],
+      "CONTROLLER_AXIS_TRIGGERRIGHT": ["shoot"]
+    },
+    "vizdoom/deathmatch-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["up / down:", "forward / back", "left / right:", "turn"],
+      "CONTROLLER_BUTTON_X": ["move left"],
+      "CONTROLLER_BUTTON_B": ["move right"],
+      "CONTROLLER_BUTTON_A": ["run"],
+      "CONTROLLER_BUTTON_Y": ["previous weapon"],
+      "CONTROLLER_AXIS_TRIGGERRIGHT": ["shoot"],
+      "CONTROLLER_AXIS_TRIGGERLEFT": ["next weapon"]
+    },
+    "vizdoom/defend_center-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["left / right:", "turn"],
+      "CONTROLLER_AXIS_TRIGGERRIGHT": ["shoot"]
+    },
+    "vizdoom/defend_line-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["left / right:", "turn"],
+      "CONTROLLER_AXIS_TRIGGERRIGHT": ["shoot"]
+    },
+    "stk/stk-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["up / down:", "accelerate / brake", "left / right:", "steer"],
+      "CONTROLLER_AXIS_TRIGGERRIGHT": ["fire item"],
+      "CONTROLLER_AXIS_TRIGGERLEFT": ["skid"],
+      "CONTROLLER_BUTTON_A": ["nitro (boost)"],
+      "CONTROLLER_BUTTON_Y": ["rescue"]
     }
   }
 }

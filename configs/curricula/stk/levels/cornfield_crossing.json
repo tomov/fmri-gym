@@ -1,27 +1,9 @@
 {
   "curriculum": [
     {
-      "__include": "../common/race.json",
-      "instructions": {
-        "title": "SuperTuxKart: Cornfield Crossing",
-        "text": [
-          "Race three laps of a cornfield at dusk, over the level crossing.",
-          "Steer around the track and beat the other karts",
-          "across the line.",
-          "",
-          "Controls:",
-          "   UP             accelerate",
-          "   DOWN           brake / reverse",
-          "   LEFT / RIGHT   steer",
-          "   SPACE          fire item",
-          "   C              skid",
-          "   X              nitro (boost)",
-          "   Z      rescue",
-          "",
-          "(press SPACE to start)"
-        ]
-      },
-      "track": "cornfield_crossing"
+      "__include": "../common/stk.json",
+      "track": "cornfield_crossing",
+      "instructions": {"title": "SuperTuxKart: Cornfield Crossing"}
     }
   ]
 }

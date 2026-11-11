@@ -126,9 +126,9 @@ A curriculum's path after `curricula/`, in camelCase (BIDS labels are letters an
 | `nethack/` | 1 | `levels/`: score (base NetHack; TTY rendered to a pixel frame) |
 | `retro/` | 1 | `levels/`: airstriker (ships with stable-retro; sound) |
 | `rushhour/` | 2 | `levels/`: easy (5 min of random easy puzzles); complete (Rush-Hour's own program, then the rest of the library: all 49 puzzles, one game phase each, with ready screens and solved feedback as message phases) |
-| `stk/` | 6 | `levels/`: hacienda, cornfield_crossing, lighthouse, scotland, snowmountain (the race tracks its asset pack ships; needs a real GL display); and `all`, those in a row |
+| `stk/` | 10 | `levels/`: hacienda, cornfield_crossing, lighthouse, scotland, snowmountain (the race tracks its asset pack ships; needs a real GL display), each also in a `*-GMPD3-stick-nav` controller version |
 | `vgdl/` | 11 | `levels/`: aliens, avoidGeorge, beesAndBirds, jaws, missile_command, plaqueAttack, portals, preconditions, pushBoulders, relational (needs the VGDL checkout), and `all` |
-| `vizdoom/` | 78 | `levels/`: basic, deadly_corridor, defend_center, defend_line, health_gathering_supreme, my_way_home, predict_position, take_cover, deathmatch, freedoom1_e1m1 … freedoom1_e4m9 and freedoom2_map01 … freedoom2_map32 (every map of [Freedoom](https://freedoom.github.io/) Phase 1 and Phase 2, whose WADs ship with `vizdoom`; `VizdoomDoom*` plays the original WADs, given them); and `take_cover_defend_line`, two of them back to back |
+| `vizdoom/` | 81 | `levels/`: basic, deadly_corridor, defend_center, defend_line, health_gathering_supreme, my_way_home, predict_position, take_cover, deathmatch, freedoom1_e1m1 … freedoom1_e4m9 and freedoom2_map01 … freedoom2_map32 (every map of [Freedoom](https://freedoom.github.io/) Phase 1 and Phase 2, whose WADs ship with `vizdoom`; `VizdoomDoom*` plays the original WADs, given them); and a `*-GMPD3-stick-nav` controller version of deadly_corridor, deathmatch, defend_center and defend_line |
 
 Each backend's `common/README.md` says what its curricula play, how to set them up and what the action indices in their `controls` mean. Most are a single game phase that opens on its own instructions screen; the fixation before and after a run is the rig's (`start_fixation`, `end_fixation`), not the curriculum's.
 
@@ -333,7 +333,7 @@ uv sync --extra stk                 # or: pip install supertuxkart-gym
 uv run fmri-play --subject sub-01 --dummy-trigger --ses 1 --run 1 --rig configs/examples/rigs/laptop.json --curriculum configs/curricula/stk/levels/hacienda.json
 ```
 
-There is one config per race track the asset pack ships with geometry — `stk__{hacienda,cornfield_crossing,lighthouse,scotland,snowmountain}.json`, 880–1330 m per lap, three laps, four karts. The pack's other track directories (`abyss`, `mines`, `zengarden`, … and the battle arenas and soccer fields) are metadata only: naming one kills the game process, so more tracks means a pack that carries them, not more configs. A track is fixed for the life of a process (`reset(options={"track": ...})` is refused by name), so race several by giving a curriculum one game phase per track.
+There is one config per race track the asset pack ships with geometry — `stk/levels/{hacienda,cornfield_crossing,lighthouse,scotland,snowmountain}.json`, 880–1330 m per lap, three laps, four karts. The pack's other track directories (`abyss`, `mines`, `zengarden`, … and the battle arenas and soccer fields) are metadata only: naming one kills the game process, so more tracks means a pack that carries them, not more configs. A track is fixed for the life of a process (`reset(options={"track": ...})` is refused by name), so race several by giving a curriculum one game phase per track.
 
 No checkout and no build: the wheel is pure Python and fetches the game with a trimmed asset pack (270 MiB, five tracks) from its GitHub release the first time an env is made, into `~/.cache/supertuxkart-gym`. It says so while it downloads, and never does it twice. The pack is tied to the package version, so a wheel and its engine cannot drift apart: upgrading `supertuxkart-gym` is the whole update procedure. There are packs for Linux x86_64 and for macOS on x86_64 and arm64; on anything else it says which platform it has no pack for. A macOS pack carries its own libraries; on Linux the engine links OpenAL and SDL2 from the system (`libopenal1 libsdl2-2.0-0`, in the install line above); without them it cannot start, and `stk_gym` reports `EngineDied: ... (exit status 127)`.
 
@@ -465,7 +465,7 @@ sh configs/examples/sessions/pilot.sh
 
 Open it in `session-editor --session configs/examples/sessions/pilot.sh` to change the games or their length, and save it under your team (`configs/<team>/subjects/sub-<label>/ses-<NNN>/`).
 
-The `MT` team's sessions are in `configs/MT/subjects/`: three of about an hour for `sub-01` (eleven 5-minute runs each: one per genre in `ses-001/dbp_mix.sh`, the COOM and ViZDoom scenarios in `ses-002/dbp_doom.sh`, puzzles in `ses-003/dbp_puzzle.sh`), and for `sub-02` `ses-001/dbp_all.sh`, eleven sequences of levels each played as two 1-minute runs back to back with `--duration 60 --loop --resume`, so the second carries on where the first stopped (see "Resuming a curriculum"); `dbp_pilot.sh` is the same without COOM. They fix their subject and the example laptop rig at the top: change `RIG=` there for a session on another rig.
+The `MT` team's sessions are in `configs/MT/subjects/`: three of about an hour for `sub-01` (eleven 5-minute runs each: one per genre in `ses-001/dbp_mix.sh`, the COOM and ViZDoom scenarios in `ses-002/dbp_doom.sh`, puzzles in `ses-003/dbp_puzzle.sh`). They fix their subject and the example laptop rig at the top: change `RIG=` there for a session on another rig.
 
 ```jsonc
 {"type": "fixation", "duration": 2.0}                 // "+" for N seconds

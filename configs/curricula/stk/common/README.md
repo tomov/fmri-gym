@@ -1,6 +1,6 @@
 # SuperTuxKart curricula
 
-The `stk` backend's curricula: one per race track, each including `common/race.json` (3 laps, 4 karts, difficulty 1, 640x360, `frame_skip` 2 at 60 fps, seed 1, 300 s) and naming its `track` and title (README, "Shared phases").
+The `stk` backend's curricula: one per race track, each including `common/stk.json` (3 laps, 4 karts, difficulty 1, 640x360, `frame_skip` 2 at 60 fps, seed 1, 300 s, the instructions) and naming its `track` and title (README, "Shared phases"). Each track also comes in a `*-GMPD3-stick-nav` version, which includes `common/stk-GMPD3-stick-nav.json` instead: the same race played on a Current Designs GMPD3 (README, "Rigs"), steering and accelerating on the left stick; it plays on a rig whose `"inputs"` list the GMPD3 or an Xbox controller.
 
 ## Setup
 
@@ -12,7 +12,7 @@ There is one curriculum per race track the asset pack ships with geometry. Its o
 
 ## Keys
 
-The env's action is MultiBinary(8) over SuperTuxKart's keys: 0=left, 1=right, 2=up (accelerate), 3=down (brake / reverse), 4=nitro, 5=skid, 6=fire, 7=rescue. Held keys combine, and the game's own player controller turns them into controls. `race.json` maps them to the rig's ten keys (arrows, X nitro, C skid, SPACE fire, Z rescue); keep each curriculum's Controls text in sync by hand.
+The env's action is MultiBinary(8) over SuperTuxKart's keys: 0=left, 1=right, 2=up (accelerate), 3=down (brake / reverse), 4=nitro, 5=skid, 6=fire, 7=rescue. Held keys combine, and the game's own player controller turns them into controls. `stk.json` maps them to the rig's ten keys (arrows, X nitro, C skid, SPACE fire, Z rescue), and `stk-GMPD3-stick-nav.json` to a controller's stick (up accelerates, down brakes), RT fire, LT skid, A nitro and Y rescue; keep each shared phase's Controls text in sync by hand.
 
 ## Timing
 
@@ -31,4 +31,4 @@ Per frame: the action (the 8-vector), the reward (progress, in metres), and ever
 | `lighthouse.json` | Around the Lighthouse | 880 m |
 | `scotland.json` | Nessie's Pond | 1329 m |
 | `snowmountain.json` | Northern Resort | 1147 m |
-| `all.json` (in `stk/`) | the five in a row | |
+| `<track>-GMPD3-stick-nav.json` | the same track, on a controller | |

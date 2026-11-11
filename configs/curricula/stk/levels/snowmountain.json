@@ -1,27 +1,9 @@
 {
   "curriculum": [
     {
-      "__include": "../common/race.json",
-      "instructions": {
-        "title": "SuperTuxKart: Northern Resort",
-        "text": [
-          "Race three laps of a snowy mountain resort, over the ice and the bridges.",
-          "Steer around the track and beat the other karts",
-          "across the line.",
-          "",
-          "Controls:",
-          "   UP             accelerate",
-          "   DOWN           brake / reverse",
-          "   LEFT / RIGHT   steer",
-          "   SPACE          fire item",
-          "   C              skid",
-          "   X              nitro (boost)",
-          "   Z      rescue",
-          "",
-          "(press SPACE to start)"
-        ]
-      },
-      "track": "snowmountain"
+      "__include": "../common/stk.json",
+      "track": "snowmountain",
+      "instructions": {"title": "SuperTuxKart: Northern Resort"}
     }
   ]
 }

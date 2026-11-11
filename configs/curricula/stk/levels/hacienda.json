@@ -1,27 +1,9 @@
 {
   "curriculum": [
     {
-      "__include": "../common/race.json",
-      "instructions": {
-        "title": "SuperTuxKart: Hacienda",
-        "text": [
-          "Race three laps of a Mexican hacienda, past the windmill and the well.",
-          "Steer around the track and beat the other karts",
-          "across the line.",
-          "",
-          "Controls:",
-          "   UP             accelerate",
-          "   DOWN           brake / reverse",
-          "   LEFT / RIGHT   steer",
-          "   SPACE          fire item",
-          "   C              skid",
-          "   X              nitro (boost)",
-          "   Z      rescue",
-          "",
-          "(press SPACE to start)"
-        ]
-      },
-      "track": "hacienda"
+      "__include": "../common/stk.json",
+      "track": "hacienda",
+      "instructions": {"title": "SuperTuxKart: Hacienda"}
     }
   ]
 }

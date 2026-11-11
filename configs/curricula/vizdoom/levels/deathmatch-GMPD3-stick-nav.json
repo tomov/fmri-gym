@@ -1,0 +1,30 @@
+{
+  "curriculum": [
+    {
+      "type": "game", "backend": "vizdoom", "game": "VizdoomDeathmatch-v1",
+      "instructions": {
+        "title": "Deathmatch", "align": "left", "controls_to_dismiss": ["CONTROLLER_BUTTON_A"],
+        "text": [
+          "An arena full of monsters, weapons and ammo. Pick",
+          "up what you find and kill as many as you can.",
+          "",
+          "![controls](images/controls/vizdoom/deathmatch-GMPD3-stick-nav.png)",
+          "",
+          "Controls:",
+          "   stick up / down      move forward / back",
+          "   stick left / right   turn left / right",
+          "   X / B                move left / right",
+          "   RT                   shoot",
+          "   Y / LT               previous / next weapon",
+          "   A                    run",
+          "",
+          "Press A to start."
+        ]
+      },
+      "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
+      "controls": {"CONTROLLER_AXIS_LEFTY_UP": 6, "CONTROLLER_AXIS_LEFTY_DOWN": 5, "CONTROLLER_AXIS_LEFTX_LEFT": 8, "CONTROLLER_AXIS_LEFTX_RIGHT": 7, "CONTROLLER_BUTTON_X": 4, "CONTROLLER_BUTTON_B": 3, "CONTROLLER_AXIS_TRIGGERRIGHT": 0, "CONTROLLER_BUTTON_Y": 16, "CONTROLLER_AXIS_TRIGGERLEFT": 15, "CONTROLLER_BUTTON_A": 1},
+      "hud": {"show_score": false, "show_time_remaining": false},
+      "mode": "duration", "duration": 300.0, "fps": 35
+    }
+  ]
+}

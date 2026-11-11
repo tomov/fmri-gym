@@ -1,0 +1,25 @@
+{
+  "type": "game", "backend": "stk", "game": "supertuxkart",
+  "instructions": {
+    "align": "left", "controls_to_dismiss": ["SPACE"],
+    "text": [
+      "Race three laps against three other karts.",
+      "Steer around the track and beat them",
+      "across the line.",
+      "",
+      "Controls:",
+      "   UP             accelerate",
+      "   DOWN           brake / reverse",
+      "   LEFT / RIGHT   steer",
+      "   SPACE          fire item",
+      "   C              skid",
+      "   X              nitro (boost)",
+      "   Z              rescue",
+      "",
+      "(press SPACE to start)"
+    ]
+  },
+  "controls": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "X": 4, "C": 5, "SPACE": 6, "Z": 7},
+  "laps": 3, "num_karts": 4, "difficulty": 1, "screensize": "640x360", "frame_skip": 2, "seed": 1, "mode": "duration", "duration": 300.0,
+  "fps": 60
+}

@@ -1,0 +1,9 @@
+{
+  "curriculum": [
+    {
+      "__include": "../common/stk-GMPD3-stick-nav.json",
+      "track": "cornfield_crossing",
+      "instructions": {"title": "SuperTuxKart: Cornfield Crossing"}
+    }
+  ]
+}

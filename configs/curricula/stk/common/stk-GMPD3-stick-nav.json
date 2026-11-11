@@ -1,0 +1,28 @@
+{
+  "type": "game", "backend": "stk", "game": "supertuxkart",
+  "instructions": {
+    "align": "left", "controls_to_dismiss": ["CONTROLLER_BUTTON_A"],
+    "text": [
+      "Race three laps against three other karts.",
+      "Steer around the track and beat them",
+      "across the line.",
+      "",
+      "![controls](images/controls/stk/stk-GMPD3-stick-nav.png)",
+      "",
+      "Controls:",
+      "   stick up             accelerate",
+      "   stick down           brake / reverse",
+      "   stick left / right   steer",
+      "   RT                   fire item",
+      "   LT                   skid",
+      "   A                    nitro (boost)",
+      "   Y                    rescue",
+      "",
+      "Press A to start."
+    ]
+  },
+  "controls": {"CONTROLLER_AXIS_LEFTX_LEFT": 0, "CONTROLLER_AXIS_LEFTX_RIGHT": 1, "CONTROLLER_AXIS_LEFTY_UP": 2, "CONTROLLER_AXIS_LEFTY_DOWN": 3, "CONTROLLER_BUTTON_A": 4, "CONTROLLER_AXIS_TRIGGERLEFT": 5, "CONTROLLER_AXIS_TRIGGERRIGHT": 6, "CONTROLLER_BUTTON_Y": 7},
+  "hud": {"show_score": false, "show_time_remaining": false},
+  "laps": 3, "num_karts": 4, "difficulty": 1, "screensize": "640x360", "frame_skip": 2, "seed": 1, "mode": "duration", "duration": 300.0,
+  "fps": 60
+}
