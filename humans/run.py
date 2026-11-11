@@ -411,12 +411,16 @@ class Run:
         return run
 
     def close(self) -> None:
-        """Close the window, the audio output, the trigger line, the inputs and the logger."""
-        self.display.close()
-        self.audio.close()
-        self.triggers.close()
-        self.inputs.close()
+        """Close the logger, the inputs, the trigger line, the audio output and the window.
+
+        The logger goes first, so the data is saved whatever fails after it; the window
+        last, because closing it shuts down every SDL subsystem the inputs read through.
+        """
         self.logger.close()
+        self.inputs.close()
+        self.triggers.close()
+        self.audio.close()
+        self.display.close()
 
     def _trigger(self) -> None:
         """Wait for experimenter ready, sync with the scanner, start the clock.
