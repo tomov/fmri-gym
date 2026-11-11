@@ -628,3 +628,11 @@ def test_a_click_is_mapped_back_to_the_picture_at_any_window_size(scope):
     scope.click(canvas.to_canvas((int(clear.rect.centerx * s), top + int(clear.rect.centery * s))))
     assert not scope.log
 
+
+def test_a_rig_measurement_lets_go_of_its_inputs_before_it_shuts_sdl_down():
+    from humans.standalone.rig_setup.measure import RigMeasurement
+    closed: list[str] = []
+    devices = {name: types.SimpleNamespace(close=lambda name=name: closed.append(name))
+               for name in ("inputs", "display", "audio", "triggers")}
+    RigMeasurement.close(types.SimpleNamespace(**devices))
+    assert closed.index("inputs") < closed.index("display")
