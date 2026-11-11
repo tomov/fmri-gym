@@ -466,6 +466,41 @@ def test_a_controller_whose_handle_a_game_closed_is_given_a_new_one(sdl, capsys)
     assert capsys.readouterr().err.count("is gone") == 1
 
 
+class _SdlControllerHandle(_FakeHandle):
+    """A handle that, like SDL's, raises when asked about itself after ``pygame.quit()``."""
+
+    def get_init(self) -> bool:
+        if not pygame.get_init():
+            raise pygame.error("Controller system not initialized")
+        return self.open
+
+
+def test_closing_a_run_saves_every_frame_and_closes_a_controller_before_the_window(
+        monkeypatch, tmp_path):
+    import numpy as np
+    from humans.run import Run
+    from humans.save.logging import Logger, read_frames
+    from humans.sync.clock import Clock
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    pygame.init()                                           # the window's close quits it
+    logger = Logger(str(tmp_path), "sub-test", [], Clock())
+    block = str(tmp_path / logger.open_block(0, "gym", "CartPole-v1", {}, base_seed=0))
+    for i in range(200):                                    # a backlog for the writer
+        logger.log_frame({"frame": i}, frame=np.full((360, 640, 3), i % 256, dtype=np.uint8))
+    run = object.__new__(Run)
+    run.logger = logger
+    run.inputs = InputDevices([Keyboard(), XBoxController(_SdlControllerHandle(),
+                                                           calibrated=False)])
+    run.triggers = run.audio = types.SimpleNamespace(close=lambda: None)
+    run.display = types.SimpleNamespace(close=pygame.quit)  # what the window's close does
+    try:
+        run.close()
+        assert not logger._process.is_alive() and logger._process.exitcode == 0
+        assert len(read_frames(block)[0]) == 200
+    finally:
+        logger.close()      # when close raised: else pytest hangs at exit on the writer's queue
+
+
 def test_a_tap_inside_one_frame_counts_for_that_frame(screen):
     from humans.run import _poll_keys_until
     keys = InputDevices([Keyboard()])
@@ -592,3 +627,4 @@ def test_a_click_is_mapped_back_to_the_picture_at_any_window_size(scope):
     scope.log.append((0.0, "a press", None))
     scope.click(canvas.to_canvas((int(clear.rect.centerx * s), top + int(clear.rect.centery * s))))
     assert not scope.log
+
