@@ -24,7 +24,7 @@ from humans.inputs import (QUIT, CalibrationError, ControlNames, CurrentDesignsG
                              InputDevices, InputEvent, Keyboard, XBoxController)
 from humans.inputs import calibration as files
 from humans.inputs.calibration import AxisCalibration
-from humans.inputs.controller import AXIS_CONTROLS, Controller
+from humans.inputs.controller import AXIS_CONTROLS, FACE_BUTTONS, Controller, short_name
 
 LX, LY = ControlNames.CONTROLLER_AXIS_LEFTX, ControlNames.CONTROLLER_AXIS_LEFTY
 RX, RY = ControlNames.CONTROLLER_AXIS_RIGHTX, ControlNames.CONTROLLER_AXIS_RIGHTY
@@ -206,12 +206,12 @@ COLD, REST = {LX: 0.02}, {LX: -0.05, LY: 0.01}
 
 
 def _frames(d: _ScriptedController, wrong: str | None = None) -> list:
-    """Hands off; each axis to each stop and back to the first; let go; each axis control
+    """Hands off; each stick rolled twice round its edge; let go; each axis control
     twice (``wrong`` pushed once first); each button twice."""
     still = [(d.axes_at(COLD), set())] * 70
-    sweep = ([-k / 10 for k in range(1, 11)] + [k / 10 for k in range(-9, 11)]
-             + [k / 10 for k in range(9, -11, -1)])
-    stops = [(d.axes_at({**COLD, name: v}), set()) for name in d.AXIS_NAMES for v in sweep]
+    turn = [(math.cos(2 * math.pi * k / 48), math.sin(2 * math.pi * k / 48)) for k in range(96)]
+    stops = [(d.axes_at({**COLD, x: cx, y: cy}), set())
+             for x, y in ((LX, LY), (RX, RY)) for cx, cy in turn]
     rest = [(d.axes_at(REST), set())] * 70
     out = still + stops + rest
     for control in ([wrong] if wrong else []) + [c for c in d.axis_controls() for _ in range(2)]:
@@ -238,7 +238,8 @@ def screen(monkeypatch):
     monkeypatch.setattr(cal, "_FrameClock", _FakeClock)
     pygame.init()
     pygame.event.clear()
-    return pygame.Surface((900, 600))
+    yield pygame.Surface((900, 600))
+    pygame.event.clear()                    # the ESC a scripted controller posts at its end
 
 
 # -- the calibration procedure ------------------------------------------------------------
@@ -259,6 +260,16 @@ def test_a_calibration_measures_each_axis_and_confirms_each_control(config_home,
     from humans.standalone.rig_setup.report import _pad_line
     line = _pad_line({"present": True, "device": "Scripted", **result.record()})
     assert f"{LX} on past 0.50" in line and "10 controls confirmed, 1 wrong" in line
+
+
+def test_the_buttons_are_asked_for_in_order_and_the_system_ones_not():
+    from humans.inputs.xbox_controller import XBoxController
+    asked = cal.cue_order(XBoxController.BUTTON_NAMES)
+    assert not set(asked) & cal.NOT_ASKED
+    assert asked[:4] == list(FACE_BUTTONS) and len(asked) == len(XBoxController.BUTTON_NAMES) - 3
+    names = [short_name(b) for b in asked[4:]]
+    assert names == ["LEFTSTICK", "RIGHTSTICK", "DPAD_UP", "DPAD_DOWN", "DPAD_LEFT", "DPAD_RIGHT",
+                     "LEFTSHOULDER", "RIGHTSHOULDER", "TRIGGERLEFT", "TRIGGERRIGHT"]
 
 
 def test_a_calibration_stopped_part_way_writes_nothing(config_home, screen):
