@@ -63,9 +63,9 @@ class CurrentDesignsGamepad3(Controller):
             if getattr(event, "instance_id", None) != self.instance_id:
                 continue
             if event.type == pygame.JOYBUTTONDOWN and event.button in BUTTONS:
-                out += self._press(BUTTONS[event.button], True)
+                out += self._press(BUTTONS[event.button])
             elif event.type == pygame.JOYBUTTONUP and event.button in BUTTONS:
-                out += self._press(BUTTONS[event.button], False)
+                out += self._release(BUTTONS[event.button])
             elif event.type == pygame.JOYAXISMOTION and event.axis in STICK_AXES:
                 out += self._move_axis(STICK_AXES[event.axis], event.value)
         return out

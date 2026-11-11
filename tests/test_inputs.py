@@ -192,7 +192,8 @@ class _ScriptedController(Controller):
             pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
             frame = (self.axes_at({}), set())
         axes, buttons = frame
-        out = [e for b in self.BUTTON_NAMES for e in self._press(b, b in buttons)]
+        out = [e for b in self.BUTTON_NAMES
+               for e in (self._press(b) if b in buttons else self._release(b))]
         return out + [e for name in self.AXIS_NAMES for e in self._move_axis(name, axes[name])]
 
     @classmethod

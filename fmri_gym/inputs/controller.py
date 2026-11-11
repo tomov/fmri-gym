@@ -222,9 +222,9 @@ class Controller(InputDevice):
     def _pull(self, name: str, value: float, on: float, off: float) -> list[InputEvent]:
         """Press ``name`` once ``value`` reaches ``on``, release it under ``off``."""
         if value >= on:
-            return self._press(name, True)
+            return self._press(name)
         if value < off:
-            return self._press(name, False)
+            return self._release(name)
         return []
 
     def _move_axis(self, axis_name: str, value: float) -> list[InputEvent]:
