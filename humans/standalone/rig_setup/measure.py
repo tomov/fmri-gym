@@ -203,11 +203,15 @@ class RigMeasurement:
         return time.perf_counter() - self.t0
 
     def close(self) -> None:
-        """Close the window, the audio output, the trigger line and the inputs."""
-        self.display.close()
-        self.audio.close()
-        self.triggers.close()
+        """Close the inputs, the trigger line, the audio output and the window.
+
+        The window goes last, because closing it shuts down every SDL subsystem the inputs
+        read through.
+        """
         self.inputs.close()
+        self.triggers.close()
+        self.audio.close()
+        self.display.close()
 
 
 def take_measurements(rig_measurement: RigMeasurement) -> None:
