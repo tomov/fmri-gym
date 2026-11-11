@@ -15,6 +15,7 @@ told from a person's. A tuning saved is a new file, never a change to the one re
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import statistics
 import time
@@ -47,12 +48,28 @@ FACE: dict[str, tuple[int, int, int]] = {
 }
 
 
+#: The system's buttons, never asked for: none is a response, and Guide opens the OS's overlay.
+NOT_ASKED = frozenset({ControlNames.CONTROLLER_BUTTON_BACK, ControlNames.CONTROLLER_BUTTON_GUIDE,
+                       ControlNames.CONTROLLER_BUTTON_START})
+
+
+#: The order buttons are asked for: the face buttons round the face the way they sit under a
+#: thumb, the sticks' clicks, the D-pad, the shoulders, then the triggers.
+ASK_ORDER = (*FACE_BUTTONS,
+             ControlNames.CONTROLLER_BUTTON_LEFTSTICK, ControlNames.CONTROLLER_BUTTON_RIGHTSTICK,
+             ControlNames.CONTROLLER_BUTTON_DPAD_UP, ControlNames.CONTROLLER_BUTTON_DPAD_DOWN,
+             ControlNames.CONTROLLER_BUTTON_DPAD_LEFT, ControlNames.CONTROLLER_BUTTON_DPAD_RIGHT,
+             ControlNames.CONTROLLER_BUTTON_LEFTSHOULDER,
+             ControlNames.CONTROLLER_BUTTON_RIGHTSHOULDER,
+             ControlNames.CONTROLLER_AXIS_TRIGGERLEFT, ControlNames.CONTROLLER_AXIS_TRIGGERRIGHT)
+
+
 def cue_order(buttons: tuple[str, ...]) -> list[str]:
-    """``buttons`` in the order the procedure asks for them: the face buttons first, round
-    the face the way they sit under a thumb; the rest follow."""
+    """``buttons`` in the order the procedure asks for them (:data:`ASK_ORDER`, any other
+    after), but :data:`NOT_ASKED`."""
     def rank(name: str) -> int:
-        return FACE_BUTTONS.index(name) if name in FACE_BUTTONS else len(FACE_BUTTONS)
-    return sorted(buttons, key=rank)
+        return ASK_ORDER.index(name) if name in ASK_ORDER else len(ASK_ORDER)
+    return sorted((b for b in buttons if b not in NOT_ASKED), key=rank)
 
 
 def arrow_of(control: str) -> str:
@@ -67,6 +84,9 @@ STILL_S, STILL_RANGE = 1.0, 0.02
 #: An axis has been pushed to its stops when each side has reached this fraction of
 #: the travel seen that way, with no further reach since; and has travelled this far, raw.
 STOP_REACH, STOP_MIN = 0.9, 0.3
+#: A stick's roll is done when each of this many directions round its edge has reached
+#: :data:`STOP_REACH`, with no axis reaching further since.
+ROLL_BINS = 12
 #: A cued push counts past this fraction of its travel; the next waits for every axis under
 #: the second.
 PUSH, RELEASE = 0.5, 0.2
@@ -149,9 +169,11 @@ class _Task:
         self.controller, self.screen, self.present = controller, screen, present
         self.to_canvas = to_canvas
         w, self.h = screen.get_size()
-        self.mx, scale = w // 2, min(2.0, max(0.8, self.h / 600))
+        #: the screen is laid out for a height of 600, fonts and places scaled by this
+        self.scale = min(2.0, max(0.8, self.h / 600))
+        self.mx = w // 2
         font = "Menlo,Monaco,monospace"
-        self.big, self.mid, self.sml = (pygame.font.SysFont(font, int(n * scale))
+        self.big, self.mid, self.sml = (pygame.font.SysFont(font, int(n * self.scale))
                                         for n in (62, 25, 15))
         self.cancel = None if to_canvas is None else pygame.Rect(w - 150, self.h - 60, 130, 40)
         self.clock = _FrameClock()
@@ -188,18 +210,26 @@ class _Task:
         return ax, bt
 
     def draw(self, lines: list[str], colour=INK, sub: str = "",
-             arrows: tuple[tuple[str, Any], ...] = ()) -> None:
-        """One screen: arrows side by side (a direction and its colour each), a word or two,
-        a line under."""
+             arrows: tuple[tuple[str, Any], ...] = (),
+             ring: tuple[int, set[int]] | None = None) -> None:
+        """One screen: arrows side by side (a direction and its colour each), or a roll's ring
+        of directions (how many, and those lit); a word or two, a line under."""
         self.screen.fill(SURFACE)
+        s = self.scale
         for k, (direction, arrow_colour) in enumerate(arrows):
-            at = (int(self.mx + (k - (len(arrows) - 1) / 2) * 200), 235)
-            draw_arrow(self.screen, direction, at, 74, arrow_colour)
-        top = 300 if arrows else 235
+            at = (int(self.mx + (k - (len(arrows) - 1) / 2) * 200 * s), int(190 * s))
+            draw_arrow(self.screen, direction, at, int(74 * s), arrow_colour)
+        if ring:
+            n, lit = ring
+            for b in range(n):
+                angle = (b + 0.5) / n * 2 * math.pi - math.pi
+                at = (self.mx + math.cos(angle) * 100 * s, (190 + math.sin(angle) * 100) * s)
+                pygame.draw.circle(self.screen, LIVE if b in lit else GRID, at, int(12 * s))
+        top = (380 if arrows or ring else 235) * s
         for k, line in enumerate(lines):
             font, ink = (self.big, colour) if k == 0 else (self.mid, INK2)
             surf = font.render(line, True, ink)
-            self.screen.blit(surf, surf.get_rect(center=(self.mx, top + k * 66)))
+            self.screen.blit(surf, surf.get_rect(center=(self.mx, int(top + k * 66 * s))))
         s = self.sml.render(sub or ("Cancel or ESC stops; nothing is written" if self.cancel
                                     else "ESC stops; nothing is written"), True, INK2)
         self.screen.blit(s, s.get_rect(center=(self.mx, self.h - 40)))
@@ -208,12 +238,24 @@ class _Task:
         self.present()
 
 
+def _stick_of(axis_name: str) -> str:
+    """The stick an axis is on: ``LEFT`` for ``CONTROLLER_AXIS_LEFTX``."""
+    return short_name(axis_name)[:-1]
+
+
+def _sticks(controller: Controller) -> dict[str, tuple[str, ...]]:
+    """Each stick of ``controller``, and its axes."""
+    sticks: dict[str, tuple[str, ...]] = {}
+    for name in controller.AXIS_NAMES:
+        sticks[_stick_of(name)] = (*sticks.get(_stick_of(name), ()), name)
+    return sticks
+
+
 def _stick_words(controller: Controller, axis_name: str) -> str:
     """The stick an axis is on, as a cue says it: ``the stick``, or ``the left stick`` on a
     pad with two."""
-    sticks = {short_name(name)[:-1] for name in controller.AXIS_NAMES}
-    stick = short_name(axis_name)[:-1]
-    return f"the {stick.lower()} stick" if len(sticks) > 1 else "the stick"
+    stick = _stick_of(axis_name)
+    return f"the {stick.lower()} stick" if len(_sticks(controller)) > 1 else "the stick"
 
 
 def _hold_still(task: _Task, phase: str, words: list[str]) -> dict[str, float]:
@@ -257,6 +299,30 @@ def _push_to_stops(task: _Task, axis_name: str, rest: float) -> tuple[float, flo
             reached.add(positive)
         if len(reached) == 2 and min(hi - rest, rest - lo) >= STOP_MIN:
             return lo, hi
+
+
+def _roll(task: _Task, x: str, y: str, rest: dict[str, float]) -> dict[str, tuple[float, float]]:
+    """Wait until the stick of axes ``x`` and ``y`` has been rolled to its stop all the way round.
+
+    :return: each axis's (min, max), raw.
+    """
+    lo, hi, lit = dict(rest), dict(rest), set()
+    words = [f"roll {_stick_words(task.controller, x)}", "round its edge"]
+    while True:
+        task.draw(words, sub="push it to its stop, all the way round, until every dot is lit",
+                  ring=(ROLL_BINS, lit))
+        ax, _ = task.frame("stops", _stick_of(x))
+        for c in (x, y):
+            if ax[c] < lo[c] - 0.01 or ax[c] > hi[c] + 0.01:
+                lit.clear()                     # further than before: round again at it
+            lo[c], hi[c] = min(lo[c], ax[c]), max(hi[c], ax[c])
+        n = [_fraction(ax[c], rest[c], lo[c], hi[c]) for c in (x, y)]
+        if math.hypot(*n) >= STOP_REACH:
+            turn = (math.atan2(n[1], n[0]) + math.pi) / (2 * math.pi)
+            lit.add(int(turn * ROLL_BINS) % ROLL_BINS)
+        if len(lit) == ROLL_BINS and all(min(hi[c] - rest[c], rest[c] - lo[c]) >= STOP_MIN
+                                         for c in (x, y)):
+            return {c: (lo[c], hi[c]) for c in (x, y)}
 
 
 def _fraction(value: float, rest: float, lo: float, hi: float) -> float:
@@ -322,9 +388,15 @@ def _ask_buttons(task: _Task) -> int:
 
 
 def _measure(task: _Task) -> tuple[int, int]:
-    """Every axis, then each of its controls, then each button. Returns (confirmed, wrong)."""
+    """Each stick rolled round its edge (an axis on its own pushed to its stops), then each
+    axis control, then each button. Returns (confirmed, wrong)."""
     cold = _hold_still(task, "cold", ["hands off"])
-    travel = {name: _push_to_stops(task, name, cold[name]) for name in task.controller.AXIS_NAMES}
+    travel: dict[str, tuple[float, float]] = {}
+    for axes in _sticks(task.controller).values():
+        if len(axes) == 2:
+            travel.update(_roll(task, *axes, cold))
+        else:
+            travel.update({name: _push_to_stops(task, name, cold[name]) for name in axes})
     rest = _hold_still(task, "rest", ["let go", "hands off"])
     wrong = _ask_axis_controls(task, rest, travel) + _ask_buttons(task)
     task.draw(["done"], LIVE)

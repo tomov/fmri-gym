@@ -8,7 +8,7 @@ its file: when it is missing or invalid, the form opens to fill it in first
 answer is saved in the rig file: no rig measurement is anyone's default::
 
     rig-setup [--rig <rig file>]                    # the form; without --rig, pick a rig
-    rig-setup --rig <rig file> --measure [--long]   # measure the rig
+    rig-setup --rig <rig file> --measure [--long] [--measurements <names>]
     rig-setup report <rig measurement folder>...    # re-file rig measurements already run
     rig-setup pool data/ /mnt/siteB/data/ --out rigmeasurements.tsv
 """
@@ -24,7 +24,8 @@ from typing import Sequence
 from ...config import rig as rig_file
 from ...sync.triggers import TriggerError, Triggers
 from .. import needs_pyside6
-from .measure import LONG, QUICK, RigMeasurement, RigMeasurementSettings, take_measurements
+from .measure import (LONG, MEASUREMENTS, QUICK, RigMeasurement, RigMeasurementSettings,
+                      take_measurements)
 from .report import finish, pool, write_outputs
 
 
@@ -70,21 +71,49 @@ def _ask_triggers(rig: rig_file.RigConfig) -> rig_file.RigConfig:
     return rig_file.RigConfig.open(where)
 
 
-def measure_rig(rig_path: str, settings: RigMeasurementSettings) -> bool:
+def measure_rig(rig_path: str, settings: RigMeasurementSettings,
+                measurement_names: tuple[str, ...] | None) -> bool:
     """Set the rig up and measure it: its file (:func:`ensure_rig`, :func:`prepare`), the
     measurements (:func:`~.measure.take_measurements`); then file it all
     (:func:`~.report.finish`).
 
     :param rig_path: the rig's file, made in the form when it is missing or invalid.
     :param settings: how long and how many (:data:`~.measure.QUICK`, :data:`~.measure.LONG`).
+    :param measurement_names: the measurements to take; ``None`` to tick them in a window
+        when there is a screen, and to take every one when there is not.
     :return: ``True`` if a test failed or did not finish.
     :raises ValueError: when the rig file is not made, or a device does not open.
     """
-    rig, trigger_error = prepare(ensure_rig(rig_path))
+    rig = ensure_rig(rig_path)
+    if measurement_names is None:
+        measurement_names = _pick_measurements(rig, settings is LONG)
+    if measurement_names is None:
+        print("rig measurement: cancelled before it started; nothing measured", file=sys.stderr)
+        return False
+    rig, trigger_error = prepare(rig)
     print(f"rig: {rig.status()}", file=sys.stderr)
-    rig_measurement = RigMeasurement.open(rig, settings, trigger_error)
+    print(f"rig measurement: measuring {', '.join(measurement_names)}", file=sys.stderr)
+    rig_measurement = RigMeasurement.open(rig, settings, trigger_error, measurement_names)
     take_measurements(rig_measurement)
     return finish(rig_measurement)
+
+
+def _pick_measurements(rig: rig_file.RigConfig, is_long: bool) -> tuple[str, ...] | None:
+    """The measurements ticked in a window; every one when there is no screen for it."""
+    if not can_show_form():
+        return tuple(MEASUREMENTS)
+    from .window import pick_measurements
+    return pick_measurements(rig, is_long)
+
+
+def _measurement_names(text: str) -> tuple[str, ...]:
+    """``--measurements``: names from :data:`~.measure.MEASUREMENTS`, comma-separated."""
+    names = tuple(n.strip() for n in text.split(",") if n.strip())
+    unknown = [n for n in names if n not in MEASUREMENTS]
+    if unknown or not names:
+        raise argparse.ArgumentTypeError(f"{text!r}: expected names from {list(MEASUREMENTS)}, "
+                                         "comma-separated")
+    return names
 
 
 def ensure_rig(path: str) -> rig_file.RigConfig:
@@ -129,6 +158,10 @@ def main(argv: Sequence[str] | None = None) -> None:
                                  "missing. Without it, a window asks which rig")
     p.add_argument("--measure", action="store_true",
                    help=f"measure the rig rather than open its form ({QUICK.about})")
+    p.add_argument("--measurements", type=_measurement_names, default=None,
+                   help=f"with --measure, the measurements to take, comma-separated, from "
+                        f"{', '.join(MEASUREMENTS)} (default: tick them in a window, or every "
+                        "one when there is no screen)")
     p.add_argument("--long", action="store_true",
                    help=f"with --measure, measure the rig at length ({LONG.about}): once per "
                         "rig, and after any hardware, driver or OS change")
@@ -148,9 +181,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     elif args.measure:
         if args.rig is None:
             p.error("--measure needs --rig <rig file>")
-        sys.exit(1 if measure_rig(args.rig, LONG if args.long else QUICK) else 0)
-    elif args.long:
-        p.error("--long is how long to measure: give it with --measure")
+        sys.exit(1 if measure_rig(args.rig, LONG if args.long else QUICK, args.measurements)
+                 else 0)
+    elif args.long or args.measurements:
+        p.error("--long and --measurements say how to measure: give them with --measure")
     else:
         _edit_rigs(args.rig)
 

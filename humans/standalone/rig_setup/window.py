@@ -232,6 +232,12 @@ def _describe(rig: rig_file.RigConfig, triggers: dict | None) -> str:
 
 def measurement_plan(rig: rig_file.RigConfig) -> str:
     """What a rig measurement tests on ``rig``, and what it leaves out and why, in plain lines."""
+    return "\n".join(measurement_plan_by_measurement(rig).values())
+
+
+def measurement_plan_by_measurement(rig: rig_file.RigConfig) -> dict[str, str]:
+    """:func:`measurement_plan`'s lines, by the name of the measurement that tests them
+    (:data:`~.measure.MEASUREMENTS`, in its order)."""
     from .measure import LONG, QUICK  # pygame and numpy: only once a rig is shown
 
     def rates(settings: RigMeasurementSettings) -> str:
@@ -240,42 +246,82 @@ def measurement_plan(rig: rig_file.RigConfig) -> str:
 
     t, c = rig.triggers, rig.rig_measurement
     codes = t.backend != "null"
-    lines = ["• Screen: whether images change exactly with the screen's refresh.",
-             f"• Frame timing: a test pattern played like a game at {rates(QUICK)} fps "
+    lines = {"display": "• Screen: whether images change exactly with the screen's refresh.",
+             "frames": f"• Frame timing: a test pattern played like a game at {rates(QUICK)} fps "
              f"(long rig measurement: {rates(LONG)})"
              + (", with its frame codes" + (f", each lasting at least 2 samples at "
                                             f"{c.recording_hz:g} Hz" if c.recording_hz else "")
-                if codes and t.on_frame else "") + "."]
+                if codes and t.on_frame else "") + "."}
     line = {"lsl": t.lsl_stream_name, "hid": f"{t.hid_device} port {t.port}"}.get(t.backend,
                                                                                 t.port or "")
     sent = (f"every code sent on {t.backend} {line}".strip()
             if codes else "")
     pulses = (f"the scanner's {t.sync.key!r} counted at each volume" if t.sync.mode == "wait"
               else "")
-    lines.append(f"• Triggers: {'; '.join(w for w in (sent, pulses) if w)}." if sent or pulses
-                 else "• Triggers: not tested -- this rig sends no codes and waits for no "
-                      "scanner.")
+    lines["triggers"] = (f"• Triggers: {'; '.join(w for w in (sent, pulses) if w)}."
+                         if sent or pulses else "• Triggers: not tested -- this rig sends no "
+                                                "codes and waits for no scanner.")
     keys = ([f"each button and stick direction of the {n}" for n in rig.inputs
              if n in CONTROLLER_CLASSES_BY_NAME]
             + [f"{k} ({v or 'response key'})" for k, v in rig.response_keys.items()])
-    lines.append(f"• Responses: the participant presses each when asked -- {', '.join(keys)}."
-                 if keys else "• Responses: not tested -- no controller listed and no "
-                              "response keys.")
-    lines.append({"none": "• Photodiode: not tested -- this rig has none.",
+    lines["controls"] = (f"• Responses: the participant presses each when asked -- "
+                         f"{', '.join(keys)}." if keys else "• Responses: not tested -- no "
+                                                            "controller listed and no response "
+                                                            "keys.")
+    photodiode = {"none": "• Photodiode: not tested -- this rig has none.",
                   "soundcard": f"• Photodiode: the delay before each image appears, measured "
                                f"on the {c.input_device or 'default'} input (corner {c.corner}).",
                   "recording": "• Photodiode: flashes for you to compare with the frame codes "
-                               "in your recording."}[c.photodiode])
-    lines.append(("• Sound: the delay before each click leaves the sound card"
-                  + (", and before it reaches the ear." if c.has_mic else "."))
-                 if rig.has_audio else "• Sound: not tested -- game sound is off on this rig.")
-    return "\n".join(lines)
+                               "in your recording."}[c.photodiode]
+    sound = (("• Sound: the delay before each click leaves the sound card"
+              + (", and before it reaches the ear." if c.has_mic else "."))
+             if rig.has_audio else "• Sound: not tested -- game sound is off on this rig.")
+    lines["photodiode"] = f"{photodiode}\n{sound}"  # the sound is clicked on the same flashes
+    return lines
 
 
-def run_rig_measurement(path: str, is_long: bool) -> str:
+def pick_measurements(rig: rig_file.RigConfig, is_long: bool) -> tuple[str, ...] | None:
+    """Ask which measurements to take on ``rig``: one box per measurement, every one ticked.
+
+    :param is_long: the long rig measurement; otherwise the quick one.
+    :return: the names ticked (:data:`~.measure.MEASUREMENTS`, in its order); ``None`` when
+        cancelled.
+    """
+    from .measure import LONG, QUICK
+
+    ui.app()
+    dialog = QtWidgets.QDialog()
+    dialog.setWindowTitle("Rig measurement")
+    layout = QtWidgets.QVBoxLayout(dialog)
+    about = (LONG if is_long else QUICK).about
+    intro = QtWidgets.QLabel(f"The {'long' if is_long else 'short'} rig measurement of "
+                             f"{rig.path} ({about}). Untick a test to leave it out: the report "
+                             "lists it as not run.")
+    intro.setWordWrap(True)
+    layout.addWidget(intro)
+    boxes = {}
+    for name, line in measurement_plan_by_measurement(rig).items():
+        boxes[name] = QtWidgets.QCheckBox(line.replace("• ", ""))
+        boxes[name].setChecked(True)
+        layout.addWidget(boxes[name])
+    buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+    start = buttons.addButton("Start", QtWidgets.QDialogButtonBox.ButtonRole.AcceptRole)
+    for box in boxes.values():
+        box.toggled.connect(lambda _on: start.setEnabled(any(b.isChecked()
+                                                             for b in boxes.values())))
+    buttons.accepted.connect(dialog.accept)
+    buttons.rejected.connect(dialog.reject)
+    layout.addWidget(buttons)
+    if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+        return None
+    return tuple(name for name, box in boxes.items() if box.isChecked())
+
+
+def run_rig_measurement(path: str, is_long: bool, measurement_names: tuple[str, ...]) -> str:
     """Measure the rig whose file is at ``path``, as ``rig-setup --measure`` does; say how it went.
 
     :param is_long: the long rig measurement; otherwise the quick one.
+    :param measurement_names: the measurements to take (:data:`~.measure.MEASUREMENTS`).
     :return: a few lines for the person who started it: the verdict and the report's path.
     """
     from ...save.bids import next_session
@@ -284,7 +330,8 @@ def run_rig_measurement(path: str, is_long: bool) -> str:
     rig = rig_file.RigConfig.open(path)
     ses = next_session(rig.data_root, SUBJECT)
     command = [sys.executable, "-m", "humans.standalone.rig_setup", "--rig", path, "--measure",
-               *(["--long"] if is_long else [])]
+               *(["--long"] if is_long else []),
+               "--measurements", ",".join(measurement_names)]
     print("rig-setup: " + " ".join(command), file=sys.stderr)
     status = subprocess.run(command, check=False).returncode
     reports = glob.glob(os.path.join(rig.data_root, SUBJECT, f"ses-{ses:03d}", "*", "*",
@@ -1142,9 +1189,13 @@ class _RigWindow(QtWidgets.QDialog):
         self._refresh_saved()
 
     def _run_measurement(self, is_long: bool) -> None:
-        """Run a rig measurement on the saved file in its own window; say how it went."""
+        """Ask which measurements to take, then take them on the saved file in their own
+        window; say how it went."""
+        measurement_names = pick_measurements(rig_file.RigConfig.open(self.path), is_long)
+        if measurement_names is None:
+            return
         with self._set_aside():
-            outcome = run_rig_measurement(self.path, is_long)
+            outcome = run_rig_measurement(self.path, is_long, measurement_names)
         QtWidgets.QMessageBox.information(self, "Rig measurement", outcome)
 
     @contextmanager
