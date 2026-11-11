@@ -10,7 +10,7 @@ A run checks everything it can before the participant screen opens, and stops on
 ## The rig file
 
 - **`<path>: no such rig file`**: `--rig` names a file that is not there. Make one in the rig form, `uv run rig-setup --rig <path>`, or copy `configs/examples/rigs/empty.json` and fill it in. A rig file lives in `configs/<team>/rigs/`.
-- **`<path>: unknown key ...`, `... must be ...`, `"site" is ..., but the file is ...`**: the rig file does not have the shape `fmri_gym/config/rig.py` describes. Fix it by hand, or open it in `uv run rig-setup --rig <path>`, which writes only valid files. `site` and `rig` must match the team folder and the file name.
+- **`<path>: unknown key ...`, `... must be ...`, `"site" is ..., but the file is ...`**: the rig file does not have the shape `humans/config/rig.py` describes. Fix it by hand, or open it in `uv run rig-setup --rig <path>`, which writes only valid files. `site` and `rig` must match the team folder and the file name.
 - **`"inputs": expected a list of distinct names from [...]`**: a device in the rig's `inputs` is misspelled or listed twice. The names are the ones listed in the message.
 
 ## The curriculum against the rig
@@ -35,7 +35,7 @@ A run checks everything it can before the participant screen opens, and stops on
 - **`triggers: the <b> backend needs the <pkg> package (pip install <pkg>)`**: install it into the environment the run uses, or set the backend to `"null"`.
 - **`triggers: cannot open <b> triggers on <target>: ...`**: the device is unplugged, the port is wrong, or the user lacks permission (on Linux, `/dev/ttyUSB*`, `/dev/parport*`, `/dev/hidraw*` need a group or a udev rule). Check them, or set the backend to `"null"`.
 - **`triggers: sync.mode "send" sends scanner_start on the trigger line, ...`**: a `send` sync needs a real backend; pick one, or use sync mode `wait` or `none`.
-- **`triggers: code ...`, `frame_bits ...`, `unknown ...`**: the code scheme is described in `fmri_gym/sync/triggers.py`'s module docstring; codes must not share a bit with each other or with the frame bits.
+- **`triggers: code ...`, `frame_bits ...`, `unknown ...`**: the code scheme is described in `humans/sync/triggers.py`'s module docstring; codes must not share a bit with each other or with the frame bits.
 
 ## Audio
 

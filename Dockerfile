@@ -50,7 +50,7 @@ RUN apt-get update \
       && apt-get clean \
       && rm -rf /var/lib/apt/lists/*
 
-COPY fmri_gym ./ /src
+COPY humans ./ /src
 # external/ (the vgdl / coom / baba_auto submodules) comes in with the build context. An
 # uninitialized submodule copies as an empty dir, so check for the files the envs read
 # before the long pip step rather than failing there (baba_auto) or at run time (coom, vgdl).

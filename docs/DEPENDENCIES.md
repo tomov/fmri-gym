@@ -1,4 +1,4 @@
-# How the modules of `fmri_gym` depend on each other
+# How the modules of `humans` depend on each other
 
 The package is a stack of layers, and an import only ever points down, type hints included. `uv run lint-imports` checks it on every pull request, from the contracts in `pyproject.toml` (`[tool.importlinter]`).
 
@@ -23,13 +23,13 @@ From the top:
 2. **`run.py`, then `menu.py`**: one run's loop, and the pause menu it opens.
 3. **`config/`**: the curriculum, the rig config and the run config, checked against the leaves below.
 4. **The leaves, an ordered stack**: `adapters/` over `outputs/` over `save/` over `sync/`; `inputs/` sits beside `sync/` and imports none of them. Each leaf imports only the leaves below it, so `sync/` and `inputs/` can be read, tested and reused alone.
-5. **Below `adapters/`**: the game engines and the `gym/` packages, which only `adapters/` imports. A `gym/` package imports no `fmri_gym` and no other `gym/` package but the one it is built on (`coom_gym` on `vizdoom_gym`). Only a `gym/` package reads `external/`, which is reached by path or compiled rather than imported by name, so the linter cannot see it and the rule is kept by review.
+5. **Below `adapters/`**: the game engines and the `gym/` packages, which only `adapters/` imports. A `gym/` package imports no `humans` and no other `gym/` package but the one it is built on (`coom_gym` on `vizdoom_gym`). Only a `gym/` package reads `external/`, which is reached by path or compiled rather than imported by name, so the linter cannot see it and the rule is kept by review.
 
-The top-level `fmri_gym/__init__.py` imports nothing, so importing one leaf loads only that leaf and the ones below it.
+The top-level `humans/__init__.py` imports nothing, so importing one leaf loads only that leaf and the ones below it.
 
 ## Module by module
 
-What each module imports from another folder or file of `fmri_gym` (imports inside its own folder are left out):
+What each module imports from another folder or file of `humans` (imports inside its own folder are left out):
 
 | module | imports |
 |---|---|

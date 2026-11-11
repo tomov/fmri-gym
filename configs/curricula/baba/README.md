@@ -8,4 +8,4 @@
 
 **Blocking, as Baba Is You is.** The block is the level played until won (`mode` `episode`, `n_episodes` 1, `advance_on` `["won"]`); a loss (YOU destroyed, or no YOU left) restarts the same level, as the game itself does, and `duration` 300 s is the cap.
 
-**Menu.** A puzzle can be pushed into a dead end, so after 15 s of play holding X for 5 s pauses the game and offers Restart / Give up / Resume (UP/DOWN to choose, SPACE to select; `fmri_gym/menu.py`). Give up is the way out of a level the subject cannot solve.
+**Menu.** A puzzle can be pushed into a dead end, so after 15 s of play holding X for 5 s pauses the game and offers Restart / Give up / Resume (UP/DOWN to choose, SPACE to select; `humans/menu.py`). Give up is the way out of a level the subject cannot solve.

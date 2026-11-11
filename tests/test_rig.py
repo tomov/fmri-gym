@@ -8,10 +8,10 @@ import sys
 
 import pytest
 
-from fmri_gym.config import rig
-from fmri_gym.config.phases import phase_problems
-from fmri_gym.config.rig import RigConfig
-from fmri_gym.inputs import ControlNames
+from humans.config import rig
+from humans.config.phases import phase_problems
+from humans.config.rig import RigConfig
+from humans.inputs import ControlNames
 
 FIELDS = {**{k: "x" for k in rig.FIELDS}, "site": "site1", "pi": "MT", "modality": "fmri",
           "notes": ""}
@@ -120,7 +120,7 @@ class _FakeHid:
 
 
 def test_a_hid_box_is_set_to_output_zero_then_holds_each_code(monkeypatch):
-    from fmri_gym.sync.triggers import Triggers
+    from humans.sync.triggers import Triggers
     fake = _FakeHid()
     monkeypatch.setitem(sys.modules, "hid", fake)
     triggers = Triggers.from_dict({"sync": {"mode": "send"}, "backend": "hid", "port": "B"})
@@ -134,8 +134,8 @@ def test_a_hid_box_is_set_to_output_zero_then_holds_each_code(monkeypatch):
 
 
 def test_a_game_key_the_scanner_types_is_refused_on_that_rig():
-    from fmri_gym.config.curriculum import Curriculum
-    from fmri_gym.config.run import RunConfig
+    from humans.config.curriculum import Curriculum
+    from humans.config.run import RunConfig
     box = RigConfig.open(write("box", triggers={"sync": {"mode": "wait", "key": "5"}}))
 
     def run_of(keys: dict) -> RunConfig:
@@ -149,8 +149,8 @@ def test_a_game_key_the_scanner_types_is_refused_on_that_rig():
 
 
 def test_a_control_none_of_the_rigs_inputs_has_is_refused_on_that_rig():
-    from fmri_gym.config.curriculum import Curriculum
-    from fmri_gym.config.run import RunConfig
+    from humans.config.curriculum import Curriculum
+    from humans.config.run import RunConfig
     pad = RigConfig.open(write("pad", inputs=["keyboard", "current_designs_gamepad3"]))
     keyboard = RigConfig.open(write("kb"))
     nothing = RigConfig.open(write("none", inputs=[]))

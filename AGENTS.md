@@ -10,20 +10,20 @@ This file is the rules: the five below, and the shape of the repo. The step-by-s
 
 ```text
 fmri_play.py                     CLI   parse the flags of one run, then play it (Run.from_config_and_curriculum)
-fmri_gym/config/run.py           CORE  RunConfig: one run's command line (subject, session, switches) and its RigConfig
-fmri_gym/config/rig.py           CORE  RigConfig: one rig's file (configs/<team>/rigs/<rig>.json): window, inputs, audio, data root
-fmri_gym/config/curriculum.py    CORE  Curriculum: the curriculum file, loaded once into typed phases; load, save, includes
-fmri_gym/config/phases.py        CORE  one frozen dataclass per phase type (Fixation, Message, GamePhase, Check*...)
-fmri_gym/run.py                  CORE  one run's experiment loop: trigger, phases, timing
-fmri_gym/menu.py                 CORE  hold-a-key pause menu: reset / forfeit / resume (opt-in per phase)
-fmri_gym/inputs/                 CORE  the input devices: one named control per key, button, stick direction
-fmri_gym/outputs/                CORE  what the participant sees and hears: display.py (the window), audio.py, sound.py
-fmri_gym/sync/                   CORE  triggers.py: the scanner's start pulse and the event codes; clock.py
-fmri_gym/save/                   CORE  the data: bids.py (where), logging.py (manifest + one log per block), replay.py
-fmri_gym/adapters/base.py        CORE  EnvAdapter + FrameState: the seam
-fmri_gym/adapters/keymap.py      CORE  the phase's keys, one Keymap per action space
-fmri_gym/adapters/<BACKEND>.py   YOU   one small wrapper per game engine
-fmri_gym/standalone/                   the commands that are not a run: rig setup, session editor, calibration
+humans/config/run.py             CORE  RunConfig: one run's command line (subject, session, switches) and its RigConfig
+humans/config/rig.py             CORE  RigConfig: one rig's file (configs/<team>/rigs/<rig>.json): window, inputs, audio, data root
+humans/config/curriculum.py      CORE  Curriculum: the curriculum file, loaded once into typed phases; load, save, includes
+humans/config/phases.py          CORE  one frozen dataclass per phase type (Fixation, Message, GamePhase, Check*...)
+humans/run.py                    CORE  one run's experiment loop: trigger, phases, timing
+humans/menu.py                   CORE  hold-a-key pause menu: reset / forfeit / resume (opt-in per phase)
+humans/inputs/                   CORE  the input devices: one named control per key, button, stick direction
+humans/outputs/                  CORE  what the participant sees and hears: display.py (the window), audio.py, sound.py
+humans/sync/                     CORE  triggers.py: the scanner's start pulse and the event codes; clock.py
+humans/save/                     CORE  the data: bids.py (where), logging.py (manifest + one log per block), replay.py
+humans/adapters/base.py          CORE  EnvAdapter + FrameState: the seam
+humans/adapters/keymap.py        CORE  the phase's keys, one Keymap per action space
+humans/adapters/<BACKEND>.py     YOU   one small wrapper per game engine
+humans/standalone/                     the commands that are not a run: rig setup, session editor, calibration
 configs/curricula/<BACKEND>/     YOU   the game's curricula: levels/ one per level, the folder a sequence; common/ the phase they share
 gym/<GAME>/                      YOU   a Gymnasium env for a game that ships none, or a rough one
 gym/replay_state/                      ReplayState: a savestate by replay, for any env
@@ -33,13 +33,13 @@ tests/                                 the suite: every backend played, logged, 
 .github/workflows/tests.yml            CI: the suite on every pull request that is ready for review
 ```
 
-**Core** is every `fmri_gym/*.py` and every file under `fmri_gym/config/`, `inputs/`, `outputs/`, `sync/` and `save/`, whether the table lists it or not, plus the adapter seam, `adapters/base.py` and `adapters/keymap.py`. Every other file under `fmri_gym/adapters/` is a backend's. `fmri_gym/standalone/` is not core: it holds the tools that run on their own (Rule 5), and nothing outside it imports from it. The package is a stack of layers, top to bottom `standalone/`, `run.py`, `menu.py`, `config/`, `adapters/`, `outputs/`, `save/`, then `sync/` and `inputs/` side by side: a module imports only from the layers below it, type hints included, and a type two layers share lives in the lower one. Game engines and the `gym/` packages are imported only from `adapters/`; a `gym/` package imports no `fmri_gym` and no other `gym/` package but the one it is built on; only a `gym/` package reads `external/`. `uv run lint-imports` checks all of it but the last, the contracts in `pyproject.toml`; the stack is drawn in `docs/DEPENDENCIES.md`, with the ways to share a type between layers.
+**Core** is every `humans/*.py` and every file under `humans/config/`, `inputs/`, `outputs/`, `sync/` and `save/`, whether the table lists it or not, plus the adapter seam, `adapters/base.py` and `adapters/keymap.py`. Every other file under `humans/adapters/` is a backend's. `humans/standalone/` is not core: it holds the tools that run on their own (Rule 5), and nothing outside it imports from it. The package is a stack of layers, top to bottom `standalone/`, `run.py`, `menu.py`, `config/`, `adapters/`, `outputs/`, `save/`, then `sync/` and `inputs/` side by side: a module imports only from the layers below it, type hints included, and a type two layers share lives in the lower one. Game engines and the `gym/` packages are imported only from `adapters/`; a `gym/` package imports no `humans` and no other `gym/` package but the one it is built on; only a `gym/` package reads `external/`. `uv run lint-imports` checks all of it but the last, the contracts in `pyproject.toml`; the stack is drawn in `docs/DEPENDENCIES.md`, with the ways to share a type between layers.
 
 The core is engine-agnostic: `run.py` never imports a game engine, never touches `env.unwrapped`, and never mentions a game by name. Everything engine-specific goes through an `EnvAdapter`.
 
-Three layers, three directories, each optional until needed: `external/` is a game's own repo when its files must be read from a checkout (use only when `pip install` is not an option); `gym/` is a `gymnasium.Env` for a game that ships none (or a rough one); `fmri_gym/adapters/` is the fMRI adapter over whatever env results. Code goes in the lowest layer that owns the concern -- game rules in the game or its `gym/` env, never in the adapter.
+Three layers, three directories, each optional until needed: `external/` is a game's own repo when its files must be read from a checkout (use only when `pip install` is not an option); `gym/` is a `gymnasium.Env` for a game that ships none (or a rough one); `humans/adapters/` is the fMRI adapter over whatever env results. Code goes in the lowest layer that owns the concern -- game rules in the game or its `gym/` env, never in the adapter.
 
-Three kinds of settings, kept apart because they are shared differently, all in `fmri_gym/config/`, and neither of the first two knows the other exists. The **curriculum** (`config/curriculum.py`, `Curriculum`, the `--curriculum` JSON) is what is played: a sequence of phases -- one game or several -- the same for every subject on every rig that plays it, read once into one typed object per phase (`config/phases.py`: `Fixation`, `Message`, `Survey`, `GamePhase`). The **rig config** (`config/rig.py`, `RigConfig`, one file per rig in `configs/<team>/rigs/`) is how one rig plays every run, the same for all of its subjects and games: what the rig is, its window, input devices, audio, triggers and data root. A rig and its curricula go together: a curriculum names the controls of input devices, so it plays only on the rigs whose inputs have them; still, neither file names the other. The **run config** (`config/run.py`, `RunConfig`) is one curriculum on one rig plus the handful of things only the run says (subject, session and run number, duration, the test switches); what needs both -- a game key the rig's scanner types, a block's sound being its game's `has_audio` and the rig's -- is decided there or in the `Run`, never by one config rewriting the other. `fmri_play` builds the `RunConfig` and calls `Run.from_config`; the `Run` keeps it whole (`run.config.curriculum`, `run.config.rig`, `run.config.duration`), records both in the manifest, and nothing below opens a file of either. A setting goes in the kind it is shared like, and keeps that kind's word all the way down the call stack.
+Three kinds of settings, kept apart because they are shared differently, all in `humans/config/`, and neither of the first two knows the other exists. The **curriculum** (`config/curriculum.py`, `Curriculum`, the `--curriculum` JSON) is what is played: a sequence of phases -- one game or several -- the same for every subject on every rig that plays it, read once into one typed object per phase (`config/phases.py`: `Fixation`, `Message`, `Survey`, `GamePhase`). The **rig config** (`config/rig.py`, `RigConfig`, one file per rig in `configs/<team>/rigs/`) is how one rig plays every run, the same for all of its subjects and games: what the rig is, its window, input devices, audio, triggers and data root. A rig and its curricula go together: a curriculum names the controls of input devices, so it plays only on the rigs whose inputs have them; still, neither file names the other. The **run config** (`config/run.py`, `RunConfig`) is one curriculum on one rig plus the handful of things only the run says (subject, session and run number, duration, the test switches); what needs both -- a game key the rig's scanner types, a block's sound being its game's `has_audio` and the rig's -- is decided there or in the `Run`, never by one config rewriting the other. `fmri_play` builds the `RunConfig` and calls `Run.from_config`; the `Run` keeps it whole (`run.config.curriculum`, `run.config.rig`, `run.config.duration`), records both in the manifest, and nothing below opens a file of either. A setting goes in the kind it is shared like, and keeps that kind's word all the way down the call stack.
 
 ## Rule 1: the game logic lives in the gym env, not the adapter
 
@@ -64,7 +64,7 @@ If you find yourself writing game rules, drawing a board, tracking a selection c
 
 ## Rule 2: changes to core libraries are a last resort, and stay generic
 
-Before editing a core file (any `fmri_gym/*.py`, any file under `config/`, `inputs/`, `outputs/`, `sync/` or `save/`, `adapters/base.py` or `adapters/keymap.py`; see "The shape of the repo"), please try to solve the problem in your adapter. If you cannot:
+Before editing a core file (any `humans/*.py`, any file under `config/`, `inputs/`, `outputs/`, `sync/` or `save/`, `adapters/base.py` or `adapters/keymap.py`; see "The shape of the repo"), please try to solve the problem in your adapter. If you cannot:
 
 - Keep it **additive and default-off**, so no existing backend changes behaviour.
 - Keep it **nameless**: no `if backend == "rushhour"`, no game ids, no engine imports. This holds for the prose too -- a core file's comments and docstrings state the contract, they don't cite the backend that happens to use it.

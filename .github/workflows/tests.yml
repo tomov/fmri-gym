@@ -52,7 +52,7 @@ jobs:
       - name: Sync the core, the gui and the dev group
         run: uv sync --extra gui
       - name: Lint
-        run: uv run ruff check fmri_gym fmri_play.py agents tests gym/*/tests
+        run: uv run ruff check humans fmri_play.py agents tests gym/*/tests
       - name: Who imports whom (the contracts in pyproject.toml)
         run: PYTHONPATH="$(printf '%s:' gym/*/)" uv run lint-imports
       - name: Engine-free tests and the gym backend

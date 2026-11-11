@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from fmri_gym.save.logging import read_events
+from humans.save.logging import read_events
 from tests.backends import REPO
 from tests.conftest import write_curriculum
 

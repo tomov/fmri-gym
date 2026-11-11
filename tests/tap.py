@@ -4,7 +4,7 @@ The log is the product of a session, and the claim it makes is that it holds
 what the subject saw and heard. :class:`Tap` checks that claim from the
 other end: it wraps the four places in the run where a picture or a sound
 leaves the program -- :meth:`Display.draw_frame`, :meth:`Audio.play`, the
-stream's :meth:`~fmri_gym.outputs.audio.SoundDeviceGameBlockStream.put` and the
+stream's :meth:`~humans.outputs.audio.SoundDeviceGameBlockStream.put` and the
 PortAudio callback that fills the device's buffers -- and keeps a fingerprint
 of every frame drawn, the PCM of every chunk queued, and every buffer the
 device was handed. Nothing in the run changes: each wrapper calls the real
@@ -16,7 +16,7 @@ logged; for every chunk, the PCM handed to the speakers; and for every chunk
 that started playing, whether the samples the device was given from its
 onset on are the samples queued (cut short only where the next chunk or an
 episode's ``stop`` cut it). The stream may stretch a chunk by a sample or two
-to follow the display's clock (:data:`~fmri_gym.outputs.audio._MAX_STRETCH`), so the
+to follow the display's clock (:data:`~humans.outputs.audio._MAX_STRETCH`), so the
 PCM queued and the PCM played are compared after that stretch, and how many
 chunks were stretched is reported, not hidden.
 
@@ -108,9 +108,9 @@ class FakeOutputStream:
 
 
 def use_fake_sound_card() -> None:
-    """Point :mod:`fmri_gym.outputs.audio` at :class:`FakeOutputStream` (before the run opens
+    """Point :mod:`humans.outputs.audio` at :class:`FakeOutputStream` (before the run opens
     audio)."""
-    from fmri_gym.outputs import audio
+    from humans.outputs import audio
 
     stub = {"name": "fake", "index": 0, "hostapi": 0, "max_output_channels": 2,
             "default_samplerate": 48000.0}
@@ -149,8 +149,8 @@ class Tap:
 
     def install(self) -> None:
         """Wrap the display, the logger and the audio output, for the rest of the process."""
-        from fmri_gym.outputs import audio, display
-        from fmri_gym.save import logging
+        from humans.outputs import audio, display
+        from humans.save import logging
 
         tap = self
         draw_frame = display.Display.draw_frame
@@ -287,7 +287,7 @@ def compare(block: str, report: dict, block_number: int = 0) -> list[str]:
     :param block_number: which of the run's game blocks this is, in order.
     :return: one line per disagreement; empty when the log is what was shown and queued.
     """
-    from fmri_gym.save.logging import AUDIO_FILENAME, read_audio, read_events, read_frames
+    from humans.save.logging import AUDIO_FILENAME, read_audio, read_events, read_frames
 
     problems = []
     pixels, index = read_frames(block)

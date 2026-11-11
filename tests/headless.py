@@ -3,7 +3,7 @@
 ``fmri_play.main()`` runs in this process, so the trigger wait, the
 instructions screen, the window, the key queue, the pacing and the logger are
 the ones a subject gets. Three things stand in for the rig: a rig file of
-its own (:mod:`fmri_gym.config.rig`, in a temporary folder: a small window, the
+its own (:mod:`humans.config.rig`, in a temporary folder: a small window, the
 keyboard alone, vsync off), SDL's dummy video driver (a window that is never
 shown; ``--window`` opens a real one) and a key script that posts key events
 on pygame's queue from a thread of its own, so every press travels the route a
@@ -41,9 +41,9 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame  # noqa: E402
 
-from fmri_gym.config import rig  # noqa: E402
-from fmri_gym.config.curriculum import load_curriculum  # noqa: E402
-from fmri_gym.inputs.keyboard import KEYCODES  # noqa: E402
+from humans.config import rig  # noqa: E402
+from humans.config.curriculum import load_curriculum  # noqa: E402
+from humans.inputs.keyboard import KEYCODES  # noqa: E402
 
 #: Seconds a scripted press is held: long enough for a real-time poll to see it,
 #: short enough never to open a hold-to-pause menu.

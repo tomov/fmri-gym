@@ -10,10 +10,10 @@ import re
 
 import pytest
 
-from fmri_gym.config.curriculum import Curriculum, load_curriculum, validate_curriculum
-from fmri_gym.config.phases import GamePhase, Message
-from fmri_gym.config.rig import RigConfig
-from fmri_gym.config.run import RunConfig
+from humans.config.curriculum import Curriculum, load_curriculum, validate_curriculum
+from humans.config.phases import GamePhase, Message
+from humans.config.rig import RigConfig
+from humans.config.run import RunConfig
 from tests.backends import BACKENDS, REPO, all_configs, game_phases, phase_backend
 
 CONFIGS = all_configs()
@@ -57,7 +57,7 @@ def test_config_names_known_backends(path):
 
 def test_table_matches_get_adapter():
     """A backend added to ``get_adapter`` needs a row in ``tests/backends.py`` to be tested."""
-    source = (REPO / "fmri_gym" / "adapters" / "__init__.py").read_text()
+    source = (REPO / "humans" / "adapters" / "__init__.py").read_text()
     registered = set(re.findall(r'backend == "(\w+)"', source))
     for group in re.findall(r"backend in \(([^)]*)\)", source):
         registered |= set(re.findall(r'"(\w+)"', group))

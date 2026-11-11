@@ -23,7 +23,7 @@ os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
 import numpy as np  # noqa: E402
 import pygame  # noqa: E402
 
-from fmri_gym.inputs.control_names import ControlNames  # noqa: E402
+from humans.inputs.control_names import ControlNames  # noqa: E402
 
 PAPER, TEXT, LEADER = (255, 255, 255), (25, 25, 25), (70, 70, 70)
 #: the part of the underlay that is the controller, and its scale in the image

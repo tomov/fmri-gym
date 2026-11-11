@@ -3,7 +3,7 @@
 A change to an adapter, to the gym package under it, to one of its configs or
 to its checkout touches that backend *directly*: the suite must be able to
 play it, and refuses to pretend otherwise when it is not installed. A change
-to the core (``fmri_gym/*.py`` outside the adapters, the run loop's entry
+to the core (``humans/*.py`` outside the adapters, the run loop's entry
 points, the recorder, the dependencies, the tests themselves) touches every
 backend; the ones this machine cannot run are then skipped, visibly.
 
@@ -21,11 +21,11 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from fmri_gym.config.curriculum import is_common_file
+from humans.config.curriculum import is_common_file
 from tests.backends import BACKENDS, REPO, game_phases, phase_backend
 
 #: Paths (repo-relative prefixes) whose change concerns every backend.
-CORE_PREFIXES = ("fmri_gym/", "fmri_play.py", "agents/", "pyproject.toml", "uv.lock",
+CORE_PREFIXES = ("humans/", "fmri_play.py", "agents/", "pyproject.toml", "uv.lock",
                  "tests/", ".github/")
 
 
@@ -70,7 +70,7 @@ def select(paths: list[str]) -> Selection:
     """The backends ``paths`` touch (see the module docstring for the rules)."""
     selection = Selection()
     for path in paths:
-        if path.startswith("fmri_gym/adapters/"):
+        if path.startswith("humans/adapters/"):
             _adapter(Path(path).stem, selection)
         elif path.startswith(CORE_PREFIXES) and path != "tests/README.md":
             selection.core = True
