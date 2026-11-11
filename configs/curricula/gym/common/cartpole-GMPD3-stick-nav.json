@@ -1,0 +1,19 @@
+{
+  "type": "game", "backend": "gym", "game": "CartPole-v1",
+  "instructions": {
+    "title": "CartPole", "align": "left", "controls_to_dismiss": ["CONTROLLER_BUTTON_A"],
+    "text": [
+      "Keep the pole balanced on the cart.",
+      "Push the cart under the pole as it starts to fall.",
+      "",
+      "![controls](images/controls/gym/cartpole-GMPD3-stick-nav.png)",
+      "",
+      "Controls:",
+      "   stick left / right   push the cart",
+      "",
+      "Press A to start."
+    ]
+  },
+  "controls": {"": 0, "CONTROLLER_AXIS_LEFTX_LEFT": 0, "CONTROLLER_AXIS_LEFTX_RIGHT": 1},
+  "mode": "duration", "duration": 60.0, "fps": 30
+}

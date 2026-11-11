@@ -1,0 +1,19 @@
+{
+  "type": "game", "backend": "gym", "game": "Acrobot-v1",
+  "instructions": {
+    "title": "Acrobot", "align": "left", "controls_to_dismiss": ["CONTROLLER_BUTTON_A"],
+    "text": [
+      "Swing the two-link arm until its tip",
+      "rises above the line.",
+      "",
+      "![controls](images/controls/gym/acrobot-GMPD3-stick-nav.png)",
+      "",
+      "Controls:",
+      "   stick left / right   turn the middle joint",
+      "",
+      "Press A to start."
+    ]
+  },
+  "controls": {"": 1, "CONTROLLER_AXIS_LEFTX_LEFT": 0, "CONTROLLER_AXIS_LEFTX_RIGHT": 2},
+  "mode": "duration", "duration": 60.0, "fps": 30
+}

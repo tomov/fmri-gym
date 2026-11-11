@@ -25,3 +25,4 @@ A phase's `controls` values are indices into the game's own action set, which di
 | `qbert.json` | Qbert |
 | `seaquest.json` | Seaquest |
 | `spaceinvaders.json` | SpaceInvaders |
+| `mspacman-GMPD3-stick-nav.json`, `spaceinvaders-GMPD3-stick-nav.json` (in `ale/`) | MsPacman or SpaceInvaders on a controller's left stick (diagonals are the stick's two axes held together), SpaceInvaders firing on RT, each with its instructions and controls image |

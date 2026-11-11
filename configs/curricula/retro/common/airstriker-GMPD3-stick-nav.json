@@ -1,0 +1,20 @@
+{
+  "type": "game", "backend": "retro", "game": "Airstriker-Genesis-v0",
+  "instructions": {
+    "title": "Airstriker", "align": "left", "controls_to_dismiss": ["CONTROLLER_BUTTON_A"],
+    "text": [
+      "Fly your ship, shoot down the enemies",
+      "and dodge their fire.",
+      "",
+      "![controls](images/controls/retro/airstriker-GMPD3-stick-nav.png)",
+      "",
+      "Controls:",
+      "   stick   move",
+      "   RT      fire",
+      "",
+      "Press A to start."
+    ]
+  },
+  "controls": {"CONTROLLER_AXIS_LEFTX_LEFT": 6, "CONTROLLER_AXIS_LEFTX_RIGHT": 7, "CONTROLLER_AXIS_LEFTY_UP": 4, "CONTROLLER_AXIS_LEFTY_DOWN": 5, "CONTROLLER_AXIS_TRIGGERRIGHT": 0},
+  "mode": "duration", "duration": 300.0, "fps": 59.92274340431231, "state_stride": 15
+}

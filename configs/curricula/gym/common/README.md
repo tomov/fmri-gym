@@ -43,3 +43,4 @@ Pendulum, MountainCarContinuous and BipedalWalker have continuous actions: pushi
 | `classic_control.json` | the five classic-control games, one episode each |
 | `box2d.json` | the three Box2D games, one episode each |
 | `toy_text.json` | the five toy-text games, two episodes each |
+| `classic_control-GMPD3-stick-nav.json` | CartPole, MountainCar and Acrobot for 60 s each on a controller's left stick, from `common/<game>-GMPD3-stick-nav.json` |

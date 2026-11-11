@@ -107,6 +107,30 @@
       "CONTROLLER_AXIS_TRIGGERLEFT": ["skid"],
       "CONTROLLER_BUTTON_A": ["nitro (boost)"],
       "CONTROLLER_BUTTON_Y": ["rescue"]
+    },
+    "gym/cartpole-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["left / right:", "push the cart"]
+    },
+    "gym/mountaincar-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["left / right:", "push the car"]
+    },
+    "gym/acrobot-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["left / right:", "turn the", "middle joint"]
+    },
+    "ale/mspacman-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["move"]
+    },
+    "ale/spaceinvaders-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["left / right:", "move"],
+      "CONTROLLER_AXIS_TRIGGERRIGHT": ["fire"]
+    },
+    "retro/airstriker-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["move"],
+      "CONTROLLER_AXIS_TRIGGERRIGHT": ["fire"]
+    },
+    "minihack/mazewalk9x9-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["move one square"],
+      "CONTROLLER_BUTTON_X": ["hold: pause menu"]
     }
   }
 }
