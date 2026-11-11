@@ -15,6 +15,7 @@ from __future__ import annotations
 import copy
 import glob
 import json
+import math
 import os
 import subprocess
 import sys
@@ -147,6 +148,37 @@ _GEOMETRY_FIELDS = {
     "distance_cm": ("eye to screen (cm)", "From the participant's eye to the screen; in a "
                     "scanner, from the eye to the mirror plus from the mirror to the screen."),
 }
+#: How far the image's shape in cm may be from its shape in pixels before the window warns.
+_SHAPE_TOLERANCE = 0.03
+#: The aspect ratios a screen's is written as when it is one of them, within 1%.
+_COMMON_ASPECTS = ((16, 9), (16, 10), (4, 3), (5, 4), (3, 2), (21, 9))
+
+
+def aspect_text(width: float, height: float) -> str:
+    """``width`` to ``height`` as ``16:9`` when it is a common aspect ratio, else ``1.54:1``."""
+    for across, down in _COMMON_ASPECTS:
+        if abs(width / height / (across / down) - 1) < 0.01:
+            return f"{across}:{down}"
+    return f"{width / height:.2f}:1"
+
+
+def parse_aspect(text: str) -> float:
+    """An aspect ratio typed ``16:9``, ``1.78:1`` or ``1.78``, as width over height.
+
+    :raises ValueError: when it is none of these, or not more than 0.
+    """
+    across, _, down = text.strip().partition(":")
+    ratio = float(across) / float(down or 1)
+    if not ratio > 0:
+        raise ValueError(f"{text!r} is not an aspect ratio")
+    return ratio
+
+
+def size_from_diagonal(diagonal_cm: float, aspect: float) -> tuple[float, float]:
+    """The image's width and height in cm, from its diagonal and its aspect ratio."""
+    height = diagonal_cm / math.hypot(aspect, 1)
+    return round(aspect * height, 1), round(height, 1)
+
 
 
 def window_sizes(width: int, height: int) -> list[str]:
@@ -642,6 +674,7 @@ class _RigWindow(QtWidgets.QDialog):
         """The fixation warning, the trigger summary, the rig measurement plan and the save step's
         summary, as things stand."""
         self._refresh_fixation_note()
+        self._refresh_geometry_note()
         self.trigger_text.setText(self._trigger_report())
         try:
             rig = rig_file.RigConfig.from_dict(self.rig, self.path)
@@ -763,7 +796,8 @@ class _RigWindow(QtWidgets.QDialog):
         return page
 
     def _geometry_rows(self, form: QtWidgets.QFormLayout, geometry: Any) -> None:
-        """The screen geometry's fields."""
+        """The screen geometry's fields, the diagonal and aspect ratio kept in step with the
+        width and height, and what they come to in degrees."""
         given = geometry if isinstance(geometry, dict) else {}
         self.geometry_fields: dict[str, QtWidgets.QLineEdit] = {}
         for key, (label, tip) in _GEOMETRY_FIELDS.items():
@@ -773,7 +807,58 @@ class _RigWindow(QtWidgets.QDialog):
             edit.setToolTip(tip)
             edit.textChanged.connect(self._check)
             self.geometry_fields[key] = edit
-            form.addRow(label, edit)
+        self.diagonal = QtWidgets.QLineEdit()
+        self.diagonal.setToolTip("The image's diagonal, in cm: with the aspect ratio, it gives "
+                                 "the width and height, and they give it.")
+        self.aspect = QtWidgets.QLineEdit()
+        self.aspect.setPlaceholderText("16:9")
+        self.aspect.setToolTip("The image's width to its height, as 16:9 or 1.78:1; it starts "
+                               "on the shape of the screen's pixels.")
+        for edit in (self.geometry_fields["width_cm"], self.geometry_fields["height_cm"]):
+            edit.textEdited.connect(lambda _text: self._diagonal_from_size())
+        for edit in (self.diagonal, self.aspect):
+            edit.textEdited.connect(lambda _text: self._size_from_diagonal())
+        self._diagonal_from_size()
+        resolution = self._picked_resolution()
+        if not self.aspect.text() and resolution is not None:
+            self.aspect.setText(aspect_text(*resolution))
+        for key in ("width_cm", "height_cm"):
+            form.addRow(_GEOMETRY_FIELDS[key][0], self.geometry_fields[key])
+        form.addRow("image diagonal (cm)", self.diagonal)
+        form.addRow("aspect ratio", self.aspect)
+        form.addRow(_GEOMETRY_FIELDS["distance_cm"][0], self.geometry_fields["distance_cm"])
+        self.geometry_note = QtWidgets.QLabel()
+        self.geometry_note.setWordWrap(True)
+        form.addRow("", self.geometry_note)
+
+    def _picked_resolution(self) -> tuple[int, int] | None:
+        """The picked monitor's pixels; ``None`` when it is not connected here."""
+        index = self.monitor_pick.currentData()
+        if not (isinstance(index, int) and 0 <= index < len(self.monitors)):
+            return None
+        return self.monitors[index][0], self.monitors[index][1]
+
+    def _diagonal_from_size(self) -> None:
+        """The diagonal and aspect ratio of the width and height typed, once both are."""
+        try:
+            width, height = (float(self.geometry_fields[k].text()) for k in ("width_cm",
+                                                                             "height_cm"))
+        except ValueError:
+            return
+        if width > 0 and height > 0:
+            self.diagonal.setText(f"{math.hypot(width, height):.1f}")
+            self.aspect.setText(aspect_text(width, height))
+
+    def _size_from_diagonal(self) -> None:
+        """The width and height of the diagonal and aspect ratio typed, once both are."""
+        try:
+            diagonal, aspect = float(self.diagonal.text()), parse_aspect(self.aspect.text())
+        except (ValueError, ZeroDivisionError):
+            return
+        if diagonal > 0:
+            width, height = size_from_diagonal(diagonal, aspect)
+            self.geometry_fields["width_cm"].setText(f"{width:g}")
+            self.geometry_fields["height_cm"].setText(f"{height:g}")
 
     def _geometry(self) -> dict[str, float]:
         """The screen geometry typed, a blank field left out.
@@ -790,6 +875,29 @@ class _RigWindow(QtWidgets.QDialog):
             except ValueError:
                 raise ValueError(f"{_GEOMETRY_FIELDS[key][0]}: {text!r} is not a number") from None
         return out
+
+    def _refresh_geometry_note(self) -> None:
+        """What the geometry comes to in degrees, and whether its shape is the screen's."""
+        try:
+            geometry = rig_file.ScreenGeometry.from_dict(self._geometry())
+        except (ValueError, KeyError):
+            self.geometry_note.setText("")
+            return
+        if any(v <= 0 for v in geometry.record().values()):
+            self.geometry_note.setText("")
+            return
+        note = (f"The image spans {geometry.degrees_for_cm(geometry.width_cm):.1f} x "
+                f"{geometry.degrees_for_cm(geometry.height_cm):.1f} degrees; one degree is "
+                f"{geometry.cm_for_degrees(1):.2f} cm.")
+        resolution = self._picked_resolution()
+        if resolution is not None:
+            cm_shape = geometry.width_cm / geometry.height_cm
+            px_shape = resolution[0] / resolution[1]
+            if abs(cm_shape / px_shape - 1) > _SHAPE_TOLERANCE:
+                note += (f" Warning: {geometry.width_cm:g} x {geometry.height_cm:g} cm is not "
+                         f"the shape of the screen's {resolution[0]} x {resolution[1]} pixels: "
+                         "measure them again.")
+        self.geometry_note.setText(note)
 
     def _fixation_field(self, key: str, values: dict) -> QtWidgets.QLineEdit:
         """Seconds of one of the rig's fixations; a new rig starts on fMRI's."""

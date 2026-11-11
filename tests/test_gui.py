@@ -157,10 +157,26 @@ def test_the_screen_step_needs_the_screen_geometry(qt, tmp_path):
     window = _RigWindow({}, str(tmp_path / "site" / "rig.json"))
     window._show_step(1)
     assert not window.next.isEnabled() and "image width" in window.problems.text()
-    for key, value in GEOMETRY.items():
-        window.geometry_fields[key].setText(f"{value:g}")
+    window.diagonal.setText("81.3")
+    window.aspect.setText("16:9")
+    window._size_from_diagonal()
+    assert window._geometry() == {"width_cm": 70.9, "height_cm": 39.9}
+    window.geometry_fields["distance_cm"].setText("120")
     assert window.next.isEnabled(), window.problems.text()
-    assert window.rig["screen"]["geometry"] == GEOMETRY
+    assert window.rig["screen"]["geometry"] == {"width_cm": 70.9, "height_cm": 39.9,
+                                                "distance_cm": 120.0}
+    assert "32.9 x 18.9 degrees" in window.geometry_note.text()
+    window.geometry_fields["height_cm"].setText("53.2")
+    window._diagonal_from_size()
+    assert (window.diagonal.text(), window.aspect.text()) == ("88.6", "4:3")
+
+
+@pytest.mark.parametrize("text, ratio", [("16:9", 16 / 9), ("1.78:1", 1.78), ("1.5", 1.5)])
+def test_an_aspect_ratio_is_read_as_typed(gui, text, ratio):
+    from humans.standalone.rig_setup.window import aspect_text, parse_aspect
+
+    assert parse_aspect(text) == pytest.approx(ratio)
+    assert aspect_text(1920, 1080) == "16:9" and aspect_text(1470, 956) == "1.54:1"
 
 
 def test_flags_fmri_play_would_refuse_are_problems(gui):
