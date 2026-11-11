@@ -38,7 +38,7 @@ def test_defaults_fill_what_the_file_leaves_out():
     desk = RigConfig.open(write("desk"))
     screen = desk.screen
     assert (screen.size, screen.is_fullscreen, screen.monitor, screen.has_vsync) == (
-        (1024, 768), False, 0, True)
+        (1024, 768), True, 0, True)
     assert (desk.inputs, desk.has_audio, desk.data_root) == (("keyboard",), True, "data")
     assert desk.record()["screen"] == rig.DEFAULTS["screen"]
 

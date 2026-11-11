@@ -19,9 +19,10 @@ run -- and say how its runs are played (:data:`DEFAULTS` when left out), under t
 names of :class:`RigConfig` and :class:`ScreenConfig`, so the file and the code
 say the same thing:
 
-- ``"screen"``: ``{"size": "1024x768", "is_fullscreen": false, "monitor": 0,
+- ``"screen"``: ``{"size": "1024x768", "is_fullscreen": true, "monitor": 0,
   "has_vsync": true}``, the monitor by index (0: the first); fullscreen scales
-  ``size`` to the monitor, aspect kept, at the monitor's own resolution;
+  ``size`` to the monitor, aspect kept, at the monitor's own resolution; a window of
+  ``size`` only when ``is_fullscreen`` is ``false``;
 - ``"inputs"``: the rig's input devices, the keyboard among them, by the names of
   :data:`humans.inputs.INPUT_DEVICE_CLASSES_BY_NAME` (``["keyboard",
   "current_designs_gamepad3"]``); each controller must be plugged in when a run starts;
@@ -88,10 +89,11 @@ EXAMPLES = {
     "audio_path": "RME Babyface -> Sensimetrics S14 insert earphones",
     "trigger_hardware": "fORP 932 USB, '=' at each volume",
 }
-#: How a run is played where the rig file says nothing: a window at the desk,
-#: the keyboard alone, the audio on, no fixation at either end.
+#: How a run is played where the rig file says nothing: fullscreen, as a session needs
+#: (a window only when asked for), the keyboard alone, the audio on, no fixation at
+#: either end.
 DEFAULTS: dict[str, Any] = {
-    "screen": {"size": "1024x768", "is_fullscreen": False, "monitor": 0, "has_vsync": True},
+    "screen": {"size": "1024x768", "is_fullscreen": True, "monitor": 0, "has_vsync": True},
     "inputs": ["keyboard"], "has_audio": True, "data_root": "data", "start_fixation": None,
     "end_fixation": None, "triggers": {}, "response_keys": {}, "rig_measurement": {},
 }
@@ -455,7 +457,7 @@ def _setting_problems(rig: dict) -> list[str]:
     if not isinstance(monitor, int) or isinstance(monitor, bool) or monitor < 0:
         out.append(f"\"screen\": \"monitor\" must be a monitor's index (0: the first), "
                    f"got {monitor!r}")
-    flags = (("screen.is_fullscreen", screen.get("is_fullscreen", False)),
+    flags = (("screen.is_fullscreen", screen.get("is_fullscreen", True)),
              ("screen.has_vsync", screen.get("has_vsync", True)),
              ("has_audio", rig.get("has_audio", True)))
     out += [f'"{k}" must be true or false, got {v!r}' for k, v in flags if not isinstance(v, bool)]
