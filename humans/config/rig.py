@@ -11,7 +11,8 @@ A run names its rig file (:meth:`RigConfig.open`) as it names its curriculum;
 there is no default, since which window, controller and data folder a session
 gets is not something to guess.
 
-Every key of a rig file is optional: an empty ``{}`` plays on the defaults. A
+Every key is optional, :data:`DEFAULTS` where left out; the screen's ``"geometry"`` has no
+default, and a rig file without one says nothing of its screen's size in degrees. A
 rig's ``site`` and ``rig`` are the team's folder (:func:`site_of`) and the
 file's name; written in the file they must say the same. It may describe the
 rig for people -- :data:`FIELDS`, notes nothing plays from, filed with every
@@ -20,9 +21,12 @@ names of :class:`RigConfig` and :class:`ScreenConfig`, so the file and the code
 say the same thing:
 
 - ``"screen"``: ``{"size": "1024x768", "is_fullscreen": true, "monitor": 0,
-  "has_vsync": true}``, the monitor by index (0: the first); fullscreen scales
-  ``size`` to the monitor, aspect kept, at the monitor's own resolution; a window of
+  "has_vsync": true, "geometry": {...}}``, the monitor by index (0: the first); fullscreen
+  scales ``size`` to the monitor, aspect kept, at the monitor's own resolution; a window of
   ``size`` only when ``is_fullscreen`` is ``false``;
+  ``"geometry"`` (:class:`ScreenGeometry`) is the image's size on the screen
+  and the participant's eye's distance to it, ``{"width_cm": 70.8, "height_cm": 39.8,
+  "distance_cm": 120}``;
 - ``"inputs"``: the rig's input devices, the keyboard among them, by the names of
   :data:`humans.inputs.INPUT_DEVICE_CLASSES_BY_NAME` (``["keyboard",
   "current_designs_gamepad3"]``); each controller must be plugged in when a run starts;
@@ -54,6 +58,7 @@ from __future__ import annotations
 
 import glob
 import json
+import math
 import os
 import re
 from dataclasses import asdict, dataclass, replace
@@ -97,6 +102,8 @@ DEFAULTS: dict[str, Any] = {
     "inputs": ["keyboard"], "has_audio": True, "data_root": "data", "start_fixation": None,
     "end_fixation": None, "triggers": {}, "response_keys": {}, "rig_measurement": {},
 }
+#: A rig file's ``"screen"`` ``"geometry"``, each in cm (:class:`ScreenGeometry`).
+GEOMETRY_KEYS = ("width_cm", "height_cm", "distance_cm")
 #: Keys refused with a pointer to ``"inputs"``, which says what they would mean.
 _GONE = {"has_pad", "bindings"}
 #: How the rig's photodiode can be read: not at all, on this PC's sound card
@@ -176,6 +183,60 @@ class RigMeasurementConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class ScreenGeometry:
+    """The participant's view of the screen: a rig file's ``"screen"`` ``"geometry"``.
+
+    What a degree of visual angle is on this screen follows from it. In a scanner, the
+    distance is the eye's to the screen by the mirror.
+    """
+
+    #: the image on the screen, as a ruler measures it: a projector's projected image,
+    #: a monitor's lit area.
+    width_cm: float
+    height_cm: float
+    #: from the participant's eye to the screen.
+    distance_cm: float
+
+    @classmethod
+    def from_dict(cls, geometry: dict) -> ScreenGeometry:
+        """Read a checked ``"geometry"`` (:func:`problems`)."""
+        return cls(**{k: float(geometry[k]) for k in GEOMETRY_KEYS})
+
+    def record(self) -> dict[str, float]:
+        """As a rig file writes it."""
+        return {k: getattr(self, k) for k in GEOMETRY_KEYS}
+
+    def cm_for_degrees(self, degrees: float) -> float:
+        """How wide, in cm, something centred on the screen is that spans ``degrees``."""
+        return 2 * self.distance_cm * math.tan(math.radians(degrees) / 2)
+
+    def degrees_for_cm(self, cm: float) -> float:
+        """How many degrees something ``cm`` wide spans, centred on the screen."""
+        return math.degrees(2 * math.atan(cm / (2 * self.distance_cm)))
+
+    def px_per_cm(self, resolution: tuple[int, int]) -> tuple[float, float]:
+        """Pixels per cm across and down, on a screen showing ``resolution`` pixels."""
+        return resolution[0] / self.width_cm, resolution[1] / self.height_cm
+
+    def describe(self) -> str:
+        """``70.8x39.8 cm at 120 cm (32.9x18.8 deg)``."""
+        return (f"{self.width_cm:g}x{self.height_cm:g} cm at {self.distance_cm:g} cm "
+                f"({self.degrees_for_cm(self.width_cm):.1f}x"
+                f"{self.degrees_for_cm(self.height_cm):.1f} deg)")
+
+
+def geometry_problem(geometry: Any) -> str | None:
+    """What is wrong with a ``"screen"`` ``"geometry"``; ``None`` when nothing is."""
+    if not isinstance(geometry, dict) or set(geometry) != set(GEOMETRY_KEYS):
+        return (f'"screen": "geometry" must be {{{", ".join(map(repr, GEOMETRY_KEYS))}}}, '
+                f"got {geometry!r}")
+    bad = [k for k in GEOMETRY_KEYS if not _is_positive(geometry[k])]
+    if bad:
+        return f'"screen": "geometry": {", ".join(bad)} must be cm, more than 0'
+    return None
+
+
+@dataclass(frozen=True, slots=True)
 class ScreenConfig:
     """The window a rig's runs are shown in: a rig file's ``"screen"``."""
 
@@ -186,6 +247,8 @@ class ScreenConfig:
     monitor: int
     #: lock flips to the monitor refresh.
     has_vsync: bool
+    #: the image's size and the eye's distance to it; ``None`` when the file says none.
+    geometry: ScreenGeometry | None
 
     @classmethod
     def from_dict(cls, screen: dict) -> ScreenConfig:
@@ -194,12 +257,15 @@ class ScreenConfig:
         screen = {**DEFAULTS["screen"], **screen}
         width, height = (int(n) for n in _SIZE.fullmatch(screen["size"]).groups())
         return cls(size=(width, height), is_fullscreen=screen["is_fullscreen"],
-                   monitor=screen["monitor"], has_vsync=screen["has_vsync"])
+                   monitor=screen["monitor"], has_vsync=screen["has_vsync"],
+                   geometry=(ScreenGeometry.from_dict(screen["geometry"])
+                             if "geometry" in screen else None))
 
     def record(self) -> dict[str, Any]:
         """As a rig file writes it."""
         return {"size": f"{self.size[0]}x{self.size[1]}", "is_fullscreen": self.is_fullscreen,
-                "monitor": self.monitor, "has_vsync": self.has_vsync}
+                "monitor": self.monitor, "has_vsync": self.has_vsync,
+                **({"geometry": self.geometry.record()} if self.geometry else {})}
 
 
 @dataclass(frozen=True, slots=True)
@@ -301,7 +367,8 @@ class RigConfig:
         fixations = "".join(f" | {s:g} s fixation at the {end}" for end, s in
                             (("start", self.start_fixation), ("end", self.end_fixation))
                             if s is not None)
-        return (f"{self.path} | {window} on monitor {screen.monitor}, vsync "
+        return (f"{self.path} | {window} on monitor {screen.monitor}, "
+                f"{screen.geometry.describe() if screen.geometry else 'no geometry'}, vsync "
                 f"{'on' if screen.has_vsync else 'off'} | inputs "
                 f"{', '.join(self.inputs)}"
                 f" | audio {'on' if self.has_audio else 'off'} | data in {self.data_root}"
@@ -421,7 +488,7 @@ def save(rig: dict, path: str) -> None:
 
 def problems(rig: dict) -> list[str]:
     """What keeps ``rig`` from being a rig file: :data:`FIELDS` and :data:`DEFAULTS` of
-    the right type where given, no other key.
+    the right type where given, the screen's ``"geometry"`` among them, and no other key.
 
     :return: one line per problem; empty when it is valid.
     """
@@ -447,9 +514,12 @@ def _setting_problems(rig: dict) -> list[str]:
     fixations, triggers, response keys and ``rig_measurement``."""
     screen = rig.get("screen", {})
     if not isinstance(screen, dict):
-        return [f'"screen": expected {{"size", "is_fullscreen", "monitor", "has_vsync"}}, '
-                f"got {screen!r}"]
-    out = [f'"screen": unknown key {k!r}' for k in screen if k not in DEFAULTS["screen"]]
+        return [f'"screen": expected {{"size", "is_fullscreen", "monitor", "has_vsync", '
+                f'"geometry"}}, got {screen!r}']
+    out = [f'"screen": unknown key {k!r}' for k in screen
+           if k not in DEFAULTS["screen"] and k != "geometry"]
+    geometry = "geometry" in screen and geometry_problem(screen["geometry"])
+    out += [geometry] if geometry else []
     size = screen.get("size", DEFAULTS["screen"]["size"])
     if not (isinstance(size, str) and _SIZE.fullmatch(size)):
         out.append(f'"screen": "size" must be <width>x<height> such as 1024x768, got {size!r}')

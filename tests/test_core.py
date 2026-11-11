@@ -30,6 +30,8 @@ from humans.save.replay import frame_arrays, reconstruction_plan
 from humans.sync.clock import Clock
 from tests.changed import select
 
+#: A screen geometry for the rig files written here.
+GEOMETRY = {"width_cm": 28.6, "height_cm": 17.9, "distance_cm": 50.0}
 PHASE = {"type": "game", "backend": "gym", "game": "CartPole-v1", "fps": 30,
          "controls": {"": 0, "LEFT": 0, "RIGHT": 1}, "mode": "episode", "n_episodes": 1}
 
@@ -391,6 +393,7 @@ def _measure_laptop_rig(tmp_path, monkeypatch, measurement_names, **rig) -> dict
     from humans.standalone.rig_setup import measure as rig_measure
     rig_path = tmp_path / "laptop.json"
     rig_path.write_text(json.dumps({"data_root": str(tmp_path / "data"), "has_audio": False,
+                                    "screen": {"geometry": GEOMETRY},
                                     "triggers": {"sync": {"mode": "none"}}, **rig}))
     wait_for_control = rig_measure._wait_for_control
 
@@ -452,7 +455,8 @@ def test_the_machine_is_described_and_pygame_left_as_it_was():
 def test_a_rig_with_no_measured_latencies_says_so_until_one_is_filed(tmp_path):
     from humans.config.rig import RigConfig, next_measured_latency_file
     rig_path = tmp_path / "laptop.json"
-    rig_path.write_text(json.dumps({"data_root": str(tmp_path / "data")}))
+    rig_path.write_text(json.dumps({"data_root": str(tmp_path / "data"),
+                                    "screen": {"geometry": GEOMETRY}}))
     rig = RigConfig.open(str(rig_path))
     assert "no measured latencies" in rig.measured_latency_warning
     assert rig.measured_latency_files == []

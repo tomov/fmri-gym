@@ -74,7 +74,7 @@ jobs:
           mkdir -p data
           timeout 60 xvfb-run -a -s "-screen 0 1280x1024x24" ./run_docker.sh \
             --subject sub-ci --ses 1 --run 1 --duration 20 --dummy-trigger \
-            --rig configs/examples/rigs/empty.json \
+            --rig configs/examples/rigs/minimal.json \
             --curriculum configs/curricula/vizdoom/levels/basic.json
           find data/sub-ci -name manifest.json | grep -q .
 

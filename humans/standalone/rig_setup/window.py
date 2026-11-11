@@ -137,6 +137,16 @@ _FIXATIONS = {"start_fixation": "fixation at the start (s)",
               "end_fixation": "fixation at the end (s)"}
 #: What a new rig's fixations start on: fMRI's, for the haemodynamic lag.
 NEW_RIG_FIXATION_S = 10.0
+#: The screen geometry's fields, as the window names them, and what each is.
+_GEOMETRY_FIELDS = {
+    "width_cm": ("image width (cm)", "The width of the image on the participant's screen, "
+                 "measured with a ruler: a projector's projected image, a monitor's lit area "
+                 "without its frame."),
+    "height_cm": ("image height (cm)", "The height of the image on the participant's screen, "
+                  "measured as its width."),
+    "distance_cm": ("eye to screen (cm)", "From the participant's eye to the screen; in a "
+                    "scanner, from the eye to the mirror plus from the mirror to the screen."),
+}
 
 
 def window_sizes(width: int, height: int) -> list[str]:
@@ -472,7 +482,8 @@ _STEPS = [
      "apart from others. Say what is actually plugged in; write \"none\" for a part this rig "
      "does not have."),
     ("Screen, sound, fixation and data",
-     "Which screen the participant sees and how the games are shown on it, whether game sound "
+     "Which screen the participant sees, how the games are shown on it, how big its image is "
+     "and how far the participant's eye is from it (measured with a ruler), whether game sound "
      "is played, how long the fixation cross at the start and end of every run lasts, and "
      "where the data of every run on this rig is saved."),
     ("Response devices",
@@ -686,7 +697,8 @@ class _RigWindow(QtWidgets.QDialog):
         about = self._about()
         missing = [k for k in self.fields if k not in _OPTIONAL and k not in about]
         names = [_ABOUT_LABELS.get(k, k) for k in missing]
-        return ([f"fill in {', '.join(names)}"] if missing else []) + rig_file.problems(about)
+        return (([f"fill in {', '.join(names)}"] if missing else [])
+                + rig_file.problems(about))
 
     def _about(self) -> dict[str, str]:
         out = {}
@@ -720,6 +732,7 @@ class _RigWindow(QtWidgets.QDialog):
         self.monitor_pick.currentIndexChanged.connect(lambda _i: self._fill_sizes())
         self.size_pick.editTextChanged.connect(self._check)
         form.addRow("window size", self.size_pick)
+        self._geometry_rows(form, screen.get("geometry"))
         form.addRow("vsync", self._switch(
             "has_vsync", screen["has_vsync"],
             "Show each image exactly on the screen's refresh. Leave it on, unless the display "
@@ -748,6 +761,35 @@ class _RigWindow(QtWidgets.QDialog):
         layout.addLayout(form)
         layout.addStretch(1)
         return page
+
+    def _geometry_rows(self, form: QtWidgets.QFormLayout, geometry: Any) -> None:
+        """The screen geometry's fields."""
+        given = geometry if isinstance(geometry, dict) else {}
+        self.geometry_fields: dict[str, QtWidgets.QLineEdit] = {}
+        for key, (label, tip) in _GEOMETRY_FIELDS.items():
+            value = given.get(key)
+            edit = QtWidgets.QLineEdit(f"{value:g}" if isinstance(value, (int, float))
+                                       else "" if value is None else str(value))
+            edit.setToolTip(tip)
+            edit.textChanged.connect(self._check)
+            self.geometry_fields[key] = edit
+            form.addRow(label, edit)
+
+    def _geometry(self) -> dict[str, float]:
+        """The screen geometry typed, a blank field left out.
+
+        :raises ValueError: a number half typed, named in the message.
+        """
+        out = {}
+        for key, edit in self.geometry_fields.items():
+            text = edit.text().strip()
+            if not text:
+                continue
+            try:
+                out[key] = float(text)
+            except ValueError:
+                raise ValueError(f"{_GEOMETRY_FIELDS[key][0]}: {text!r} is not a number") from None
+        return out
 
     def _fixation_field(self, key: str, values: dict) -> QtWidgets.QLineEdit:
         """Seconds of one of the rig's fixations; a new rig starts on fMRI's."""
@@ -833,15 +875,22 @@ class _RigWindow(QtWidgets.QDialog):
         self.size_pick.blockSignals(False)
 
     def _screen(self) -> dict[str, Any]:
-        """:raises ValueError: a fixation half typed, named in the message."""
+        """:raises ValueError: a fixation or a measurement half typed, named in the message."""
+        geometry = self._geometry()
         return {"screen": {"size": self.size_pick.currentText().strip(),
                            "is_fullscreen": self.switches["is_fullscreen"].isChecked(),
                            "monitor": self.monitor_pick.currentData(),
-                           "has_vsync": self.switches["has_vsync"].isChecked()},
+                           "has_vsync": self.switches["has_vsync"].isChecked(),
+                           **({"geometry": geometry} if len(geometry) == len(_GEOMETRY_FIELDS)
+                              else {})},
                 "has_audio": self.switches["has_audio"].isChecked(),
                 "data_root": self.data_root.text().strip(), **self._fixation_seconds()}
 
     def _screen_problems(self) -> list[str]:
+        missing = [label for key, (label, _tip) in _GEOMETRY_FIELDS.items()
+                   if not self.geometry_fields[key].text().strip()]
+        if missing:
+            return [f"fill in {', '.join(missing)}"]
         try:
             return rig_file.problems(self._screen())
         except ValueError as exc:
