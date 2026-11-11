@@ -15,6 +15,7 @@ from humans.inputs import ControlNames
 
 FIELDS = {**{k: "x" for k in rig.FIELDS}, "site": "site1", "pi": "MT", "modality": "fmri",
           "notes": ""}
+GEOMETRY = {"width_cm": 70.8, "height_cm": 39.8, "distance_cm": 120.0}
 
 
 @pytest.mark.parametrize("path", [str(p) for p in rig.repo_rig_files()])
@@ -30,7 +31,7 @@ def in_tmp(tmp_path, monkeypatch):
 def write(name: str, **values) -> str:
     """The rig file ``site1/<name>.json``, written; its path."""
     path = f"site1/{name}.json"
-    rig.save({**FIELDS, "rig": name, **values}, path)
+    rig.save({**FIELDS, "rig": name, "screen": {"geometry": GEOMETRY}, **values}, path)
     return path
 
 
@@ -38,14 +39,15 @@ def test_defaults_fill_what_the_file_leaves_out():
     desk = RigConfig.open(write("desk"))
     screen = desk.screen
     assert (screen.size, screen.is_fullscreen, screen.monitor, screen.has_vsync) == (
-        (1024, 768), False, 0, True)
+        (1024, 768), True, 0, True)
     assert (desk.inputs, desk.has_audio, desk.data_root) == (("keyboard",), True, "data")
-    assert desk.record()["screen"] == rig.DEFAULTS["screen"]
+    assert desk.record()["screen"] == {**rig.DEFAULTS["screen"], "geometry": GEOMETRY}
 
 
 def test_settings_are_read():
     scan = RigConfig.open(write("scan", screen={"size": "800x600", "is_fullscreen": True,
-                                                "monitor": 1, "has_vsync": False},
+                                                "monitor": 1, "has_vsync": False,
+                                                "geometry": GEOMETRY},
                                 inputs=["current_designs_gamepad3"], has_audio=False,
                                 data_root="/data"))
     screen = scan.screen
@@ -196,6 +198,7 @@ def test_every_key_is_optional_and_site_and_rig_are_the_files_place(tmp_path):
     (tmp_path / "site1" / "bare.json").write_text("{}")
     bare = RigConfig.open("site1/bare.json")
     assert bare.fields == {"site": "site1", "rig": "bare"} and bare.has_audio
+    assert bare.screen.geometry is None and "geometry" not in bare.record()["screen"]
     (tmp_path / "site1" / "bare.json").write_text(json.dumps({"site": "elsewhere"}))
     with pytest.raises(ValueError, match="the site is its team's folder"):
         RigConfig.open("site1/bare.json")
@@ -203,7 +206,8 @@ def test_every_key_is_optional_and_site_and_rig_are_the_files_place(tmp_path):
 
 def test_a_teams_rig_is_filed_under_the_team(tmp_path):
     (tmp_path / "MT" / "rigs").mkdir(parents=True)
-    (tmp_path / "MT" / "rigs" / "mgh-prisma.json").write_text("{}")
+    (tmp_path / "MT" / "rigs" / "mgh-prisma.json").write_text(
+        json.dumps({"screen": {"geometry": GEOMETRY}}))
     rig = RigConfig.open(str(tmp_path / "MT" / "rigs" / "mgh-prisma.json"))
     assert rig.fields == {"site": "MT", "rig": "mgh-prisma"}
 
@@ -218,6 +222,23 @@ def test_a_teams_rig_is_filed_under_the_team(tmp_path):
 ])
 def test_a_wrong_rig_measurement_section_is_refused(values, problem):
     assert any(problem in p for p in rig.problems(values))
+
+
+@pytest.mark.parametrize("geometry, problem", [
+    ({**GEOMETRY, "distance_cm": 0}, "more than 0"),
+    ({**GEOMETRY, "width_cm": "70"}, "more than 0"),
+    ({"diagonal_in": 32, "distance_cm": 120}, '"geometry" must be'),
+])
+def test_a_wrong_screen_geometry_is_refused(geometry, problem):
+    assert any(problem in p for p in rig.problems({"screen": {"geometry": geometry}}))
+
+
+def test_the_geometry_says_what_a_degree_is():
+    geometry = rig.ScreenGeometry(**GEOMETRY)
+    assert geometry.cm_for_degrees(1) == pytest.approx(2.094, abs=1e-3)
+    assert geometry.degrees_for_cm(geometry.cm_for_degrees(20)) == pytest.approx(20)
+    assert geometry.px_per_cm((1920, 1080)) == pytest.approx((27.12, 27.14), abs=0.01)
+    assert RigConfig.open(write("scan")).screen.geometry == geometry
 
 
 def test_a_message_is_dismissed_by_a_control_name_not_a_character():

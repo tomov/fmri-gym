@@ -15,6 +15,7 @@ from __future__ import annotations
 import copy
 import glob
 import json
+import math
 import os
 import subprocess
 import sys
@@ -33,6 +34,7 @@ from ...sync.triggers import (HID_DEVICES, SYNC_MODES, TRIGGER_BACKENDS, Codes, 
                         TriggerError, Triggers, TriggerSettings)
 from ..forms import Field
 from .. import widgets as ui
+from .ruler import SQUARE_CM
 
 if TYPE_CHECKING:
     from .measure import RigMeasurementSettings
@@ -137,6 +139,47 @@ _FIXATIONS = {"start_fixation": "fixation at the start (s)",
               "end_fixation": "fixation at the end (s)"}
 #: What a new rig's fixations start on: fMRI's, for the haemodynamic lag.
 NEW_RIG_FIXATION_S = 10.0
+#: The screen geometry's fields, as the window names them, and what each is.
+_GEOMETRY_FIELDS = {
+    "width_cm": ("image width (cm)", "The width of the image on the participant's screen, "
+                 "measured with a ruler: a projector's projected image, a monitor's lit area "
+                 "without its frame."),
+    "height_cm": ("image height (cm)", "The height of the image on the participant's screen, "
+                  "measured as its width."),
+    "distance_cm": ("eye to screen (cm)", "From the participant's eye to the screen; in a "
+                    "scanner, from the eye to the mirror plus from the mirror to the screen."),
+}
+#: How far the image's shape in cm may be from its shape in pixels before the window warns.
+_SHAPE_TOLERANCE = 0.03
+#: The aspect ratios a screen's is written as when it is one of them, within 1%.
+_COMMON_ASPECTS = ((16, 9), (16, 10), (4, 3), (5, 4), (3, 2), (21, 9))
+
+
+def aspect_text(width: float, height: float) -> str:
+    """``width`` to ``height`` as ``16:9`` when it is a common aspect ratio, else ``1.54:1``."""
+    for across, down in _COMMON_ASPECTS:
+        if abs(width / height / (across / down) - 1) < 0.01:
+            return f"{across}:{down}"
+    return f"{width / height:.2f}:1"
+
+
+def parse_aspect(text: str) -> float:
+    """An aspect ratio typed ``16:9``, ``1.78:1`` or ``1.78``, as width over height.
+
+    :raises ValueError: when it is none of these, or not more than 0.
+    """
+    across, _, down = text.strip().partition(":")
+    ratio = float(across) / float(down or 1)
+    if not ratio > 0:
+        raise ValueError(f"{text!r} is not an aspect ratio")
+    return ratio
+
+
+def size_from_diagonal(diagonal_cm: float, aspect: float) -> tuple[float, float]:
+    """The image's width and height in cm, from its diagonal and its aspect ratio."""
+    height = diagonal_cm / math.hypot(aspect, 1)
+    return round(aspect * height, 1), round(height, 1)
+
 
 
 def window_sizes(width: int, height: int) -> list[str]:
@@ -472,7 +515,8 @@ _STEPS = [
      "apart from others. Say what is actually plugged in; write \"none\" for a part this rig "
      "does not have."),
     ("Screen, sound, fixation and data",
-     "Which screen the participant sees and how the games are shown on it, whether game sound "
+     "Which screen the participant sees, how the games are shown on it, how big its image is "
+     "and how far the participant's eye is from it (measured with a ruler), whether game sound "
      "is played, how long the fixation cross at the start and end of every run lasts, and "
      "where the data of every run on this rig is saved."),
     ("Response devices",
@@ -596,6 +640,7 @@ class _RigWindow(QtWidgets.QDialog):
     def _show_applicable(self) -> None:
         """Hide, or turn off, what the choices made so far make irrelevant."""
         self.size_pick.setEnabled(not self.switches["is_fullscreen"].isChecked())
+        self.ruler_button.setEnabled(self._picked_resolution() is not None)
         self.calibrate.setEnabled(bool((self.controller or {}).get("devices")))
         self.sync_form.show_rows(["mode", *SYNC_ROWS.get(self._value(self.sync_form, "mode"),
                                                          [f.key for f in SYNC_FIELDS])])
@@ -631,6 +676,7 @@ class _RigWindow(QtWidgets.QDialog):
         """The fixation warning, the trigger summary, the rig measurement plan and the save step's
         summary, as things stand."""
         self._refresh_fixation_note()
+        self._refresh_geometry_note()
         self.trigger_text.setText(self._trigger_report())
         try:
             rig = rig_file.RigConfig.from_dict(self.rig, self.path)
@@ -686,7 +732,8 @@ class _RigWindow(QtWidgets.QDialog):
         about = self._about()
         missing = [k for k in self.fields if k not in _OPTIONAL and k not in about]
         names = [_ABOUT_LABELS.get(k, k) for k in missing]
-        return ([f"fill in {', '.join(names)}"] if missing else []) + rig_file.problems(about)
+        return (([f"fill in {', '.join(names)}"] if missing else [])
+                + rig_file.problems(about))
 
     def _about(self) -> dict[str, str]:
         out = {}
@@ -720,6 +767,7 @@ class _RigWindow(QtWidgets.QDialog):
         self.monitor_pick.currentIndexChanged.connect(lambda _i: self._fill_sizes())
         self.size_pick.editTextChanged.connect(self._check)
         form.addRow("window size", self.size_pick)
+        self._geometry_rows(form, screen.get("geometry"))
         form.addRow("vsync", self._switch(
             "has_vsync", screen["has_vsync"],
             "Show each image exactly on the screen's refresh. Leave it on, unless the display "
@@ -748,6 +796,145 @@ class _RigWindow(QtWidgets.QDialog):
         layout.addLayout(form)
         layout.addStretch(1)
         return page
+
+    def _geometry_rows(self, form: QtWidgets.QFormLayout, geometry: Any) -> None:
+        """The screen geometry's fields, the diagonal and aspect ratio kept in step with the
+        width and height, what they come to in degrees, and the measurement with a ruler."""
+        given = geometry if isinstance(geometry, dict) else {}
+        self.geometry_fields: dict[str, QtWidgets.QLineEdit] = {}
+        for key, (label, tip) in _GEOMETRY_FIELDS.items():
+            value = given.get(key)
+            edit = QtWidgets.QLineEdit(f"{value:g}" if isinstance(value, (int, float))
+                                       else "" if value is None else str(value))
+            edit.setToolTip(tip)
+            edit.textChanged.connect(self._check)
+            self.geometry_fields[key] = edit
+        self.diagonal = QtWidgets.QLineEdit()
+        self.diagonal.setToolTip("The image's diagonal, in cm: with the aspect ratio, it gives "
+                                 "the width and height, and they give it.")
+        self.aspect = QtWidgets.QLineEdit()
+        self.aspect.setPlaceholderText("16:9")
+        self.aspect.setToolTip("The image's width to its height, as 16:9 or 1.78:1; it starts "
+                               "on the shape of the screen's pixels.")
+        for edit in (self.geometry_fields["width_cm"], self.geometry_fields["height_cm"]):
+            edit.textEdited.connect(lambda _text: self._diagonal_from_size())
+        for edit in (self.diagonal, self.aspect):
+            edit.textEdited.connect(lambda _text: self._size_from_diagonal())
+        self._diagonal_from_size()
+        resolution = self._picked_resolution()
+        if not self.aspect.text() and resolution is not None:
+            self.aspect.setText(aspect_text(*resolution))
+        for key in ("width_cm", "height_cm"):
+            form.addRow(_GEOMETRY_FIELDS[key][0], self.geometry_fields[key])
+        form.addRow("image diagonal (cm)", self.diagonal)
+        form.addRow("aspect ratio", self.aspect)
+        self.ruler_button = ui.button("Measure on the screen...", self._measure_with_ruler)
+        self.ruler_button.setToolTip(f"Resize a square on the participant's screen until a "
+                                     f"ruler says it is {SQUARE_CM:g} cm each way: fills the "
+                                     "width and height from it.")
+        self.ruler_note = QtWidgets.QLabel()
+        self.ruler_note.setWordWrap(True)
+        form.addRow("", self._column(self.ruler_button, self.ruler_note))
+        form.addRow(_GEOMETRY_FIELDS["distance_cm"][0], self.geometry_fields["distance_cm"])
+        self.geometry_note = QtWidgets.QLabel()
+        self.geometry_note.setWordWrap(True)
+        form.addRow("", self.geometry_note)
+
+    def _picked_resolution(self) -> tuple[int, int] | None:
+        """The picked monitor's pixels; ``None`` when it is not connected here."""
+        index = self.monitor_pick.currentData()
+        if not (isinstance(index, int) and 0 <= index < len(self.monitors)):
+            return None
+        return self.monitors[index][0], self.monitors[index][1]
+
+    def _diagonal_from_size(self) -> None:
+        """The diagonal and aspect ratio of the width and height typed, once both are."""
+        try:
+            width, height = (float(self.geometry_fields[k].text()) for k in ("width_cm",
+                                                                             "height_cm"))
+        except ValueError:
+            return
+        if width > 0 and height > 0:
+            self.diagonal.setText(f"{math.hypot(width, height):.1f}")
+            self.aspect.setText(aspect_text(width, height))
+
+    def _size_from_diagonal(self) -> None:
+        """The width and height of the diagonal and aspect ratio typed, once both are."""
+        try:
+            diagonal, aspect = float(self.diagonal.text()), parse_aspect(self.aspect.text())
+        except (ValueError, ZeroDivisionError):
+            return
+        if diagonal > 0:
+            width, height = size_from_diagonal(diagonal, aspect)
+            self.geometry_fields["width_cm"].setText(f"{width:g}")
+            self.geometry_fields["height_cm"].setText(f"{height:g}")
+
+    def _geometry(self) -> dict[str, float]:
+        """The screen geometry typed, a blank field left out.
+
+        :raises ValueError: a number half typed, named in the message.
+        """
+        out = {}
+        for key, edit in self.geometry_fields.items():
+            text = edit.text().strip()
+            if not text:
+                continue
+            try:
+                out[key] = float(text)
+            except ValueError:
+                raise ValueError(f"{_GEOMETRY_FIELDS[key][0]}: {text!r} is not a number") from None
+        return out
+
+    def _refresh_geometry_note(self) -> None:
+        """What the geometry comes to in degrees, and whether its shape is the screen's."""
+        try:
+            geometry = rig_file.ScreenGeometry.from_dict(self._geometry())
+        except (ValueError, KeyError):
+            self.geometry_note.setText("")
+            return
+        if any(v <= 0 for v in geometry.record().values()):
+            self.geometry_note.setText("")
+            return
+        note = (f"The image spans {geometry.degrees_for_cm(geometry.width_cm):.1f} x "
+                f"{geometry.degrees_for_cm(geometry.height_cm):.1f} degrees; one degree is "
+                f"{geometry.cm_for_degrees(1):.2f} cm.")
+        resolution = self._picked_resolution()
+        if resolution is not None:
+            cm_shape = geometry.width_cm / geometry.height_cm
+            px_shape = resolution[0] / resolution[1]
+            if abs(cm_shape / px_shape - 1) > _SHAPE_TOLERANCE:
+                note += (f" Warning: {geometry.width_cm:g} x {geometry.height_cm:g} cm is not "
+                         f"the shape of the screen's {resolution[0]} x {resolution[1]} pixels: "
+                         "measure them again.")
+        self.geometry_note.setText(note)
+
+    def _measure_with_ruler(self) -> None:
+        """Measure the image on the participant's screen with a ruler, into the width and
+        height."""
+        command = [sys.executable, "-m", "humans.standalone.rig_setup.ruler",
+                   "--monitor", str(self.monitor_pick.currentData()),
+                   *(arg for key, value in self._sizes_typed().items()
+                     for arg in (f"--{key.replace('_', '-')}", f"{value:g}"))]
+        with self._set_aside():
+            done = subprocess.run(command, check=False, capture_output=True, text=True)
+        if done.returncode != 0:
+            self.ruler_note.setText("Measurement cancelled: nothing changed." if done.returncode
+                                    == 2 else f"The measurement failed: {done.stderr.strip()}")
+            return
+        measured = json.loads(done.stdout.strip().splitlines()[-1])
+        for key in ("width_cm", "height_cm"):
+            self.geometry_fields[key].setText(f"{measured[key]:g}")
+        self._diagonal_from_size()
+        self.ruler_note.setText(f"Measured on the screen: {measured['width_cm']:g} x "
+                                f"{measured['height_cm']:g} cm.")
+
+    def _sizes_typed(self) -> dict[str, float]:
+        """The width and height typed, to start a measurement from; none half typed."""
+        try:
+            return {k: v for k, v in self._geometry().items() if k != "distance_cm" and v > 0}
+        except ValueError:
+            return {}
+
 
     def _fixation_field(self, key: str, values: dict) -> QtWidgets.QLineEdit:
         """Seconds of one of the rig's fixations; a new rig starts on fMRI's."""
@@ -833,15 +1020,22 @@ class _RigWindow(QtWidgets.QDialog):
         self.size_pick.blockSignals(False)
 
     def _screen(self) -> dict[str, Any]:
-        """:raises ValueError: a fixation half typed, named in the message."""
+        """:raises ValueError: a fixation or a measurement half typed, named in the message."""
+        geometry = self._geometry()
         return {"screen": {"size": self.size_pick.currentText().strip(),
                            "is_fullscreen": self.switches["is_fullscreen"].isChecked(),
                            "monitor": self.monitor_pick.currentData(),
-                           "has_vsync": self.switches["has_vsync"].isChecked()},
+                           "has_vsync": self.switches["has_vsync"].isChecked(),
+                           **({"geometry": geometry} if len(geometry) == len(_GEOMETRY_FIELDS)
+                              else {})},
                 "has_audio": self.switches["has_audio"].isChecked(),
                 "data_root": self.data_root.text().strip(), **self._fixation_seconds()}
 
     def _screen_problems(self) -> list[str]:
+        missing = [label for key, (label, _tip) in _GEOMETRY_FIELDS.items()
+                   if not self.geometry_fields[key].text().strip()]
+        if missing:
+            return [f"fill in {', '.join(missing)}"]
         try:
             return rig_file.problems(self._screen())
         except ValueError as exc:

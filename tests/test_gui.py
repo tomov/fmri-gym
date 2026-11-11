@@ -17,6 +17,7 @@ from humans.sync.triggers import TriggerSettings
 
 RIG = "configs/examples/rigs/laptop.json"
 EXAMPLES = rig_file.CONFIGS / "examples" / "rigs"
+GEOMETRY = {"width_cm": 53.1, "height_cm": 29.9, "distance_cm": 60.0}
 
 
 @pytest.fixture
@@ -32,7 +33,8 @@ def test_the_measurement_plan_follows_the_rig(gui):
     meg = measurement_plan(rig_file.RigConfig.open(str(EXAMPLES / "meg.json")))
     assert "Triggers: not tested" in laptop and "Responses: not tested" in laptop
     assert "serial" in meg and "1000 Hz" in meg and "recording" in meg
-    typed = rig_file.RigConfig.from_dict({"response_keys": {"1": "index"}},
+    typed = rig_file.RigConfig.from_dict({"screen": {"geometry": GEOMETRY},
+                                          "response_keys": {"1": "index"}},
                                          str(EXAMPLES / "typed.json"))
     assert "1 (index)" in measurement_plan(typed)
 
@@ -80,7 +82,7 @@ def test_the_rig_window_gives_back_the_file(qt, name):
 
 
 def test_a_rig_without_triggers_is_not_given_any_until_chosen(qt):
-    window, written = _rig_window("empty")
+    window, written = _rig_window("minimal")
     assert "triggers" not in written and "triggers" not in window.rig
     assert window._triggers_problems()
 
@@ -97,7 +99,7 @@ def test_response_keys_and_the_rig_measurement_are_the_rig_files(qt):
 
 
 def test_a_rig_measurement_waits_for_its_triggers_to_be_chosen(qt):
-    window, _ = _rig_window("empty", need_triggers=True)
+    window, _ = _rig_window("minimal", need_triggers=True)
     assert window.stack.currentIndex() == 3 and not window.next.isEnabled()
     window.preset.setCurrentIndex(0)
     window._apply_preset()
@@ -123,7 +125,7 @@ def test_only_the_options_that_apply_are_shown(qt):
 
 def test_a_new_rig_is_filled_step_by_step_then_saved_then_measured(qt, tmp_path):
     path = str(tmp_path / "site" / "rig.json")
-    window, _ = _rig_window("empty", path=path)
+    window, _ = _rig_window("minimal", path=path)
     assert not window.next.isEnabled()  # the rig is not described yet
     for key, w in window.fields.items():
         if key == "modality":
@@ -147,6 +149,58 @@ def test_a_new_rig_is_filled_step_by_step_then_saved_then_measured(qt, tmp_path)
     assert window.short_measurement.isEnabled() and not window.save.isEnabled()
     window.switches["has_audio"].setChecked(False)  # a change: save again before a rig measurement
     assert not window.short_measurement.isEnabled() and window.save.isEnabled()
+
+
+def test_the_screen_step_needs_the_screen_geometry(qt, tmp_path):
+    from humans.standalone.rig_setup.window import _RigWindow
+
+    window = _RigWindow({}, str(tmp_path / "site" / "rig.json"))
+    window._show_step(1)
+    assert not window.next.isEnabled() and "image width" in window.problems.text()
+    window.diagonal.setText("81.3")
+    window.aspect.setText("16:9")
+    window._size_from_diagonal()
+    assert window._geometry() == {"width_cm": 70.9, "height_cm": 39.9}
+    window.geometry_fields["distance_cm"].setText("120")
+    assert window.next.isEnabled(), window.problems.text()
+    assert window.rig["screen"]["geometry"] == {"width_cm": 70.9, "height_cm": 39.9,
+                                                "distance_cm": 120.0}
+    assert "32.9 x 18.9 degrees" in window.geometry_note.text()
+    window.geometry_fields["height_cm"].setText("53.2")
+    window._diagonal_from_size()
+    assert (window.diagonal.text(), window.aspect.text()) == ("88.6", "4:3")
+
+
+@pytest.mark.parametrize("text, ratio", [("16:9", 16 / 9), ("1.78:1", 1.78), ("1.5", 1.5)])
+def test_an_aspect_ratio_is_read_as_typed(gui, text, ratio):
+    from humans.standalone.rig_setup.window import aspect_text, parse_aspect
+
+    assert parse_aspect(text) == pytest.approx(ratio)
+    assert aspect_text(1920, 1080) == "16:9" and aspect_text(1470, 956) == "1.54:1"
+
+
+def test_the_ruler_measures_the_image_from_the_square_resized_to_its_size(monkeypatch):
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    import pygame
+
+    from humans.standalone.rig_setup import ruler
+
+    side = ruler.first_side_px((1920, 1080), 70.8, 39.8)
+    assert ruler.image_cm(side, (1920, 1080)) == pytest.approx({"width_cm": 70.8,
+                                                              "height_cm": 39.8}, abs=0.15)
+    assert ruler.first_side_px((1920, 1080), None, None) == (384, 384)
+    pygame.display.init()
+    pygame.font.init()
+    try:
+        screen = pygame.display.set_mode((1920, 1080))
+        for key, mod in ((pygame.K_RIGHT, pygame.KMOD_SHIFT), (pygame.K_RIGHT, 0),
+                         (pygame.K_DOWN, 0), (pygame.K_RETURN, 0)):
+            pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=key, mod=mod))
+        assert ruler.resize_until_measured(screen, (384, 384)) == (395, 383)
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, mod=0))
+        assert ruler.resize_until_measured(screen, (384, 384)) is None
+    finally:
+        pygame.quit()
 
 
 def test_flags_fmri_play_would_refuse_are_problems(gui):
