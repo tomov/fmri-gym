@@ -179,6 +179,30 @@ def test_an_aspect_ratio_is_read_as_typed(gui, text, ratio):
     assert aspect_text(1920, 1080) == "16:9" and aspect_text(1470, 956) == "1.54:1"
 
 
+def test_the_ruler_measures_the_image_from_the_square_resized_to_its_size(monkeypatch):
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    import pygame
+
+    from humans.standalone.rig_setup import ruler
+
+    side = ruler.first_side_px((1920, 1080), 70.8, 39.8)
+    assert ruler.image_cm(side, (1920, 1080)) == pytest.approx({"width_cm": 70.8,
+                                                              "height_cm": 39.8}, abs=0.15)
+    assert ruler.first_side_px((1920, 1080), None, None) == (384, 384)
+    pygame.display.init()
+    pygame.font.init()
+    try:
+        screen = pygame.display.set_mode((1920, 1080))
+        for key, mod in ((pygame.K_RIGHT, pygame.KMOD_SHIFT), (pygame.K_RIGHT, 0),
+                         (pygame.K_DOWN, 0), (pygame.K_RETURN, 0)):
+            pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=key, mod=mod))
+        assert ruler.resize_until_measured(screen, (384, 384)) == (395, 383)
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, mod=0))
+        assert ruler.resize_until_measured(screen, (384, 384)) is None
+    finally:
+        pygame.quit()
+
+
 def test_flags_fmri_play_would_refuse_are_problems(gui):
     from humans.standalone.session_editor import _flag_problems
 

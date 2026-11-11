@@ -34,6 +34,7 @@ from ...sync.triggers import (HID_DEVICES, SYNC_MODES, TRIGGER_BACKENDS, Codes, 
                         TriggerError, Triggers, TriggerSettings)
 from ..forms import Field
 from .. import widgets as ui
+from .ruler import SQUARE_CM
 
 if TYPE_CHECKING:
     from .measure import RigMeasurementSettings
@@ -639,6 +640,7 @@ class _RigWindow(QtWidgets.QDialog):
     def _show_applicable(self) -> None:
         """Hide, or turn off, what the choices made so far make irrelevant."""
         self.size_pick.setEnabled(not self.switches["is_fullscreen"].isChecked())
+        self.ruler_button.setEnabled(self._picked_resolution() is not None)
         self.calibrate.setEnabled(bool((self.controller or {}).get("devices")))
         self.sync_form.show_rows(["mode", *SYNC_ROWS.get(self._value(self.sync_form, "mode"),
                                                          [f.key for f in SYNC_FIELDS])])
@@ -797,7 +799,7 @@ class _RigWindow(QtWidgets.QDialog):
 
     def _geometry_rows(self, form: QtWidgets.QFormLayout, geometry: Any) -> None:
         """The screen geometry's fields, the diagonal and aspect ratio kept in step with the
-        width and height, and what they come to in degrees."""
+        width and height, what they come to in degrees, and the measurement with a ruler."""
         given = geometry if isinstance(geometry, dict) else {}
         self.geometry_fields: dict[str, QtWidgets.QLineEdit] = {}
         for key, (label, tip) in _GEOMETRY_FIELDS.items():
@@ -826,6 +828,13 @@ class _RigWindow(QtWidgets.QDialog):
             form.addRow(_GEOMETRY_FIELDS[key][0], self.geometry_fields[key])
         form.addRow("image diagonal (cm)", self.diagonal)
         form.addRow("aspect ratio", self.aspect)
+        self.ruler_button = ui.button("Measure on the screen...", self._measure_with_ruler)
+        self.ruler_button.setToolTip(f"Resize a square on the participant's screen until a "
+                                     f"ruler says it is {SQUARE_CM:g} cm each way: fills the "
+                                     "width and height from it.")
+        self.ruler_note = QtWidgets.QLabel()
+        self.ruler_note.setWordWrap(True)
+        form.addRow("", self._column(self.ruler_button, self.ruler_note))
         form.addRow(_GEOMETRY_FIELDS["distance_cm"][0], self.geometry_fields["distance_cm"])
         self.geometry_note = QtWidgets.QLabel()
         self.geometry_note.setWordWrap(True)
@@ -898,6 +907,34 @@ class _RigWindow(QtWidgets.QDialog):
                          f"the shape of the screen's {resolution[0]} x {resolution[1]} pixels: "
                          "measure them again.")
         self.geometry_note.setText(note)
+
+    def _measure_with_ruler(self) -> None:
+        """Measure the image on the participant's screen with a ruler, into the width and
+        height."""
+        command = [sys.executable, "-m", "humans.standalone.rig_setup.ruler",
+                   "--monitor", str(self.monitor_pick.currentData()),
+                   *(arg for key, value in self._sizes_typed().items()
+                     for arg in (f"--{key.replace('_', '-')}", f"{value:g}"))]
+        with self._set_aside():
+            done = subprocess.run(command, check=False, capture_output=True, text=True)
+        if done.returncode != 0:
+            self.ruler_note.setText("Measurement cancelled: nothing changed." if done.returncode
+                                    == 2 else f"The measurement failed: {done.stderr.strip()}")
+            return
+        measured = json.loads(done.stdout.strip().splitlines()[-1])
+        for key in ("width_cm", "height_cm"):
+            self.geometry_fields[key].setText(f"{measured[key]:g}")
+        self._diagonal_from_size()
+        self.ruler_note.setText(f"Measured on the screen: {measured['width_cm']:g} x "
+                                f"{measured['height_cm']:g} cm.")
+
+    def _sizes_typed(self) -> dict[str, float]:
+        """The width and height typed, to start a measurement from; none half typed."""
+        try:
+            return {k: v for k, v in self._geometry().items() if k != "distance_cm" and v > 0}
+        except ValueError:
+            return {}
+
 
     def _fixation_field(self, key: str, values: dict) -> QtWidgets.QLineEdit:
         """Seconds of one of the rig's fixations; a new rig starts on fMRI's."""
