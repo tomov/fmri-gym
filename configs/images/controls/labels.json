@@ -108,11 +108,13 @@
       "CONTROLLER_BUTTON_A": ["nitro (boost)"],
       "CONTROLLER_BUTTON_Y": ["rescue"]
     },
-    "gym/cartpole-GMPD3-stick-nav.png": {
-      "LEFT_STICK": ["left / right:", "push the cart"]
-    },
     "gym/mountaincar-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["left / right:", "push the car"]
+    },
+    "gym/carracing-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["left / right:", "steer"],
+      "CONTROLLER_AXIS_TRIGGERRIGHT": ["gas"],
+      "CONTROLLER_AXIS_TRIGGERLEFT": ["brake"]
     },
     "gym/acrobot-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["left / right:", "turn the", "middle joint"]
@@ -128,7 +130,7 @@
       "LEFT_STICK": ["move"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["fire"]
     },
-    "minihack/mazewalk9x9-GMPD3-stick-nav.png": {
+    "minihack/navigate-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["move one square"],
       "CONTROLLER_BUTTON_X": ["hold: pause menu"]
     }

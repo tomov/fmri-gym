@@ -1,0 +1,5 @@
+{
+  "curriculum": [
+    {"__include": "common/carracing-GMPD3-stick-nav.json"}
+  ]
+}

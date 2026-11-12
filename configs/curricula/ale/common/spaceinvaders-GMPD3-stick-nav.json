@@ -17,5 +17,5 @@
   },
   "controls": {"": 0, "CONTROLLER_AXIS_TRIGGERRIGHT": 1, "CONTROLLER_AXIS_LEFTX_RIGHT": 2, "CONTROLLER_AXIS_LEFTX_LEFT": 3,
                "CONTROLLER_AXIS_LEFTX_RIGHT+CONTROLLER_AXIS_TRIGGERRIGHT": 4, "CONTROLLER_AXIS_LEFTX_LEFT+CONTROLLER_AXIS_TRIGGERRIGHT": 5},
-  "mode": "duration", "duration": 300.0, "fps": 30
+  "mode": "duration", "duration": 300.0, "fps": 60
 }

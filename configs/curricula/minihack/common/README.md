@@ -59,5 +59,5 @@ Each block is its task played until completed (`mode` `episode`, `n_episodes` 1,
 | `room_beyond_the_next_wall.json` | Room: Beyond the Next Wall |
 | `room_find_the_connections.json` | Room: Find the Connections |
 | `room_look_before_moving.json` | Room: Look Before Moving |
-| `mazewalk9x9-GMPD3-stick-nav.json` (in `minihack/`) | MiniHack-MazeWalk-9x9-Allocentric-v0 on a controller's left stick: the four cardinal moves only (a turn-based step is one control's press, so a stick diagonal is two moves), hold X for the pause menu |
+| `practice-GMPD3-stick-nav.json` (in `minihack/`) | nine levels on a controller's left stick, from a small room through monsters, a dark room, a maze and a river to three designed levels, each capped at 60-240 s, from `common/navigate-GMPD3-stick-nav.json`: the four cardinal moves only (a turn-based step is one control's press, so a stick diagonal is two moves), hold X for the pause menu |
 | `all.json` (in `minihack/`) | room5x5, room15x15, mazewalk9x9, corridor, river, eat (allocentric) in a row |

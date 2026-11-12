@@ -1,0 +1,27 @@
+{
+  "type": "game", "backend": "gym", "game": "CarRacing-v3",
+  "instructions": {
+    "title": "CarRacing", "align": "left", "controls_to_dismiss": ["CONTROLLER_BUTTON_A"],
+    "text": [
+      "Drive round the track and stay on the road.",
+      "Each new tile of road you cross scores points.",
+      "",
+      "![controls](images/controls/gym/carracing-GMPD3-stick-nav.png)",
+      "",
+      "Controls:",
+      "   stick left / right   steer",
+      "   RT                   gas",
+      "   LT                   brake",
+      "",
+      "Press A to start."
+    ]
+  },
+  "controls": {"": [0.0, 0.0, 0.0],
+               "CONTROLLER_AXIS_LEFTX_LEFT": [-1.0, 0.0, 0.0], "CONTROLLER_AXIS_LEFTX_RIGHT": [1.0, 0.0, 0.0],
+               "CONTROLLER_AXIS_TRIGGERRIGHT": [0.0, 1.0, 0.0], "CONTROLLER_AXIS_TRIGGERLEFT": [0.0, 0.0, 0.8],
+               "CONTROLLER_AXIS_LEFTX_LEFT+CONTROLLER_AXIS_TRIGGERRIGHT": [-1.0, 1.0, 0.0],
+               "CONTROLLER_AXIS_LEFTX_RIGHT+CONTROLLER_AXIS_TRIGGERRIGHT": [1.0, 1.0, 0.0],
+               "CONTROLLER_AXIS_LEFTX_LEFT+CONTROLLER_AXIS_TRIGGERLEFT": [-1.0, 0.0, 0.8],
+               "CONTROLLER_AXIS_LEFTX_RIGHT+CONTROLLER_AXIS_TRIGGERLEFT": [1.0, 0.0, 0.8]},
+  "mode": "duration", "duration": 180.0, "fps": 25
+}

@@ -1,12 +1,11 @@
 {
   "type": "game", "backend": "minihack",
   "instructions": {
-    "title": "MiniHack: MazeWalk (9x9)", "align": "left", "controls_to_dismiss": ["CONTROLLER_BUTTON_A"],
+    "title": "MiniHack", "align": "left", "controls_to_dismiss": ["CONTROLLER_BUTTON_A"],
     "text": [
-      "Find your way through the maze to the exit",
-      "( the down-staircase, > ).",
+      "Walk to the staircase ( > ) to finish the level.",
       "",
-      "![controls](images/controls/minihack/mazewalk9x9-GMPD3-stick-nav.png)",
+      "![controls](images/controls/minihack/navigate-GMPD3-stick-nav.png)",
       "",
       "Controls:",
       "   stick    move one square  N / S / W / E",
