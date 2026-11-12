@@ -5,8 +5,8 @@
 set -e  # Exit on error
 
 # Session parameters
-SUBJECT=sub-01
-RIG=configs/MT/rigs/xbox.json
+SUBJECT=sub-BC01
+RIG=configs/BC/rigs/xbox.json
 SES=900
 RUN_DURATION=120
 

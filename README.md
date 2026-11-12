@@ -78,7 +78,7 @@ A run is a JSON file and a session is a `.sh` script (below). Write them by hand
 ```bash
 uv sync --extra dbp --extra gui
 uv run session-editor --curriculum configs/curricula/ale/levels/pong.json
-uv run session-editor --session configs/MT/subjects/sub-01/ses-001/dbp_mix.sh
+uv run session-editor --session configs/BC/subjects/sub-BC01/ses-001/dbp_mix.sh
 uv run session-editor                               # start from a new run
 uv run rig-setup                                    # pick a rig file (or make one), see and change it, run its rig measurements
 uv run rig-setup --rig configs/examples/rigs/laptop.json --measure   # measure the rig; --long once per rig
@@ -465,7 +465,7 @@ sh configs/examples/sessions/pilot.sh
 
 Open it in `session-editor --session configs/examples/sessions/pilot.sh` to change the games or their length, and save it under your team (`configs/<team>/subjects/sub-<label>/ses-<NNN>/`).
 
-The `MT` team's sessions are in `configs/MT/subjects/`: three of about an hour for `sub-01` (eleven 5-minute runs each: one per genre in `ses-001/dbp_mix.sh`, the COOM and ViZDoom scenarios in `ses-002/dbp_doom.sh`, puzzles in `ses-003/dbp_puzzle.sh`). They fix their subject and the example laptop rig at the top: change `RIG=` there for a session on another rig.
+The `BC` team's sessions are in `configs/BC/subjects/`: three of about an hour for `sub-BC01` (eleven 5-minute runs each: one per genre in `ses-001/dbp_mix.sh`, the COOM and ViZDoom scenarios in `ses-002/dbp_doom.sh`, puzzles in `ses-003/dbp_puzzle.sh`). They fix their subject and the example laptop rig at the top: change `RIG=` there for a session on another rig.
 
 ```jsonc
 {"type": "fixation", "duration": 2.0}                 // "+" for N seconds

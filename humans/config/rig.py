@@ -88,7 +88,7 @@ FIELDS = {
 }
 #: What each of :data:`FIELDS` looks like, for the form's placeholders.
 EXAMPLES = {
-    "site": "MT", "rig": "mgh-prisma", "pi": "MT", "modality": "fmri",
+    "site": "BC", "rig": "mgh-prisma", "pi": "MT", "modality": "fmri",
     "monitor": "BOLDscreen 32 LCD, 120 Hz, 1920x1080",
     "photodiode": "BioSemi photodiode on sound card input 0",
     "audio_path": "RME Babyface -> Sensimetrics S14 insert earphones",
