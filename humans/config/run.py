@@ -21,7 +21,7 @@ from importlib import metadata
 
 from ..inputs import controls_of_input_devices
 from .curriculum import Curriculum
-from .phases import GamePhase, MenuSettings, Message, Phase, Survey
+from .phases import GamePhase, HintSettings, MenuSettings, Message, Phase, Survey
 from .rig import RigConfig
 
 
@@ -167,7 +167,7 @@ def get_all_required_controls_for(phase: Phase) -> frozenset[str]:
     """Every control the participant must be able to press in ``phase``.
 
     :param phase: any phase; one that takes no control needs none.
-    :return: a game's bound controls, its menu's and its instructions'; a
+    :return: a game's bound controls, its menu's, its hint's and its instructions'; a
         message's dismissing controls; a survey's points.
     """
     if isinstance(phase, Survey):
@@ -189,11 +189,13 @@ def _controls_that_dismiss(message: Message) -> frozenset[str]:
 
 
 def _controls_of_game(game: GamePhase) -> frozenset[str]:
-    """Every control in its ``controls`` combos, its menu's, and its instructions'."""
+    """Every control in its ``controls`` combos, its menu's, its hint's and its instructions'."""
     out = {name for combo in game.spec["controls"] for name in combo.split("+") if name}
     if game.instructions is not None and game.instructions.controls_to_dismiss is not None:
         out |= set(game.instructions.controls_to_dismiss)
     if "menu" in game.spec:
         menu = MenuSettings.from_dict(game.spec["menu"])
         out |= {menu.control, *menu.move, menu.confirm}
+    if "hint" in game.spec:
+        out.add(HintSettings.from_dict(game.spec["hint"]).control)
     return frozenset(out)

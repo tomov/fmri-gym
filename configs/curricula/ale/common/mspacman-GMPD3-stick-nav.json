@@ -10,6 +10,7 @@
       "",
       "Controls:",
       "   stick   move",
+      "   hold Y  show the controls",
       "",
       "Press A to start."
     ]
@@ -17,5 +18,13 @@
   "controls": {"": 0, "CONTROLLER_AXIS_LEFTY_UP": 1, "CONTROLLER_AXIS_LEFTX_RIGHT": 2, "CONTROLLER_AXIS_LEFTX_LEFT": 3, "CONTROLLER_AXIS_LEFTY_DOWN": 4,
                "CONTROLLER_AXIS_LEFTY_UP+CONTROLLER_AXIS_LEFTX_RIGHT": 5, "CONTROLLER_AXIS_LEFTY_UP+CONTROLLER_AXIS_LEFTX_LEFT": 6,
                "CONTROLLER_AXIS_LEFTY_DOWN+CONTROLLER_AXIS_LEFTX_RIGHT": 7, "CONTROLLER_AXIS_LEFTY_DOWN+CONTROLLER_AXIS_LEFTX_LEFT": 8},
+  "hint": {
+    "control": "CONTROLLER_BUTTON_Y", "hold": 0.0, "after": 0.0,
+    "text": [
+      "![controls](images/controls/ale/mspacman-GMPD3-stick-nav.png)",
+      "",
+      "Let go of Y to go back to the game."
+    ]
+  },
   "mode": "duration", "duration": 300.0, "fps": 60
 }

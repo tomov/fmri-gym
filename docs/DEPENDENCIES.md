@@ -4,7 +4,7 @@ The package is a stack of layers, and an import only ever points down, type hint
 
 ```mermaid
 flowchart TD
-    standalone["standalone/"] --> runLayer["run.py, menu.py"]
+    standalone["standalone/"] --> runLayer["run.py, popup.py"]
     runLayer --> config["config/"]
     config --> adapters["adapters/"]
     adapters --> outputs["outputs/"]
@@ -20,7 +20,7 @@ flowchart TD
 From the top:
 
 1. **`standalone/`**: the commands that are not a run (rig setup, gamepad calibration, the session editor, the photodiode test). They may import anything below them; nothing outside `standalone/` imports from it.
-2. **`run.py`, then `menu.py`**: one run's loop, and the pause menu it opens.
+2. **`run.py`, then `popup.py`**: one run's loop, and the pop-ups it opens (the pause menu, the hint).
 3. **`config/`**: the curriculum, the rig config and the run config, checked against the leaves below.
 4. **The leaves, an ordered stack**: `adapters/` over `outputs/` over `save/` over `sync/`; `inputs/` sits beside `sync/` and imports none of them. Each leaf imports only the leaves below it, so `sync/` and `inputs/` can be read, tested and reused alone.
 5. **Below `adapters/`**: the game engines and the `gym/` packages, which only `adapters/` imports. A `gym/` package imports no `humans` and no other `gym/` package but the one it is built on (`coom_gym` on `vizdoom_gym`). Only a `gym/` package reads `external/`, which is reached by path or compiled rather than imported by name, so the linter cannot see it and the rule is kept by review.
@@ -34,7 +34,7 @@ What each module imports from another folder or file of `humans` (imports inside
 | module | imports |
 |---|---|
 | `run.py` | `menu`, `config/run`, `config/curriculum`, `config/phases`, `adapters`, `inputs`, `outputs/display`, `outputs/audio`, `save/logging`, `save/bids`, `sync/clock`, `sync/triggers` |
-| `menu.py` | `config/phases` (`MenuSettings`), `inputs`, `outputs/display`, `save/logging` |
+| `popup.py` | `config/phases` (`MenuSettings`, `HintSettings`), `inputs`, `outputs/display`, `save/logging` |
 | `config/run.py` | `adapters` (`get_adapter`, only to build each game once at start-up), `inputs` |
 | `config/phases.py` | `inputs`, `outputs/display` (`image_line_problems`) |
 | `config/rig.py` | `inputs`, `sync/triggers` (`TriggerSettings`) |
@@ -82,4 +82,4 @@ Each of these also imports from the layers below: `rig_setup/measure.py` reaches
 
 ## Keeping it this way
 
-Run `PYTHONPATH="$(printf '%s:' gym/*/)" uv run lint-imports` before pushing; CI runs it too. A broken contract names the import and the chain that breaks it. The fix is to move the shared piece down to the lower of the layers that use it, as `MenuSettings` sits in `config/phases.py` so that the config need not import the menu, or to pass what a lower layer needs from above as an argument, as `save.replay.reconstruct_episode` takes the adapter rather than building one. A new backend's engine and `gym/` package go into the contracts' lists (the `add-backend` skill).
+Run `PYTHONPATH="$(printf '%s:' gym/*/)" uv run lint-imports` before pushing; CI runs it too. A broken contract names the import and the chain that breaks it. The fix is to move the shared piece down to the lower of the layers that use it, as `MenuSettings` sits in `config/phases.py` so that the config need not import the pop-ups, or to pass what a lower layer needs from above as an argument, as `save.replay.reconstruct_episode` takes the adapter rather than building one. A new backend's engine and `gym/` package go into the contracts' lists (the `add-backend` skill).

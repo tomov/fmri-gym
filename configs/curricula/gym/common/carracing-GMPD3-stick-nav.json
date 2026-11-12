@@ -12,6 +12,7 @@
       "   stick left / right   steer",
       "   RT                   gas",
       "   LT                   brake",
+      "   hold Y               show the controls",
       "",
       "Press A to start."
     ]
@@ -23,5 +24,13 @@
                "CONTROLLER_AXIS_LEFTX_RIGHT+CONTROLLER_AXIS_TRIGGERRIGHT": [1.0, 1.0, 0.0],
                "CONTROLLER_AXIS_LEFTX_LEFT+CONTROLLER_AXIS_TRIGGERLEFT": [-1.0, 0.0, 0.8],
                "CONTROLLER_AXIS_LEFTX_RIGHT+CONTROLLER_AXIS_TRIGGERLEFT": [1.0, 0.0, 0.8]},
+  "hint": {
+    "control": "CONTROLLER_BUTTON_Y", "hold": 0.0, "after": 0.0,
+    "text": [
+      "![controls](images/controls/gym/carracing-GMPD3-stick-nav.png)",
+      "",
+      "Let go of Y to go back to the game."
+    ]
+  },
   "mode": "duration", "duration": 180.0, "fps": 25
 }

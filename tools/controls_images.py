@@ -29,7 +29,7 @@ PAPER, TEXT, LEADER = (255, 255, 255), (25, 25, 25), (70, 70, 70)
 #: the part of the underlay that is the controller, and its scale in the image
 CROP, SCALE = pygame.Rect(50, 50, 1180, 800), 0.75
 #: room for the labels on each side of the controller, and under it
-MARGIN, BELOW = 420, 90
+MARGIN, BELOW = 440, 90
 
 
 #: what an unused control fades to: its pixels keep this share of their contrast with
@@ -50,6 +50,9 @@ class Control:
     anchor: tuple[int, int]
     #: which side of the controller its label goes: "left", "right" or "below"
     side: str
+    #: a label of several lines grows upward from its last line, beside the control,
+    #: rather than both ways from its middle (the top label of a column)
+    grows_up: bool = False
 
 
 #: each control a label may name, and the stick as a whole as ``LEFT_STICK``
@@ -60,7 +63,7 @@ CONTROLS = {
         Control(pygame.Rect(920, 65, 82, 103), False, (995, 150), "right"),
     "LEFT_STICK": Control(pygame.Rect(138, 300, 288, 285), True, (205, 456), "left"),
     ControlNames.CONTROLLER_BUTTON_Y:
-        Control(pygame.Rect(940, 296, 110, 104), True, (1037, 345), "right"),
+        Control(pygame.Rect(940, 296, 110, 104), True, (1037, 345), "right", grows_up=True),
     ControlNames.CONTROLLER_BUTTON_B:
         Control(pygame.Rect(1038, 380, 102, 92), True, (1123, 421), "right"),
     ControlNames.CONTROLLER_BUTTON_A:
@@ -145,6 +148,8 @@ def draw_label(canvas: pygame.Surface, font: pygame.font.Font, control: Control,
         end = (anchor[0], top - 6)
     else:
         top = anchor[1] - height // 2
+        if control.grows_up:
+            top = anchor[1] - height + surfaces[-1].get_height() // 2
         x = MARGIN - 20 if control.side == "left" else canvas.get_width() - MARGIN + 20
         end = (x + 10, anchor[1]) if control.side == "left" else (x - 10, anchor[1])
     pygame.draw.line(canvas, LEADER, anchor, end, 3)

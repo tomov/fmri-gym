@@ -141,6 +141,12 @@ def test_keymap_refuses_an_action_outside_the_space():
     ({**PHASE, "hud": {"show_score": "no"}}, "hud.show_score"),
     ({**PHASE, "hud": {"show_clock": False}}, "show_clock"),
     ({**PHASE, "hud": False}, "hud"),
+    ({**PHASE, "menu": {"control": "X", "text": ["![pad](images/no-such.png)"]}}, "no-such.png"),
+    ({**PHASE, "menu": {"control": "X", "text": [1]}}, "menu.text"),
+    ({**PHASE, "hint": {"control": "X"}}, "hint.text"),
+    ({**PHASE, "hint": {"text": "hi"}}, "hint.control"),
+    ({**PHASE, "hint": {"control": "X", "text": "hi", "hold": -1}}, "hint.hold"),
+    ({**PHASE, "hint": {"control": "X", "text": "hi", "colour": "red"}}, "colour"),
 ])
 def test_validate_config_refuses(phase, problem):
     problems = validate_curriculum({"curriculum": [phase]})
@@ -151,6 +157,33 @@ def test_validate_config_accepts_a_plain_game_phase():
     assert validate_curriculum({"curriculum": [PHASE]}) == []
     hud = {"show_score": False, "show_time_remaining": True}
     assert validate_curriculum({"curriculum": [{**PHASE, "hud": hud}]}) == []
+    menu = {"control": "X", "text": ["![pad](images/controllers/xbox-controller.png)", "", "hi"]}
+    assert validate_curriculum({"curriculum": [{**PHASE, "menu": menu}]}) == []
+    hint = {"control": "X", "hold": 3.0, "text": ["![pad](images/controllers/xbox-controller.png)"]}
+    assert validate_curriculum({"curriculum": [{**PHASE, "hint": hint}]}) == []
+
+
+def test_a_hint_shows_once_held_long_enough_and_until_let_go(monkeypatch):
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    from humans.popup import Hint
+    from humans.outputs.display import Display
+    clock = iter(range(100_000))
+    monkeypatch.setattr("humans.popup.time.perf_counter", lambda: float(next(clock)))
+    held = [frozenset({"X"})] * 6 + [frozenset()]
+    held_now = lambda: held.pop(0) if len(held) > 1 else held[0]     # noqa: E731
+    hint = Hint({"control": "X", "hold": 2.0, "text": "hi"}, 0.0, held_now)
+    assert [hint.armed() for _ in range(3)] == [False, False, True] and hint.pending
+
+    class Log:
+        def log(self, **record):
+            pass
+    display = Display(size=(200, 150), vsync=False)
+    try:
+        assert hint.run(display, lambda: 1.0, Log(), lambda: []) == "resume"
+    finally:
+        display.close()
+    assert not hint.pending and held == [frozenset()]
+    assert hint.describe()["events"] == [{"opened": 1.0, "closed": 1.0}]
 
 
 @pytest.mark.parametrize("hud, lines", [

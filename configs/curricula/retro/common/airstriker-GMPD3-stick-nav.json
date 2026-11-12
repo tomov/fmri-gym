@@ -11,10 +11,19 @@
       "Controls:",
       "   stick   move",
       "   RT      fire",
+      "   hold Y  show the controls",
       "",
       "Press A to start."
     ]
   },
   "controls": {"CONTROLLER_AXIS_LEFTX_LEFT": 6, "CONTROLLER_AXIS_LEFTX_RIGHT": 7, "CONTROLLER_AXIS_LEFTY_UP": 4, "CONTROLLER_AXIS_LEFTY_DOWN": 5, "CONTROLLER_AXIS_TRIGGERRIGHT": 0},
+  "hint": {
+    "control": "CONTROLLER_BUTTON_Y", "hold": 0.0, "after": 0.0,
+    "text": [
+      "![controls](images/controls/retro/airstriker-GMPD3-stick-nav.png)",
+      "",
+      "Let go of Y to go back to the game."
+    ]
+  },
   "mode": "duration", "duration": 300.0, "fps": 59.92274340431231, "state_stride": 15
 }

@@ -12,12 +12,27 @@
       "   X / B                  slide a horizontal car left / right",
       "   Y / A                  slide a vertical car up / down",
       "   hold LT                pause menu (restart / give up / resume)",
+      "   hold Y                 show the controls",
       "",
       "Press A to begin."
     ]
   },
   "controls": {"CONTROLLER_AXIS_TRIGGERLEFT": 4, "CONTROLLER_AXIS_TRIGGERRIGHT": 5, "CONTROLLER_BUTTON_X": 8, "CONTROLLER_BUTTON_B": 9, "CONTROLLER_BUTTON_Y": 10, "CONTROLLER_BUTTON_A": 11},
-  "menu": {"control": "CONTROLLER_AXIS_TRIGGERLEFT", "hold": 3.0, "after": 300.0, "options": ["reset", "forfeit", "resume"], "move": ["CONTROLLER_BUTTON_Y", "CONTROLLER_BUTTON_A"], "confirm": "CONTROLLER_AXIS_TRIGGERRIGHT"},
+  "menu": {
+    "control": "CONTROLLER_AXIS_TRIGGERLEFT", "hold": 3.0, "after": 300.0, "options": ["reset", "forfeit", "resume"], "move": ["CONTROLLER_BUTTON_Y", "CONTROLLER_BUTTON_A"], "confirm": "CONTROLLER_AXIS_TRIGGERRIGHT",
+    "text": [
+      "   Y / A   choose",
+      "   RT      select"
+    ]
+  },
+  "hint": {
+    "control": "CONTROLLER_BUTTON_Y", "hold": 3.0, "after": 0.0,
+    "text": [
+      "![controls](images/controls/rushhour/rushhour-GMPD3-ABXY-nav.png)",
+      "",
+      "Let go of Y to go back to the game."
+    ]
+  },
   "hud": {"show_score": false, "show_time_remaining": false},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 480.0,
   "env_kwargs": {"movable_only": true}, "fps": 60,

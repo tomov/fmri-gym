@@ -32,7 +32,7 @@ import math
 import sys
 import time
 from collections import Counter, deque
-from collections.abc import Callable, Collection, Iterator
+from collections.abc import Callable, Collection, Iterator, Sequence
 from dataclasses import asdict, dataclass, replace
 from typing import TYPE_CHECKING, Any
 
@@ -47,7 +47,7 @@ from .config.phases import BlockMode, Fixation, GamePhase, Message, Phase, Surve
 from .config.run import RunConfig
 from .outputs.display import Display, check_monitor
 from .inputs import QUIT, ControlNames, Edge, InputDevice, InputEvent, open_input_devices
-from .menu import Menu
+from .popup import Hint, Menu, PopUp
 from .save.logging import Logger
 from .sync.clock import Clock
 from .sync.triggers import Triggers
@@ -118,7 +118,7 @@ def _poll_keys_until(
     deadline: float,
     clock: Clock,
     logger: Logger,
-    menu: Menu | None = None,
+    pop_ups: Sequence[PopUp] = (),
     stop_on: Collection[str] = (),
     redraw: Callable[[], float] | None = None,
 ) -> tuple[list[str], bool]:
@@ -130,15 +130,15 @@ def _poll_keys_until(
     sleeping. The controls pressed meanwhile are returned, so a tap shorter
     than the wait still counts for the frame. In turn-based play (``stop_on``
     given) the wait ends at the first press of one of them, so the step happens
-    then, not at the tick. The wait also ends the moment the block's menu is
-    armed (its key held long enough), which the caller reads off ``menu.pending``.
+    then, not at the tick. The wait also ends the moment one of the block's pop-ups is
+    armed (its key held long enough), which the caller reads off its ``pending``.
 
     :param inputs: the run's input devices.
     :param display: the display, idled between polls.
     :param deadline: ``perf_counter`` at which to stop waiting.
     :param clock: the run's clock, for the log.
     :param logger: the run's logger.
-    :param menu: the block's :class:`~.menu.Menu`, if the phase has one.
+    :param pop_ups: the block's :class:`~.popup.Menu` and :class:`~.popup.Hint`, those it has.
     :param stop_on: control names a press of which ends the wait.
     :param redraw: called every :data:`HUD_REDRAW_S` while waiting, for a
         wait long enough that the screen would otherwise go stale. It
@@ -149,7 +149,7 @@ def _poll_keys_until(
     pressed: list[str] = []
     next_redraw = time.perf_counter() + HUD_REDRAW_S
     while True:
-        if menu is not None and menu.armed():
+        if any(pop_up.armed() for pop_up in pop_ups):
             return pressed, False
         for name, edge in read_input_events(inputs):
             down = edge is Edge.DOWN
@@ -532,7 +532,7 @@ class Run:
         seed: int,
         episode_id: int,
         block_end: float,
-        menu: Menu | None,
+        pop_ups: Sequence[PopUp],
         initial_state: bytes | None = None,
         recent_states: deque | None = None,
     ) -> EpisodeResult:
@@ -546,7 +546,7 @@ class Run:
         :param seed: RNG seed for this episode's ``reset``.
         :param episode_id: index of this episode within the game block.
         :param block_end: ``perf_counter`` deadline for the game block.
-        :param menu: the block's :class:`~.menu.Menu`, or ``None``.
+        :param pop_ups: the block's :class:`~.popup.Menu` and :class:`~.popup.Hint`, those it has.
         :param initial_state: a savestate to restore over the reset, so the
             episode starts where an earlier run's stopped; logged on
             ``episode_start``, since it, not the seed, is what the episode
@@ -605,15 +605,16 @@ class Run:
             waits_for_press = game_phase.is_turn_based and auto is None
             deadline = block_end if waits_for_press else next_t
             pressed, user_quit = _poll_keys_until(
-                self.inputs, self.display, deadline, self.clock, self.logger, menu,
+                self.inputs, self.display, deadline, self.clock, self.logger, pop_ups,
                 stop_on=key_to_action if waits_for_press else (),
                 redraw=redraw if waits_for_press else None)
             if user_quit:
                 outcome = "quit"
                 break
-            if menu is not None and menu.pending:
-                choice = menu.run(self.display, self.clock.run_time, self.logger,
-                                  lambda: read_input_events(self.inputs))
+            pop_up = next((pop_up for pop_up in pop_ups if pop_up.pending), None)
+            if pop_up is not None:
+                choice = pop_up.run(self.display, self.clock.run_time, self.logger,
+                                    lambda: read_input_events(self.inputs))
                 if choice != "resume":
                     outcome = choice
                     break
@@ -742,8 +743,8 @@ class Run:
         Creates the env via the phase's backend adapter, plays until duration /
         episode count / quit, then writes its log and a manifest phase entry.
 
-        :param game_phase: the block; its ``spec`` (``keys``, ``menu``, and the
-            backend's own keys) is what the adapter and the menu are built from.
+        :param game_phase: the block; its ``spec`` (``keys``, ``menu``, ``hint``, and the
+            backend's own keys) is what the adapter and the pop-ups are built from.
         :param index: phase index in the curriculum (for the manifest).
         :param block_progress: what an earlier run that stopped this block
             left of it; ``None`` plays the block from its beginning.
@@ -783,8 +784,10 @@ class Run:
         block_start = time.perf_counter()
         own_end = block_start + game_phase.duration - block_time_elapsed
         block_end = min(own_end, self._run_end)
-        # The hold-a-key pause menu (reset / forfeit / resume), if the phase has one.
+        # The hold-a-key pause menu (reset / forfeit / resume) and hint, those the phase has.
         menu = Menu(spec["menu"], block_start, self.inputs.held) if "menu" in spec else None
+        hint = Hint(spec["hint"], block_start, self.inputs.held) if "hint" in spec else None
+        pop_ups = tuple(pop_up for pop_up in (menu, hint) if pop_up is not None)
         episodes: list[EpisodeResult] = []
         outcome = ""
 
@@ -796,7 +799,7 @@ class Run:
             # the very instance the subject gave up on (a start-over).
             result = self._episode(
                 adapter, game_phase, seed=game_phase.seed + num_completed_episodes,
-                episode_id=len(episodes), block_end=block_end, menu=menu,
+                episode_id=len(episodes), block_end=block_end, pop_ups=pop_ups,
                 initial_state=initial_state, recent_states=recent_states)
             episodes.append(result)
             outcome = result.outcome
@@ -851,6 +854,7 @@ class Run:
                if game_phase.advance_on is not None else {}),
             "data_dir": data_dir, **speed,
             **({"menu": menu.describe()} if menu else {}),
+            **({"hint": hint.describe()} if hint else {}),
             **({"instructions": instructions} if instructions else {}),
         })
 

@@ -10,12 +10,27 @@
       "Controls:",
       "   stick    move one square  N / S / W / E",
       "   hold X   pause menu (restart / give up / resume)",
+      "   hold Y   show the controls",
       "",
       "Press A to start."
     ]
   },
   "controls": {"CONTROLLER_AXIS_LEFTY_UP": 0, "CONTROLLER_AXIS_LEFTX_RIGHT": 1, "CONTROLLER_AXIS_LEFTY_DOWN": 2, "CONTROLLER_AXIS_LEFTX_LEFT": 3},
-  "menu": {"control": "CONTROLLER_BUTTON_X", "hold": 3.0, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["CONTROLLER_AXIS_LEFTY_UP", "CONTROLLER_AXIS_LEFTY_DOWN"], "confirm": "CONTROLLER_BUTTON_A"},
+  "menu": {
+    "control": "CONTROLLER_BUTTON_X", "hold": 3.0, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["CONTROLLER_AXIS_LEFTY_UP", "CONTROLLER_AXIS_LEFTY_DOWN"], "confirm": "CONTROLLER_BUTTON_A",
+    "text": [
+      "   stick up / down   choose",
+      "   A                 select"
+    ]
+  },
+  "hint": {
+    "control": "CONTROLLER_BUTTON_Y", "hold": 0.0, "after": 0.0,
+    "text": [
+      "![controls](images/controls/minihack/navigate-GMPD3-stick-nav.png)",
+      "",
+      "Let go of Y to go back to the game."
+    ]
+  },
   "hud": {"show_score": false, "show_time_remaining": false},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 300.0, "fps": 15, "is_turn_based": true
 }

@@ -12,11 +12,20 @@
       "   stick left / right   highlight a tube",
       "   RT                   select / pour",
       "   X                    undo",
+      "   hold Y               show the controls",
       "",
       "Press A to start."
     ]
   },
   "controls": {"CONTROLLER_AXIS_LEFTX_LEFT": 0, "CONTROLLER_AXIS_LEFTX_RIGHT": 1, "CONTROLLER_AXIS_TRIGGERRIGHT": 2, "CONTROLLER_BUTTON_X": 3},
+  "hint": {
+    "control": "CONTROLLER_BUTTON_Y", "hold": 0.0, "after": 0.0,
+    "text": [
+      "![controls](images/controls/aigamestore/game1-GMPD3-stick-nav.png)",
+      "",
+      "Let go of Y to go back to the game."
+    ]
+  },
   "hud": {"show_score": false, "show_time_remaining": false},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 120.0,
   "fps": 30, "frame_skip": 2
