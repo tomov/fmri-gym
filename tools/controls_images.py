@@ -29,7 +29,7 @@ PAPER, TEXT, LEADER = (255, 255, 255), (25, 25, 25), (70, 70, 70)
 #: the part of the underlay that is the controller, and its scale in the image
 CROP, SCALE = pygame.Rect(50, 50, 1180, 800), 0.75
 #: room for the labels on each side of the controller, and under it
-MARGIN, BELOW = 420, 90
+MARGIN, BELOW = 440, 90
 
 
 #: what an unused control fades to: its pixels keep this share of their contrast with

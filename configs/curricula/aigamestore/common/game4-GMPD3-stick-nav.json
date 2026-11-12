@@ -17,7 +17,7 @@
   },
   "controls": {"CONTROLLER_BUTTON_A": 0, "CONTROLLER_AXIS_LEFTY_UP": 1},
   "hint": {
-    "control": "CONTROLLER_BUTTON_Y", "hold": 3.0, "after": 0.0,
+    "control": "CONTROLLER_BUTTON_Y", "hold": 0.0, "after": 0.0,
     "text": [
       "![controls](images/controls/aigamestore/game4-GMPD3-stick-nav.png)",
       "",

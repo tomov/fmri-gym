@@ -9,7 +9,7 @@ A screen's text shows an image where a line is only `![alt](path)`, the path fro
 
 ## Make or change one
 
-1. Edit its entry in `labels.json`: one key per control the phase binds in `controls`, plus the menu's `control` (labelled "hold: pause menu") and the hint's ("hold: controls"); the text is the action the adapter's docstring gives that index, worded as the Controls lines word it.
+1. Edit its entry in `labels.json`: one key per control the phase binds in `controls`, plus the menu's `control` (labelled "hold: pause menu") and the hint's ("hold: show controls"); the text is the action the adapter's docstring gives that index, worded as the Controls lines word it.
 2. Redraw: `uv run python tools/controls_images.py configs/images/controls/labels.json`. A control the drawing does not have stops it, with the list of the ones it has.
 3. For a new image, add the line to the instructions' `text` in the `common/` file, above the Controls lines with an empty line after it: `"![controls](images/controls/<backend>/<name>.png)"`. A phase with a `hint` shows the same line at the top of the hint's `text`.
 4. Look at the image, and at the screen it is on, at the rigs' 1024x768: the text and the image must fit, the heading and the "Press X to start" line included. To see one game's screen:
