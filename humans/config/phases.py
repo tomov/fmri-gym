@@ -36,7 +36,9 @@ _SURVEY_CONTROLS = (ControlNames.K_1, ControlNames.K_2, ControlNames.K_3, Contro
 MENU_OPTIONS = ("reset", "forfeit", "resume")
 _MENU_DEFAULTS = {"hold": 5.0, "after": 15.0, "options": list(MENU_OPTIONS),
                   "move": [ControlNames.K_UP, ControlNames.K_DOWN],
-                  "confirm": ControlNames.K_RETURN}
+                  "confirm": ControlNames.K_RETURN, "text": None}
+#: A game phase's ``hint``'s fields' defaults (``control`` and ``text`` have none).
+_HINT_DEFAULTS = {"hold": 3.0, "after": 0.0}
 
 
 class BlockMode(str, Enum):
@@ -64,6 +66,9 @@ class MenuSettings:
     move: tuple[str, str]
     #: the control that confirms the choice
     confirm: str
+    #: the lines shown under the options, saying in the subject's words how to
+    #: choose; ``None`` names the controls themselves
+    text: str | None
 
     @classmethod
     def from_dict(cls, spec: dict) -> MenuSettings:
@@ -73,7 +78,29 @@ class MenuSettings:
         return cls(control=cfg["control"].upper(), hold=float(cfg["hold"]),
                    after=float(cfg["after"]), options=tuple(cfg["options"]),
                    move=(previous.upper(), following.upper()),
-                   confirm=cfg["confirm"].upper())
+                   confirm=cfg["confirm"].upper(),
+                   text=None if cfg["text"] is None else join_text(cfg["text"]))
+
+
+@dataclass(frozen=True, slots=True)
+class HintSettings:
+    """A phase's ``hint`` field with its defaults filled in and its control name upper-cased."""
+
+    #: the control held to show the hint, which shows until it is let go
+    control: str
+    #: seconds it has to be held
+    hold: float
+    #: seconds into the block before the hint is available
+    after: float
+    #: the lines shown, image lines included
+    text: str
+
+    @classmethod
+    def from_dict(cls, spec: dict) -> HintSettings:
+        """Read a phase's ``hint`` dict (already validated by :func:`hint_problems`)."""
+        cfg = {**_HINT_DEFAULTS, **spec}
+        return cls(control=cfg["control"].upper(), hold=float(cfg["hold"]),
+                   after=float(cfg["after"]), text=join_text(cfg["text"]))
 
 
 def join_text(text: str | list | tuple) -> str:
@@ -355,6 +382,8 @@ class GamePhase(Phase):
             out.append(f"show_outcome_duration: expected seconds >= 0, got {seconds!r}")
         if "menu" in d:
             out.extend(menu_problems(d["menu"]))
+        if "hint" in d:
+            out.extend(hint_problems(d["hint"]))
         if "hud" in d:
             out.extend(hud_problems(d["hud"]))
         if "instructions" in d:
@@ -491,17 +520,8 @@ def menu_problems(spec: object) -> list[str]:
         out.append("menu.control: the control to hold is required, e.g. \"X\"")
     for field, names in (("control", [spec.get("control")]), ("move", spec.get("move", [])),
                          ("confirm", [spec.get("confirm", _MENU_DEFAULTS["confirm"])])):
-        wrong = [n for n in (names if isinstance(names, list) else []) if isinstance(n, str)
-                 and (not is_control_of_any_input_device(n.upper())
-                      or n.upper() == ControlNames.K_ESCAPE)]
-        if wrong:
-            out.append(f"menu.{field}: {wrong} is no control name "
-                       f"({ControlNames.K_ESCAPE} quits the run): a value in "
-                       "humans/inputs/control_names.py")
-    for field in ("hold", "after"):
-        value = spec.get(field, _MENU_DEFAULTS[field])
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
-            out.append(f"menu.{field}: expected seconds (>= 0), got {value!r}")
+        out += _held_control_names_problems(f"menu.{field}", names)
+    out += _hold_and_after_problems("menu", spec, _MENU_DEFAULTS)
     options = spec.get("options", _MENU_DEFAULTS["options"])
     if not isinstance(options, list) or not options or set(options) - set(MENU_OPTIONS):
         out.append(f"menu.options: expected a non-empty list from {list(MENU_OPTIONS)}, got {options!r}")
@@ -510,10 +530,64 @@ def menu_problems(spec: object) -> list[str]:
         out.append(f"menu.move: expected two control names [previous, next], got {move!r}")
     if not isinstance(spec.get("confirm", _MENU_DEFAULTS["confirm"]), str):
         out.append(f"menu.confirm: expected a control name, got {spec.get('confirm')!r}")
+    if spec.get("text") is not None:
+        out += _text_problems("menu.text", spec["text"])
     unknown = set(spec) - {"control"} - set(_MENU_DEFAULTS)
     if unknown:
         out.append(f"menu: unknown fields {sorted(unknown)}")
     return out
+
+
+def hint_problems(spec: object) -> list[str]:
+    """What is wrong with a phase's ``hint`` dict, for :meth:`GamePhase.problems`.
+
+    :param spec: the phase's ``"hint"`` value.
+    :return: human-readable problems, empty when the hint is usable.
+    """
+    if not isinstance(spec, dict):
+        return [f"hint: expected a dict with at least 'control' and 'text', got {spec!r}"]
+    out = []
+    if not isinstance(spec.get("control"), str):
+        out.append("hint.control: the control to hold is required, e.g. \"A\"")
+    out += _held_control_names_problems("hint.control", [spec.get("control")])
+    out += _hold_and_after_problems("hint", spec, _HINT_DEFAULTS)
+    if "text" not in spec:
+        out.append("hint.text: the lines to show are required")
+    else:
+        out += _text_problems("hint.text", spec["text"])
+    unknown = set(spec) - {"control", "text"} - set(_HINT_DEFAULTS)
+    if unknown:
+        out.append(f"hint: unknown fields {sorted(unknown)}")
+    return out
+
+
+def _held_control_names_problems(field: str, names: object) -> list[str]:
+    """The names in ``names`` that are no control, or the one that quits the run, as text."""
+    wrong = [n for n in (names if isinstance(names, list) else []) if isinstance(n, str)
+             and (not is_control_of_any_input_device(n.upper())
+                  or n.upper() == ControlNames.K_ESCAPE)]
+    if not wrong:
+        return []
+    return [f"{field}: {wrong} is no control name ({ControlNames.K_ESCAPE} quits the run): "
+            "a value in humans/inputs/control_names.py"]
+
+
+def _hold_and_after_problems(field: str, spec: dict, defaults: dict) -> list[str]:
+    """``hold`` and ``after`` of ``spec`` when either is not seconds >= 0, as text."""
+    out = []
+    for name in ("hold", "after"):
+        value = spec.get(name, defaults[name])
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+            out.append(f"{field}.{name}: expected seconds (>= 0), got {value!r}")
+    return out
+
+
+def _text_problems(field: str, text: object) -> list[str]:
+    """``text`` when it is no string or list of lines, or shows an image it cannot read."""
+    if not (isinstance(text, str) or (isinstance(text, list)
+                                      and all(isinstance(line, str) for line in text))):
+        return [f"{field}: expected a string or a list of lines, got {text!r}"]
+    return [f"{field}: {problem}" for problem in image_line_problems(join_text(text))]
 
 
 def hud_problems(spec: object) -> list[str]:

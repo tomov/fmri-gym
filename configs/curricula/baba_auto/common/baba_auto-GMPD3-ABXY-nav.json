@@ -14,12 +14,27 @@
       "   A    down",
       "   RT    wait a turn",
       "   hold LT   pause menu (restart / give up / resume)",
+      "   hold Y    show the controls",
       "",
       "Press A to start."
     ]
   },
   "controls": {"CONTROLLER_AXIS_TRIGGERRIGHT": 0, "CONTROLLER_BUTTON_Y": 1, "CONTROLLER_BUTTON_A": 2, "CONTROLLER_BUTTON_X": 3, "CONTROLLER_BUTTON_B": 4},
-  "menu": {"control": "CONTROLLER_AXIS_TRIGGERLEFT", "hold": 3.0, "after": 480.0, "options": ["reset", "forfeit", "resume"], "move": ["CONTROLLER_BUTTON_Y", "CONTROLLER_BUTTON_A"], "confirm": "CONTROLLER_AXIS_TRIGGERRIGHT"},
+  "menu": {
+    "control": "CONTROLLER_AXIS_TRIGGERLEFT", "hold": 3.0, "after": 480.0, "options": ["reset", "forfeit", "resume"], "move": ["CONTROLLER_BUTTON_Y", "CONTROLLER_BUTTON_A"], "confirm": "CONTROLLER_AXIS_TRIGGERRIGHT",
+    "text": [
+      "   Y / A   choose",
+      "   RT      select"
+    ]
+  },
+  "hint": {
+    "control": "CONTROLLER_BUTTON_Y", "hold": 3.0, "after": 0.0,
+    "text": [
+      "![controls](images/controls/baba_auto/baba_auto-GMPD3-ABXY-nav.png)",
+      "",
+      "Let go of Y to go back to the game."
+    ]
+  },
   "hud": {"show_score": false, "show_time_remaining": false},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 900.0, "fps": 15, "is_turn_based": true
 }

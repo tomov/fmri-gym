@@ -15,7 +15,7 @@ humans/config/rig.py             CORE  RigConfig: one rig's file (configs/<team>
 humans/config/curriculum.py      CORE  Curriculum: the curriculum file, loaded once into typed phases; load, save, includes
 humans/config/phases.py          CORE  one frozen dataclass per phase type (Fixation, Message, GamePhase, Check*...)
 humans/run.py                    CORE  one run's experiment loop: trigger, phases, timing
-humans/menu.py                   CORE  hold-a-key pause menu: reset / forfeit / resume (opt-in per phase)
+humans/popup.py                  CORE  hold-a-key pop-ups: pause menu (reset / forfeit / resume) and hint (opt-in per phase)
 humans/inputs/                   CORE  the input devices: one named control per key, button, stick direction
 humans/outputs/                  CORE  what the participant sees and hears: display.py (the window), audio.py, sound.py
 humans/sync/                     CORE  triggers.py: the scanner's start pulse and the event codes; clock.py
@@ -33,7 +33,7 @@ tests/                                 the suite: every backend played, logged, 
 .github/workflows/tests.yml            CI: the suite on every pull request that is ready for review
 ```
 
-**Core** is every `humans/*.py` and every file under `humans/config/`, `inputs/`, `outputs/`, `sync/` and `save/`, whether the table lists it or not, plus the adapter seam, `adapters/base.py` and `adapters/keymap.py`. Every other file under `humans/adapters/` is a backend's. `humans/standalone/` is not core: it holds the tools that run on their own (Rule 5), and nothing outside it imports from it. The package is a stack of layers, top to bottom `standalone/`, `run.py`, `menu.py`, `config/`, `adapters/`, `outputs/`, `save/`, then `sync/` and `inputs/` side by side: a module imports only from the layers below it, type hints included, and a type two layers share lives in the lower one. Game engines and the `gym/` packages are imported only from `adapters/`; a `gym/` package imports no `humans` and no other `gym/` package but the one it is built on; only a `gym/` package reads `external/`. `uv run lint-imports` checks all of it but the last, the contracts in `pyproject.toml`; the stack is drawn in `docs/DEPENDENCIES.md`, with the ways to share a type between layers.
+**Core** is every `humans/*.py` and every file under `humans/config/`, `inputs/`, `outputs/`, `sync/` and `save/`, whether the table lists it or not, plus the adapter seam, `adapters/base.py` and `adapters/keymap.py`. Every other file under `humans/adapters/` is a backend's. `humans/standalone/` is not core: it holds the tools that run on their own (Rule 5), and nothing outside it imports from it. The package is a stack of layers, top to bottom `standalone/`, `run.py`, `popup.py`, `config/`, `adapters/`, `outputs/`, `save/`, then `sync/` and `inputs/` side by side: a module imports only from the layers below it, type hints included, and a type two layers share lives in the lower one. Game engines and the `gym/` packages are imported only from `adapters/`; a `gym/` package imports no `humans` and no other `gym/` package but the one it is built on; only a `gym/` package reads `external/`. `uv run lint-imports` checks all of it but the last, the contracts in `pyproject.toml`; the stack is drawn in `docs/DEPENDENCIES.md`, with the ways to share a type between layers.
 
 The core is engine-agnostic: `run.py` never imports a game engine, never touches `env.unwrapped`, and never mentions a game by name. Everything engine-specific goes through an `EnvAdapter`.
 

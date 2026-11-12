@@ -12,12 +12,27 @@
       "   stick left / right     slide a horizontal car left / right",
       "   stick up / down        slide a vertical car up / down",
       "   hold X                 pause menu (restart / give up / resume)",
+      "   hold Y                 show the controls",
       "",
       "Press A to begin."
     ]
   },
   "controls": {"CONTROLLER_AXIS_TRIGGERLEFT": 4, "CONTROLLER_AXIS_TRIGGERRIGHT": 5, "CONTROLLER_AXIS_LEFTX_LEFT": 8, "CONTROLLER_AXIS_LEFTX_RIGHT": 9, "CONTROLLER_AXIS_LEFTY_UP": 10, "CONTROLLER_AXIS_LEFTY_DOWN": 11},
-  "menu": {"control": "CONTROLLER_BUTTON_X", "hold": 3.0, "after": 300.0, "options": ["reset", "forfeit", "resume"], "move": ["CONTROLLER_AXIS_LEFTY_UP", "CONTROLLER_AXIS_LEFTY_DOWN"], "confirm": "CONTROLLER_BUTTON_A"},
+  "menu": {
+    "control": "CONTROLLER_BUTTON_X", "hold": 3.0, "after": 300.0, "options": ["reset", "forfeit", "resume"], "move": ["CONTROLLER_AXIS_LEFTY_UP", "CONTROLLER_AXIS_LEFTY_DOWN"], "confirm": "CONTROLLER_BUTTON_A",
+    "text": [
+      "   stick up / down   choose",
+      "   A                 select"
+    ]
+  },
+  "hint": {
+    "control": "CONTROLLER_BUTTON_Y", "hold": 3.0, "after": 0.0,
+    "text": [
+      "![controls](images/controls/rushhour/rushhour-GMPD3-stick-nav.png)",
+      "",
+      "Let go of Y to go back to the game."
+    ]
+  },
   "hud": {"show_score": false, "show_time_remaining": false},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 1800.0,
   "env_kwargs": {"movable_only": true}, "fps": 60,

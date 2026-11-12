@@ -45,7 +45,7 @@ COMMON_DIRNAME = "common"
 #: block on; any other change makes it a different game. ``seed`` is the
 #: run's own (folded in from the run label).
 RESUMABLE_CHANGES = frozenset({"duration", "n_episodes", "advance_on", "show_outcome_duration",
-                               "instructions", "controls", "menu", "hud", "seed", "has_audio",
+                               "instructions", "controls", "menu", "hint", "hud", "seed", "has_audio",
                                "rewind_on", "rewind_frames"})
 
 def check_shape(curriculum: Any, where: str) -> dict:

@@ -12,7 +12,7 @@ Clone utilForever/baba-is-auto into `external/baba_auto` at the commit the READM
 
 ## Blocking and the menu
 
-Blocking, as Baba Is You is: the block is the level played until won (mode `episode`, `n_episodes` 1, `advance_on` `["won"]`); a loss (YOU destroyed, or no YOU left) restarts the same level, as the game itself does, and `duration` 300 s is the cap. A puzzle can be pushed into a dead end, so holding X for 3 s pauses the game and offers Restart / Give up / Resume (UP/DOWN to choose, SPACE to select; `humans/menu.py`); Give up is the way out of a level the subject cannot solve.
+Blocking, as Baba Is You is: the block is the level played until won (mode `episode`, `n_episodes` 1, `advance_on` `["won"]`); a loss (YOU destroyed, or no YOU left) restarts the same level, as the game itself does, and `duration` 300 s is the cap. A puzzle can be pushed into a dead end, so holding X for 3 s pauses the game and offers Restart / Give up / Resume (UP/DOWN to choose, SPACE to select; `humans/popup.py`); Give up is the way out of a level the subject cannot solve.
 
 ## Curricula
 

@@ -14,11 +14,20 @@
       "   A       sprint",
       "   B       take cover",
       "   LT      next weapon",
+      "   hold Y  show the controls",
       "",
       "Press A to start."
     ]
   },
   "controls": {"CONTROLLER_AXIS_LEFTX_LEFT": 0, "CONTROLLER_AXIS_LEFTX_RIGHT": 1, "CONTROLLER_AXIS_LEFTY_UP": 2, "CONTROLLER_AXIS_LEFTY_DOWN": 3, "CONTROLLER_AXIS_TRIGGERRIGHT": 4, "CONTROLLER_BUTTON_A": 5, "CONTROLLER_BUTTON_B": 6, "CONTROLLER_AXIS_TRIGGERLEFT": 12},
+  "hint": {
+    "control": "CONTROLLER_BUTTON_Y", "hold": 3.0, "after": 0.0,
+    "text": [
+      "![controls](images/controls/aigamestore/game7-GMPD3-stick-nav.png)",
+      "",
+      "Let go of Y to go back to the game."
+    ]
+  },
   "hud": {"show_score": false, "show_time_remaining": false},
   "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 600.0,
   "fps": 30, "frame_skip": 2

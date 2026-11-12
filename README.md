@@ -351,7 +351,7 @@ A game reaches the scanner through up to three layers, each its own directory:
 
 Most games need only the last: a pip package already provides the env. Nothing about fMRI leaks below the adapter, so the env an agent is trained on is the one the subject plays.
 
-The package is a stack of layers, drawn in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) and checked by `uv run lint-imports`: each imports only from the layers below it -- `adapters/` over `outputs/` over `save/` over `sync/` and `inputs/` -- the run (`config/`, `menu.py`, `run.py`) puts them together, game engines and the `gym/` envs are imported only by `adapters/`, and the tools in `standalone/` sit on top, imported by nothing else.
+The package is a stack of layers, drawn in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) and checked by `uv run lint-imports`: each imports only from the layers below it -- `adapters/` over `outputs/` over `save/` over `sync/` and `inputs/` -- the run (`config/`, `popup.py`, `run.py`) puts them together, game engines and the `gym/` envs are imported only by `adapters/`, and the tools in `standalone/` sit on top, imported by nothing else.
 
 ```
 humans/
@@ -361,7 +361,7 @@ humans/
     phases.py       # one dataclass per phase type (Fixation, Message, Survey, GamePhase, Check*), its checks
     rig.py          # the rig files (configs/<team>/rigs/<rig>.json): what it is, screen, pad, audio, data root
     run.py          # RunConfig: one run's command line and the rig it is played on
-  menu.py           # the hold-a-key pause menu (reset / forfeit / resume), opt-in per game phase
+  popup.py          # the hold-a-key pop-ups: pause menu (reset / forfeit / resume) and hint, opt-in per game phase
   inputs/           # the input devices: one named control per key, button, stick direction
   outputs/
     display.py      # pygame: fixed window, aspect-fit frame, fixation, text; vsync-locked flip + call_on_flip
@@ -585,10 +585,22 @@ A subject can get stuck (a Baba Is You puzzle with its rules pushed into a corne
 ```jsonc
 "menu": {"control": "X", "hold": 5.0, "after": 15.0,
          "options": ["reset", "forfeit", "resume"],
-         "move": ["UP", "DOWN"], "confirm": "SPACE"}
+         "move": ["UP", "DOWN"], "confirm": "SPACE",
+         "text": ["   arrows up / down   choose", "   space              select"]}
 ```
 
-Holding `control` for `hold` seconds -- even if that control does something in the game -- pauses the game and shows the options; `move` steps through them and `confirm` picks one. `reset` starts the episode over -- a new `reset()` of the env with the same seed, so the very same level instance -- `forfeit` ends the block and moves on to the next phase, `resume` continues. The menu is unavailable for the first `after` seconds of the block (0 = always), and a hold plus a two-press choice is hard to do by accident -- the point is that this is possible but never done lightly. Only `control` is required; the rest default to the values shown, and `options` may list any subset, in the order to show them. The manifest's phase entry records the settings and every pop-up (`menu.events`: when, and what was chosen); a reset or forfeited episode's `episode_outcome` is `reset` / `forfeit` (the env's own `terminated` / `truncated` flags are never touched), and a reset one does not count towards `n_episodes`. `configs/curricula/baba/levels/make_win.json` uses it.
+Holding `control` for `hold` seconds -- even if that control does something in the game -- pauses the game and shows the options; `move` steps through them and `confirm` picks one. `reset` starts the episode over -- a new `reset()` of the env with the same seed, so the very same level instance -- `forfeit` ends the block and moves on to the next phase, `resume` continues. The menu is unavailable for the first `after` seconds of the block (0 = always), and a hold plus a two-press choice is hard to do by accident -- the point is that this is possible but never done lightly. `text` is shown under the options, so it can name `move` and `confirm` in the subject's words; without it, that line names them by their control names. Only `control` is required; the rest but `text` default to the values shown, and `options` may list any subset, in the order to show them. The manifest's phase entry records the settings and every pop-up (`menu.events`: when, and what was chosen); a reset or forfeited episode's `episode_outcome` is `reset` / `forfeit` (the env's own `terminated` / `truncated` flags are never touched), and a reset one does not count towards `n_episodes`. `configs/curricula/baba/levels/make_win.json` uses it.
+
+### The hint (the `hint` field)
+
+A subject who forgets the controls mid-game can look them up again. A game phase can opt into a hint, opened the way the menu is:
+
+```jsonc
+"hint": {"control": "Y", "hold": 3.0, "after": 0.0,
+         "text": ["![controls](images/controls/<backend>/<name>.png)", "", "Let go of Y to go back to the game."]}
+```
+
+Holding `control` for `hold` seconds -- even if that control does something in the game -- pauses the game and shows `text`, as an instructions screen's is (an image line draws the image); letting go of it goes back to the game. It is unavailable for the first `after` seconds of the block. `control` and `text` are required; `hold` and `after` default to the values shown. The block's clock runs on meanwhile, as it does in the menu. The manifest's phase entry records the settings and every time it was shown (`hint.events`: when it opened and closed).
 
 ### The status strip (the `hud` field)
 

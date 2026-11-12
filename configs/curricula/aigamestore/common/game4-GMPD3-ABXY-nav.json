@@ -10,11 +10,20 @@
       "",
       "Controls:",
       "   RT or A   thrust / fly",
+      "   hold Y    show the controls",
       "",
       "Press A to start."
     ]
   },
   "controls": {"CONTROLLER_AXIS_TRIGGERRIGHT": 0, "CONTROLLER_BUTTON_A": 1},
+  "hint": {
+    "control": "CONTROLLER_BUTTON_Y", "hold": 3.0, "after": 0.0,
+    "text": [
+      "![controls](images/controls/aigamestore/game4-GMPD3-ABXY-nav.png)",
+      "",
+      "Let go of Y to go back to the game."
+    ]
+  },
   "hud": {"show_score": false, "show_time_remaining": false},
   "mode": "episode", "n_episodes": 10, "duration": 3600.0,
   "fps": 30, "frame_skip": 2

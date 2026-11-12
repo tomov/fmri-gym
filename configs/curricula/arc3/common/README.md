@@ -12,7 +12,7 @@ A game's `controls` index its simple actions in ascending order (`humans/adapter
 
 ## Blocking and the menu
 
-The block is the whole game played until won (mode `episode`, `n_episodes` 1, `advance_on` `["won"]`, `duration` 600 s); a GAME_OVER restarts it from level 1. A level can be a dead end (the game can end before it is solved; in ls20, when its energy runs out), so after 15 s of play, holding X for 5 s pauses the game and offers Restart / Give up / Resume (UP/DOWN to choose, SPACE to select; `humans/menu.py`).
+The block is the whole game played until won (mode `episode`, `n_episodes` 1, `advance_on` `["won"]`, `duration` 600 s); a GAME_OVER restarts it from level 1. A level can be a dead end (the game can end before it is solved; in ls20, when its energy runs out), so after 15 s of play, holding X for 5 s pauses the game and offers Restart / Give up / Resume (UP/DOWN to choose, SPACE to select; `humans/popup.py`).
 
 ## Curricula
 
