@@ -12,16 +12,12 @@ RUN_DURATION=120
 
 # Runs, one per line
 
-uv run fmri-play --subject $SUBJECT --ses $SES --run 1 --rig "$RIG" --duration $RUN_DURATION --loop --curriculum configs/curricula/gym/mountaincar-GMPD3-stick-nav.json
+uv run fmri-play --subject $SUBJECT --ses $SES --run 1 --rig "$RIG" --duration $RUN_DURATION --loop --curriculum configs/curricula/gym/carracing-GMPD3-stick-nav.json
 
-uv run fmri-play --subject $SUBJECT --ses $SES --run 2 --rig "$RIG" --duration $RUN_DURATION --loop --curriculum configs/curricula/gym/acrobot-GMPD3-stick-nav.json
+uv run fmri-play --subject $SUBJECT --ses $SES --run 2 --rig "$RIG" --duration $RUN_DURATION --loop --curriculum configs/curricula/ale/mspacman-GMPD3-stick-nav.json
 
-uv run fmri-play --subject $SUBJECT --ses $SES --run 3 --rig "$RIG" --duration $RUN_DURATION --loop --curriculum configs/curricula/gym/carracing-GMPD3-stick-nav.json
+uv run fmri-play --subject $SUBJECT --ses $SES --run 3 --rig "$RIG" --duration $RUN_DURATION --loop --curriculum configs/curricula/ale/spaceinvaders-GMPD3-stick-nav.json
 
-uv run fmri-play --subject $SUBJECT --ses $SES --run 4 --rig "$RIG" --duration $RUN_DURATION --loop --curriculum configs/curricula/ale/mspacman-GMPD3-stick-nav.json
+uv run fmri-play --subject $SUBJECT --ses $SES --run 4 --rig "$RIG" --duration $RUN_DURATION --loop --curriculum configs/curricula/retro/airstriker-GMPD3-stick-nav.json
 
-uv run fmri-play --subject $SUBJECT --ses $SES --run 5 --rig "$RIG" --duration $RUN_DURATION --loop --curriculum configs/curricula/ale/spaceinvaders-GMPD3-stick-nav.json
-
-uv run fmri-play --subject $SUBJECT --ses $SES --run 6 --rig "$RIG" --duration $RUN_DURATION --loop --curriculum configs/curricula/retro/airstriker-GMPD3-stick-nav.json
-
-uv run fmri-play --subject $SUBJECT --ses $SES --run 7 --rig "$RIG" --duration $RUN_DURATION --loop --curriculum configs/curricula/minihack/practice-GMPD3-stick-nav.json
+uv run fmri-play --subject $SUBJECT --ses $SES --run 5 --rig "$RIG" --duration $RUN_DURATION --loop --curriculum configs/curricula/minihack/practice-GMPD3-stick-nav.json

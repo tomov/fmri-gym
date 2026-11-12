@@ -108,16 +108,10 @@
       "CONTROLLER_BUTTON_A": ["nitro (boost)"],
       "CONTROLLER_BUTTON_Y": ["rescue"]
     },
-    "gym/mountaincar-GMPD3-stick-nav.png": {
-      "LEFT_STICK": ["left / right:", "push the car"]
-    },
     "gym/carracing-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["left / right:", "steer"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["gas"],
       "CONTROLLER_AXIS_TRIGGERLEFT": ["brake"]
-    },
-    "gym/acrobot-GMPD3-stick-nav.png": {
-      "LEFT_STICK": ["left / right:", "turn the", "middle joint"]
     },
     "ale/mspacman-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["move"]
