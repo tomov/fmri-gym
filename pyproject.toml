@@ -164,13 +164,13 @@ include_external_packages = true
 name = "humans's layers: each imports only the ones below it"
 type = "layers"
 containers = ["humans"]
-layers = ["standalone", "run", "menu", "config", "adapters", "outputs", "save", "sync | inputs"]
+layers = ["standalone", "run", "popup", "config", "adapters", "outputs", "save", "sync | inputs"]
 
 [[tool.importlinter.contracts]]
 name = "Only the adapters import a game engine or a gym/ package"
 type = "forbidden"
 source_modules = [
-    "humans.standalone", "humans.run", "humans.menu", "humans.config",
+    "humans.standalone", "humans.run", "humans.popup", "humans.config",
     "humans.outputs", "humans.save", "humans.sync", "humans.inputs",
 ]
 forbidden_modules = [

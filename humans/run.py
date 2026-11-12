@@ -47,7 +47,7 @@ from .config.phases import BlockMode, Fixation, GamePhase, Message, Phase, Surve
 from .config.run import RunConfig
 from .outputs.display import Display, check_monitor
 from .inputs import QUIT, ControlNames, Edge, InputDevice, InputEvent, open_input_devices
-from .menu import Menu
+from .popup import Menu
 from .save.logging import Logger
 from .sync.clock import Clock
 from .sync.triggers import Triggers
@@ -138,7 +138,7 @@ def _poll_keys_until(
     :param deadline: ``perf_counter`` at which to stop waiting.
     :param clock: the run's clock, for the log.
     :param logger: the run's logger.
-    :param menu: the block's :class:`~.menu.Menu`, if the phase has one.
+    :param menu: the block's :class:`~.popup.Menu`, if the phase has one.
     :param stop_on: control names a press of which ends the wait.
     :param redraw: called every :data:`HUD_REDRAW_S` while waiting, for a
         wait long enough that the screen would otherwise go stale. It
@@ -546,7 +546,7 @@ class Run:
         :param seed: RNG seed for this episode's ``reset``.
         :param episode_id: index of this episode within the game block.
         :param block_end: ``perf_counter`` deadline for the game block.
-        :param menu: the block's :class:`~.menu.Menu`, or ``None``.
+        :param menu: the block's :class:`~.popup.Menu`, or ``None``.
         :param initial_state: a savestate to restore over the reset, so the
             episode starts where an earlier run's stopped; logged on
             ``episode_start``, since it, not the seed, is what the episode
