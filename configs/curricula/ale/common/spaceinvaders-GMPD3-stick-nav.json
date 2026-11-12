@@ -19,7 +19,7 @@
   "controls": {"": 0, "CONTROLLER_AXIS_TRIGGERRIGHT": 1, "CONTROLLER_AXIS_LEFTX_RIGHT": 2, "CONTROLLER_AXIS_LEFTX_LEFT": 3,
                "CONTROLLER_AXIS_LEFTX_RIGHT+CONTROLLER_AXIS_TRIGGERRIGHT": 4, "CONTROLLER_AXIS_LEFTX_LEFT+CONTROLLER_AXIS_TRIGGERRIGHT": 5},
   "hint": {
-    "control": "CONTROLLER_BUTTON_Y", "hold": 3.0, "after": 0.0,
+    "control": "CONTROLLER_BUTTON_Y", "hold": 0.0, "after": 0.0,
     "text": [
       "![controls](images/controls/ale/spaceinvaders-GMPD3-stick-nav.png)",
       "",

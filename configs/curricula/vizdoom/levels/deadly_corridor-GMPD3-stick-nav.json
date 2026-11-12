@@ -24,7 +24,7 @@
       "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
       "controls": {"CONTROLLER_AXIS_LEFTY_UP": 3, "CONTROLLER_AXIS_LEFTY_DOWN": 4, "CONTROLLER_AXIS_LEFTX_LEFT": 5, "CONTROLLER_AXIS_LEFTX_RIGHT": 6, "CONTROLLER_BUTTON_X": 0, "CONTROLLER_BUTTON_B": 1, "CONTROLLER_AXIS_TRIGGERRIGHT": 2},
       "hint": {
-        "control": "CONTROLLER_BUTTON_Y", "hold": 3.0, "after": 0.0,
+        "control": "CONTROLLER_BUTTON_Y", "hold": 0.0, "after": 0.0,
         "text": [
           "![controls](images/controls/vizdoom/deadly_corridor-GMPD3-stick-nav.png)",
           "",

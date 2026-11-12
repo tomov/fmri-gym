@@ -24,7 +24,7 @@
     ]
   },
   "hint": {
-    "control": "CONTROLLER_BUTTON_Y", "hold": 3.0, "after": 0.0,
+    "control": "CONTROLLER_BUTTON_Y", "hold": 0.0, "after": 0.0,
     "text": [
       "![controls](images/controls/minihack/navigate-GMPD3-stick-nav.png)",
       "",

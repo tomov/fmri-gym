@@ -25,7 +25,7 @@
     ]
   },
   "hint": {
-    "control": "CONTROLLER_BUTTON_Y", "hold": 3.0, "after": 0.0,
+    "control": "CONTROLLER_BUTTON_Y", "hold": 0.0, "after": 0.0,
     "text": [
       "![controls](images/controls/baba_auto/baba_auto-GMPD3-stick-nav.png)",
       "",
