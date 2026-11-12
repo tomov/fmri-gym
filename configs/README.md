@@ -17,7 +17,7 @@ configs/
   <team>/subjects/sub-<label>/ses-<NNN>/<name>.sh   which runs one subject plays in one session
 ```
 
-A team's folder is made the first time one of its rigs is made with `rig-setup` (New rig... asks for the team and the rig's name) or one of its sessions is saved with `session-editor`. A team with several places names each rig after its place: `MT/rigs/mgh-prisma.json`, `MT/rigs/mit-desk.json`.
+A team's folder is made the first time one of its rigs is made with `rig-setup` (New rig... asks for the team and the rig's name) or one of its sessions is saved with `session-editor`. A team with several places names each rig after its place: `BC/rigs/mgh-prisma.json`, `BC/rigs/mit-desk.json`.
 
 ## curricula/
 
