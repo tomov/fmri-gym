@@ -1,0 +1,16 @@
+{
+  "pi": "MT",
+  "modality": "fmri",
+  "monitor": "the scanner's projector or MR-safe screen",
+  "photodiode": "none",
+  "audio_path": "MR-safe insert earphones",
+  "trigger_hardware": "the 932 interface types '=' at each volume",
+  "notes": "an MRI scanner, the participant on a Current Designs controller (one stick, six buttons)",
+  "screen": {"size": "1024x768", "is_fullscreen": true, "monitor": 0, "has_vsync": true},
+  "inputs": ["keyboard", "current_designs_gamepad3"],
+  "has_audio": true,
+  "data_root": "data",
+  "start_fixation": 10,
+  "end_fixation": 10,
+  "triggers": {"sync": {"mode": "wait", "key": "EQUALS"}, "backend": "null"}
+}

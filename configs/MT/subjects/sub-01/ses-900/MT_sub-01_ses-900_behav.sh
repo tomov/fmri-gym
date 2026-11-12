@@ -1,12 +1,13 @@
 #!/bin/sh
 # fmri-gym session: one line per run, in order.
+# BEHAVIOURAL ONLY: controller practice outside the scanner, on an Xbox controller. Not a scan session; 900s are practice.
 
 set -e  # Exit on error
 
 # Session parameters
 SUBJECT=sub-01
-RIG=configs/examples/rigs/xbox.json
-SES=2
+RIG=configs/MT/rigs/xbox.json
+SES=900
 RUN_DURATION=180
 
 # Runs, one per line

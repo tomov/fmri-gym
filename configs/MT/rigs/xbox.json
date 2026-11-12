@@ -1,0 +1,14 @@
+{
+  "pi": "MT",
+  "modality": "behav",
+  "monitor": "any desk monitor",
+  "photodiode": "none",
+  "audio_path": "desk speakers or headphones",
+  "trigger_hardware": "none (no scanner)",
+  "notes": "an Xbox controller, at a desk; no scanner",
+  "screen": {"size": "1024x768", "is_fullscreen": false, "monitor": 0, "has_vsync": true},
+  "inputs": ["keyboard", "xbox_controller"],
+  "has_audio": true,
+  "data_root": "data",
+  "triggers": {"sync": {"mode": "none"}, "backend": "null"}
+}
