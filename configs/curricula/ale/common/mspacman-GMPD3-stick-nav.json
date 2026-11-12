@@ -1,0 +1,21 @@
+{
+  "type": "game", "backend": "ale", "game": "ALE/MsPacman-v5",
+  "instructions": {
+    "title": "Ms. Pac-Man", "align": "left", "controls_to_dismiss": ["CONTROLLER_BUTTON_A"],
+    "text": [
+      "Eat all the dots in the maze and avoid the ghosts.",
+      "A power pellet lets you eat the ghosts for a while.",
+      "",
+      "![controls](images/controls/ale/mspacman-GMPD3-stick-nav.png)",
+      "",
+      "Controls:",
+      "   stick   move",
+      "",
+      "Press A to start."
+    ]
+  },
+  "controls": {"": 0, "CONTROLLER_AXIS_LEFTY_UP": 1, "CONTROLLER_AXIS_LEFTX_RIGHT": 2, "CONTROLLER_AXIS_LEFTX_LEFT": 3, "CONTROLLER_AXIS_LEFTY_DOWN": 4,
+               "CONTROLLER_AXIS_LEFTY_UP+CONTROLLER_AXIS_LEFTX_RIGHT": 5, "CONTROLLER_AXIS_LEFTY_UP+CONTROLLER_AXIS_LEFTX_LEFT": 6,
+               "CONTROLLER_AXIS_LEFTY_DOWN+CONTROLLER_AXIS_LEFTX_RIGHT": 7, "CONTROLLER_AXIS_LEFTY_DOWN+CONTROLLER_AXIS_LEFTX_LEFT": 8},
+  "mode": "duration", "duration": 300.0, "fps": 60
+}

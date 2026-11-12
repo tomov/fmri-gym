@@ -25,3 +25,6 @@ A phase's `controls` values are indices into the game's own action set, which di
 | `qbert.json` | Qbert |
 | `seaquest.json` | Seaquest |
 | `spaceinvaders.json` | SpaceInvaders |
+| `mspacman-GMPD3-stick-nav.json`, `spaceinvaders-GMPD3-stick-nav.json` (in `ale/`) | MsPacman or SpaceInvaders on a controller's left stick (diagonals are the stick's two axes held together), SpaceInvaders firing on RT, each with its instructions and controls image, at the console's own 60 frames per second: real speed, and sprites flicker as on the console |
+
+**Speed and flicker.** The adapter steps one console frame at a time, so a phase's `fps` is its speed: 60 is the console's own, and lower slows the game. The 2600 draws some sprites on alternate frames only (each Ms. Pac-Man ghost on one frame in four, Space Invaders' shots on every other one); at 60 fps they flicker as they did on a TV, while at 30 fps each gap holds for two refreshes and the sprites blink visibly. The stick curricula play them as the console did.

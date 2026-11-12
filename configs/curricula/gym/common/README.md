@@ -43,3 +43,4 @@ Pendulum, MountainCarContinuous and BipedalWalker have continuous actions: pushi
 | `classic_control.json` | the five classic-control games, one episode each |
 | `box2d.json` | the three Box2D games, one episode each |
 | `toy_text.json` | the five toy-text games, two episodes each |
+| `carracing-GMPD3-stick-nav.json` | CarRacing on a controller: the left stick steers, RT is gas and LT brakes, at 25 steps per second, which an Intel Mac keeps up with (needs the box2d extra) |

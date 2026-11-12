@@ -1,0 +1,5 @@
+{
+  "curriculum": [
+    {"__include": "common/airstriker-GMPD3-stick-nav.json"}
+  ]
+}

@@ -107,6 +107,26 @@
       "CONTROLLER_AXIS_TRIGGERLEFT": ["skid"],
       "CONTROLLER_BUTTON_A": ["nitro (boost)"],
       "CONTROLLER_BUTTON_Y": ["rescue"]
+    },
+    "gym/carracing-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["left / right:", "steer"],
+      "CONTROLLER_AXIS_TRIGGERRIGHT": ["gas"],
+      "CONTROLLER_AXIS_TRIGGERLEFT": ["brake"]
+    },
+    "ale/mspacman-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["move"]
+    },
+    "ale/spaceinvaders-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["left / right:", "move"],
+      "CONTROLLER_AXIS_TRIGGERRIGHT": ["fire"]
+    },
+    "retro/airstriker-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["move"],
+      "CONTROLLER_AXIS_TRIGGERRIGHT": ["fire"]
+    },
+    "minihack/navigate-GMPD3-stick-nav.png": {
+      "LEFT_STICK": ["move one square"],
+      "CONTROLLER_BUTTON_X": ["hold: pause menu"]
     }
   }
 }

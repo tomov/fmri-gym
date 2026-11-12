@@ -1,0 +1,5 @@
+{
+  "curriculum": [
+    {"__include": "common/mspacman-GMPD3-stick-nav.json"}
+  ]
+}
