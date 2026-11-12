@@ -15,5 +15,5 @@
     ]
   },
   "controls": {"": 1, "CONTROLLER_AXIS_LEFTX_LEFT": 0, "CONTROLLER_AXIS_LEFTX_RIGHT": 2},
-  "mode": "duration", "duration": 90.0, "fps": 30
+  "mode": "duration", "duration": 120.0, "fps": 30
 }

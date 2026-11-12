@@ -1,7 +1,0 @@
-{
-  "curriculum": [
-    {"__include": "common/mountaincar-GMPD3-stick-nav.json"},
-    {"type": "fixation", "duration": 1.0},
-    {"__include": "common/acrobot-GMPD3-stick-nav.json"}
-  ]
-}
