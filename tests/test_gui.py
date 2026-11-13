@@ -4,6 +4,7 @@ that cannot be set up without JSON."""
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import replace
 from pathlib import Path
 
@@ -105,6 +106,15 @@ def test_a_rig_measurement_waits_for_its_triggers_to_be_chosen(qt):
     window._apply_preset()
     assert window.next.isEnabled()
     assert window.rig["triggers"]["sync"]["mode"] == "wait"
+
+
+def test_a_preset_applied_raises_nothing(qt, monkeypatch):
+    raised = []  # Qt prints a slot's exception and goes on, so catch it here
+    monkeypatch.setattr(sys, "excepthook", lambda *exception: raised.append(exception))
+    window, _ = _rig_window("minimal", need_triggers=True)
+    window.preset.setCurrentIndex(0)
+    window._apply_preset()
+    assert not raised
 
 
 def test_only_the_options_that_apply_are_shown(qt):

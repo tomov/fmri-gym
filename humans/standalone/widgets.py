@@ -171,7 +171,9 @@ class Form(QtWidgets.QWidget):
         elif f.kind == "choice":
             # A choice has no blank entry, so a key the file left out (or gave a
             # value outside the list) gets one: shown as it is, not as a default.
+            w.blockSignals(True)  # the emptied list is no value to announce
             w.clear()
+            w.blockSignals(False)
             w.addItems(list(f.choices) if raw in f.choices else [raw, *f.choices])
             w.setCurrentText(raw)
         elif f.kind in ("text", "lines"):
