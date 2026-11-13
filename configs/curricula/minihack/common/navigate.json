@@ -1,0 +1,36 @@
+{
+  "type": "game", "backend": "minihack",
+  "instructions": {
+    "title": "MiniHack", "align": "left", "controls_to_dismiss": ["SPACE"],
+    "text": [
+      "Walk to the staircase ( > ) to finish the level.",
+      "",
+      "Controls:",
+      "   ARROWS   move one square  N / S / W / E",
+      "   hold X   pause menu (restart / give up / resume)",
+      "   hold H   show the controls",
+      "",
+      "Press SPACE to start."
+    ]
+  },
+  "controls": {"UP": 0, "RIGHT": 1, "DOWN": 2, "LEFT": 3},
+  "menu": {
+    "control": "X", "hold": 3.0, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["UP", "DOWN"], "confirm": "SPACE",
+    "text": [
+      "   UP / DOWN   choose",
+      "   SPACE       select"
+    ]
+  },
+  "hint": {
+    "control": "H", "hold": 0.0, "after": 0.0,
+    "text": [
+      "Controls:",
+      "   ARROWS   move one square  N / S / W / E",
+      "   hold X   pause menu (restart / give up / resume)",
+      "",
+      "Let go of H to go back to the game."
+    ]
+  },
+  "hud": {"show_score": false, "show_time_remaining": false},
+  "mode": "episode", "n_episodes": 1, "advance_on": ["won"], "duration": 300.0, "fps": 15, "is_turn_based": true
+}

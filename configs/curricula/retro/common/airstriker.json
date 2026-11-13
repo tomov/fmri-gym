@@ -1,0 +1,29 @@
+{
+  "type": "game", "backend": "retro", "game": "Airstriker-Genesis-v0",
+  "instructions": {
+    "title": "Airstriker", "align": "left", "controls_to_dismiss": ["SPACE"],
+    "text": [
+      "Fly your ship, shoot down the enemies",
+      "and dodge their fire.",
+      "",
+      "Controls:",
+      "   ARROWS   move",
+      "   X        fire",
+      "   hold H   show the controls",
+      "",
+      "Press SPACE to start."
+    ]
+  },
+  "controls": {"LEFT": 6, "RIGHT": 7, "UP": 4, "DOWN": 5, "X": 0},
+  "hint": {
+    "control": "H", "hold": 0.0, "after": 0.0,
+    "text": [
+      "Controls:",
+      "   ARROWS   move",
+      "   X        fire",
+      "",
+      "Let go of H to go back to the game."
+    ]
+  },
+  "mode": "duration", "duration": 300.0, "fps": 59.92274340431231, "state_stride": 15
+}
