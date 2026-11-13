@@ -57,6 +57,7 @@ import http.server
 import io
 import re
 import socketserver
+import sys
 import threading
 import urllib.parse
 from pathlib import Path
@@ -112,7 +113,10 @@ GAME_LEVELS: dict[str, int | None] = {
 
 # Headless Chrome falls back to SwiftShader (software GL) unless told to use
 # the GPU; the three.js game then takes ~130 ms a frame instead of ~2 ms.
-_BROWSER_ARGS = ["--use-gl=angle", "--use-angle=gl", "--ignore-gpu-blocklist"]
+# On Windows the GPU is reached through D3D11: ANGLE over GL there loses its
+# WebGL context (a black canvas, or no canvas once the page has idled).
+_ANGLE = "d3d11" if sys.platform == "win32" else "gl"
+_BROWSER_ARGS = ["--use-gl=angle", f"--use-angle={_ANGLE}", "--ignore-gpu-blocklist"]
 _BOOT_FRAMES = 600                 # 10 s of game time for p5 to set up
 
 
