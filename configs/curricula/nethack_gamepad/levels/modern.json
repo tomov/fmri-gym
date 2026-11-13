@@ -1,0 +1,50 @@
+{
+  "curriculum": [
+    {
+      "type": "game",
+      "backend": "nethack_gamepad",
+      "game": "nethack_gamepad_gym:NetHackGamepad-v0",
+      "controls": {
+        "UP": 0,
+        "RIGHT": 1,
+        "DOWN": 2,
+        "LEFT": 3,
+        "Z": 4,
+        "X": 5,
+        "C": 6,
+        "V": 7
+      },
+      "env_kwargs": {
+        "game_mode": "modern"
+      },
+      "is_turn_based": true,
+      "continue_campaign": true,
+      "mode": "duration",
+      "duration": 1800.0,
+      "fps": 10,
+      "hud": {
+        "show_score": false,
+        "show_time_remaining": true
+      },
+      "instructions": {
+        "title": "NetHack: Modern-style revival",
+        "controls_to_dismiss": [
+          "Z"
+        ],
+        "text": [
+          "Arrows: move / select",
+          "Z: confirm / pick up",
+          "X: cancel / search",
+          "C: commands; press again for keyboard",
+          "V: inventory",
+          "",
+          "Enter your name using the on-screen keyboard.",
+          "NetHack provides character selection and the full adventure.",
+          "Menus pause the dungeon; arrows scroll long documents.",
+          "Deaths return you near the entrance to this floor; your character and inventory continue.",
+          "The run saves a campaign checkpoint for your next session."
+        ]
+      }
+    }
+  ]
+}

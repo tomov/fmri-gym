@@ -837,6 +837,10 @@ minihack = [
 mujoco = [
     { name = "gymnasium", extra = ["mujoco"] },
 ]
+nethack-gamepad = [
+    { name = "nethack-gamepad-gym" },
+    { name = "replay-state-gym" },
+]
 nethack = [
     { name = "minihack-levels" },
     { name = "nle" },
@@ -892,7 +896,7 @@ requires-dist = [
     { name = "box2d", marker = "extra == 'box2d'", specifier = ">=2.3.10" },
     { name = "coom-gym", marker = "extra == 'coom'", editable = "gym/coom" },
     { name = "crafter-gym", marker = "extra == 'crafter'", editable = "gym/crafter" },
-    { name = "fmri-gym", extras = ["dbp", "ale", "retro", "nethack", "vgdl", "arc3", "box2d", "mujoco", "shimmy", "tilematch", "triggers", "gui"], marker = "extra == 'all'" },
+    { name = "fmri-gym", extras = ["dbp", "ale", "retro", "nethack", "nethack-gamepad", "vgdl", "arc3", "box2d", "mujoco", "shimmy", "tilematch", "triggers", "gui"], marker = "extra == 'all'" },
     { name = "fmri-gym", extras = ["vizdoom", "coom", "aigamestore", "crafter", "rushhour", "baba-auto", "minihack", "stk"], marker = "extra == 'dbp'" },
     { name = "gymnasium" },
     { name = "gymnasium", extras = ["mujoco"], marker = "extra == 'mujoco'" },
@@ -901,6 +905,7 @@ requires-dist = [
     { name = "minihack", marker = "extra == 'minihack'" },
     { name = "minihack-levels", marker = "extra == 'minihack'", editable = "gym/minihack" },
     { name = "minihack-levels", marker = "extra == 'nethack'", editable = "gym/minihack" },
+    { name = "nethack-gamepad-gym", marker = "extra == 'nethack-gamepad'", editable = "gym/nethack_gamepad" },
     { name = "nle", marker = "extra == 'minihack'", specifier = ">=1.3" },
     { name = "nle", marker = "extra == 'nethack'", specifier = ">=1.3" },
     { name = "numpy" },
@@ -916,6 +921,7 @@ requires-dist = [
     { name = "replay-state-gym", marker = "extra == 'baba-auto'", editable = "gym/replay_state" },
     { name = "replay-state-gym", marker = "extra == 'coom'", editable = "gym/replay_state" },
     { name = "replay-state-gym", marker = "extra == 'minihack'", editable = "gym/replay_state" },
+    { name = "replay-state-gym", marker = "extra == 'nethack-gamepad'", editable = "gym/replay_state" },
     { name = "replay-state-gym", marker = "extra == 'nethack'", editable = "gym/replay_state" },
     { name = "replay-state-gym", marker = "extra == 'rushhour'", editable = "gym/replay_state" },
     { name = "replay-state-gym", marker = "extra == 'vizdoom'", editable = "gym/replay_state" },
@@ -931,7 +937,7 @@ requires-dist = [
     { name = "vizdoom-gym", marker = "extra == 'coom'", editable = "gym/vizdoom" },
     { name = "vizdoom-gym", marker = "extra == 'vizdoom'", editable = "gym/vizdoom" },
 ]
-provides-extras = ["ale", "retro", "crafter", "baba", "baba-auto", "vgdl", "minihack", "nethack", "aigamestore", "arc3", "vizdoom", "coom", "rushhour", "stk", "box2d", "mujoco", "shimmy", "tilematch", "triggers", "gui", "dbp", "all"]
+provides-extras = ["ale", "retro", "crafter", "baba", "baba-auto", "vgdl", "minihack", "nethack", "nethack-gamepad", "aigamestore", "arc3", "vizdoom", "coom", "rushhour", "stk", "box2d", "mujoco", "shimmy", "tilematch", "triggers", "gui", "dbp", "all"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1797,6 +1803,29 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/98/b3/8e14f18a4d983697b6cb8b44b436dab9a4bc0dcb445e2ec45147e018a620/mujoco-3.13.0-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:862cc7510639824d7740d39a408abc54300febd12432e5e56d52d6c93334cfe7", size = 19104285, upload-time = "2026-09-09T15:38:58.375Z" },
     { url = "https://files.pythonhosted.org/packages/e6/1d/a04b3d96ecd5ada2cf340ea68a163de610bfe4ec8929c4d3edcb9d9c8bb6/mujoco-3.13.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:3d0befa6869355a91b7bd452c71a98bc3f93bd94cb96c3f4eaae4172cc6a8975", size = 20379173, upload-time = "2026-09-09T15:39:01.31Z" },
     { url = "https://files.pythonhosted.org/packages/d2/b2/9e26281c4150fdde0fd9277891dd7655e674a118cdb15c4c137c53742968/mujoco-3.13.0-cp313-cp313-win_amd64.whl", hash = "sha256:101571a624e3cf2c2d4c7e08772d50973dc29863587b18f03b753f399538fe8d", size = 17232226, upload-time = "2026-09-09T15:39:03.845Z" },
+]
+
+[[package]]
+name = "nethack-gamepad-gym"
+version = "0.4.1"
+source = { editable = "gym/nethack_gamepad" }
+dependencies = [
+    { name = "gymnasium" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
+    { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "pillow" },
+    { name = "pygame-ce" },
+    { name = "replay-state-gym" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "gymnasium" },
+    { name = "numpy" },
+    { name = "pillow" },
+    { name = "pygame-ce" },
+    { name = "replay-state-gym" },
 ]
 
 [[package]]

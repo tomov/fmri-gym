@@ -29,8 +29,7 @@ from .rig import RigConfig
 class RunConfig:
     """One run: its curriculum, its rig, and who, which run, for how long.
 
-    Every field is required, so a flag a caller forgets is a ``TypeError`` at
-    the desk and never a default in the scanner.
+    Campaign startup is opt-in; existing run callers keep their previous defaults.
     """
 
     #: what is played
@@ -55,6 +54,9 @@ class RunConfig:
     #: do not build, reset and close each game once before the window.
     skip_load_games: bool
 
+    #: explicitly start new episodes in campaign-enabled phases.
+    new_campaign: bool = False
+
     @classmethod
     def from_args(cls, args: argparse.Namespace, curriculum: Curriculum,
                   rig: RigConfig) -> RunConfig:
@@ -67,7 +69,7 @@ class RunConfig:
         return cls(curriculum=curriculum, rig=rig, subject=args.subject, ses=args.ses,
                    run=args.run, duration=args.duration, resume=args.resume, loop=args.loop,
                    dummy_trigger=args.dummy_trigger,
-                   skip_load_games=args.skip_load_games)
+                   skip_load_games=args.skip_load_games, new_campaign=args.new_campaign)
 
     def problems(self, *, load_games: bool = False) -> list[str]:
         """What keeps this curriculum from being played on this rig, which neither shows alone.
@@ -85,8 +87,20 @@ class RunConfig:
             a duration the fixations fill, and, with ``load_games``, per game that
             cannot start.
         """
-        return (self._scanner_key_problems() + self._curriculum_requires_controls_missing_from_rig()
+        return (self._campaign_problems() + self._scanner_key_problems()
+                + self._curriculum_requires_controls_missing_from_rig()
                 + self._duration_problems() + (self._game_problems() if load_games else []))
+
+    def _campaign_problems(self) -> list[str]:
+        campaigns = [phase for phase in self.curriculum.phases
+                     if isinstance(phase, GamePhase) and phase.continue_campaign]
+        if self.new_campaign and self.resume:
+            return ["--new-campaign and --resume cannot be combined"]
+        if self.new_campaign and not campaigns:
+            return ["--new-campaign requires a game phase with continue_campaign: true"]
+        if campaigns and self.loop:
+            return ["campaign-enabled curricula cannot use --loop"]
+        return []
 
     def _game_problems(self) -> list[str]:
         """Build, reset and close each distinct game once; the ones that cannot start.

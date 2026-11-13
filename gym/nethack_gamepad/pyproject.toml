@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nethack-gamepad-gym"
+version = "0.4.1"
+description = "NetHack with original tiles and a gamepad interface."
+requires-python = ">=3.10,<3.14"
+dependencies = ["gymnasium", "numpy", "pillow", "pygame-ce", "replay-state-gym"]
+
+[project.scripts]
+nethack-gamepad-build = "nethack_gamepad_gym.build:main"
+nethack-campaign = "nethack_gamepad_gym.campaign:main"
+nethack-gamepad = "nethack_gamepad_gym.play:main"
+
+[tool.setuptools]
+include-package-data = false
+packages = ["nethack_gamepad_gym"]
+
+[tool.setuptools.package-data]
+nethack_gamepad_gym = ["bridge.c", "modern.inc"]

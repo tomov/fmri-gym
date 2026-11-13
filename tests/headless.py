@@ -152,6 +152,7 @@ def main() -> None:
     p.add_argument("--tap", metavar="JSON",
                    help="write what the window drew and the speakers played here (tests.tap)")
     p.add_argument("--run", type=int, default=1, help="the run number (--run of fmri-play)")
+    p.add_argument("--new-campaign", action="store_true", help="start a campaign explicitly")
     p.add_argument("--resume", action="store_true", help="pass --resume to fmri-play")
     p.add_argument("--loop", action="store_true", help="pass --loop to fmri-play")
     args = p.parse_args()
@@ -171,7 +172,7 @@ def main() -> None:
     name = use_rig(args.data_root, has_audio=not args.no_audio, end_fixation=args.end_fixation)
     sys.argv = ["fmri-play", "--curriculum", args.curriculum, "--subject", "sub-test",
                 "--ses", "1", "--run", str(args.run), "--rig", name, "--dummy-trigger",
-                "--duration", str(args.duration)] + ["--resume"] * args.resume + ["--loop"] * args.loop
+                "--duration", str(args.duration)] + ["--resume"] * args.resume + ["--loop"] * args.loop + ["--new-campaign"] * args.new_campaign
     import fmri_play
     try:
         fmri_play.main()

@@ -73,7 +73,10 @@ def _parser() -> argparse.ArgumentParser:
                    "whatever is playing. Default: play the curriculum to its end")
     p.add_argument("--resume", action="store_true",
                    help="carry on from where this subject's latest run of this config (any "
-                   "session) stopped, mid-block included. Default: start at the beginning")
+                   "session) stopped, mid-block included. Default: start a new run; campaign-enabled "
+                   "phases load their last checkpoint")
+    p.add_argument("--new-campaign", action="store_true",
+                   help="start fresh in campaign-enabled phases instead of loading the last checkpoint")
     p.add_argument("--loop", action="store_true",
                    help="when the curriculum ends before --duration, play it again from its "
                    "first phase, until --duration (which it needs)")

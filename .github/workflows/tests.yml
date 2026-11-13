@@ -66,7 +66,7 @@ jobs:
       fail-fast: false
       matrix:
         # Every row of tests/backends.py without a `ci` reason, minus gym (above).
-        backend: [ale, crafter, minihack, nethack, vizdoom, coom, vgdl, baba, baba_auto,
+        backend: [ale, crafter, minihack, nethack, nethack_gamepad, vizdoom, coom, vgdl, baba, baba_auto,
                   rushhour, aigamestore, arc3]
     name: ${{ matrix.backend }}
     steps:
@@ -87,6 +87,11 @@ jobs:
             libportaudio2 libopenal1 build-essential cmake libegl1 libxkbcommon0
       - name: Sync the backend's extra and the gui
         run: uv sync --extra ${{ matrix.backend }} --extra gui
+      - name: Build the NetHack gamepad engine from the supplied source
+        if: matrix.backend == 'nethack_gamepad'
+        run: |
+          uv run nethack-gamepad-build
+          uv run nethack-gamepad-build --test-driver --home /tmp/fmri-nethack-gamepad-tests
       - name: Browser for the AI GameStore pages
         if: matrix.backend == 'aigamestore'
         run: uv run playwright install --with-deps chrome
@@ -97,6 +102,8 @@ jobs:
             uv run python -m arc3_gym "$game"
           done
       - name: Play the backend
+        env:
+          NETHACK_GAMEPAD_TEST_HOME: /tmp/fmri-nethack-gamepad-tests
         run: >
           uv run pytest --backend ${{ matrix.backend }} --strict-backends --thorough --no-audio
           --run-seconds 25 --durations=15
