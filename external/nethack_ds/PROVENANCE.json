@@ -1,0 +1,8 @@
+{
+  "engine": "NetHack 3.6.0, supplied NetHackDS source snapshot",
+  "sources": {
+    "nethackds-master.zip": "4a91a68de2103830c7d64722d7446ad0ba5aa5016be8890ff38c6e2c313f2c05",
+    "Amphitere-NetHack-5.0.0-android.zip": "c57a748475d8c2867ebf6fa789339125bceab1fa9401b6fe823924bf0f05c036"
+  },
+  "android_frontend": "ForkFront submodule absent from supplied Android archive"
+}
