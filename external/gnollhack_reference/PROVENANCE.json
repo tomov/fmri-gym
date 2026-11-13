@@ -1,0 +1,13 @@
+{
+  "source": "https://github.com/hyvanmielenpelit/GnollHack",
+  "archive": "GnollHack-master.zip",
+  "sha256": "6c551975b48470d7397a9385777f4182440a174bb2c42530c8c65c98ae8e3ac5",
+  "files": [
+    "src/end.c",
+    "src/do.c",
+    "src/mklev.c",
+    "include/flag.h",
+    "LICENSE.md"
+  ],
+  "scope": "Unmodified source references; adapted resurrection functions are compiled in the desktop NetHack port, not the GnollHack engine."
+}

@@ -232,6 +232,8 @@ def _headless(config: Path, data_root: Path, plan, tap: Path, backend: str,
     cmd = [sys.executable, "-m", "tests.headless", "--curriculum", str(config),
            "--data-root", str(data_root), "--duration", str(plan.run_seconds),
            "--tap", str(tap), *more]
+    if not more and any(phase.get("continue_campaign") for phase in game_phases(config)):
+        cmd.append("--new-campaign")
     window = plan.has_window or BACKENDS[backend].needs_display
     cmd += ["--fake-audio"] * fake + ["--window"] * window
     env = {**os.environ}

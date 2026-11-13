@@ -340,6 +340,9 @@ class GamePhase(Phase):
     #: the loading screen's label instead of the env id, if any
     text: str | None
 
+    #: load the last episode at each new run, with a fresh block clock.
+    continue_campaign: bool
+
     @property
     def frame_period(self) -> float:
         """Seconds per frame."""
@@ -363,6 +366,7 @@ class GamePhase(Phase):
             seed=d.get("seed"), state_stride=max(1, int(d.get("state_stride", 1))),
             is_turn_based=d.get("is_turn_based", False),
             has_audio=d.get("has_audio", True),
+            continue_campaign=d.get("continue_campaign", False),
             fps=d["fps"],
             instructions=None if instructions is None else Instructions.from_dict(instructions),
             text=d.get("text"))
@@ -376,7 +380,7 @@ class GamePhase(Phase):
             out.append(f"mode: expected 'duration' or 'episode', got {d.get('mode')!r}")
         out += (_fps_problems(d) + _controls_problems(d) + _advance_problems(d)
                 + _rewind_problems(d))
-        out += _bool_problems(d, ("is_turn_based", "has_audio"))
+        out += _bool_problems(d, ("is_turn_based", "has_audio", "continue_campaign"))
         seconds = d.get("show_outcome_duration", 0)
         if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or seconds < 0:
             out.append(f"show_outcome_duration: expected seconds >= 0, got {seconds!r}")

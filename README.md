@@ -12,6 +12,7 @@ A proof-of-concept framework that turns games into neuroimaging tasks — fixed 
 | `vgdl`        | VGDL games (`aliens`, `beesAndBirds`, …), from a pinned checkout in `external/vgdl` | vgdl-gym (`gym/vgdl/`) over the language_and_experience fork |
 | `crafter`     | Crafter (open-world survival) | crafter-gym (`gym/crafter/`) over crafter |
 | `minihack`    | MiniHack tasks (pixel obs) | minihack / NLE |
+| `nethack_gamepad` | Full NetHack 3.6.0 from supplied DS source; native menus and tiles | [nethack-gamepad-gym](gym/nethack_gamepad/README.md); explicit C build |
 | `nethack`     | NetHack (`NetHack*-v0`; TTY rendered to pixels) | nle |
 | `aigamestore` | AI GameStore browser games (`game1`…`game10`), lock-stepped | aigamestore-gym (`gym/aigamestore/`) |
 | `vizdoom`     | Doom action-shooter scenarios (COOM's engine) | ViZDoom |
@@ -524,6 +525,7 @@ The `BC` team's sessions are in `configs/BC/subjects/`: three of about an hour f
                                 // prints each phase's seed, session-editor shows it (and Pin
                                 // copies it in), the manifest logs it
 
+ "continue_campaign": false,    // optional: start each run from the last checkpoint, with a fresh clock
  "state_stride": 1,             // save a full savestate every K frames (see below)
  "frame_stride": 1,             // save the rendered frame every K frames (0 = none)
  "state": "Level1",             // retro: named savestate/level (optional)
@@ -605,6 +607,19 @@ Holding `control` for `hold` seconds -- even if that control does something in t
 ### The status strip (the `hud` field)
 
 Above the frame, a strip shows the seconds left in the block in its left corner and the episode's score in its right, without covering a game pixel. A game phase can hide either with `"hud": {"show_score": false}` or `"hud": {"show_time_remaining": false}`; both are shown by default. A hidden line leaves its corner empty, so the other stays where it was, and with both hidden the strip is gone and the frame gets the whole screen. A game may add fields of its own between the two corners (crafter's task and cue).
+
+### Continuing a campaign across scans
+
+A game phase may opt into `"continue_campaign": true` (default: false). Start its
+first recording with `--new-campaign`; later launches with the same subject and
+task automatically restore the latest saved episode and get a fresh block duration.
+The console, experimenter screen and manifest identify the source checkpoint.
+Missing, unclosed, ended or incompatible checkpoints stop startup; nothing falls
+back to a fresh game. Use `--new-campaign` deliberately to start again. An ended
+campaign episode closes its block rather than automatically starting another one.
+Other curricula keep their existing behavior. `--resume` explicitly retains the
+interrupted-curriculum behavior below; `--new-campaign` cannot be combined with
+`--resume`, and campaign curricula cannot use `--loop`.
 
 ### Resuming a curriculum (`--duration`, `--resume`)
 

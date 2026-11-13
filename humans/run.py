@@ -306,6 +306,37 @@ def _run_progress(data_root: str, subject: str, curriculum: Curriculum,
     return progress
 
 
+def _campaign_checkpoints(config: RunConfig) -> dict:
+    """Resolve and validate opted-in checkpoints before opening the participant window."""
+    from .save.campaign import latest_checkpoint
+
+    checkpoints = {}
+    phases = [(index, phase) for index, phase in enumerate(config.curriculum.phases)
+              if isinstance(phase, GamePhase) and phase.continue_campaign]
+    if config.resume:
+        return checkpoints
+    for index, phase in phases:
+        if config.new_campaign:
+            print(f"campaign: phase {index}: starting a new campaign", file=sys.stderr)
+            continue
+        checkpoint = latest_checkpoint(config.rig.data_root, config.subject,
+                                       config.curriculum.path, index)
+        changed = game_changes(checkpoint.phase, phase.spec)
+        if changed:
+            raise ValueError(f"campaign: phase {index} changed ({', '.join(changed)}); "
+                             "use the matching curriculum or --new-campaign")
+        adapter = get_adapter(phase.backend, phase.spec)
+        try:
+            adapter.reset(phase.seed if phase.seed is not None else index)
+            adapter.restore(checkpoint.state)
+        finally:
+            adapter.close()
+        print(f"campaign: phase {index}: continuing {checkpoint.block} with a fresh block clock",
+              file=sys.stderr)
+        checkpoints[index] = checkpoint
+    return checkpoints
+
+
 class Run:
     """Plays one curriculum for one subject, dispatching phases to handlers."""
 
@@ -348,6 +379,8 @@ class Run:
         self.sync = self.triggers.sync
         self.inputs = inputs
         self.resume_from = resume_from
+        self.campaign_checkpoints = {}
+        self.campaign_status = ""
         #: ``perf_counter`` at which the phases stop for the closing fixation.
         self._run_end = math.inf
         self.logger.set_extra("duration", config.duration)
@@ -370,6 +403,10 @@ class Run:
             size this machine or this subject refuses; a progress to resume
             from that this curriculum cannot carry on (see :func:`_run_progress`).
         """
+        campaign_problems = config._campaign_problems()
+        if campaign_problems:
+            raise ValueError("; ".join(campaign_problems))
+        checkpoints = _campaign_checkpoints(config)
         if config.loop and config.duration is None:
             raise ValueError("loop: plays the curriculum until the run's duration, and it has none")
         out = bids.run_output(config.rig.data_root, config.subject,
@@ -403,6 +440,14 @@ class Run:
         display = Display(size=screen.size, fullscreen=screen.is_fullscreen,
                           vsync=screen.has_vsync, monitor=screen.monitor)
         run = cls(config, display, out.folder, audio, triggers, inputs, resume_from)
+        run.campaign_checkpoints = checkpoints
+        if any(isinstance(phase, GamePhase) and phase.continue_campaign
+               for phase in config.curriculum.phases) and not config.resume:
+            run.campaign_status = ("campaign: starting new episodes" if config.new_campaign else
+                                   "campaign: continuing saved episodes with a fresh scan duration")
+            run.logger.set_extra("campaign", {"new": config.new_campaign,
+                                 "sources": {str(index): checkpoint.record()
+                                             for index, checkpoint in checkpoints.items()}})
         run.logger.set_extra("run", {"label": out.label, "attempt": out.attempt})
         run.logger.set_extra("seeds", {"derived_from": out.label, "phases": how})
         run.logger.set_extra("inputs", inputs.status())   # which devices answered, and how
@@ -435,7 +480,8 @@ class Run:
             "Please keep your head as still as possible.\n\n"
             "(experimenter: press SPACE when ready)\n\n"
             f"triggers: {self.triggers.status()}\n"
-            f"audio: {self.audio.status()}")
+            f"audio: {self.audio.status()}"
+            + (f"\n{self.campaign_status}" if self.campaign_status else ""))
         _wait_for_control(self.inputs, self.display, EXPERIMENTER_KEY,
                       dummy_trigger=self.config.dummy_trigger)
         if self.sync.mode == "wait":
@@ -753,6 +799,8 @@ class Run:
         ## Settings
         spec = game_phase.spec
         # A block an earlier run stopped goes on with the time and episodes it has left.
+        if block_progress is None and index in self.campaign_checkpoints:
+            block_progress = BlockProgress(0.0, 0, self.campaign_checkpoints[index].state)
         block_time_elapsed = (0.0 if block_progress is None
                               else block_progress.block_time_elapsed)
         num_completed_episodes = (0 if block_progress is None
@@ -820,6 +868,9 @@ class Run:
             advances = game_phase.advance_on is None or outcome in game_phase.advance_on
             num_completed_episodes += (outcome not in ("reset", "playing", "quit")
                                        and not rewound and advances)
+            if (game_phase.continue_campaign and not rewound
+                    and outcome not in ("playing", "quit", "reset")):
+                break
             if (game_phase.mode is BlockMode.EPISODE
                     and num_completed_episodes >= game_phase.n_episodes):
                 break
