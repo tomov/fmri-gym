@@ -1,0 +1,46 @@
+{
+  "pi": "MT",
+  "modality": "behav",
+  "monitor": "default",
+  "photodiode": "none",
+  "audio_path": "default",
+  "trigger_hardware": "none",
+  "screen": {
+    "size": "1024x768",
+    "is_fullscreen": false,
+    "monitor": 0,
+    "has_vsync": true,
+    "geometry": {
+      "width_cm": 20.1,
+      "height_cm": 13.1,
+      "distance_cm": 54.0
+    }
+  },
+  "has_audio": true,
+  "data_root": "data",
+  "start_fixation": 10.0,
+  "end_fixation": 10.0,
+  "inputs": [
+    "keyboard",
+    "xbox_controller"
+  ],
+  "triggers": {
+    "sync": {
+      "mode": "none"
+    },
+    "backend": "null",
+    "hid_device": "mcc-1208fs",
+    "lsl_stream_name": "fmri_gym",
+    "pulse_ms": 10.0,
+    "on_frame": true,
+    "frame_every": 1,
+    "on_episode_start": true,
+    "codes": {
+      "frame_bits": 3,
+      "task_start": 8,
+      "task_stop": 16,
+      "episode_start": 32,
+      "scanner_start": 64
+    }
+  }
+}
