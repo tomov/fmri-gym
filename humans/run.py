@@ -117,13 +117,11 @@ def _poll_keys_until(
     inputs: InputDevice,
     display: Display,
     deadline: float,
-    clock: Clock,
-    logger: Logger,
     pop_ups: Sequence[PopUp] = (),
     stop_on: Collection[str] = (),
     redraw: Callable[[], float] | None = None,
 ) -> tuple[list[str], bool]:
-    """Poll the inputs until ``deadline``, logging every press and release.
+    """Poll the inputs until ``deadline``.
 
     Replaces a plain sleep between frames: events are time-stamped on arrival
     -- to about a millisecond, or to one refresh when the display is
@@ -137,8 +135,6 @@ def _poll_keys_until(
     :param inputs: the run's input devices.
     :param display: the display, idled between polls.
     :param deadline: ``perf_counter`` at which to stop waiting.
-    :param clock: the run's clock, for the log.
-    :param logger: the run's logger.
     :param pop_ups: the block's :class:`~.popup.Menu` and :class:`~.popup.Hint`, those it has.
     :param stop_on: control names a press of which ends the wait.
     :param redraw: called every :data:`HUD_REDRAW_S` while waiting, for a
@@ -158,7 +154,6 @@ def _poll_keys_until(
                 if down:
                     return pressed, True
                 continue
-            logger.log(type="input_event", run_time=clock.run_time(), name=name, down=down)
             if not down:
                 continue
             pressed.append(name)
@@ -406,12 +401,19 @@ class Run:
         display = Display(size=screen.size, fullscreen=screen.is_fullscreen,
                           vsync=screen.has_vsync, monitor=screen.monitor)
         run = cls(config, display, out.folder, audio, triggers, inputs, resume_from)
+        inputs.record_with(run._record_input)
         run.logger.set_extra("run", {"label": out.label, "attempt": out.attempt})
         run.logger.set_extra("seeds", {"derived_from": out.label, "phases": how})
         run.logger.set_extra("inputs", inputs.record())   # which devices answered, and how
         run.logger.set_extra("versions", versions())
         run.logger.set_extra("platform", platform_info())
         return run
+
+    def _record_input(self, perf_time: float, record: dict) -> None:
+        """Log one edge or stick reading at ``perf_time``; its ``run_time`` is None before the
+        scanner's trigger."""
+        run_time = None if self.clock.t0_perf is None else self.clock.from_perf(perf_time)
+        self.logger.log(**record, perf_time=perf_time, run_time=run_time)
 
     def close(self) -> None:
         """Close the logger, the inputs, the trigger line, the audio output and the window.
@@ -609,7 +611,7 @@ class Run:
             waits_for_press = game_phase.is_turn_based and auto is None
             deadline = block_end if waits_for_press else next_t
             pressed, user_quit = _poll_keys_until(
-                self.inputs, self.display, deadline, self.clock, self.logger, pop_ups,
+                self.inputs, self.display, deadline, pop_ups,
                 stop_on=key_to_action if waits_for_press else (),
                 redraw=redraw if waits_for_press else None)
             if user_quit:
@@ -617,7 +619,7 @@ class Run:
                 break
             pop_up = next((pop_up for pop_up in pop_ups if pop_up.pending), None)
             if pop_up is not None:
-                choice = pop_up.run(self.display, self.clock.run_time, self.logger,
+                choice = pop_up.run(self.display, self.clock.run_time,
                                     lambda: read_input_events(self.inputs))
                 if choice != "resume":
                     outcome = choice

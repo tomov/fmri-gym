@@ -337,6 +337,24 @@ def test_a_diagonal_push_presses_a_side_of_each_axis():
                                  _down(ControlNames.CONTROLLER_AXIS_LEFTY_DOWN)]
 
 
+def test_recorded_inputs_hand_over_each_raw_axis_reading_then_each_edge():
+    d = _calibrated(_ScriptedController(), FILE)
+    d.frames = iter([(d.axes_at({LX: 0.9}), {"S_A"})])
+    recorded: list[tuple[float, dict]] = []
+    inputs = InputDevices([d])
+    inputs.record_with(lambda perf_time, record: recorded.append((perf_time, record)))
+    inputs.handle([], 2.5)
+    axis = {"type": "axis", "input": "scripted"}
+    assert recorded == [(2.5, {**axis, "axis": LX, "value": 0.9}),
+                        (2.5, {**axis, "axis": LY, "value": 0.0}),
+                        (2.5, {**axis, "axis": RX, "value": 0.0}),
+                        (2.5, {**axis, "axis": RY, "value": 0.0}),
+                        (2.5, {"type": "input_event", "name": "S_A", "down": True}),
+                        (2.5, {"type": "input_event", "name": ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT,
+                               "down": True})]
+    assert d.axis_readings == []
+
+
 def test_an_uncalibrated_axis_presses_nothing():
     d = _ScriptedController()
     d.frames = iter([(d.axes_at({LX: 1.0, LY: -1.0}), set())])
@@ -524,19 +542,18 @@ def test_a_tap_inside_one_frame_counts_for_that_frame(screen):
     from humans.run import _poll_keys_until
     keys = InputDevices([Keyboard()])
     logged: list[dict] = []
+    keys.record_with(lambda perf_time, record: logged.append(record))
     display = types.SimpleNamespace(idle=lambda deadline: None)
-    clock = types.SimpleNamespace(run_time=lambda: 0.0)
-    logger = types.SimpleNamespace(log=lambda **r: logged.append(r))
     pygame.event.post(_key(pygame.KEYDOWN, pygame.K_LEFT))
     pygame.event.post(_key(pygame.KEYUP, pygame.K_LEFT))
     pygame.event.post(_key(pygame.KEYDOWN, pygame.K_SPACE))
-    pressed, quit_ = _poll_keys_until(keys, display, 0.0, clock, logger)
+    pressed, quit_ = _poll_keys_until(keys, display, 0.0)
     assert (pressed, quit_, keys.held()) == (["LEFT", "SPACE"], False, {"SPACE"})
     assert [(r["name"], r["down"]) for r in logged] == [
         ("LEFT", True), ("LEFT", False), ("SPACE", True)]
     pygame.event.post(_key(pygame.KEYDOWN, pygame.K_z))     # turn-based: the wait ends at Z
     pygame.event.post(_key(pygame.KEYDOWN, pygame.K_x))
-    pressed, _ = _poll_keys_until(keys, display, math.inf, clock, logger, stop_on={"Z"})
+    pressed, _ = _poll_keys_until(keys, display, math.inf, stop_on={"Z"})
     assert pressed == ["Z"]
 
 

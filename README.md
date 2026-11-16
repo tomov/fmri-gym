@@ -372,7 +372,7 @@ humans/
     triggers.py     # run-start sync (wait/send/none) + MEG/EEG trigger codes over lsl/serial/parallel/hid
   save/
     bids.py         # where a run's data goes, BIDS-style, and the numbers in its name
-    logging.py      # manifest.json + one crash-safe JSONL/HDF5 log per game block
+    logging.py      # manifest.json + the run's crash-safe JSONL/HDF5 log, cut into one per game block
     replay.py       # replay an episode from a block's log; its frame fields as arrays
   standalone/       # the commands that are not a run; nothing outside imports them
     rig_setup/      # `rig-setup`: a rig file in a form (window.py); with --measure, the rig measured (measure.py, report.py)
@@ -716,15 +716,17 @@ Data is never overwritten. A run whose folder is already there writes to `..._02
 The names follow BIDS apart from that suffix, the contents not yet (no `_beh.tsv` / `_events.tsv`). Each folder holds:
 
 - **`manifest.json`** — subject, curriculum, trigger epoch, per-phase onsets/offsets (+ survey responses; onsets are flip times), the `display` actually opened (size, `vsync`, `refresh_rate`, driver), the `triggers` settings + lifecycle triggers sent (+ what the config left `defaulted`), the `audio` output (device, measured device delay, chosen delay), `dummy_trigger`, the `run` it is (label and `attempt`), the `seeds` (each game phase derived or pinned), the `versions` of pygame and SDL, the run's `duration` and where it was `resumed_from` (see "Resuming a curriculum").
-- **`block-NN_<backend>_<game>/`** — one folder per game block, written as the block plays (so a crash loses at most the last second), holding:
-  - **`events.jsonl`** — one JSON object per line, in order; `type` says which:
+- **`events.jsonl`**, **`frames.h5`**, **`audio.h5`** — the run's log, the only files written as the run plays: forced to disk every second, so a crash, a killed process or a machine reset loses at most the last second. Every line of every block is in `events.jsonl` with its `block` (the folder name below; `null` outside a game block), and so is every press and release from the start of the run to its end, the scanner's trigger key included, in every phase. `frames.h5` and `audio.h5` hold one group per block, named as its folder.
+- **`block-NN_<backend>_<game>/`** — one folder per game block, cut from the run's log when the run ends and checked against it (what is wrong with any is printed and listed in the manifest's `block_files`). A run that stopped before then has its folders cut the first time one is read (`humans.save.logging.read_events` and the other readers), which says so. Each holds:
+  - **`events.jsonl`** — the block's lines of the run's log, in order, without `block`; `type` says which:
 
     | `type` | fields |
     |--------|--------|
     | `block_start` | first line: `format`, `version`, `subject`, `block_index`, `backend`, `game`, `phase` (the config), `base_seed` |
     | `episode_start` | `episode_id`, `seed`, `initial_state` (the savestate an episode carried on from an earlier run starts from, as a frame's `state`; `null` otherwise) |
     | `frame` | `frame` (index in the block), `episode_id`, `ep_frame` (index in the episode), `action`, `reward`, `terminated`, `truncated`, `run_time` (seconds since the trigger, after the step), `flip_time` (of the **flip that showed the frame**: its onset; vsync-locked when the display reports `vsync: true`), `wall_time` (Unix), `variables` (the backend's: `ram` for ale/retro, `info_*` for retro, `obs` for gym, …), and when present `env_action` (an adapter's own reading of the keys, e.g. Rush Hour), `trigger` (the code sent on that flip), `audio_chunk` (the chunk this frame's sound was queued as, -1 none; in blocks that play sound), `state` (a savestate, zlib'd then base64, every `state_stride` frames) |
-    | `input_event` | `run_time`, `name`, `down`: every key press/release during the block, stamped on arrival (~1 ms), independent of the frame grid; the pause menu's included |
+    | `input_event` | `perf_time`, `run_time` (`null` before the trigger), `name`, `down`: every press/release of a control, stamped on arrival (~1 ms), independent of the frame grid; the pause menu's included |
+    | `axis` | `perf_time`, `run_time`, `input`, `axis`, `value`: each raw reading of a stick axis, before its calibration, so the presses can be worked out again with another one |
     | `pacing_reset` | `flip_time`, `late`: a flip that ended a stall of more than a frame, and how many seconds late it was; the frame schedule restarted there instead of catching up with a burst of short frames (none in a clean block; why frames fall behind is open, issue #43) |
     | `episode_end` | `episode_id`, `outcome` (`won`, `lost`, `terminated`, `truncated`, `playing` for the block's clock; `quit`, `reset`, `forfeit` for the subject's) , `terminated`, `truncated`, `score`, `n_pacing_resets` |
     | `block_end` | last line: `n_episodes`, `n_frames`, `outcomes`, `n_pacing_resets`, `total_reward`, `block_time_elapsed` and `num_completed_episodes` (earlier runs' included, for a block carried on), `block_did_not_finish` (stopped by the run's clock or ESC before its own end) (the manifest entry's summary), `audio` (when the block played sound: `onsets`, `[chunk, run_time]` when each chunk reached the DAC, so a frame's sound onset is the entry for its `audio_chunk` and `onset - flip_time` the audio delay achieved; `delay_ms`, `resyncs`, `trimmed_samples`), `extra` (the adapter's block extras, e.g. an ALE palette, and `state`, the savestate the block ended in) |

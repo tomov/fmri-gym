@@ -3,19 +3,24 @@
 ::
 
     <outdir>/manifest.json                            the run: subject, curriculum, one entry per phase, rig
-    <outdir>/block-NN_<backend>_<game>/events.jsonl   one JSON object per line, in order
+    <outdir>/events.jsonl                             every line of the run, in order, each with its ``block``
+    <outdir>/frames.h5, audio.h5                      the run's frames and PCM, one group per block
+    <outdir>/block-NN_<backend>_<game>/events.jsonl   one block's lines, in order
     <outdir>/block-NN_<backend>_<game>/frames.h5      the rendered frames, when the phase keeps them
     <outdir>/block-NN_<backend>_<game>/audio.h5       the queued PCM, when the block played any
 
 A phase played again in the same run writes ``block-NN_<backend>_<game>_2``, ``_3``...
 
-There is one :class:`Logger` per run and it writes all three. The manifest is
-rewritten (atomically) whenever a phase entry or a run-level field lands, so
-it is current at every phase boundary. A block's lines and frames go through
-a queue to a writer process that owns the file handles, flushes on a timer
-and finishes on its own if the run dies: a crash mid-block loses at most the
-last flush interval, and a partial last line is skipped on read. One block is
-open at a time (a run plays its curriculum in order).
+There is one :class:`Logger` per run. The manifest is rewritten (atomically)
+whenever a phase entry or a run-level field lands, so it is current at every
+phase boundary. Everything else is written only to the run's own files, as it
+happens: lines and frames go through a queue to a writer process that owns the
+file handles, flushes them to disk on a timer and finishes on its own if the run
+dies, so a crash loses at most the last flush interval, and a partial last line
+is skipped on read. A line written outside a block has a ``block`` of ``None``.
+The block folders are cut from the run's files when the logger closes
+(:func:`write_blocks`), each checked against the run's; a block read before
+then is cut first. One block is open at a time (a run plays its curriculum in order).
 
 Every line in ``events.jsonl`` has a ``type``. The logger writes the first
 and last itself -- ``block_start`` (``format``, ``version``, ``subject``,
@@ -46,11 +51,12 @@ import json
 import multiprocessing as mp
 import os
 import queue as queue_mod
+import sys
 import time
 import zlib
 from collections import Counter
 from dataclasses import asdict, dataclass, replace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
 
@@ -62,7 +68,7 @@ VERSION = 1
 EVENTS_FILENAME = "events.jsonl"
 FRAMES_FILENAME = "frames.h5"
 AUDIO_FILENAME = "audio.h5"
-#: Seconds between flushes of a block's files to the OS (not every frame).
+#: Seconds between flushes of the run's files to disk (not every frame).
 FLUSH_INTERVAL = 1.0
 
 
@@ -92,7 +98,7 @@ class AudioBlockLog:
 
 
 class Logger:
-    """Writes one run's ``manifest.json`` and its per-block logs."""
+    """Writes one run's ``manifest.json``, its run-level log, and at the end its blocks."""
 
     def __init__(self, outdir: str, subject: str, phases: list[dict], clock: Clock) -> None:
         """Create the run's output directory, an empty manifest and the writer process.
@@ -117,7 +123,7 @@ class Logger:
         # Unbounded queue: a full one would silently stall put(), the exact
         # invisible data loss this exists to avoid.
         self._queue: mp.Queue = mp.Queue()
-        self._process = mp.Process(target=_writer_main, args=(self._queue,), daemon=True)
+        self._process = mp.Process(target=_writer_main, args=(self._queue, outdir), daemon=True)
         self._process.start()
 
     # -- the manifest --------------------------------------------------------
@@ -172,7 +178,7 @@ class Logger:
         self._block_names[name] += 1
         if self._block_names[name] > 1:
             name += f"_{self._block_names[name]}"
-        self._block = os.path.join(self.outdir, name)
+        self._block = name
         self.n_frames = 0
         self._frame_stride = int(phase.get("frame_stride", 1))
         self.log(type="block_start", format=FORMAT, version=VERSION,
@@ -181,7 +187,7 @@ class Logger:
         return name
 
     def log(self, **record: Any) -> None:
-        """Append one line to the open block's ``events.jsonl``.
+        """Append one line to the run's ``events.jsonl``, in the open block if there is one.
 
         :param record: the line's fields; give it a ``type``.
         """
@@ -231,11 +237,17 @@ class Logger:
         self._block = None
 
     def close(self) -> None:
-        """Flush everything and stop the writer process. Safe to call more than once."""
+        """Flush everything, stop the writer process, then write and check the block folders
+        (:func:`write_blocks`), saying on stderr and in the manifest (``block_files``) what is
+        wrong with any. Safe to call more than once."""
         if not self._process.is_alive():
             return
         self._queue.put({"op": "shutdown"})
         self._process.join()
+        problems = write_blocks(self.outdir)
+        for problem in problems:
+            print(f"log: {problem}", file=sys.stderr)
+        self.set_extra("block_files", {"problems": problems})
 
 
 # --------------------------------------------------------------------------- #
@@ -246,46 +258,40 @@ class Logger:
 _ORPHAN_GRACE = 1.0
 
 
-def _writer_main(q: mp.Queue) -> None:
-    """Consume queued ops, owning every file handle; flush on a timer; exit on
+def _writer_main(q: mp.Queue, outdir: str) -> None:
+    """Consume queued ops, owning every file handle; flush to disk on a timer; exit on
     ``shutdown`` or, having drained the queue, when the parent is gone."""
-    lines: dict[str, Any] = {}
-    h5: dict[str, Any] = {}
-    audio: dict[str, Any] = {}
+    events = open(os.path.join(outdir, EVENTS_FILENAME), "a")
+    #: the run's open HDF5 files, by file name, each in SWMR mode
+    h5_files: dict[str, Any] = {}
     parent = os.getppid()
     last_flush = time.monotonic()
 
     def _flush() -> None:
-        for fh in lines.values():
-            fh.flush()
-        for f in h5.values():
+        events.flush()
+        os.fsync(events.fileno())
+        for filename, f in h5_files.items():
             f.flush()  # SWMR: this is what makes a written frame durable
-        for f in audio.values():
-            f.flush()
+            _fsync(os.path.join(outdir, filename))
 
-    def _open_h5(block: str, frame: np.ndarray) -> Any:
-        """Sized from the first frame; SWMR mode must be set after every dataset exists."""
+    def _reopen(filename: str, add: Callable[[Any], None]) -> Any:
+        """The run's ``filename`` with ``add`` applied: SWMR mode allows no new object, so
+        the file is closed, changed, and put back in SWMR mode."""
         import h5py
-        f = h5py.File(os.path.join(block, FRAMES_FILENAME), "w", libver="latest")
-        f.create_dataset("frames", shape=(0, *frame.shape), maxshape=(None, *frame.shape),
-                         dtype=frame.dtype, chunks=(1, *frame.shape),
-                         compression="gzip", compression_opts=1)
-        f.create_dataset("frame_index", shape=(0,), maxshape=(None,), dtype="int64",
-                         chunks=(1024,))
+        if filename in h5_files:
+            h5_files.pop(filename).close()
+        f = h5py.File(os.path.join(outdir, filename), "a", libver="latest")
+        add(f)
         f.swmr_mode = True
+        h5_files[filename] = f
         return f
 
-    def _open_audio_h5(block: str, pcm: np.ndarray, sample_rate: float) -> Any:
-        """Sized from the first chunk; SWMR mode must be set after every dataset exists."""
-        import h5py
-        f = h5py.File(os.path.join(block, AUDIO_FILENAME), "w", libver="latest")
-        f.create_dataset("samples", shape=(0, pcm.shape[1]), maxshape=(None, pcm.shape[1]),
-                         dtype=pcm.dtype, chunks=(4096, pcm.shape[1]))
-        f.create_dataset("chunk_len", shape=(0,), maxshape=(None,), dtype="int64",
-                         chunks=(1024,))
-        f.attrs["sample_rate"] = sample_rate
-        f.swmr_mode = True
-        return f
+    def _group(filename: str, block: str, create: Callable[[Any], None]) -> Any:
+        """``block``'s group in the run's ``filename``, made by ``create`` when it is new."""
+        f = h5_files.get(filename)
+        if f is None or block not in f:
+            f = _reopen(filename, lambda f: create(f.create_group(block)))
+        return f[block]
 
     def _handle(rec: dict) -> bool:
         """Apply one op; True when it was ``shutdown``."""
@@ -293,60 +299,35 @@ def _writer_main(q: mp.Queue) -> None:
         if op == "shutdown":
             return True
         if op == "line":
-            if block not in lines:
-                os.makedirs(block, exist_ok=True)
-                lines[block] = open(os.path.join(block, EVENTS_FILENAME), "a")
-            line = rec["line"]
+            line = {"block": block, **rec["line"]}
             if rec.get("state") is not None:
                 # Savestates are large and mostly redundant (a crafter pickle is
                 # 2.3 MB, ~57 KB zlib'd), so they are compressed here, by
                 # _json_default as every logged bytes value is, not in the game loop.
                 line["state"] = rec["state"]
-            lines[block].write(json.dumps(line, default=_json_default) + "\n")
+            events.write(json.dumps(line, default=_json_default) + "\n")
         elif op == "frame":
-            if block not in h5:
-                h5[block] = _open_h5(block, rec["frame"])
-            for name, value in (("frames", rec["frame"]), ("frame_index", rec["index"])):
-                ds = h5[block][name]
-                n = ds.shape[0]
-                ds.resize(n + 1, axis=0)
-                ds[n] = value
+            group = _group(FRAMES_FILENAME, block, lambda g: _create_frames(g, rec["frame"]))
+            _append(group["frames"], rec["frame"][None])
+            _append(group["frame_index"], [rec["index"]])
         elif op == "audio":
             pcm = rec["pcm"]
-            if block not in audio:
-                audio[block] = _open_audio_h5(block, pcm, rec["sample_rate"])
-            samples, chunk_len = audio[block]["samples"], audio[block]["chunk_len"]
-            n = samples.shape[0]
-            samples.resize(n + len(pcm), axis=0)
-            samples[n:n + len(pcm)] = pcm
-            m = chunk_len.shape[0]
-            chunk_len.resize(m + 1, axis=0)
-            chunk_len[m] = len(pcm)
+            group = _group(AUDIO_FILENAME, block,
+                           lambda g: _create_audio(g, pcm, rec["sample_rate"]))
+            _append(group["samples"], pcm)
+            _append(group["chunk_len"], [len(pcm)])
         elif op == "audio_summary":
-            f = audio.get(block)
-            if f is not None:
-                a = rec["audio"]
-                f.attrs["delay_ms"] = a["delay_ms"]
-                f.attrs["resyncs"] = a["resyncs"]
-                f.attrs["trimmed_samples"] = a["trimmed_samples"]
-                f.create_dataset("onset_chunk", data=[o[0] for o in a["onsets"]], dtype="int64")
-                f.create_dataset("onset_time", data=[o[1] for o in a["onsets"]], dtype="float64")
-                f.create_dataset("stretched_chunk", data=[c for c, _ in a["stretched"]],
-                                 dtype="int64")
-                f.create_dataset("stretched_len", data=[n for _, n in a["stretched"]],
-                                 dtype="int64")
+            if block in h5_files.get(AUDIO_FILENAME, ()):
+                _reopen(AUDIO_FILENAME, lambda f: _write_audio_summary(f[block], rec["audio"]))
         elif op == "close":
-            for handles in (lines, h5, audio):
-                fh = handles.pop(block, None)
-                if fh is not None:
-                    fh.close()
+            _flush()
         return False
 
     def _finish() -> None:
         _flush()
-        for handles in (lines, h5, audio):
-            for fh in handles.values():
-                fh.close()
+        events.close()
+        for f in h5_files.values():
+            f.close()
 
     while True:
         wait = max(0.0, FLUSH_INTERVAL - (time.monotonic() - last_flush))
@@ -370,6 +351,53 @@ def _writer_main(q: mp.Queue) -> None:
         if time.monotonic() - last_flush >= FLUSH_INTERVAL:
             _flush()
             last_flush = time.monotonic()
+
+
+def _create_frames(group: Any, frame: np.ndarray) -> None:
+    """A block's frame datasets, sized from its first frame."""
+    group.create_dataset("frames", shape=(0, *frame.shape), maxshape=(None, *frame.shape),
+                         dtype=frame.dtype, chunks=(1, *frame.shape),
+                         compression="gzip", compression_opts=1)
+    group.create_dataset("frame_index", shape=(0,), maxshape=(None,), dtype="int64",
+                         chunks=(1024,))
+
+
+def _create_audio(group: Any, pcm: np.ndarray, sample_rate: float) -> None:
+    """A block's audio datasets, sized from its first chunk."""
+    group.create_dataset("samples", shape=(0, pcm.shape[1]), maxshape=(None, pcm.shape[1]),
+                         dtype=pcm.dtype, chunks=(4096, pcm.shape[1]))
+    group.create_dataset("chunk_len", shape=(0,), maxshape=(None,), dtype="int64",
+                         chunks=(1024,))
+    group.attrs["sample_rate"] = sample_rate
+
+
+def _write_audio_summary(group: Any, audio: dict) -> None:
+    """A block's sound timing (:meth:`AudioBlockLog.record`), beside its samples."""
+    group.attrs["delay_ms"] = audio["delay_ms"]
+    group.attrs["resyncs"] = audio["resyncs"]
+    group.attrs["trimmed_samples"] = audio["trimmed_samples"]
+    group.create_dataset("onset_chunk", data=[o[0] for o in audio["onsets"]], dtype="int64")
+    group.create_dataset("onset_time", data=[o[1] for o in audio["onsets"]], dtype="float64")
+    group.create_dataset("stretched_chunk", data=[c for c, _ in audio["stretched"]],
+                         dtype="int64")
+    group.create_dataset("stretched_len", data=[n for _, n in audio["stretched"]],
+                         dtype="int64")
+
+
+def _append(dataset: Any, rows: Any) -> None:
+    """Add ``rows`` at the end of ``dataset``."""
+    n = dataset.shape[0]
+    dataset.resize(n + len(rows), axis=0)
+    dataset[n:] = rows
+
+
+def _fsync(path: str) -> None:
+    """Force a file's written data to disk."""
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
 
 
 def _atomic_write(path: str, data: bytes) -> None:
@@ -396,8 +424,113 @@ def _json_default(o: Any) -> Any:
 
 
 # --------------------------------------------------------------------------- #
+# The block folders, cut from the run's files
+# --------------------------------------------------------------------------- #
+
+def write_blocks(outdir: str) -> list[str]:
+    """Write each block's folder from the run's files -- its lines of ``events.jsonl``, its
+    groups of ``frames.h5`` and ``audio.h5`` -- then check each against them.
+
+    :param outdir: the run's folder.
+    :return: what is wrong with each block, one line each; empty when every block is whole.
+    """
+    lines_of_block: dict[str, list[dict]] = {}
+    for line in _read_lines(os.path.join(outdir, EVENTS_FILENAME)):
+        block = line.pop("block")
+        if block is not None:
+            lines_of_block.setdefault(block, []).append(line)
+    frames_logged = _frames_in_manifest(outdir)
+    problems = []
+    for block, lines in lines_of_block.items():
+        folder = os.path.join(outdir, block)
+        os.makedirs(folder, exist_ok=True)
+        _atomic_write(os.path.join(folder, EVENTS_FILENAME), "".join(
+            json.dumps(line, default=_json_default) + "\n" for line in lines).encode())
+        for filename in (FRAMES_FILENAME, AUDIO_FILENAME):
+            _copy_group(os.path.join(outdir, filename), block, os.path.join(folder, filename))
+        problems += [f"{block}: {problem}"
+                     for problem in _block_problems(folder, lines, frames_logged.get(block))]
+    return problems
+
+
+def _copy_group(run_file: str, block: str, block_file: str) -> None:
+    """``block``'s group of the run's HDF5 file as a file of its own; nothing when it has none."""
+    import h5py
+    if not os.path.exists(run_file):
+        return
+    # swmr: a writer killed mid-run leaves the file marked open for writing
+    with h5py.File(run_file, "r", swmr=True) as source:
+        if block not in source:
+            return
+        with h5py.File(block_file, "w", libver="latest") as copy:
+            for name in source[block]:
+                source.copy(source[block][name], copy, name)
+            copy.attrs.update(source[block].attrs)
+
+
+def _frames_in_manifest(outdir: str) -> dict[str, int]:
+    """Each block's frame count as its phase entry in the manifest gives it; none without one."""
+    path = os.path.join(outdir, "manifest.json")
+    if not os.path.exists(path):
+        return {}
+    with open(path) as f:
+        phases = json.load(f)["phases"]
+    return {p["data_dir"]: p["n_frames"] for p in phases if "data_dir" in p and "n_frames" in p}
+
+
+def _block_problems(folder: str, lines: list[dict], frames_in_manifest: int | None) -> list[str]:
+    """What a block's folder lacks or contradicts: its lines' order and frame numbers, and its
+    ``frames.h5`` and the manifest against those lines."""
+    out = []
+    if lines[0]["type"] != "block_start":
+        out.append(f"opens with a {lines[0]['type']!r} line, not block_start")
+    if lines[-1]["type"] != "block_end":
+        out.append("has no block_end line: the run stopped inside it")
+    frames = [line["frame"] for line in lines if line["type"] == "frame"]
+    if frames != list(range(len(frames))):
+        out.append(f"its {len(frames)} frame lines are not numbered 0 to {len(frames) - 1}")
+    if frames_in_manifest is not None and frames_in_manifest != len(frames):
+        out.append(f"the manifest gives {frames_in_manifest} frames, its lines {len(frames)}")
+    frames_file = os.path.join(folder, FRAMES_FILENAME)
+    if os.path.exists(frames_file):
+        import h5py
+        with h5py.File(frames_file, "r") as f:
+            kept, index = f["frames"].shape[0], f["frame_index"][:]
+        if kept != len(index) or not set(index.tolist()) <= set(frames):
+            out.append(f"frames.h5 holds {kept} frames indexed {len(index)}, not all of "
+                       "them frames of its lines")
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # Reading a block back
 # --------------------------------------------------------------------------- #
+
+def _written(block: str) -> str:
+    """``block``, its folder first written from its run's files when the run stopped
+    before it was (:func:`write_blocks`), saying so on stderr."""
+    run = os.path.dirname(os.path.normpath(block))
+    if os.path.exists(os.path.join(block, EVENTS_FILENAME)) \
+            or not os.path.exists(os.path.join(run, EVENTS_FILENAME)):
+        return block
+    print(f"log: {run}: its block folders were never written; writing them from its log",
+          file=sys.stderr)
+    for problem in write_blocks(run):
+        print(f"log: {problem}", file=sys.stderr)
+    return block
+
+
+def _read_lines(path: str) -> list[dict]:
+    """Every line of a ``.jsonl`` file; a partial last line (a crash mid-write) is dropped."""
+    lines = []
+    with open(path) as f:
+        for line in f:
+            try:
+                lines.append(json.loads(line))
+            except json.JSONDecodeError:
+                break
+    return lines
+
 
 def read_events(block: str) -> list[dict]:
     """Every line of a block's ``events.jsonl``, in order.
@@ -405,14 +538,7 @@ def read_events(block: str) -> list[dict]:
     :param block: the block's folder.
     :return: the records; a partial last line (a crash mid-write) is dropped, not raised.
     """
-    events = []
-    with open(os.path.join(block, EVENTS_FILENAME)) as f:
-        for line in f:
-            try:
-                events.append(json.loads(line))
-            except json.JSONDecodeError:
-                break
-    return events
+    return _read_lines(os.path.join(_written(block), EVENTS_FILENAME))
 
 
 def read_state(text: str) -> bytes:
@@ -429,7 +555,7 @@ def read_frames(block: str) -> tuple[np.ndarray, np.ndarray]:
     :raises FileNotFoundError: if the block kept no frames.
     """
     import h5py
-    with h5py.File(os.path.join(block, FRAMES_FILENAME), "r") as f:
+    with h5py.File(os.path.join(_written(block), FRAMES_FILENAME), "r") as f:
         return f["frames"][:], f["frame_index"][:]
 
 
@@ -441,7 +567,7 @@ def read_frame(block: str, frame: int) -> np.ndarray | None:
     :return: the ``(H, W, C)`` array, or ``None`` if that frame was not kept.
     """
     import h5py
-    with h5py.File(os.path.join(block, FRAMES_FILENAME), "r") as f:
+    with h5py.File(os.path.join(_written(block), FRAMES_FILENAME), "r") as f:
         index = f["frame_index"][:]
         pos = int(np.searchsorted(index, frame))
         if pos >= len(index) or index[pos] != frame:
@@ -459,7 +585,7 @@ def read_audio(block: str) -> tuple[np.ndarray, float, np.ndarray]:
     :raises FileNotFoundError: if the block queued no audio.
     """
     import h5py
-    with h5py.File(os.path.join(block, AUDIO_FILENAME), "r") as f:
+    with h5py.File(os.path.join(_written(block), AUDIO_FILENAME), "r") as f:
         chunk_len = f["chunk_len"][:]
         chunk_offset = np.concatenate(([0], np.cumsum(chunk_len)[:-1]))
         return f["samples"][:], f.attrs["sample_rate"], chunk_offset

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any, ClassVar, NamedTuple
+from typing import Any, Callable, ClassVar, NamedTuple
 
 import pygame
 
@@ -51,6 +51,9 @@ class InputDevice(ABC):
 
     def __init__(self) -> None:
         self._held: set[str] = set()
+        #: ``(axis, raw value)`` of each stick reading since they were last taken; ``None``:
+        #: not kept. A device without sticks never adds to it.
+        self.axis_readings: list[tuple[str, float]] | None = None
 
     @classmethod
     @abstractmethod
@@ -128,6 +131,15 @@ class InputDevices(InputDevice):
         super().__init__()
         self.devices = tuple(devices)
         self.ignored_joysticks = tuple(ignored_joysticks)
+        self._recorder: Callable[[float, dict], None] | None = None
+
+    def record_with(self, recorder: Callable[[float, dict], None]) -> None:
+        """Hand ``recorder`` each edge and each raw stick reading as it is read, with the time
+        it was read (``perf_counter``): an ``input_event`` (``name``, ``down``) or an ``axis``
+        (``input``, ``axis``, ``value``) record."""
+        self._recorder = recorder
+        for device in self.devices:
+            device.axis_readings = []
 
     @classmethod
     def open(cls) -> InputDevices:
@@ -138,7 +150,19 @@ class InputDevices(InputDevice):
         out = [InputEvent(QUIT, Edge.DOWN) for e in events if e.type == pygame.QUIT]
         for device in self.devices:
             out += device.handle(events, now)
+        if self._recorder is not None:
+            self._record(out, now)
         return out
+
+    def _record(self, edges: list[InputEvent], now: float) -> None:
+        """Hand the recorder each device's stick readings, then ``edges``."""
+        for device in self.devices:
+            for axis, value in device.axis_readings:
+                self._recorder(now, {"type": "axis", "input": device.name, "axis": axis,
+                                     "value": value})
+            device.axis_readings.clear()
+        for name, edge in edges:
+            self._recorder(now, {"type": "input_event", "name": name, "down": edge is Edge.DOWN})
 
     def controls(self) -> frozenset[str]:
         return frozenset().union(*(d.controls() for d in self.devices))

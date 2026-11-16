@@ -7,6 +7,7 @@ a game plays; ``test_backends`` does that, per backend.
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import h5py
@@ -23,8 +24,8 @@ from humans.config.curriculum import (
     shared_overrides, validate_curriculum,
 )
 from humans.save.logging import (
-    AUDIO_FILENAME, FRAMES_FILENAME, AudioBlockLog, Logger, read_audio, read_events, read_frames,
-    read_state,
+    AUDIO_FILENAME, EVENTS_FILENAME, FRAMES_FILENAME, AudioBlockLog, Logger, read_audio,
+    read_events, read_frames, read_state, write_blocks,
 )
 from humans.save.replay import frame_arrays, reconstruction_plan
 from humans.sync.clock import Clock
@@ -106,6 +107,42 @@ def test_logger_writes_no_audio_file_for_a_silent_block(tmp_path):
     assert not (tmp_path / name / AUDIO_FILENAME).exists()
 
 
+def test_the_run_log_holds_every_line_and_its_blocks_are_cut_from_it_at_close(tmp_path):
+    clock = Clock()
+    logger = Logger(str(tmp_path), "sub-test", [PHASE], clock)
+    logger.log(type="input_event", name="5", down=True)            # before any block
+    name = logger.open_block(0, "gym", "CartPole-v1", PHASE, base_seed=1)
+    logger.log_frame({"episode_id": 0}, frame=np.zeros((2, 2, 3), np.uint8))
+    logger.close_block(n_frames=1)
+    logger.log(type="input_event", name="5", down=False)
+    logger.log_phase({"index": 0, "type": "game", "data_dir": name, "n_frames": 1})
+    logger.close()
+    run_lines = [json.loads(line) for line in (tmp_path / EVENTS_FILENAME).read_text().splitlines()]
+    assert [(line["block"], line["type"]) for line in run_lines] == [
+        (None, "input_event"), (name, "block_start"), (name, "frame"), (name, "block_end"),
+        (None, "input_event")]
+    block_lines = [{k: v for k, v in line.items() if k != "block"}
+                   for line in run_lines if line["block"] == name]
+    assert read_events(str(tmp_path / name)) == block_lines
+    assert len(read_frames(str(tmp_path / name))[0]) == 1
+    manifest = json.loads((tmp_path / "manifest.json").read_text())
+    assert manifest["block_files"] == {"problems": []}
+
+    shutil.rmtree(tmp_path / name)          # a run that stopped before its blocks were cut
+    assert read_events(str(tmp_path / name)) == block_lines
+    assert len(read_frames(str(tmp_path / name))[0]) == 1
+
+
+def test_a_block_cut_short_is_named_when_its_folder_is_written(tmp_path):
+    (tmp_path / EVENTS_FILENAME).write_text("".join(json.dumps(line) + "\n" for line in [
+        {"block": "block-00_gym_x", "type": "block_start"},
+        {"block": "block-00_gym_x", "type": "frame", "frame": 0},
+        {"block": "block-00_gym_x", "type": "frame", "frame": 2}]))
+    assert write_blocks(str(tmp_path)) == [
+        "block-00_gym_x: has no block_end line: the run stopped inside it",
+        "block-00_gym_x: its 2 frame lines are not numbered 0 to 1"]
+
+
 def test_discrete_keymap_longest_combo_wins():
     km = make_keymap({"controls": {"": 0, "LEFT": 1, "LEFT+SPACE": 2}}, spaces.Discrete(3))
     assert km.resolve(frozenset()) == 0
@@ -174,12 +211,9 @@ def test_a_hint_shows_once_held_long_enough_and_until_let_go(monkeypatch):
     hint = Hint({"control": "X", "hold": 2.0, "text": "hi"}, 0.0, held_now)
     assert [hint.armed() for _ in range(3)] == [False, False, True] and hint.pending
 
-    class Log:
-        def log(self, **record):
-            pass
     display = Display(size=(200, 150), vsync=False)
     try:
-        assert hint.run(display, lambda: 1.0, Log(), lambda: []) == "resume"
+        assert hint.run(display, lambda: 1.0, lambda: []) == "resume"
     finally:
         display.close()
     assert not hint.pending and held == [frozenset()]

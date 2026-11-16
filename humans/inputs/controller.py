@@ -242,6 +242,8 @@ class Controller(InputDevice):
         An uncalibrated axis presses nothing.
         """
         self.axis_values[axis_name] = value
+        if self.axis_readings is not None:
+            self.axis_readings.append((axis_name, value))
         if self.calibration is None:
             return []
         axis: AxisCalibration = self.calibration.axes[axis_name]
