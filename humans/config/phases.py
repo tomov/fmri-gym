@@ -219,10 +219,9 @@ class Instructions:
                    align=d.get("align", "center"), duration=d.get("duration"),
                    controls_to_dismiss=None if dismiss is None else tuple(dismiss))
 
-    def message(self, resumed: bool) -> Message:
-        """As the message shown, its heading marking a block a run carries on."""
-        heading = f"{'Resuming:' if resumed else 'Starting:'} {self.title}"
-        return Message(spec={}, include_on_resume=False, text=f"{heading}\n\n{self.text}",
+    def message(self) -> Message:
+        """As the message shown: its title over its text."""
+        return Message(spec={}, include_on_resume=False, text=f"{self.title}\n\n{self.text}",
                        duration=self.duration, control=ControlNames.K_SPACE,
                        controls_to_dismiss=self.controls_to_dismiss, align=self.align)
 

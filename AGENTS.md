@@ -96,7 +96,7 @@ The worst outcome this code can produce is not a crash. It is a session that run
 
 - **Validate at start-up and raise, with the fix in the message**, before the participant screen (`fmri_play.py` builds the triggers before the window for this reason). Don't catch an error to `sys.exit` politely, and don't catch one to continue.
 - **One shape per input.** No `isinstance` branches that accept two config layouts, no `x or {}` / `.get(k) or []` that turn a wrong value into an empty one. Enforce the shape and say what was expected.
-- **A default that changes what the recording gets is allowed only if it is visible**: on the experimenter screen, on the console, and in the manifest (see `Triggers.status()` / `triggers.defaulted`). A silent default is a bug.
+- **A default that changes what the recording gets is allowed only if it is visible**: on the console, where the experimenter reads it, and in the manifest; never on the participant's screen (see `Triggers.status()` / `triggers.defaulted`). A silent default is a bug.
 - **Test switches announce themselves** (`--dummy-trigger` prints what it skips and lands in the manifest). Degrading gracefully is for the frame loop mid-session, not for set-up.
 
 ## Rule 5: build the smallest thing that reuses what is already there
