@@ -436,11 +436,13 @@ class Run:
             "(experimenter: press SPACE when ready)\n\n"
             f"triggers: {self.triggers.status()}\n"
             f"audio: {self.audio.status()}")
+        self.display.take_focus()
         _wait_for_control(self.inputs, self.display, EXPERIMENTER_KEY,
                       dummy_trigger=self.config.dummy_trigger)
         if self.sync.mode == "wait":
             self.display.draw_text(f"Waiting for the scanner...\n\n(its trigger key: "
                                    f"{self.sync.key!r})")
+            self.display.take_focus()
             _wait_for_control(self.inputs, self.display, self.sync.key,
                           dummy_trigger=self.config.dummy_trigger)
         elif self.sync.mode == "send":

@@ -33,6 +33,7 @@ import re
 import statistics
 import sys
 import time
+import warnings
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -55,6 +56,8 @@ HUD_COLOR = (235, 235, 235)
 # sky blue: bright over both dark and light art, and cool enough not to be
 # mistaken for the red a game may reserve.
 OVERLAY_COLOR = (150, 215, 255)
+#: Seconds the window is given to receive the keyboard focus once raised.
+FOCUS_WAIT_S = 1.0
 
 
 class Display:
@@ -109,6 +112,7 @@ class Display:
         self.fix_font = pygame.font.Font(pygame.font.get_default_font(), 80)
         self.hud_font = pygame.font.Font(pygame.font.get_default_font(), 24)
         self._labels: dict[str, pygame.Surface] = {}    # _draw_hud's rendered lines
+        self.take_focus()
 
     def _open(self) -> pygame.Surface:
         """Open the window, trying for a vsync-locked flip.
@@ -136,6 +140,30 @@ class Display:
         if scaled is not None:
             return scaled
         return pygame.display.set_mode(size, 0, display=at)
+
+    def take_focus(self) -> bool:
+        """Raise the window and make it the one the keyboard types into, saying on stderr
+        when it is not.
+
+        A window opened by a process launched from a terminal can open behind that terminal
+        (macOS), and its keys then go to the terminal.
+
+        :return: whether the window has the keyboard focus.
+        """
+        with warnings.catch_warnings():
+            # pygame-ce deprecates drawing through this Window; raising it is all it is used for
+            warnings.simplefilter("ignore", DeprecationWarning)
+            pygame.Window.from_display_module().focus()
+        deadline = time.perf_counter() + FOCUS_WAIT_S
+        pygame.event.pump()
+        while not pygame.key.get_focused() and time.perf_counter() < deadline:
+            time.sleep(0.01)
+            pygame.event.pump()
+        if pygame.key.get_focused():
+            return True
+        print("display: the window does NOT have the keyboard focus -- keys go to another "
+              "window until it is clicked", file=sys.stderr)
+        return False
 
     def _flips_block(self, n: int = 24) -> bool:
         """Measure whether a burst of flips waits for the blank.
