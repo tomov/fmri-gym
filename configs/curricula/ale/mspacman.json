@@ -1,0 +1,30 @@
+{
+  "curriculum": [
+    {
+      "__include": "common/mspacman.json",
+      "instructions": {
+        "title": "Ms. Pac-Man", "align": "left", "controls_to_dismiss": ["SPACE"],
+        "text": [
+          "Eat all the dots in the maze and avoid the ghosts.",
+          "A power pellet lets you eat the ghosts for a while.",
+          "",
+          "Controls:",
+          "   ARROWS   move",
+          "   hold H   show the controls",
+          "",
+          "Press SPACE to start."
+        ]
+      },
+      "hint": {
+        "control": "H", "hold": 0.0, "after": 0.0,
+        "text": [
+          "Controls:",
+          "   ARROWS   move",
+          "",
+          "Let go of H to go back to the game."
+        ]
+      },
+      "duration": 300.0, "fps": 60
+    }
+  ]
+}

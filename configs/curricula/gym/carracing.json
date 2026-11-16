@@ -1,0 +1,37 @@
+{
+  "curriculum": [
+    {
+      "__include": "common/carracing.json",
+      "instructions": {
+        "title": "CarRacing", "align": "left", "controls_to_dismiss": ["SPACE"],
+        "text": [
+          "Drive round the track and stay on the road.",
+          "Each new tile of road you cross scores points.",
+          "",
+          "Controls:",
+          "   LEFT / RIGHT   steer",
+          "   UP             gas",
+          "   DOWN           brake",
+          "   hold H         show the controls",
+          "",
+          "Press SPACE to start."
+        ]
+      },
+      "controls": {"DOWN": [0.0, 0.0, 0.8],
+                   "LEFT+UP": [-1.0, 1.0, 0.0], "RIGHT+UP": [1.0, 1.0, 0.0],
+                   "LEFT+DOWN": [-1.0, 0.0, 0.8], "RIGHT+DOWN": [1.0, 0.0, 0.8]},
+      "hint": {
+        "control": "H", "hold": 0.0, "after": 0.0,
+        "text": [
+          "Controls:",
+          "   LEFT / RIGHT   steer",
+          "   UP             gas",
+          "   DOWN           brake",
+          "",
+          "Let go of H to go back to the game."
+        ]
+      },
+      "mode": "duration", "duration": 180.0, "fps": 25
+    }
+  ]
+}

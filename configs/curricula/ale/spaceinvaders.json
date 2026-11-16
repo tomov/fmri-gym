@@ -1,0 +1,32 @@
+{
+  "curriculum": [
+    {
+      "__include": "common/spaceinvaders.json",
+      "instructions": {
+        "title": "Space Invaders", "align": "left", "controls_to_dismiss": ["SPACE"],
+        "text": [
+          "Shoot the invaders before they reach the ground,",
+          "and dodge their shots behind the shields.",
+          "",
+          "Controls:",
+          "   LEFT / RIGHT   move",
+          "   SPACE          fire",
+          "   hold H         show the controls",
+          "",
+          "Press SPACE to start."
+        ]
+      },
+      "hint": {
+        "control": "H", "hold": 0.0, "after": 0.0,
+        "text": [
+          "Controls:",
+          "   LEFT / RIGHT   move",
+          "   SPACE          fire",
+          "",
+          "Let go of H to go back to the game."
+        ]
+      },
+      "duration": 300.0, "fps": 60
+    }
+  ]
+}
