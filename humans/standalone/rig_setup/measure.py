@@ -58,8 +58,8 @@ import pygame
 from gymnasium import spaces
 
 from ...config import rig as rig_file
-from ...inputs import (CONTROLLER_CLASSES_BY_NAME, QUIT, ControlNames, Controller, Edge,
-                      InputDevice, InputDevices, open_input_devices)
+from ...inputs import (CONTROLLER_CLASSES_BY_NAME, QUIT, CalibrationError, ControlNames, Controller,
+                      Edge, InputDevice, InputDevices, open_input_devices)
 from ...inputs.keyboard import KEYCODES
 from ...outputs.audio import Audio
 from ...outputs.display import Display, check_monitor, is_locked, quit_like_esc
@@ -498,7 +498,11 @@ def _calibrate(rig_measurement: RigMeasurement, device: Controller) -> dict[str,
     if not device.AXIS_NAMES:
         return {"present": True, "device": device.device_name, "measured": False, "why": "",
                 "note": "it has no stick"}
-    result = calibrate(device, rig_measurement.display.screen, pygame.display.flip)
+    try:
+        result = calibrate(device, rig_measurement.display.screen, pygame.display.flip)
+    except CalibrationError as exc:
+        return {"present": True, "device": device.device_name, "measured": False,
+                "why": f"refused, nothing written: {exc}"}
     if result is None:
         return {"present": True, "device": device.device_name, "measured": False,
                 "why": "stopped before it finished; nothing written"}

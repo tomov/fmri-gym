@@ -3,8 +3,10 @@ how far it must be pushed.
 
 One file per controller per measurement in :func:`calibrations_dir`, outside the
 checkout since it describes this machine's controller, found by the name SDL
-gives the device (:func:`newest`), and never rewritten (:func:`write`). Nothing here
-knows which axes a controller has; each axis is read on its own (:meth:`AxisCalibration.normalise`).
+gives the device, in its file name (:func:`newest`), and never rewritten (:func:`write`).
+Only a device's newest file is read, so its older ones never stop a run. Each file states the
+:data:`FORMAT` it is written in. Nothing here knows which axes a controller has; each axis is
+read on its own (:meth:`AxisCalibration.normalise`).
 """
 
 from __future__ import annotations
@@ -20,6 +22,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
+#: The layout of a calibration file; a file of another is refused, never converted.
+FORMAT = 1
 
 
 class CalibrationError(ValueError):
@@ -54,6 +58,11 @@ class AxisCalibration:
                                    f"rest={rest:g}, high={high:g}")
         on = _number(d, "on", where, lambda v: 0 < v < 1, "a number in (0, 1)")
         off = _number(d, "off", where, lambda v: 0 < v <= on, f"a number in (0, on={on:g}]")
+        for side, span in (("low", rest - low), ("high", high - rest)):
+            if drift >= off * span:     # back at rest after a push, it would still be pressed
+                raise CalibrationError(
+                    f"{where}: its centre drifts {drift:g}, past its release point on its "
+                    f"{side} side ({off:g} of {span:g})")
         return cls(rest, low, high, drift, on, off)
 
     def record(self) -> dict[str, float]:
@@ -93,7 +102,10 @@ class ControllerCalibration:
 
         :raises CalibrationError: naming the field that is missing, unknown or wrong.
         """
-        d = _checked(d, where, ("device", "tuned_from", "made", "axes"))
+        if isinstance(d, dict) and d.get("format") != FORMAT:
+            raise CalibrationError(f"{_at(where, 'format')}: expected {FORMAT}, got "
+                                   f"{d.get('format')!r} (a calibration of another layout)")
+        d = _checked(d, where, ("format", "device", "tuned_from", "made", "axes"))
         if not isinstance(d["device"], str) or not d["device"]:
             raise CalibrationError(f"{_at(where, 'device')}: expected a name, got {d['device']!r}")
         tuned_from = d["tuned_from"]
@@ -109,7 +121,7 @@ class ControllerCalibration:
 
     def record(self) -> dict[str, Any]:
         """The calibration file's contents."""
-        return {"device": self.device, "tuned_from": self.tuned_from,
+        return {"format": FORMAT, "device": self.device, "tuned_from": self.tuned_from,
                 "made": self.made.isoformat(timespec="seconds"),
                 "axes": {name: axis.record() for name, axis in self.axes.items()}}
 
@@ -184,35 +196,18 @@ def read(path: Path) -> ControllerCalibration:
         raise CalibrationError(f"{path}: {exc}") from None
 
 
-def _device_in(path: Path) -> str | None:
-    """The device a file names, or None when it names none."""
-    try:
-        d = json.loads(path.read_text())
-    except ValueError:
-        return None
-    device = d.get("device") if isinstance(d, dict) else None
-    return device if isinstance(device, str) else None
-
-
 def newest(device: str) -> tuple[Path, ControllerCalibration] | None:
-    """The newest calibration of ``device`` in :func:`calibrations_dir`, by file time; or None.
+    """The newest calibration file of ``device`` in :func:`calibrations_dir`, by file time,
+    and its contents; or None. Only that file is read: older ones, and other devices', are not.
 
-    :raises CalibrationError: when a file there is malformed and is, or may be, ``device``'s.
+    :raises CalibrationError: when that file is malformed.
     """
-    calibrations_of_device = []
-    for path in sorted(calibrations_dir().glob("*.json")):
-        try:
-            calibration = read(path)
-        except CalibrationError:
-            if _device_in(path) in (device, None):
-                raise
-            continue
-        if calibration.device == device:
-            calibrations_of_device.append((path.stat().st_mtime_ns, path.name, path, calibration))
-    if not calibrations_of_device:
+    files_of_device = [(path.stat().st_mtime_ns, path.name, path)
+                       for path in calibrations_dir().glob(f"{_slug(device)}_*.json")]
+    if not files_of_device:
         return None
-    _, _, path, calibration = max(calibrations_of_device, key=lambda m: m[:2])
-    return path, calibration
+    _, _, path = max(files_of_device)
+    return path, read(path)
 
 
 def _slug(name: str) -> str:
