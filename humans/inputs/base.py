@@ -20,9 +20,9 @@ import pygame
 
 #: The name the run's inputs give the window's close button.
 QUIT = "QUIT"
-#: The pygame events not recorded as they are: a stick's motion is kept as its raw reading
-#: (an ``axis`` record), and the pointer's motion and the text typed repeat what the keys
-#: and the mouse buttons already say, many times over.
+#: The pygame events not recorded as they are: an axis's motion is kept by the device that
+#: reads it, as its raw reading (an ``axis`` record), and the pointer's motion and the text
+#: typed repeat what the keys and the mouse buttons already say, many times over.
 _EVENTS_NOT_RECORDED = frozenset({
     pygame.JOYAXISMOTION, pygame.CONTROLLERAXISMOTION, pygame.MOUSEMOTION,
     pygame.TEXTINPUT, pygame.TEXTEDITING})

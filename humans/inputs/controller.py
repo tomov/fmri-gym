@@ -236,14 +236,18 @@ class Controller(InputDevice):
             return self._release(name)
         return []
 
+    def _keep_reading(self, axis_name: str, value: float) -> None:
+        """Keep a raw reading of an axis, while readings are kept."""
+        if self.axis_readings is not None:
+            self.axis_readings.append((axis_name, value))
+
     def _move_axis(self, axis_name: str, value: float) -> list[InputEvent]:
         """Take a raw reading of an axis, and press or release each of its sides by it.
 
         An uncalibrated axis presses nothing.
         """
         self.axis_values[axis_name] = value
-        if self.axis_readings is not None:
-            self.axis_readings.append((axis_name, value))
+        self._keep_reading(axis_name, value)
         if self.calibration is None:
             return []
         axis: AxisCalibration = self.calibration.axes[axis_name]

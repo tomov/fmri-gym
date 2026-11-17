@@ -87,6 +87,7 @@ class XBoxController(Controller):
             elif event.type == pygame.CONTROLLERBUTTONUP and event.button in BUTTONS:
                 out += self._release(BUTTONS[event.button])
             elif event.type == pygame.CONTROLLERAXISMOTION and event.axis in TRIGGERS:
+                self._keep_reading(TRIGGERS[event.axis], _scaled(event.value))
                 out += self._pull(TRIGGERS[event.axis], _scaled(event.value),
                                   _TRIGGER_ON, _TRIGGER_OFF)
             elif event.type == pygame.CONTROLLERAXISMOTION and event.axis in STICK_AXES:

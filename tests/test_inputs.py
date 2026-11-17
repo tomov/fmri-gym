@@ -444,6 +444,18 @@ def test_an_xbox_controller_reads_its_mapping_and_not_the_joystick_twin():
     assert pad.handle(let_go, 1.3) == [_up(ControlNames.CONTROLLER_AXIS_TRIGGERLEFT)]
 
 
+def test_an_xbox_controllers_trigger_keeps_its_raw_reading_like_a_stick():
+    pad = _bare(XBoxController)
+    recorded: list[dict] = []
+    inputs = InputDevices([pad])
+    inputs.record_with(lambda perf_time, record: recorded.append(record))
+    inputs.handle([_joy(pygame.CONTROLLERAXISMOTION,
+                        axis=pygame.CONTROLLER_AXIS_TRIGGERLEFT, value=20000)], 1.0)
+    assert [r for r in recorded if r["type"] == "axis"] == [
+        {"type": "axis", "input": "xbox_controller", "axis": ControlNames.CONTROLLER_AXIS_TRIGGERLEFT,
+         "value": pytest.approx(20000 / 32767)}]
+
+
 def test_an_xbox_controller_reads_each_stick_axis_through_its_calibration():
     pad = _calibrated(_bare(XBoxController), FILE)
     right_x = pygame.CONTROLLER_AXIS_RIGHTX
