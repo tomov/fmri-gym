@@ -63,6 +63,9 @@ def get_adapter(backend: str, spec: dict) -> EnvAdapter:
     if backend == "nethack":
         from .nethack import NetHackAdapter
         return NetHackAdapter(spec)
+    if backend == "nethack_gamepad":
+        from .nethack_gamepad import NetHackGamepadAdapter
+        return NetHackGamepadAdapter(spec)
     if backend in ("aigamestore", "p5"):
         from .aigamestore import AIGameStoreAdapter
         return AIGameStoreAdapter(spec)

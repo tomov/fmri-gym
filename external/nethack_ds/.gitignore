@@ -1,0 +1,11 @@
+*.lev
+*.o
+binary
+build
+tags
+cscope.out
+build_idx
+gdb
+gdb.cmds
+gdb.stub.cmds
+Makefile

@@ -46,7 +46,7 @@ COMMON_DIRNAME = "common"
 #: run's own (folded in from the run label).
 RESUMABLE_CHANGES = frozenset({"duration", "n_episodes", "advance_on", "show_outcome_duration",
                                "instructions", "controls", "menu", "hint", "hud", "seed", "has_audio",
-                               "rewind_on", "rewind_frames"})
+                               "rewind_on", "rewind_frames", "continue_campaign"})
 
 def check_shape(curriculum: Any, where: str) -> dict:
     """Enforce the one curriculum shape.

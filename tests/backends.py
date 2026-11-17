@@ -96,7 +96,14 @@ def _stk() -> str | None:
             "STK_ENV_BIN names a binary of your own")
 
 
-_RUNTIME_NEEDS = {"aigamestore": _chrome, "arc3": _arc3_files, "stk": _stk}
+def _nethack_gamepad() -> str | None:
+    from nethack_gamepad_gym.build import default_home
+    if (default_home() / "runtime/build.json").is_file():
+        return None
+    return "NetHack gamepad engine is not built: uv run nethack-gamepad-build"
+
+
+_RUNTIME_NEEDS = {"nethack_gamepad": _nethack_gamepad, "aigamestore": _chrome, "arc3": _arc3_files, "stk": _stk}
 
 _C = "configs/curricula/"
 BACKENDS: dict[str, Backend] = {b.name: b for b in (
@@ -110,8 +117,12 @@ BACKENDS: dict[str, Backend] = {b.name: b for b in (
     Backend("minihack", "minihack", "minihack",
             (_C + "minihack/levels/room5x5.json", _C + "minihack/levels/river_reposition.json"),
             gym_dirs=("minihack", "replay_state")),
-    Backend("nethack", "nethack", "nle", (_C + "nethack/levels/score.json",),
-            gym_dirs=("minihack", "replay_state")),
+    Backend("nethack", "nethack", "nle",
+            (_C + "nethack/levels/score.json",), gym_dirs=("minihack", "replay_state")),
+    Backend("nethack_gamepad", "nethack_gamepad", "nethack_gamepad_gym",
+            (_C + "nethack_gamepad/levels/classic.json", _C + "nethack_gamepad/levels/modern.json"),
+            gym_dirs=("nethack_gamepad", "replay_state"), external="nethack_ds",
+            marker="sys/nds/arm9/src/nds_win.c"),
     Backend("vizdoom", "vizdoom", "vizdoom_gym", (_C + "vizdoom/levels/basic.json",),
             gym_dirs=("vizdoom", "replay_state")),
     Backend("coom", "coom", "coom_gym", (_C + "coom/levels/pitfall.json",),
