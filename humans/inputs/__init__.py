@@ -9,9 +9,10 @@ of kinds can press is known before anything is plugged in
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from pathlib import Path
 
 from .base import QUIT, Edge, InputDevice, InputDevices, InputEvent
-from .calibration import CalibrationError, newest
+from .calibration import CalibrationError, ControllerCalibration, newest, read
 from .control_names import ControlNames
 from .controller import Controller, sdl_joystick_names, start_sdl_joysticks_and_wait_for
 from .current_designs_gamepad3 import CurrentDesignsGamepad3
@@ -71,14 +72,18 @@ def detect_controllers() -> list[dict]:
 
 
 def open_input_devices(input_device_names: Sequence[str],
-                       required_controls: frozenset[str] = frozenset()) -> InputDevices:
+                       required_controls: frozenset[str] = frozenset(),
+                       calibration_files: Sequence[Path] = ()) -> InputDevices:
     """A device of each kind ``input_device_names`` lists, each controller on one plugged in.
 
     :param input_device_names: the kinds of device, by name.
     :param required_controls: controls that must be readable; a stick direction
         among them needs its controller calibrated. Empty: none needs it.
+    :param calibration_files: a calibration file per controller to read it through, matched by
+        the device it names; a controller with none is read through its newest.
     :raises ValueError: for a kind that is not one, listed twice, or not plugged in.
-    :raises CalibrationError: for a malformed calibration, or a needed axis without one.
+    :raises CalibrationError: for a malformed calibration, a needed axis without one, or a
+        calibration file of no controller opened.
     """
     unknown = [n for n in input_device_names if n not in INPUT_DEVICE_CLASSES_BY_NAME]
     if unknown or len(set(input_device_names)) < len(input_device_names):
@@ -86,8 +91,37 @@ def open_input_devices(input_device_names: Sequence[str],
                          f"from {sorted(INPUT_DEVICE_CLASSES_BY_NAME)}")
     classes = [INPUT_DEVICE_CLASSES_BY_NAME[n] for n in input_device_names]
     start_sdl_joysticks_and_wait_for(sum(issubclass(c, Controller) for c in classes))
-    devices = [cls.open() for cls in classes]
-    opened = {d.device_name for d in devices if isinstance(d, Controller)}
-    inputs = InputDevices(devices, [n for n in sdl_joystick_names() if n not in opened])
+    devices = [cls.open(calibrated=False) if issubclass(cls, Controller) else cls.open()
+               for cls in classes]
+    controllers = [d for d in devices if isinstance(d, Controller)]
+    opened_device_names = {c.device_name for c in controllers}
+    calibration_files_by_device = _calibration_files_by_device(calibration_files)
+    for controller in controllers:
+        if controller.device_name in calibration_files_by_device:
+            controller.set_calibration(calibration_files_by_device.pop(controller.device_name))
+        else:
+            controller.load_calibration()
+    if calibration_files_by_device:
+        device_name, (path, _) = next(iter(calibration_files_by_device.items()))
+        raise CalibrationError(f"{path}: a calibration of {device_name!r}, which is not a "
+                               f"controller opened ({sorted(opened_device_names)})")
+    inputs = InputDevices(devices, [n for n in sdl_joystick_names()
+                                    if n not in opened_device_names])
     inputs.require_calibrated_axes_for(required_controls)
     return inputs
+
+
+def _calibration_files_by_device(
+        calibration_files: Sequence[Path]) -> dict[str, tuple[Path, ControllerCalibration]]:
+    """Each calibration file and its contents, by the device it names.
+
+    :raises CalibrationError: for a malformed file, or two of one device.
+    """
+    calibration_files_by_device: dict[str, tuple[Path, ControllerCalibration]] = {}
+    for path in calibration_files:
+        calibration = read(path)
+        if calibration.device in calibration_files_by_device:
+            raise CalibrationError(f"{path}: a second calibration of {calibration.device!r}, "
+                                   f"after {calibration_files_by_device[calibration.device][0]}")
+        calibration_files_by_device[calibration.device] = (path, calibration)
+    return calibration_files_by_device

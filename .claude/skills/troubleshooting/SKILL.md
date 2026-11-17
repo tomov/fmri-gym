@@ -27,7 +27,10 @@ A run checks everything it can before the participant screen opens, and stops on
 - **`no "<kind>" is plugged in (joysticks SDL sees: ...)`**: the rig lists a controller in `inputs` and none of that kind is connected. Plug it in (on the GMPD3, the 932 interface in joystick mode), or take it out of the rig's `inputs` if this rig plays without it.
 - **`no calibration of '<controller>' in <folder>, and its stick controls are required`**: the curriculum maps a stick direction and this machine has never calibrated that controller. Run `uv run gamepad-calibration` (or Calibrate controller... in rig-setup) with the controller plugged in; the calibration is kept per machine in the folder named.
 - **`<file>: calibrates the axes [...], but '<controller>' has [...]`**: the newest calibration was made on another kind of controller under the same name. Calibrate again with `gamepad-calibration`.
-- **`<file>: not JSON ...`, `<file>: ... expected ...`**: a calibration file is damaged. Calibrate again, then delete or move the damaged file out of the folder; files there are never rewritten.
+- **`<file>: format: expected <n>, got ... (a calibration of another layout)`**: the controller's calibration was written by another version of fmri-gym. Calibrate again with `gamepad-calibration`. A run reads only the newest file of each controller, or the one given with `--calibration`, so older files can stay in the folder.
+- **`<file>: axes.<axis>: its centre drifts <d>, past its release point on its <side> side (...)`**: the stick came back from a push further off centre than its release threshold, so a push that way would stay pressed. Calibrate again, hands off the stick while it measures the centre; if it is refused again, the stick is worn or the pad needs re-zeroing.
+- **`<file>: a calibration of '<device>', which is not a controller opened (...)`, `<file>: a second calibration of '<device>' ...`**: a `--calibration` file names a device that is not plugged in, or two name the same one. Pass one file per controller plugged in.
+- **`<file>: not JSON ...`, `<file>: ... expected ...`**: the calibration file is damaged. Calibrate again, or pass a good one with `--calibration`.
 
 ## Triggers
 

@@ -397,7 +397,8 @@ class Run:
                   "this is a test run, not a session", file=sys.stderr)
         audio = Audio(enabled=config.rig.has_audio)
         print(f"audio: {audio.status()}", file=sys.stderr)
-        inputs = open_input_devices(config.rig.inputs, config.required_controls())
+        inputs = open_input_devices(config.rig.inputs, config.required_controls(),
+                                    config.calibration_files)
         print(f"inputs: {inputs.status()}", file=sys.stderr)
         screen = config.rig.screen
         display = Display(size=screen.size, fullscreen=screen.is_fullscreen,

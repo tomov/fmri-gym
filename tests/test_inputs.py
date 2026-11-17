@@ -31,7 +31,7 @@ RX, RY = ControlNames.CONTROLLER_AXIS_RIGHTX, ControlNames.CONTROLLER_AXIS_RIGHT
 MADE = "2026-01-21T14:15:00+00:00"
 AXIS = {"rest": 0.0, "low": -1.0, "high": 1.0, "drift": 0.01, "on": 0.5, "off": 0.3}
 #: A calibration of the scripted controller's four axes, and of the GMPD3's two.
-FILE = {"device": "Scripted", "tuned_from": None, "made": MADE,
+FILE = {"format": files.FORMAT, "device": "Scripted", "tuned_from": None, "made": MADE,
         "axes": {LX: AXIS, LY: AXIS, RX: {**AXIS, "on": 0.6}, RY: AXIS}}
 GMPD3_FILE = {**FILE, "axes": {LX: AXIS, LY: AXIS}}
 
@@ -88,6 +88,9 @@ def test_a_calibration_round_trips_through_its_file():
     ("device", "", "device: expected a name, got ''"),
     ("tuned_from", 3, "tuned_from: expected null or a file name, got 3"),
     ("stick", "LEFT_STICK", "stick: unknown key"),
+    ("format", ..., "format: expected 1, got None"),
+    ("format", 0, "format: expected 1, got 0"),
+    (f"axes.{LX}.drift", 0.3, f"axes.{LX}: its centre drifts 0.3, past its release point"),
 ])
 def test_each_wrong_field_is_refused_by_its_file_and_name(tmp_path, field, value, says):
     path = tmp_path / "Scripted_20261021-141500.json"
@@ -110,12 +113,19 @@ def test_a_controller_is_read_through_its_newest_calibration(config_home):
     assert files.newest("Nobody") is None
 
 
+def test_an_older_calibration_is_never_read(config_home):
+    _write(config_home, "Scripted_a.json", {"device": "Scripted", "sticks": {}}, 1000)
+    _write(config_home, "Scripted_b.json", _set(FILE, f"axes.{LX}.drift", 0.9), 2000)
+    newest = _write(config_home, "Scripted_c.json", FILE, 3000)
+    assert files.newest("Scripted")[0] == newest
+
+
 def test_a_malformed_newest_calibration_stops_the_run_with_no_fallback(config_home):
     _write(config_home, "Scripted_a.json", FILE, 1000)
     bad = _write(config_home, "Scripted_b.json", _set(FILE, f"axes.{LX}.on", "0.5"), 2000)
     with pytest.raises(CalibrationError, match=re.escape(f"{bad}: axes.{LX}.on")):
         files.newest("Scripted")
-    bad.write_text("{not json")                    # names no device: it may be this one's
+    bad.write_text("{not json")
     with pytest.raises(CalibrationError, match="not JSON"):
         files.newest("Scripted")
 
@@ -542,6 +552,18 @@ def test_a_rigs_inputs_open_its_devices_and_say_which_joysticks_they_ignore(sdl,
                                   frozenset({ControlNames.CONTROLLER_AXIS_LEFTX_LEFT}))
     assert [d.name for d in inputs.open_input_devices(["current_designs_gamepad3"]).devices] == [
         "current_designs_gamepad3"]                   # no keyboard unless the rig lists one
+
+
+def test_a_rigs_controller_is_read_through_the_calibration_file_given(sdl, config_home):
+    given = _write(config_home, "Scripted_a.json", GMPD3_FILE, 1000)
+    _write(config_home, "Scripted_b.json", {"device": "Scripted", "sticks": {}}, 2000)
+    opened = inputs.open_input_devices(["current_designs_gamepad3"], frozenset(), [given])
+    assert opened.devices[0].calibration_path == given
+    other = _write(config_home, "Other_a.json", {**GMPD3_FILE, "device": "Other"}, 1000)
+    with pytest.raises(CalibrationError, match=re.escape(f"{other}: a calibration of 'Other'")):
+        inputs.open_input_devices(["current_designs_gamepad3"], frozenset(), [given, other])
+    with pytest.raises(CalibrationError, match="a second calibration of 'Scripted'"):
+        inputs.open_input_devices(["current_designs_gamepad3"], frozenset(), [given, given])
 
 
 # -- gamepad-calibration's window ---------------------------------------------------------------

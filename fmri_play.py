@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import signal
 import sys
+from pathlib import Path
 
 from humans.run import Run
 from humans.config.curriculum import Curriculum
@@ -84,6 +85,9 @@ def _parser() -> argparse.ArgumentParser:
                    help="do not build, reset and close each game once before the window. "
                    "Default: do, so a game that cannot start fails before the participant screen")
     p.add_argument("--dummy-trigger", action="store_true")
+    p.add_argument("--calibration", action="append", type=Path, default=[],
+                   help="a controller's calibration file to read it through, once per controller "
+                   "(gamepad-calibration writes them). Default: the controller's newest")
     return p
 
 

@@ -145,7 +145,8 @@ def test_a_game_key_the_scanner_types_is_refused_on_that_rig():
         curriculum = Curriculum.from_dict({"curriculum": [game]}, "cartpole.json")
         return RunConfig(curriculum=curriculum, rig=box, subject="sub-01", ses=1, run=1,
                          duration=None, resume=False, loop=False,
-                         dummy_trigger=True, skip_load_games=False)
+                         dummy_trigger=True, skip_load_games=False,
+                         calibration_files=())
 
     assert run_of({"": 0, "5": 1}).problems() and not run_of({"": 0, "LEFT": 1}).problems()
 
@@ -161,7 +162,8 @@ def test_a_control_none_of_the_rigs_inputs_has_is_refused_on_that_rig():
         curriculum = Curriculum.from_dict({"curriculum": [phase]}, "c.json")
         return RunConfig(curriculum=curriculum, rig=on, subject="sub-01", ses=1, run=1,
                          duration=None, resume=False, loop=False, dummy_trigger=True,
-                         skip_load_games=False)
+                         skip_load_games=False,
+                         calibration_files=())
 
     def game(keys: dict, **more) -> dict:
         return {"type": "game", "game": "CartPole-v1", "fps": 30, "controls": keys, **more}

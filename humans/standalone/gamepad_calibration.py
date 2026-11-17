@@ -418,6 +418,7 @@ def calibrate(controller: Controller, screen: pygame.Surface, present: Callable[
     :param to_canvas: a window position -> ``screen``'s; given, the screen has a Cancel button.
     :return: what was written; None when ESC, Cancel or the window closing stopped
         it, with nothing written.
+    :raises CalibrationError: when what was measured would not read back, with nothing written.
     """
     task = _Task(controller, screen, present, to_canvas)
     try:
@@ -669,8 +670,13 @@ class _Scope:
 
     def calibrate(self) -> None:
         """Run the calibration of every axis and button, in this window."""
-        result = calibrate(self.controller, self.canvas.surface,
-                           self.canvas.present, self.canvas.to_canvas)
+        try:
+            result = calibrate(self.controller, self.canvas.surface,
+                               self.canvas.present, self.canvas.to_canvas)
+        except CalibrationError as exc:
+            self.reload("")
+            self.say(f"NOT calibrated, nothing written: {exc}", seconds=15.0)
+            return
         self.reload("NOT calibrated: cancelled; nothing written" if result is None
                     else f"calibrated: {result.path.name}")
 
@@ -678,7 +684,10 @@ class _Scope:
         """Write the retuned calibration as a new file."""
         source = self.controller.calibration_path.name
         tuned = replace(self.controller.calibration, tuned_from=source)
-        self.reload(f"saved {write(tuned).name} from {source}")
+        try:
+            self.reload(f"saved {write(tuned).name} from {source}")
+        except CalibrationError as exc:
+            self.say(f"NOT saved, nothing written: {exc}", seconds=15.0)
 
     def is_retuned(self) -> bool:
         """Whether the calibration in use differs from its file's."""

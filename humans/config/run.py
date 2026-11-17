@@ -18,6 +18,7 @@ import sys
 import time
 from dataclasses import dataclass
 from importlib import metadata
+from pathlib import Path
 
 from ..inputs import controls_of_input_devices
 from .curriculum import Curriculum
@@ -54,6 +55,9 @@ class RunConfig:
     dummy_trigger: bool
     #: do not build, reset and close each game once before the window.
     skip_load_games: bool
+    #: a calibration file per controller to read it through; a controller with none is read
+    #: through its newest.
+    calibration_files: tuple[Path, ...]
 
     @classmethod
     def from_args(cls, args: argparse.Namespace, curriculum: Curriculum,
@@ -66,8 +70,8 @@ class RunConfig:
         """
         return cls(curriculum=curriculum, rig=rig, subject=args.subject, ses=args.ses,
                    run=args.run, duration=args.duration, resume=args.resume, loop=args.loop,
-                   dummy_trigger=args.dummy_trigger,
-                   skip_load_games=args.skip_load_games)
+                   dummy_trigger=args.dummy_trigger, skip_load_games=args.skip_load_games,
+                   calibration_files=tuple(args.calibration))
 
     def problems(self, *, load_games: bool = False) -> list[str]:
         """What keeps this curriculum from being played on this rig, which neither shows alone.
