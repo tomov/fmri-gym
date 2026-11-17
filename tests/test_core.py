@@ -212,6 +212,21 @@ def test_an_image_line_is_drawn_as_its_image_between_the_text(monkeypatch):
         display.close()
 
 
+def test_a_window_without_the_keyboard_focus_says_so(monkeypatch, capsys):
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    from humans.outputs.display import Display
+    import pygame
+    display = Display(size=(200, 150), vsync=False)
+    try:
+        assert display.take_focus()
+        monkeypatch.setattr("humans.outputs.display.FOCUS_WAIT_S", 0.05)
+        monkeypatch.setattr(pygame.key, "get_focused", lambda: False)
+        assert not display.take_focus()
+    finally:
+        display.close()
+    assert "does NOT have the keyboard focus" in capsys.readouterr().err
+
+
 @pytest.mark.parametrize("path, label", [
     ("configs/curricula/minihack/levels/room5x5.json", "minihackLevelsRoom5x5"),
     ("/elsewhere/curricula/baba_auto/levels/lock.json", "babaAutoLevelsLock"),
