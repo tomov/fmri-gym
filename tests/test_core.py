@@ -143,6 +143,55 @@ def test_a_block_cut_short_is_named_when_its_folder_is_written(tmp_path):
         "block-00_gym_x: its 2 frame lines are not numbered 0 to 1"]
 
 
+def test_each_text_and_fixation_screen_is_recorded_at_the_flip_that_showed_it(monkeypatch):
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    from humans.outputs.display import Display
+    display = Display(size=(200, 150), vsync=False)
+    recorded = []
+    display.record_with(lambda perf_time, record: recorded.append((perf_time, record)))
+    try:
+        text_flip = display.draw_text("Press SPACE")
+        fixation_flip = display.draw_fixation()
+        display.redraw()                                    # the same screen again: no record
+    finally:
+        display.close()
+    assert recorded == [(text_flip, {"type": "screen", "kind": "text", "text": "Press SPACE"}),
+                        (fixation_flip, {"type": "screen", "kind": "fixation", "text": None})]
+
+
+def test_a_lifecycle_code_is_recorded_only_when_a_line_sends_it():
+    from humans.sync.triggers import Triggers
+    triggers = Triggers.from_dict(None)                     # the null line sends nothing
+    recorded = []
+    triggers.record_with(lambda perf_time, record: recorded.append(record))
+    triggers.lifecycle("task_start")
+    assert recorded == []
+    triggers.enabled = True
+    value = triggers.lifecycle("task_stop")
+    assert recorded == [{"type": "trigger_sent", "name": "task_stop", "value": value}]
+
+
+def test_each_press_of_the_scanner_key_is_logged_as_one_pulse():
+    from types import SimpleNamespace
+
+    from humans.run import Run
+    from humans.sync.triggers import SyncSettings
+    logged = []
+    run = SimpleNamespace(sync=SyncSettings(mode="wait", key="EQUALS"), clock=Clock(),
+                          logger=SimpleNamespace(log=lambda **record: logged.append(record)))
+    run._is_scanner_key = lambda record: Run._is_scanner_key(run, record)
+    for name, down in (("EQUALS", True), ("EQUALS", False), ("SPACE", True)):
+        Run._record_event(run, 1.0, {"type": "input_event", "name": name, "down": down})
+    run.clock.trigger()
+    Run._record_event(run, run.clock.t0_perf + 2.0,
+                      {"type": "input_event", "name": "EQUALS", "down": True})
+    assert logged == [
+        {"type": "scanner_pulse", "perf_time": 1.0, "run_time": None},
+        {"type": "input_event", "name": "SPACE", "down": True, "perf_time": 1.0,
+         "run_time": None},
+        {"type": "scanner_pulse", "perf_time": run.clock.t0_perf + 2.0, "run_time": 2.0}]
+
+
 def test_discrete_keymap_longest_combo_wins():
     km = make_keymap({"controls": {"": 0, "LEFT": 1, "LEFT+SPACE": 2}}, spaces.Discrete(3))
     assert km.resolve(frozenset()) == 0

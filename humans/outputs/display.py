@@ -91,6 +91,7 @@ class Display:
         self._caption = caption
         self._want_vsync = vsync
         self._on_flip: list[tuple[Callable[..., Any], tuple]] = []
+        self._recorder: Callable[[float, dict], None] | None = None
         self.last_flip: float | None = None
         self._init_display()
 
@@ -197,6 +198,16 @@ class Display:
         :param args: its positional arguments.
         """
         self._on_flip.append((fn, args))
+
+    def record_with(self, recorder: Callable[[float, dict], None]) -> None:
+        """Hand ``recorder`` each text or fixation screen as it is shown, with the time of the
+        flip that showed it (``perf_counter``): a ``screen`` record (``kind``, ``text``)."""
+        self._recorder = recorder
+
+    def _record_screen(self, flip_time: float, kind: str, text: str | None) -> None:
+        """Hand the recorder, if there is one, the screen shown at ``flip_time``."""
+        if self._recorder is not None:
+            self._recorder(flip_time, {"type": "screen", "kind": kind, "text": text})
 
     def _present(self) -> float:
         """Show the canvas: blit, flip, stamp, run the queued on-flip callbacks.
@@ -417,7 +428,14 @@ class Display:
         :param align: ``"center"`` or ``"left"`` horizontal alignment mode.
         :return: ``perf_counter`` of the flip that showed it.
         """
-        font = font or self.font
+        self._compose_text(text, color, font or self.font, align)
+        flip_time = self._present()
+        self._record_screen(flip_time, "text", text)
+        return flip_time
+
+    def _compose_text(self, text: str, color: tuple[int, int, int], font: pygame.font.Font,
+                      align: str) -> None:
+        """Draw :meth:`draw_text`'s screen on the canvas, without showing it."""
         self.canvas.fill(BG_COLOR)
         rows = self._text_rows(text, font, color, int(self.size[0] * 0.92))
         y = (self.size[1] - sum(surf.get_height() for surf, _ in rows)) // 2
@@ -430,7 +448,6 @@ class Display:
                 rect = surf.get_rect(center=(self.size[0] // 2, y + surf.get_height() // 2))
             self.canvas.blit(surf, rect)
             y += surf.get_height()
-        return self._present()
 
     def _text_rows(self, text: str, font: pygame.font.Font, color: tuple[int, int, int],
                    max_w: int) -> list[tuple[pygame.Surface, bool]]:
@@ -462,7 +479,10 @@ class Display:
 
         :return: ``perf_counter`` of the flip that showed it.
         """
-        return self.draw_text("+", color=FIX_COLOR, font=self.fix_font)
+        self._compose_text("+", FIX_COLOR, self.fix_font, "center")
+        flip_time = self._present()
+        self._record_screen(flip_time, "fixation", None)
+        return flip_time
 
     def describe(self) -> dict[str, Any]:
         """What was actually opened.

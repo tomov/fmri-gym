@@ -49,7 +49,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 from .clock import Clock
 
@@ -417,6 +417,7 @@ class Triggers:
         self.last_frame = 0
         self._level = 0     # frame code currently on the lines (0 between blocks)
         self._n_sent = 0    # frame triggers sent in the current block
+        self._recorder: Callable[[float, dict], None] | None = None
 
     @classmethod
     def from_dict(cls, section: dict | None) -> Triggers:
@@ -430,6 +431,12 @@ class Triggers:
         """
         return cls(TriggerSettings.from_dict(section))
 
+    def record_with(self, recorder: Callable[[float, dict], None]) -> None:
+        """Hand ``recorder`` each lifecycle code as it goes out on the line, with the time it
+        was sent (``perf_counter``): a ``trigger_sent`` record (``name``, ``value``). A backend
+        that sends nothing hands it nothing."""
+        self._recorder = recorder
+
     def lifecycle(self, name: str) -> int:
         """Send a lifecycle trigger, OR'd with the frame level in force.
 
@@ -441,8 +448,11 @@ class Triggers:
         """
         value = self.codes.lifecycle(name) | self._level
         self._backend.send(value)
+        sent_at = time.perf_counter()
         self.events.append({"name": name, "value": value,
-                            "wall_time": time.time(), "perf_time": time.perf_counter()})
+                            "wall_time": time.time(), "perf_time": sent_at})
+        if self._recorder is not None and self.enabled:
+            self._recorder(sent_at, {"type": "trigger_sent", "name": name, "value": value})
         if self._backend.holds_level and self._level == 0:
             time.sleep(self.settings.pulse_ms / 1000.0)
             self._backend.clear()

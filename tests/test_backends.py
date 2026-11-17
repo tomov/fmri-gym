@@ -306,6 +306,14 @@ def test_headless_run(session):
     assert any(e["type"] == "input_event" for e in events), "no key press was logged"
     if any(e.get("audio_chunk", -1) >= 0 for e in frames):
         assert (block / AUDIO_FILENAME).exists(), "sound was played but audio.h5 is missing"
+    run_lines = [json.loads(line)
+                 for line in (session.run / EVENTS_FILENAME).read_text().splitlines()]
+    types = [line["type"] for line in run_lines]
+    assert types[0] == "run_start" and types[-1] == "run_end", f"{types[:3]} ... {types[-3:]}"
+    assert run_lines[-1]["how"] in ("finished", "time_up"), run_lines[-1]
+    assert types.count("scanner_trigger") == 1
+    screens = [line for line in run_lines if line["type"] == "screen"]
+    assert any(line["kind"] == "fixation" for line in screens), "no fixation screen was logged"
 
 
 def test_headless_log_is_what_was_shown(session):

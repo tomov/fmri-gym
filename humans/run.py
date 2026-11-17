@@ -334,6 +334,8 @@ class Run:
         self.audio = audio
         self.clock = Clock()
         self.logger = Logger(outdir, config.subject, config.curriculum.record(), self.clock)
+        self.logger.log(type="run_start", perf_time=time.perf_counter(), run_time=None,
+                        wall_time=time.time())
         self.logger.set_extra("curriculum_path", config.curriculum.path)
         self.logger.set_extra("rig", config.rig.record())
         self.logger.set_extra("display", display.describe())
@@ -401,7 +403,8 @@ class Run:
         display = Display(size=screen.size, fullscreen=screen.is_fullscreen,
                           vsync=screen.has_vsync, monitor=screen.monitor)
         run = cls(config, display, out.folder, audio, triggers, inputs, resume_from)
-        inputs.record_with(run._record_input)
+        for recorded in (inputs, display, triggers):
+            recorded.record_with(run._record_event)
         run.logger.set_extra("run", {"label": out.label, "attempt": out.attempt})
         run.logger.set_extra("seeds", {"derived_from": out.label, "phases": how})
         run.logger.set_extra("inputs", inputs.record())   # which devices answered, and how
@@ -409,11 +412,21 @@ class Run:
         run.logger.set_extra("platform", platform_info())
         return run
 
-    def _record_input(self, perf_time: float, record: dict) -> None:
-        """Log one edge or stick reading at ``perf_time``; its ``run_time`` is None before the
-        scanner's trigger."""
+    def _record_event(self, perf_time: float, record: dict) -> None:
+        """Log one record that happened at ``perf_time``; its ``run_time`` is None before the
+        scanner's trigger. A press of the scanner's trigger key is a ``scanner_pulse``, and
+        its release is not logged."""
+        if self._is_scanner_key(record):
+            if not record["down"]:
+                return
+            record = {"type": "scanner_pulse"}
         run_time = None if self.clock.t0_perf is None else self.clock.from_perf(perf_time)
         self.logger.log(**record, perf_time=perf_time, run_time=run_time)
+
+    def _is_scanner_key(self, record: dict) -> bool:
+        """Whether ``record`` is an edge of the key the scanner types at every volume."""
+        return (self.sync.mode == "wait" and record["type"] == "input_event"
+                and record["name"] == self.sync.key)
 
     def close(self) -> None:
         """Close the logger, the inputs, the trigger line, the audio output and the window.
@@ -456,6 +469,9 @@ class Run:
 
         self.clock.trigger()
         self.logger.set_trigger_time()
+        self.logger.log(type="scanner_trigger", perf_time=self.clock.t0_perf, run_time=0.0,
+                        wall_time=self.clock.t0_epoch, sync_mode=self.sync.mode,
+                        dummy_trigger=self.config.dummy_trigger)
         self.triggers.lifecycle("task_start")
 
     def _fixation(self, phase: Fixation, index: int) -> None:
@@ -910,6 +926,7 @@ class Run:
             report a run that stopped early.
         """
         user_quit = False
+        how_the_run_ended = "quit"
         start = 0 if self.resume_from is None else self.resume_from.phase_index
         block_progress = None if self.resume_from is None else self.resume_from.block_progress
         handlers: dict[type, Callable[[Any, int], None]] = {
@@ -943,12 +960,17 @@ class Run:
             if reached_end:
                 self.display.draw_text("Done. Thank you!")
                 time.sleep(2.0)
+            how_the_run_ended = "finished" if reached_end else "time_up"
         except KeyboardInterrupt:
             user_quit = True
             print("Interrupted -- saving partial data.", file=sys.stderr)
+        except Exception as error:
+            how_the_run_ended = f"error: {type(error).__name__}: {error}"
+            raise
         finally:
             if self.clock.t0_perf is not None:
                 self.triggers.lifecycle("task_stop")
+            self._record_event(time.perf_counter(), {"type": "run_end", "how": how_the_run_ended})
             self.logger.set_extra("triggers", self.triggers.describe(self.clock))
             manifest_path = self.logger.save_manifest()
             print(f"Saved run to: {self.outdir}")
