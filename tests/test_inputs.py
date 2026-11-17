@@ -344,6 +344,15 @@ def test_an_uncalibrated_axis_presses_nothing():
     assert d.calibrated_value(LX) is None
 
 
+def test_a_controller_records_the_calibration_it_reads_through(config_home):
+    pad = _bare(CurrentDesignsGamepad3)
+    assert pad.record()["calibration"] is None
+    path = _write(config_home, "Scripted_a.json", GMPD3_FILE, 1000)
+    pad.load_calibration()
+    assert pad.record() == {"input": pad.name, "device_name": "Scripted",
+                            "calibration_file": str(path), "calibration": GMPD3_FILE}
+
+
 def test_a_controller_refuses_a_required_axis_with_no_calibration(config_home):
     pad = _bare(CurrentDesignsGamepad3)
     with pytest.raises(CalibrationError,
