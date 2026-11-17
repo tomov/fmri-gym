@@ -7,7 +7,6 @@ a game plays; ``test_backends`` does that, per backend.
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 
 import h5py
@@ -125,12 +124,28 @@ def test_the_run_log_holds_every_line_and_its_blocks_are_cut_from_it_at_close(tm
                    for line in run_lines if line["block"] == name]
     assert read_events(str(tmp_path / name)) == block_lines
     assert len(read_frames(str(tmp_path / name))[0]) == 1
+    assert not (tmp_path / FRAMES_FILENAME).exists()        # frames are kept in the block only
     manifest = json.loads((tmp_path / "manifest.json").read_text())
     assert manifest["block_files"] == {"problems": []}
 
-    shutil.rmtree(tmp_path / name)          # a run that stopped before its blocks were cut
+    (tmp_path / name / EVENTS_FILENAME).unlink()  # a run that stopped before its blocks were cut
     assert read_events(str(tmp_path / name)) == block_lines
     assert len(read_frames(str(tmp_path / name))[0]) == 1
+
+
+def test_the_console_is_logged_line_by_line_until_the_log_closes(tmp_path):
+    import sys
+    logger = Logger(str(tmp_path), "sub-test", [PHASE], Clock())
+    logger.copy_console()
+    try:
+        print("one\ntwo")
+        print("half", end="", file=sys.stderr)
+    finally:
+        logger.close()
+    print("after")
+    lines = [json.loads(line) for line in (tmp_path / EVENTS_FILENAME).read_text().splitlines()]
+    assert [(line["stream"], line["text"]) for line in lines] == [
+        ("stdout", "one"), ("stdout", "two"), ("stderr", "half")]
 
 
 def test_a_block_cut_short_is_named_when_its_folder_is_written(tmp_path):

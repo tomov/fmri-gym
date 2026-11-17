@@ -311,18 +311,18 @@ class Run:
         self,
         config: RunConfig,
         display: Display,
-        outdir: str,
+        logger: Logger,
         audio: Audio,
         triggers: Triggers,
         inputs: InputDevices,
         resume_from: RunProgress | None = None,
     ) -> None:
-        """Set up clock, logger, and phase dispatch for one subject.
+        """Set up phase dispatch for one subject, on the run's open log.
 
         :param config: the run config: its curriculum (seeded), its rig, subject,
             duration, test switches; the curriculum and the rig go in the manifest.
         :param display: shared pygame display used by all phases.
-        :param outdir: the run's folder, for its manifest and block logs.
+        :param logger: the run's log, open in its folder; its clock is the run's.
         :param audio: shared audio output used by all phases.
         :param triggers: shared trigger output (start sync + codes; see
             :mod:`humans.sync.triggers`), opened on the rig's line.
@@ -334,17 +334,15 @@ class Run:
         self.config = config
         self.display = display
         self.audio = audio
-        self.clock = Clock()
-        self.logger = Logger(outdir, config.subject, config.curriculum.record(), self.clock)
-        self.logger.log(type="run_start", perf_time=time.perf_counter(), run_time=None,
-                        wall_time=time.time())
+        self.logger = logger
+        self.clock = logger.clock
         self.logger.set_extra("curriculum_path", config.curriculum.path)
         self.logger.set_extra("rig", config.rig.record())
         self.logger.set_extra("display", display.describe())
         self.logger.set_extra("dummy_trigger", config.dummy_trigger)
         self.logger.set_extra("skip_load_games", config.skip_load_games)
         self.logger.set_extra("audio", self.audio.describe())
-        self.outdir = outdir
+        self.outdir = logger.outdir
         self.triggers = triggers
         self.sync = self.triggers.sync
         self.inputs = inputs
@@ -360,10 +358,10 @@ class Run:
     def from_config(cls, config: RunConfig) -> "Run":
         """Everything one run needs, from its run config.
 
-        Works out where the run writes and what seeds it plays, then opens the
-        trigger line, the audio output and the window -- in that order, so a
-        bad section, an unopenable port or an unusable output stops the run
-        before anything is on screen. Each says on stderr what it got.
+        Works out where the run writes and what seeds it plays, and opens the run's log
+        there, logging the console as well; then, on the log, opens the trigger line, the
+        audio output and the window (:meth:`_open_outputs`). A start-up that stops leaves
+        the log with its ``run_end`` and the error.
 
         :param config: the curriculum, the rig and the command line, as the run reads them.
         :return: the run, ready to :meth:`play`.
@@ -376,21 +374,41 @@ class Run:
         out = bids.run_output(config.rig.data_root, config.subject,
                               bids.task_label(config.curriculum.path),
                               config.ses, config.run)
-        if out.attempt > 1:
-            print(f"{out.label} already has data: this is attempt {out.attempt} at it, and "
-                  "writes beside the others", file=sys.stderr)
-        print(f"output: {out.folder}", file=sys.stderr)
+        curriculum, how = config.curriculum.with_seeds(lambda i: bids.phase_seed(out.label, i))
+        config = replace(config, curriculum=curriculum)
+        logger = Logger(out.folder, config.subject, curriculum.record(), Clock())
+        logger.log(type="run_start", perf_time=time.perf_counter(), run_time=None,
+                   wall_time=time.time())
+        logger.copy_console()
+        try:
+            if out.attempt > 1:
+                print(f"{out.label} already has data: this is attempt {out.attempt} at it, and "
+                      "writes beside the others", file=sys.stderr)
+            print(f"output: {out.folder}", file=sys.stderr)
+            for i, phase in enumerate(curriculum.phases):
+                if i in how:
+                    print(f"seeds: phase {i} = {phase.seed} ({how[i]})", file=sys.stderr)
+            run = cls._open_outputs(config, logger)
+        except BaseException as error:
+            logger.log(type="run_end", how=f"error: {type(error).__name__}: {error}",
+                       perf_time=time.perf_counter(), run_time=None)
+            logger.close()
+            raise
+        run.logger.set_extra("run", {"label": out.label, "attempt": out.attempt})
+        run.logger.set_extra("seeds", {"derived_from": out.label, "phases": how})
+        return run
+
+    @classmethod
+    def _open_outputs(cls, config: RunConfig, logger: Logger) -> "Run":
+        """The run on ``logger``: where it resumes from, then the trigger line, the audio
+        output, the inputs and the window, in that order, so a bad section, an unopenable
+        port or an unusable output stops the run before anything is on screen. Each says on
+        stderr what it got."""
         resume_from = None
         if config.resume:
             resume_from = _run_progress(config.rig.data_root, config.subject, config.curriculum,
                                         config.loop)
-        curriculum, how = config.curriculum.with_seeds(lambda i: bids.phase_seed(out.label, i))
-        for i, phase in enumerate(curriculum.phases):
-            if i in how:
-                print(f"seeds: phase {i} = {phase.seed} ({how[i]})", file=sys.stderr)
-        config = replace(config, curriculum=curriculum)
         check_monitor(config.rig.screen.monitor)
-
         triggers = Triggers(config.rig.triggers)
         print(f"triggers: {triggers.status()}", file=sys.stderr)
         if config.dummy_trigger:
@@ -404,11 +422,9 @@ class Run:
         screen = config.rig.screen
         display = Display(size=screen.size, fullscreen=screen.is_fullscreen,
                           vsync=screen.has_vsync, monitor=screen.monitor)
-        run = cls(config, display, out.folder, audio, triggers, inputs, resume_from)
+        run = cls(config, display, logger, audio, triggers, inputs, resume_from)
         for recorded in (inputs, display, triggers):
             recorded.record_with(run._record_event)
-        run.logger.set_extra("run", {"label": out.label, "attempt": out.attempt})
-        run.logger.set_extra("seeds", {"derived_from": out.label, "phases": how})
         run.logger.set_extra("inputs", inputs.record())   # which devices answered, and how
         run.logger.set_extra("versions", versions())
         run.logger.set_extra("platform", platform_info())
@@ -975,11 +991,11 @@ class Run:
         finally:
             if self.clock.t0_perf is not None:
                 self.triggers.lifecycle("task_stop")
-            self._record_event(time.perf_counter(), {"type": "run_end", "how": how_the_run_ended})
             self.logger.set_extra("triggers", self.triggers.describe(self.clock))
             manifest_path = self.logger.save_manifest()
             print(f"Saved run to: {self.outdir}")
             print(f"Manifest: {manifest_path}")
+            self._record_event(time.perf_counter(), {"type": "run_end", "how": how_the_run_ended})
         return not user_quit
 
     def _schedule(self, start: int) -> Iterator[tuple[int, Phase]]:

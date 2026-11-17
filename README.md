@@ -716,19 +716,20 @@ Data is never overwritten. A run whose folder is already there writes to `..._02
 The names follow BIDS apart from that suffix, the contents not yet (no `_beh.tsv` / `_events.tsv`). Each folder holds:
 
 - **`manifest.json`** — subject, curriculum, trigger epoch, per-phase onsets/offsets (+ survey responses; onsets are flip times), the `display` actually opened (size, `vsync`, `refresh_rate`, driver), the `triggers` settings + lifecycle triggers sent (+ what the config left `defaulted`), the `audio` output (device, measured device delay, chosen delay), `dummy_trigger`, the `run` it is (label and `attempt`), the `seeds` (each game phase derived or pinned), the `versions` of pygame and SDL, the run's `duration` and where it was `resumed_from` (see "Resuming a curriculum").
-- **`events.jsonl`**, **`frames.h5`**, **`audio.h5`** — the run's log, the only files written as the run plays: forced to disk every second, so a crash, a killed process or a machine reset loses at most the last second. Every line of every block is in `events.jsonl` with its `block` (the folder name below; `null` outside a game block), and so is every press and release from the start of the run to its end, the scanner's trigger key included, in every phase. `frames.h5` and `audio.h5` hold one group per block, named as its folder. Besides the block lines below, the run's log holds:
+- **`events.jsonl`** — the run's log, written as the run plays and forced to disk every second, so a crash, a killed process or a machine reset loses at most the last second. Every line of every block is in it with its `block` (the folder name below; `null` outside a game block), and so is everything else that happened from the start of the run to its end. Besides the block lines below, it holds:
 
     | `type` | fields (each line also has `perf_time` and `run_time`, `null` before the trigger) |
     |--------|--------|
-    | `run_start` | `wall_time`: the first line, when the log opens |
+    | `run_start` | `wall_time`: the first line, written as soon as the run's folder is known, before the trigger line, sound, inputs and window are opened |
+    | `console` | `stream` (`stdout` or `stderr`), `text`: each line the run printed, the experimenter's prompts included |
     | `scanner_trigger` | `wall_time`, `sync_mode`, `dummy_trigger`: the run clock's zero (`run_time` 0) |
     | `scanner_pulse` | a press of the key the scanner types at every volume (`wait` sync); its release is not logged |
     | `screen` | `kind` (`text` or `fixation`), `text`: a screen other than a game frame, at the flip that showed it: messages, instructions (a controls image is a line of their text), loading, outcome, pop-ups, the ready and closing screens |
     | `trigger_sent` | `name`, `value`: a lifecycle code as it went out on the trigger line (none on a `null` line) |
     | `pygame_event` | `event` (its type's name) and its fields, `key_name` for a key: every event the run read off pygame's queue, a key no device maps included, but for stick and pointer motion and typed text |
-    | `run_end` | `how`: `finished`, `time_up`, `quit`, or `error: ...`; the last line |
+    | `run_end` | `how`: `finished`, `time_up`, `quit`, or `error: ...` (a start-up that stopped included: its folder holds only this log); the last line |
 
-- **`block-NN_<backend>_<game>/`** — one folder per game block, cut from the run's log when the run ends and checked against it (what is wrong with any is printed and listed in the manifest's `block_files`). A run that stopped before then has its folders cut the first time one is read (`humans.save.logging.read_events` and the other readers), which says so. Each holds:
+- **`block-NN_<backend>_<game>/`** — one folder per game block. Its `frames.h5` and `audio.h5` are written as the block plays, forced to disk with the log; its `events.jsonl` is cut from the run's log when the run ends and checked against it (what is wrong with any is printed and listed in the manifest's `block_files`). A run that stopped before then has its folders cut the first time one is read (`humans.save.logging.read_events` and the other readers), which says so. Each holds:
   - **`events.jsonl`** — the block's lines of the run's log, in order, without `block`; `type` says which:
 
     | `type` | fields |

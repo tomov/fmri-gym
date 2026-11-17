@@ -19,7 +19,7 @@ humans/popup.py                  CORE  hold-a-key pop-ups: pause menu (reset / f
 humans/inputs/                   CORE  the input devices: one named control per key, button, stick direction
 humans/outputs/                  CORE  what the participant sees and hears: display.py (the window), audio.py, sound.py
 humans/sync/                     CORE  triggers.py: the scanner's start pulse and the event codes; clock.py
-humans/save/                     CORE  the data: bids.py (where), logging.py (manifest + one log per block), replay.py
+humans/save/                     CORE  the data: bids.py (where), logging.py (manifest + one log per run, cut into its blocks), replay.py
 humans/adapters/base.py          CORE  EnvAdapter + FrameState: the seam
 humans/adapters/keymap.py        CORE  the phase's keys, one Keymap per action space
 humans/adapters/<BACKEND>.py     YOU   one small wrapper per game engine
