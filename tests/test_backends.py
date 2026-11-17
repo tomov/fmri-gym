@@ -316,6 +316,24 @@ def test_headless_run(session):
     assert any(line["kind"] == "fixation" for line in screens), "no fixation screen was logged"
 
 
+def test_each_step_names_the_presses_read_since_the_step_before(session):
+    """A frame line's ``controls_pressed`` are the presses logged between it and the frame
+    before it in its episode, read no later than the step."""
+    run_lines = [json.loads(line)
+                 for line in (session.run / EVENTS_FILENAME).read_text().splitlines()]
+    pressed_since_step: list[str] | None = None        # None: no step yet in this episode
+    for line in run_lines:
+        if line["type"] == "episode_start":
+            pressed_since_step = None
+        elif line["type"] == "input_event" and line["down"] and pressed_since_step is not None:
+            pressed_since_step.append(line["name"])
+        elif line["type"] == "frame":
+            if pressed_since_step is not None:
+                assert line["controls_pressed"] == pressed_since_step, line["frame"]
+            assert line["inputs_read_time"] <= line["run_time"], line["frame"]
+            pressed_since_step = []
+
+
 def test_headless_log_is_what_was_shown(session):
     """Every logged frame is the one on screen when it was logged; every chunk the PCM queued."""
     problems = tap.compare(str(_game_block(session.run)), session.tap)

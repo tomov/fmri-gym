@@ -138,6 +138,8 @@ class InputDevices(InputDevice):
         self.devices = tuple(devices)
         self.ignored_joysticks = tuple(ignored_joysticks)
         self._recorder: Callable[[float, dict], None] | None = None
+        #: ``perf_counter`` of the latest read (:meth:`handle`); ``None`` before the first.
+        self.last_read_time: float | None = None
 
     def record_with(self, recorder: Callable[[float, dict], None]) -> None:
         """Hand ``recorder`` each pygame event, each raw stick reading and each edge as it is
@@ -154,6 +156,7 @@ class InputDevices(InputDevice):
         return cls([])
 
     def handle(self, events: list[pygame.event.Event], now: float) -> list[InputEvent]:
+        self.last_read_time = now
         out = [InputEvent(QUIT, Edge.DOWN) for e in events if e.type == pygame.QUIT]
         for device in self.devices:
             out += device.handle(events, now)

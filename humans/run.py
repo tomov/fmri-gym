@@ -47,7 +47,9 @@ from .config.curriculum import Curriculum, game_changes
 from .config.phases import BlockMode, Fixation, GamePhase, Message, Phase, Survey
 from .config.run import RunConfig
 from .outputs.display import Display, check_monitor
-from .inputs import QUIT, ControlNames, Edge, InputDevice, InputEvent, open_input_devices
+from .inputs import (
+    QUIT, ControlNames, Edge, InputDevice, InputDevices, InputEvent, open_input_devices,
+)
 from .popup import Hint, Menu, PopUp
 from .save.logging import Logger
 from .sync.clock import Clock
@@ -312,7 +314,7 @@ class Run:
         outdir: str,
         audio: Audio,
         triggers: Triggers,
-        inputs: InputDevice,
+        inputs: InputDevices,
         resume_from: RunProgress | None = None,
     ) -> None:
         """Set up clock, logger, and phase dispatch for one subject.
@@ -693,7 +695,10 @@ class Run:
 
             fields = {
                 "episode_id": episode_id, "ep_frame": ep_frame,
-                "action": action, "reward": reward,
+                "action": action, "controls_pressed": pressed,
+                "controls_held": sorted(self.inputs.held()),
+                "inputs_read_time": self.clock.from_perf(self.inputs.last_read_time),
+                "reward": reward,
                 "terminated": bool(terminated), "truncated": bool(truncated),
                 "run_time": t_step, "flip_time": self.clock.from_perf(flip_t),
                 "wall_time": self.clock.wall_time(), "variables": fs.variables,
