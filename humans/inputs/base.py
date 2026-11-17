@@ -20,6 +20,12 @@ import pygame
 
 #: The name the run's inputs give the window's close button.
 QUIT = "QUIT"
+#: The pygame events not recorded as they are: a stick's motion is kept as its raw reading
+#: (an ``axis`` record), and the pointer's motion and the text typed repeat what the keys
+#: and the mouse buttons already say, many times over.
+_EVENTS_NOT_RECORDED = frozenset({
+    pygame.JOYAXISMOTION, pygame.CONTROLLERAXISMOTION, pygame.MOUSEMOTION,
+    pygame.TEXTINPUT, pygame.TEXTEDITING})
 
 
 class Edge(Enum):
@@ -134,9 +140,10 @@ class InputDevices(InputDevice):
         self._recorder: Callable[[float, dict], None] | None = None
 
     def record_with(self, recorder: Callable[[float, dict], None]) -> None:
-        """Hand ``recorder`` each edge and each raw stick reading as it is read, with the time
-        it was read (``perf_counter``): an ``input_event`` (``name``, ``down``) or an ``axis``
-        (``input``, ``axis``, ``value``) record."""
+        """Hand ``recorder`` each pygame event, each raw stick reading and each edge as it is
+        read, with the time it was read (``perf_counter``): a ``pygame_event`` (``event``, the
+        event's own fields, and ``key_name`` for a key), an ``axis`` (``input``, ``axis``,
+        ``value``) or an ``input_event`` (``name``, ``down``) record."""
         self._recorder = recorder
         for device in self.devices:
             device.axis_readings = []
@@ -151,11 +158,15 @@ class InputDevices(InputDevice):
         for device in self.devices:
             out += device.handle(events, now)
         if self._recorder is not None:
-            self._record(out, now)
+            self._record(events, out, now)
         return out
 
-    def _record(self, edges: list[InputEvent], now: float) -> None:
-        """Hand the recorder each device's stick readings, then ``edges``."""
+    def _record(self, events: list[pygame.event.Event], edges: list[InputEvent],
+                now: float) -> None:
+        """Hand the recorder ``events``, then each device's stick readings, then ``edges``."""
+        for event in events:
+            if event.type not in _EVENTS_NOT_RECORDED:
+                self._recorder(now, _pygame_event_record(event))
         for device in self.devices:
             for axis, value in device.axis_readings:
                 self._recorder(now, {"type": "axis", "input": device.name, "axis": axis,
@@ -189,3 +200,14 @@ class InputDevices(InputDevice):
     def close(self) -> None:
         for device in self.devices:
             device.close()
+
+
+def _pygame_event_record(event: pygame.event.Event) -> dict:
+    """A pygame event as a ``pygame_event`` record: its type's name and those of its fields a
+    log line can hold (the window it came to is left out), with the key's name for a key."""
+    fields = {name: value for name, value in event.dict.items()
+              if isinstance(value, (bool, int, float, str, tuple)) or value is None}
+    record = {**fields, "type": "pygame_event", "event": pygame.event.event_name(event.type)}
+    if event.type in (pygame.KEYDOWN, pygame.KEYUP):
+        record["key_name"] = pygame.key.name(event.key)
+    return record

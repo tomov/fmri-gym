@@ -355,6 +355,20 @@ def test_recorded_inputs_hand_over_each_raw_axis_reading_then_each_edge():
     assert d.axis_readings == []
 
 
+def test_recorded_inputs_hand_over_every_pygame_event_but_motion_and_text():
+    recorded: list[dict] = []
+    keys = InputDevices([Keyboard()])
+    keys.record_with(lambda perf_time, record: recorded.append(record))
+    keys.handle([_key(pygame.KEYDOWN, pygame.K_F13),                     # a key no device has
+                 pygame.event.Event(pygame.JOYAXISMOTION, joy=0, instance_id=0, axis=0, value=0.5),
+                 pygame.event.Event(pygame.TEXTINPUT, text="a"),
+                 pygame.event.Event(pygame.WINDOWFOCUSLOST, window=object())], 1.0)
+    assert recorded == [
+        {"type": "pygame_event", "event": "KeyDown", "key": pygame.K_F13, "mod": 0, "unicode": "",
+         "key_name": "f13"},
+        {"type": "pygame_event", "event": "WindowFocusLost"}]
+
+
 def test_an_uncalibrated_axis_presses_nothing():
     d = _ScriptedController()
     d.frames = iter([(d.axes_at({LX: 1.0, LY: -1.0}), set())])
@@ -549,7 +563,7 @@ def test_a_tap_inside_one_frame_counts_for_that_frame(screen):
     pygame.event.post(_key(pygame.KEYDOWN, pygame.K_SPACE))
     pressed, quit_ = _poll_keys_until(keys, display, 0.0)
     assert (pressed, quit_, keys.held()) == (["LEFT", "SPACE"], False, {"SPACE"})
-    assert [(r["name"], r["down"]) for r in logged] == [
+    assert [(r["name"], r["down"]) for r in logged if r["type"] == "input_event"] == [
         ("LEFT", True), ("LEFT", False), ("SPACE", True)]
     pygame.event.post(_key(pygame.KEYDOWN, pygame.K_z))     # turn-based: the wait ends at Z
     pygame.event.post(_key(pygame.KEYDOWN, pygame.K_x))
