@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import ClassVar, NamedTuple
+from typing import Any, ClassVar, NamedTuple
 
 import pygame
 
@@ -87,6 +87,10 @@ class InputDevice(ABC):
         """One line naming the device and how it is read."""
         return self.name
 
+    def record(self) -> dict[str, Any]:
+        """The device, and everything that sets how it is read."""
+        return {"input": self.name}
+
     def close(self) -> None:
         """Let go of the device."""
 
@@ -152,6 +156,11 @@ class InputDevices(InputDevice):
         lines += [f"IGNORED {name!r}: not among the devices opened"
                   for name in self.ignored_joysticks]
         return "; ".join(lines)
+
+    def record(self) -> dict[str, Any]:
+        """Each device's record, and the joysticks ignored."""
+        return {"devices": [d.record() for d in self.devices],
+                "ignored_joysticks": list(self.ignored_joysticks)}
 
     def close(self) -> None:
         for device in self.devices:

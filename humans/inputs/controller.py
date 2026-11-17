@@ -218,6 +218,15 @@ class Controller(InputDevice):
                          for name, axis in self.calibration.axes.items())
         return f"{self.name}: {self.device_name!r}; {axes} ({self.calibration_path})"
 
+    def record(self) -> dict[str, Any]:
+        """The controller, its calibration file and that file's contents; both None uncalibrated."""
+        if self.calibration is None:
+            return {"input": self.name, "device_name": self.device_name,
+                    "calibration_file": None, "calibration": None}
+        return {"input": self.name, "device_name": self.device_name,
+                "calibration_file": str(self.calibration_path),
+                "calibration": self.calibration.record()}
+
     # -- for a subclass's handle() -----------------------------------------------------
     def _pull(self, name: str, value: float, on: float, off: float) -> list[InputEvent]:
         """Press ``name`` once ``value`` reaches ``on``, release it under ``off``."""

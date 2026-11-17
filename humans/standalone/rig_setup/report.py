@@ -26,7 +26,6 @@ import json
 import os
 import platform
 import re
-import socket
 import subprocess
 import sys
 import time
@@ -37,15 +36,13 @@ import pygame
 
 from ...config import rig as rig_file
 from ...inputs import ControlNames
+from ...save.provenance import platform_info, versions
 from .measure import (LONG, QUICK, SUBJECT, TESTS, RigMeasurement, detect_outputs, input_devices,
                       port_name)
 
 # ---------------------------------------------------------------------------
 # The pooling row
 # ---------------------------------------------------------------------------
-
-
-_REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 #: The pooled table: ``(column, path into the manifest, description, units)``.
 COLUMNS: list[tuple[str, tuple[str, ...], str, str | None]] = [
@@ -298,29 +295,6 @@ def _cell(v: Any) -> str:
         numbers = all(isinstance(x, (int, float)) for x in v)
         return ("x" if numbers else "; ").join(map(str, v))
     return re.sub(r"\s+", " ", str(v))
-
-
-def versions() -> dict[str, str]:
-    """What ran the rig measurement: fmri-gym, its git checkout, and the libraries timing
-    depends on."""
-    from importlib.metadata import version
-
-    import numpy
-    import pygame
-    try:
-        git = subprocess.run(["git", "-C", _REPO, "describe", "--always", "--dirty"],
-                             capture_output=True, text=True, timeout=5).stdout.strip()
-    except (OSError, subprocess.TimeoutExpired):
-        git = ""
-    return {"fmri_gym": version("fmri-gym"), "git": git or "n/a",
-            "python": platform.python_version(), "numpy": numpy.__version__,
-            "pygame": pygame.version.ver, "sdl": ".".join(map(str, pygame.get_sdl_version()))}
-
-
-def platform_info() -> dict[str, str]:
-    """The machine: OS, architecture, host name."""
-    return {"system": platform.platform(), "machine": platform.machine(),
-            "hostname": socket.gethostname()}
 
 
 def machine() -> dict[str, Any]:

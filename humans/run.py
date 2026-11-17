@@ -42,6 +42,7 @@ from .save import bids
 from .adapters import get_adapter
 from .outputs.audio import Audio
 from .save.bids import BlockProgress, RunProgress
+from .save.provenance import platform_info, versions
 from .config.curriculum import Curriculum, game_changes
 from .config.phases import BlockMode, Fixation, GamePhase, Message, Phase, Survey
 from .config.run import RunConfig
@@ -338,6 +339,7 @@ class Run:
         self.audio = audio
         self.clock = Clock()
         self.logger = Logger(outdir, config.subject, config.curriculum.record(), self.clock)
+        self.logger.set_extra("curriculum_path", config.curriculum.path)
         self.logger.set_extra("rig", config.rig.record())
         self.logger.set_extra("display", display.describe())
         self.logger.set_extra("dummy_trigger", config.dummy_trigger)
@@ -405,9 +407,9 @@ class Run:
         run = cls(config, display, out.folder, audio, triggers, inputs, resume_from)
         run.logger.set_extra("run", {"label": out.label, "attempt": out.attempt})
         run.logger.set_extra("seeds", {"derived_from": out.label, "phases": how})
-        run.logger.set_extra("inputs", inputs.status())   # which devices answered, and how
-        run.logger.set_extra("versions", {  # the banner humans hides said these
-            "pygame": pygame.version.ver, "sdl": ".".join(map(str, pygame.get_sdl_version()))})
+        run.logger.set_extra("inputs", inputs.record())   # which devices answered, and how
+        run.logger.set_extra("versions", versions())
+        run.logger.set_extra("platform", platform_info())
         return run
 
     def close(self) -> None:
