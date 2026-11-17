@@ -5,7 +5,7 @@ set -e  # Exit on error
 
 # Session parameters
 SUBJECT=sub-BC01
-RIG=configs/examples/rigs/fmri.json
+RIG=configs/BC/rigs/3T_MIT_GMPD3.json
 SES=1
 RUN_DURATION=600
 
