@@ -1,10 +1,10 @@
 # NetHack gamepad curricula
 
-Install/build once from the repository root:
+Install from the repository root with Python 3.10–3.13. The `nethack_gamepad` extra installs the standalone `nethack-gamepad-gym` package.
 
 ```bash
-uv sync --locked --extra nethack-gamepad
-uv run nethack-gamepad-build
+uv sync --extra nethack_gamepad
+uv run --locked nethack-gamepad-build
 ```
 
 Launch through the shared experiment interface:

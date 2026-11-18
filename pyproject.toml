@@ -46,7 +46,7 @@ vgdl = ["vgdl-gym"]  # the games come from the external/vgdl checkout (language_
 # resolver may prefer gymnasium 1.3 and fall back to nle 0.9.1 (source build).
 minihack = ["minihack", "nle>=1.3", "minihack-levels", "replay-state-gym"]
 # minihack-levels for NLESeeding, the wrapper that seeds NetHack's own RNGs.
-nethack_gamepad = ["nethack-gamepad-gym", "replay-state-gym"]
+nethack_gamepad = ["nethack-gamepad-gym==0.1.0"]
 nethack = ["nle>=1.3", "minihack-levels", "replay-state-gym"]
 # The ten browser games as a gym env, from gym/aigamestore (see tool.uv.sources).
 aigamestore = ["aigamestore-gym", "replay-state-gym"]
@@ -124,7 +124,7 @@ dev = [
 [tool.pytest.ini_options]
 # tests/ is the suite; a gym/<pkg>/tests/ folder is that package's own tests,
 # collected when its backend is selected (tests/conftest.py).
-testpaths = ["tests", "gym/minihack/tests", "gym/nethack_gamepad/tests", "gym/vizdoom/tests", "gym/coom/tests"]
+testpaths = ["tests", "gym/minihack/tests", "gym/vizdoom/tests", "gym/coom/tests"]
 # -ra: every skip and its reason in the summary. A backend this machine cannot
 # run is skipped, and the summary is where that must be seen.
 addopts = "-ra"
@@ -139,7 +139,6 @@ override-dependencies = ["pygame; sys_platform == 'pygame-ce-only'"]
 
 [tool.uv.sources]
 minihack-levels = { path = "gym/minihack", editable = true }
-nethack-gamepad-gym = { path = "gym/nethack_gamepad", editable = true }
 aigamestore-gym = { path = "gym/aigamestore", editable = true }
 coom-gym = { path = "gym/coom", editable = true }
 baba-gym = { path = "gym/baba", editable = true }
@@ -158,7 +157,7 @@ vizdoom-gym = { path = "gym/vizdoom", editable = true }
 root_packages = [
     "humans",
     "aigamestore_gym", "arc3_gym", "baba_gym", "baba_auto_gym", "coom_gym", "crafter_gym",
-    "minihack_levels", "nethack_gamepad_gym", "replay_state_gym", "vgdl_gym", "vizdoom_gym",
+    "minihack_levels", "replay_state_gym", "vgdl_gym", "vizdoom_gym",
 ]
 include_external_packages = true
 
@@ -188,7 +187,7 @@ name = "A gym/ package imports no humans"
 type = "forbidden"
 source_modules = [
     "aigamestore_gym", "arc3_gym", "baba_gym", "baba_auto_gym", "coom_gym", "crafter_gym",
-    "minihack_levels", "nethack_gamepad_gym", "replay_state_gym", "vgdl_gym", "vizdoom_gym",
+    "minihack_levels", "replay_state_gym", "vgdl_gym", "vizdoom_gym",
 ]
 forbidden_modules = ["humans"]
 
@@ -197,10 +196,9 @@ name = "A gym/ package imports no other, but the one it is built on and depends 
 type = "independence"
 modules = [
     "aigamestore_gym", "arc3_gym", "baba_gym", "baba_auto_gym", "coom_gym", "crafter_gym",
-    "minihack_levels", "nethack_gamepad_gym", "replay_state_gym", "vgdl_gym", "vizdoom_gym",
+    "minihack_levels", "replay_state_gym", "vgdl_gym", "vizdoom_gym",
 ]
-ignore_imports = ["coom_gym.env -> vizdoom_gym",
-                  "nethack_gamepad_gym.campaign -> replay_state_gym"]
+ignore_imports = ["coom_gym.env -> vizdoom_gym"]
 
 [tool.ruff]
 line-length = 100

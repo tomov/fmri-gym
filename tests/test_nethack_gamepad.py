@@ -1,7 +1,6 @@
 """Gym/adapter/logger integration, including a real death and a second scan start.
 
-Run through pytest with the installed nethack_gamepad extra. These are actual
-engine/recording checks; they require Gymnasium, pygame and h5py.
+Requires the installed nethack_gamepad extra and its explicitly built runtime.
 """
 
 from __future__ import annotations
@@ -12,6 +11,9 @@ import tempfile
 import unittest
 
 import numpy as np
+import pytest
+
+pytestmark = pytest.mark.backend("nethack_gamepad")
 
 
 class CampaignRecordingTest(unittest.TestCase):
