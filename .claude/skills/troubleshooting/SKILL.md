@@ -1,6 +1,6 @@
 ---
 name: troubleshooting
-description: What to do when fmri-play, rig-setup, gamepad-calibration or a session script stops before the run starts, with an error about the rig file, the curriculum, a controller or its calibration, the triggers, the audio output, a game that cannot start, --resume or --loop. Use when a run refuses to start, when asked what an fmri-gym error means, or how to fix one.
+description: What to do when fmri-play, rig-setup, gamepad-calibration or a session script stops before the run starts, or bids-from-logs writes nothing, with an error about the rig file, the curriculum, a controller or its calibration, the triggers, the audio output, a game that cannot start, --resume or --loop. Use when a run refuses to start, when asked what an fmri-gym error means, or how to fix one.
 ---
 
 # When a run will not start
@@ -56,3 +56,12 @@ A run checks everything it can before the participant screen opens, and stops on
 
 - **`subject '<s>': BIDS needs sub-<letters or digits>`**: give `--subject sub-01` (letters and digits only after `sub-`).
 - **`<curriculum>: no letter or digit in its name to make a BIDS task label from`**: rename the curriculum file; its path after `curricula/` is the task label.
+
+## A BIDS dataset from the logs
+
+`bids-from-logs` checks every run before it writes anything, and lists each run it cannot convert under `nothing was written`.
+
+- **`<run label>: N attempts reached the trigger, and BIDS keeps one run`**: the run was played again (its folders end in `_02`, `_03`...) and more than one attempt reached the scanner. Keep the attempt the session uses: move the others out of the data root (into a folder of attempts set aside, say), then run `bids-from-logs` again.
+- **`<run folder>: no events.jsonl: recorded before runs kept one log`**: the run was recorded by a version of fmri-play that kept its lines in its block folders only, and its screens, fixations and presses outside the games were not logged. Convert another subject (`--subject`) or move the run out of the data root.
+- **`no configs/<team>/dataset_description.json: run this in a terminal to make it, or write it`**: the team has no dataset description, and the command was not started from a terminal that can ask for one. Run it in a terminal once, or write the file by hand (`configs/examples/dataset_description.json` is one).
+- **`skipped, never reached its trigger: <run folder>`** is not an error: that attempt stopped before the scanner started (at start-up, or at the ready screen), so it has nothing to convert.
