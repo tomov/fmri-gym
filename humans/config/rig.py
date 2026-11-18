@@ -41,9 +41,12 @@ say the same thing:
 - ``"triggers"``: the scanner's start sync and the trigger codes, over which
   line (:class:`~humans.sync.triggers.TriggerSettings`); left out, the run waits
   for ``=`` and sends no codes, and the settings mark it (``defaulted``);
+- ``"photodiode_patch"``: the square under the rig's photodiode, ``{"corner": "br",
+  "size_px": 120}`` (:class:`~humans.outputs.display.PhotodiodePatch`), painted in every run
+  and flashed by the rig measurement; left out, the rig has no photodiode at the screen;
 - ``"rig_measurement"``: the equipment the rig's timing is measured with
-  (:class:`RigMeasurementConfig`): the photodiode, a microphone, the recording's rate,
-  more frame rates.
+  (:class:`RigMeasurementConfig`): how the photodiode is read, a microphone, the recording's
+  rate, more frame rates.
 
 **Controls and response keys**, never mixed. A curriculum's **controls** (a game
 phase's ``"controls"``) are control names of the rig's input devices
@@ -66,6 +69,7 @@ from pathlib import Path
 from typing import Any
 
 from ..inputs import INPUT_DEVICE_CLASSES_BY_NAME, Keyboard
+from ..outputs.display import PHOTODIODE_CORNERS, PhotodiodePatch
 from ..sync.triggers import TriggerError, TriggerSettings
 
 MODALITIES = ("fmri", "meg", "eeg", "behav")
@@ -100,7 +104,8 @@ EXAMPLES = {
 DEFAULTS: dict[str, Any] = {
     "screen": {"size": "1024x768", "is_fullscreen": True, "monitor": 0, "has_vsync": True},
     "inputs": ["keyboard"], "has_audio": True, "data_root": "data", "start_fixation": None,
-    "end_fixation": None, "triggers": {}, "response_keys": {}, "rig_measurement": {},
+    "end_fixation": None, "triggers": {}, "response_keys": {}, "photodiode_patch": None,
+    "rig_measurement": {},
 }
 #: A rig file's ``"screen"`` ``"geometry"``, each in cm (:class:`ScreenGeometry`).
 GEOMETRY_KEYS = ("width_cm", "height_cm", "distance_cm")
@@ -109,13 +114,15 @@ _GONE = {"has_pad", "bindings"}
 #: How the rig's photodiode can be read: not at all, on this PC's sound card
 #: (input 0), or in the MEG/EEG recording (matched offline).
 PHOTODIODE_READOUTS = ("none", "soundcard", "recording")
-#: Where the flashing patch the photodiode reads is.
-CORNERS = ("br", "bl", "tr", "tl")
+#: A rig file's ``"photodiode_patch"`` where it says nothing of a key.
+PHOTODIODE_PATCH_DEFAULTS: dict[str, Any] = {"corner": "br", "size_px": 120}
 #: A rig file's ``"rig_measurement"`` where it says nothing (:class:`RigMeasurementConfig`).
 RIG_MEASUREMENT_DEFAULTS: dict[str, Any] = {
-    "photodiode": "none", "input_device": None, "has_mic": False, "corner": "br",
-    "patch_px": 120, "recording_hz": None, "frame_rates": [],
+    "photodiode": "none", "input_device": None, "has_mic": False, "recording_hz": None,
+    "frame_rates": [],
 }
+#: ``"rig_measurement"`` keys refused with a pointer to ``"photodiode_patch"``.
+_RIG_MEASUREMENT_GONE = {"corner", "patch_px"}
 #: Trigger presets the rig form offers. Each names ``sync.mode``
 #: and ``backend`` outright: a section that leaves them out runs, but is
 #: reported as NOT SET.
@@ -157,9 +164,6 @@ class RigMeasurementConfig:
     input_device: int | str | None
     #: a microphone at the ear on the sound card's input 1 times the sound as heard
     has_mic: bool
-    #: where the flashing patch is, under the diode: one of :data:`CORNERS`
-    corner: str
-    patch_px: int
     #: the MEG/EEG recording's sampling rate: each frame code must last two samples there
     recording_hz: float | None
     #: frame rates this rig's games use, measured besides the usual ones
@@ -174,8 +178,7 @@ class RigMeasurementConfig:
         if isinstance(device, str) and device.isdigit():
             device = int(device)
         return cls(photodiode=d["photodiode"], input_device=device, has_mic=d["has_mic"],
-                   corner=d["corner"], patch_px=d["patch_px"], recording_hz=d["recording_hz"],
-                   frame_rates=tuple(d["frame_rates"]))
+                   recording_hz=d["recording_hz"], frame_rates=tuple(d["frame_rates"]))
 
     def record(self) -> dict[str, Any]:
         """As a rig file writes it."""
@@ -294,6 +297,8 @@ class RigConfig:
     #: the scanner's start sync and the trigger codes, over which line.
     triggers: TriggerSettings
     #: the equipment the rig's timing is measured with.
+    #: the square under the rig's photodiode; ``None``: no photodiode at the screen.
+    photodiode_patch: PhotodiodePatch | None
     rig_measurement: RigMeasurementConfig
 
     @classmethod
@@ -324,6 +329,9 @@ class RigConfig:
                    start_fixation=settings["start_fixation"],
                    end_fixation=settings["end_fixation"],
                    triggers=TriggerSettings.from_dict(settings["triggers"]),
+                   photodiode_patch=(PhotodiodePatch(**{**PHOTODIODE_PATCH_DEFAULTS,
+                                                         **settings["photodiode_patch"]})
+                                     if settings["photodiode_patch"] is not None else None),
                    rig_measurement=RigMeasurementConfig.from_dict(settings["rig_measurement"]))
 
     @classmethod
@@ -357,7 +365,10 @@ class RigConfig:
                 "inputs": list(self.inputs), "response_keys": self.response_keys,
                 "has_audio": self.has_audio, "data_root": self.data_root,
                 "start_fixation": self.start_fixation, "end_fixation": self.end_fixation,
-                "triggers": asdict(self.triggers), "rig_measurement": self.rig_measurement.record()}
+                "triggers": asdict(self.triggers),
+                "photodiode_patch": (asdict(self.photodiode_patch)
+                                     if self.photodiode_patch is not None else None),
+                "rig_measurement": self.rig_measurement.record()}
 
     def status(self) -> str:
         """One line for the console: which file, and what it settles."""
@@ -511,7 +522,7 @@ def problems(rig: dict) -> list[str]:
 
 def _setting_problems(rig: dict) -> list[str]:
     """What is wrong with the file's ``screen``, ``inputs``, ``has_audio``, ``data_root``,
-    fixations, triggers, response keys and ``rig_measurement``."""
+    fixations, triggers, response keys, ``photodiode_patch`` and ``rig_measurement``."""
     screen = rig.get("screen", {})
     if not isinstance(screen, dict):
         return [f'"screen": expected {{"size", "is_fullscreen", "monitor", "has_vsync", '
@@ -538,7 +549,7 @@ def _setting_problems(rig: dict) -> list[str]:
             for k in ("start_fixation", "end_fixation")
             if rig.get(k) is not None and not _is_seconds(rig[k])]
     return (out + trigger_problems(rig.get("triggers", {})) + _input_device_problems(rig)
-            + _response_key_problems(rig)
+            + _response_key_problems(rig) + _photodiode_patch_problems(rig)
             + _rig_measurement_problems(rig.get("rig_measurement", {})))
 
 
@@ -563,12 +574,39 @@ def _response_key_problems(rig: dict) -> list[str]:
                if not isinstance(v, str)])
 
 
+def _photodiode_patch_problems(rig: dict) -> list[str]:
+    """``photodiode_patch``: a corner and a size, or null; one is needed by a rig whose
+    photodiode is read."""
+    section = rig.get("photodiode_patch")
+    measurement = rig.get("rig_measurement", {})
+    readout = measurement.get("photodiode", "none") if isinstance(measurement, dict) else "none"
+    if section is None:
+        return ([] if readout == "none" else
+                [f'"rig_measurement": "photodiode" is {readout!r}, so the rig needs a '
+                 '"photodiode_patch": the corner the photodiode is taped to, and the size of '
+                 "the square under it"])
+    if not isinstance(section, dict):
+        return [f'"photodiode_patch": expected {{"corner", "size_px"}} or null, got {section!r}']
+    d = {**PHOTODIODE_PATCH_DEFAULTS, **section}
+    out = [f'"photodiode_patch": unknown key {k!r}'
+           for k in section if k not in PHOTODIODE_PATCH_DEFAULTS]
+    if d["corner"] not in PHOTODIODE_CORNERS:
+        out.append(f'"photodiode_patch": "corner" must be one of {PHOTODIODE_CORNERS}, got '
+                   f'{d["corner"]!r}')
+    if not _is_positive(d["size_px"], int):
+        out.append(f'"photodiode_patch": "size_px" must be a whole number of pixels, got '
+                   f'{d["size_px"]!r}')
+    return out
+
+
 def _rig_measurement_problems(section: Any) -> list[str]:
     """``rig_measurement``: :data:`RIG_MEASUREMENT_DEFAULTS`' keys, each of the right kind."""
     if not isinstance(section, dict):
         return [f'"rig_measurement": expected an object, got {section!r}']
     d = {**RIG_MEASUREMENT_DEFAULTS, **section}
     out = [f'"rig_measurement": unknown key {k!r}'
+           + (': the photodiode\'s square is the rig\'s "photodiode_patch" ("corner", '
+              '"size_px")' if k in _RIG_MEASUREMENT_GONE else "")
            for k in section if k not in RIG_MEASUREMENT_DEFAULTS]
     if d["photodiode"] not in PHOTODIODE_READOUTS:
         out.append(f'"rig_measurement": "photodiode" must be one of {PHOTODIODE_READOUTS}, '
@@ -578,11 +616,6 @@ def _rig_measurement_problems(section: Any) -> list[str]:
     if d["has_mic"] and d["photodiode"] != "soundcard":
         out.append('"rig_measurement": "has_mic" needs "photodiode": "soundcard" -- the microphone '
                    "is read on the sound card, next to the diode")
-    if d["corner"] not in CORNERS:
-        out.append(f'"rig_measurement": "corner" must be one of {CORNERS}, got {d["corner"]!r}')
-    if not _is_positive(d["patch_px"], int):
-        out.append(f'"rig_measurement": "patch_px" must be a whole number of pixels, got '
-                   f'{d["patch_px"]!r}')
     if d["recording_hz"] is not None and not _is_positive(d["recording_hz"]):
         out.append(f'"rig_measurement": "recording_hz" must be a rate in Hz, or null, got '
                    f'{d["recording_hz"]!r}')

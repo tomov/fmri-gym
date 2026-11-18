@@ -22,7 +22,11 @@ block). Without it, :meth:`idle` sleeps in 1 ms slices and frame onsets are
 what the flip reported.
 
 The remaining unknown is any constant offset between the flip returning and
-photons (swap-chain depth, panel latency); that is what a photodiode is for.
+photons (swap-chain depth, panel latency); that is what a photodiode is for. With a
+:class:`PhotodiodePatch`, every present paints a square in a corner, under the diode:
+black, or white and black in turn from one game frame to the next
+(:meth:`Display.alternate_photodiode_patch`), so each flip of a game frame is an edge
+in the diode's signal.
 ``python -m humans.outputs.display`` reports what a given machine achieves, on a
 given ``monitor`` (:func:`list_monitors`).
 """
@@ -34,6 +38,7 @@ import statistics
 import sys
 import time
 import warnings
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -58,6 +63,25 @@ HUD_COLOR = (235, 235, 235)
 OVERLAY_COLOR = (150, 215, 255)
 #: Seconds the window is given to receive the keyboard focus once raised.
 FOCUS_WAIT_S = 1.0
+#: The corners a photodiode patch can be in: bottom right, bottom left, top right, top left.
+PHOTODIODE_CORNERS = ("br", "bl", "tr", "tl")
+PHOTODIODE_LIT_COLOR = (255, 255, 255)
+
+
+@dataclass(frozen=True, slots=True)
+class PhotodiodePatch:
+    """The square under a photodiode taped to a corner of the screen."""
+
+    #: one of :data:`PHOTODIODE_CORNERS`
+    corner: str
+    #: the square's side, in pixels of the canvas
+    size_px: int
+
+    def rect(self, canvas_size: tuple[int, int]) -> pygame.Rect:
+        """Where the square is on a canvas of ``canvas_size``."""
+        x = canvas_size[0] - self.size_px if self.corner[1] == "r" else 0
+        y = canvas_size[1] - self.size_px if self.corner[0] == "b" else 0
+        return pygame.Rect(x, y, self.size_px, self.size_px)
 
 
 class Display:
@@ -75,6 +99,7 @@ class Display:
         caption: str = "fmri-gym",
         vsync: bool = True,
         monitor: int = 0,
+        photodiode_patch: PhotodiodePatch | None = None,
     ) -> None:
         """Create and show the display window.
 
@@ -84,7 +109,11 @@ class Display:
         :param caption: window title string.
         :param vsync: ask for a flip locked to the vertical blank (default).
         :param monitor: the monitor to open on, by :func:`list_monitors` index.
+        :param photodiode_patch: the square painted under the photodiode on every present;
+            ``None``: none.
         """
+        self.photodiode_patch = photodiode_patch
+        self._is_photodiode_patch_lit = False
         self._monitor = monitor
         self._req_size = size
         self._fullscreen = fullscreen
@@ -204,6 +233,9 @@ class Display:
         :return: ``perf_counter`` right after the flip returned.
         """
         self.screen.blit(self.canvas, (0, 0))
+        if self.photodiode_patch is not None:
+            self.screen.fill(PHOTODIODE_LIT_COLOR if self._is_photodiode_patch_lit else BG_COLOR,
+                             self.photodiode_patch.rect(self.size))
         pygame.display.flip()
         t = time.perf_counter()
         self.last_flip = t
@@ -211,6 +243,10 @@ class Display:
         for fn, args in callbacks:
             fn(*args)
         return t
+
+    def alternate_photodiode_patch(self) -> None:
+        """Paint the photodiode patch the other colour from the next present on."""
+        self._is_photodiode_patch_lit = not self._is_photodiode_patch_lit
 
     def redraw(self) -> float:
         """Present the current canvas again (one refresh when vsync-locked).
@@ -403,7 +439,7 @@ class Display:
         font: pygame.font.Font | None = None,
         align: str = "center",
     ) -> float:
-        """Render multi-line text, block-centered vertically.
+        """Render multi-line text, block-centered vertically; the photodiode patch goes black.
 
         ``align="center"`` centers each line horizontally (default, for
         messages); ``align="left"`` left-aligns all lines against a common left
@@ -418,6 +454,7 @@ class Display:
         :return: ``perf_counter`` of the flip that showed it.
         """
         font = font or self.font
+        self._is_photodiode_patch_lit = False
         self.canvas.fill(BG_COLOR)
         rows = self._text_rows(text, font, color, int(self.size[0] * 0.92))
         y = (self.size[1] - sum(surf.get_height() for surf, _ in rows)) // 2
