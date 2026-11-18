@@ -13,6 +13,7 @@ devices together are one :class:`InputDevices`, which is itself a device.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from enum import Enum
 from typing import Any, ClassVar, NamedTuple
 
@@ -128,6 +129,8 @@ class InputDevices(InputDevice):
         super().__init__()
         self.devices = tuple(devices)
         self.ignored_joysticks = tuple(ignored_joysticks)
+        #: called with every control held, after a :meth:`handle` that changed them
+        self.on_held_change: Callable[[frozenset[str]], Any] | None = None
 
     @classmethod
     def open(cls) -> InputDevices:
@@ -138,6 +141,8 @@ class InputDevices(InputDevice):
         out = [InputEvent(QUIT, Edge.DOWN) for e in events if e.type == pygame.QUIT]
         for device in self.devices:
             out += device.handle(events, now)
+        if self.on_held_change is not None and any(e.name != QUIT for e in out):
+            self.on_held_change(self.held())
         return out
 
     def controls(self) -> frozenset[str]:

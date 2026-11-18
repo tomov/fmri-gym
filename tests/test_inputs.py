@@ -447,6 +447,16 @@ def test_the_keyboard_holds_what_its_events_press_until_the_window_loses_focus()
     assert keys.held() == frozenset()
 
 
+def test_the_runs_inputs_say_what_is_held_each_time_it_changes():
+    keys = InputDevices([Keyboard()])
+    held: list[frozenset[str]] = []
+    keys.on_held_change = held.append
+    keys.handle([_key(pygame.KEYDOWN, pygame.K_LEFT)], 1.0)
+    keys.handle([pygame.event.Event(pygame.QUIT), _key(pygame.KEYDOWN, pygame.K_F15)], 1.1)
+    keys.handle([_key(pygame.KEYDOWN, pygame.K_UP), _key(pygame.KEYUP, pygame.K_LEFT)], 1.2)
+    assert held == [{"LEFT"}, {"UP"}]
+
+
 def test_the_runs_inputs_take_the_queue_and_name_the_windows_close(screen):
     from humans.run import read_input_events
     pygame.event.post(_key(pygame.KEYDOWN, pygame.K_SPACE))

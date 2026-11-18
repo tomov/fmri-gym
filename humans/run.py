@@ -401,6 +401,8 @@ class Run:
         print(f"audio: {audio.status()}", file=sys.stderr)
         inputs = open_input_devices(config.rig.inputs, config.required_controls(),
                                     config.calibration_files)
+        if triggers.codes.inputs:
+            inputs.on_held_change = triggers.hold_input_codes
         print(f"inputs: {inputs.status()}", file=sys.stderr)
         screen = config.rig.screen
         display = Display(size=screen.size, fullscreen=screen.is_fullscreen,

@@ -136,6 +136,52 @@ def test_a_hid_box_is_set_to_output_zero_then_holds_each_code(monkeypatch):
     assert fake.reports == [[0x04, 1, 1], [0x04, 1, 0], [0x04, 1, 0], ["closed"]]
 
 
+_INPUT_CODES = {"sync": {"mode": "send"}, "backend": "hid", "port": "B", "on_frame": False,
+                "codes": {"inputs": {"CONTROLLER_BUTTON_A": 1, "CONTROLLER_BUTTON_B": 128}}}
+
+
+def test_each_input_holds_its_bit_while_held_and_the_lifecycle_codes_add_theirs(monkeypatch):
+    from humans.sync.triggers import Triggers
+    fake = _FakeHid()
+    monkeypatch.setitem(sys.modules, "hid", fake)
+    triggers = Triggers.from_dict(_INPUT_CODES)
+    del fake.reports[:]
+    assert triggers.hold_input_codes(frozenset({"CONTROLLER_BUTTON_A", "LEFT"})) == 1
+    assert triggers.hold_input_codes(frozenset({"CONTROLLER_BUTTON_A"})) == 1  # sends nothing
+    assert triggers.hold_input_codes(frozenset({"CONTROLLER_BUTTON_A",
+                                                "CONTROLLER_BUTTON_B"})) == 129
+    assert triggers.frame() == 0                                   # no frame codes
+    triggers.lifecycle("task_stop")                    # pulsed, then the held bits again
+    triggers.block_end()
+    assert triggers.hold_input_codes(frozenset()) == 0
+    assert [r[2] for r in fake.reports] == [1, 129, 129 | 16, 129, 129, 0]
+    assert "inputs marked, not frames: CONTROLLER_BUTTON_A=1, CONTROLLER_BUTTON_B=128" in (
+        triggers.status())
+
+
+@pytest.mark.parametrize("change, problem", [
+    ({"on_frame": True}, "so on_frame must be false"),
+    ({"codes": {"inputs": {"CONTROLLER_BUTTON_A": 3}}}, "must be one bit"),
+    ({"codes": {"inputs": {"CONTROLLER_BUTTON_A": 16}}}, "shares its bit with task_stop"),
+    ({"codes": {"inputs": {"CONTROLLER_BUTTON_A": 1, "CONTROLLER_BUTTON_B": 1}}},
+     "CONTROLLER_BUTTON_B=1 shares its bit with CONTROLLER_BUTTON_A"),
+    ({"codes": {"inputs": {"UP": 1}}}, "'UP' is no control of the rig's inputs"),
+    ({"codes": {"inputs": {"CONTROLLER_BUTTON_A": 1}}, "sync": {"mode": "wait", "key": "5"}}, None),
+])
+def test_an_input_code_that_is_no_bit_of_its_own_or_no_button_is_refused(change, problem):
+    triggers = {**_INPUT_CODES, **change}
+    problems = rig.problems({"inputs": ["xbox_controller"], "triggers": triggers})
+    assert (problems == []) if problem is None else any(problem in p for p in problems), problems
+
+
+def test_the_scanner_key_and_escape_mark_no_input():
+    triggers = {**_INPUT_CODES, "sync": {"mode": "wait", "key": "5"},
+                "codes": {"inputs": {"5": 1, "ESCAPE": 2}}}
+    problems = rig.problems({"inputs": ["keyboard"], "triggers": triggers})
+    assert any("'5' is the key the scanner types" in p for p in problems)
+    assert any("'ESCAPE' quits the run" in p for p in problems)
+
+
 def test_a_game_key_the_scanner_types_is_refused_on_that_rig():
     from humans.config.curriculum import Curriculum
     from humans.config.run import RunConfig
