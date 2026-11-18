@@ -713,7 +713,7 @@ The task is the config's file name (letters and digits); `--subject` must be `su
 
 Data is never overwritten. A run whose folder is already there writes to `..._02`, then `_03`; the attempt that stopped stays where it is. That suffix names the folder only — the run's label, which the manifest records with the `attempt` number and which keys the seeds, stays canonical, so every attempt at a run plays the same episodes.
 
-The names follow BIDS apart from that suffix, the contents not yet (no `_beh.tsv` / `_events.tsv`). Each folder holds:
+The names follow BIDS apart from that suffix; the folders are fmri-gym's own, and `bids-from-logs` makes a BIDS dataset from them ("A BIDS dataset from the logs", below). Each folder holds:
 
 - **`manifest.json`** — subject, curriculum, trigger epoch, per-phase onsets/offsets (+ survey responses; onsets are flip times), the `display` actually opened (size, `vsync`, `refresh_rate`, driver), the `triggers` settings + lifecycle triggers sent (+ what the config left `defaulted`), the `audio` output (device, measured device delay, chosen delay), `dummy_trigger`, the `run` it is (label and `attempt`), the `seeds` (each game phase derived or pinned), the `versions` of pygame and SDL, the run's `duration` and where it was `resumed_from` (see "Resuming a curriculum").
 - **`events.jsonl`** — the run's log, written as the run plays and forced to disk every second, so a crash, a killed process or a machine reset loses at most the last second. Every line of every block is in it with its `block` (the folder name below; `null` outside a game block), and so is everything else that happened from the start of the run to its end. Besides the block lines below, it holds:
@@ -746,6 +746,12 @@ The names follow BIDS apart from that suffix, the contents not yet (no `_beh.tsv
   - **`frames.h5`** — the rendered frames, `frames` `(N, H, W, C)` gzip'd one chunk per frame plus `frame_index` `(N,)`, the `frame` of each row: every `frame_stride`-th frame (default every one; `0` keeps none). `humans.save.logging.read_frames` / `read_frame` read them.
 
   The manifest's phase entry carries the same summary and names the folder (`data_dir`).
+
+### A BIDS dataset from the logs
+
+`uv run bids-from-logs --rig configs/<team>/rigs/<rig>.json` writes a behavioural BIDS dataset from the runs in the rig's data root, into `<data root>/bids` (`--out` for another folder; `--subject` for one subject's runs). Each run that reached its trigger becomes `sub-*/ses-*/beh/<run>_events.tsv` and its `_events.json`: one row per screen, game block, episode and press of a control, `onset` and `duration` in seconds from the trigger, `n/a` where a column does not apply. A screen lasts until the next screen, game frame or the end of the run; a press until it is let go, and its `frame` is the step it was given to (`n/a`: none, e.g. a press in a pop-up). The scanner's pulses and each frame stay in the logs. Beside them go `participants.tsv`, a `README` and `dataset_description.json`, which starts from the team's `configs/<team>/dataset_description.json` (`configs/examples/` has one); a team without one is asked for its name and authors on the terminal, and the answers are saved there. The logs are only read. The dataset holds behaviour alone, to be put together with the imaging or M/EEG data later.
+
+The conversion writes nothing, and says which runs and why, when it would have to choose: two attempts at one run that both reached the trigger (BIDS keeps one run; move the other out of the data root), or a run recorded before runs kept one log. A run that never reached its trigger has nothing to convert, and is listed and skipped.
 
 ### Reconstruction (all verified bit-exact)
 
@@ -836,6 +842,7 @@ Many games already expose a Gymnasium API and drop straight into the `gym` backe
 - [ ] Per-subject deterministic curriculum generation; multi-run structure with one trigger per fMRI run.
 - [ ] More adapters: ViZDoom/COOM, MiniHack, crafter, MuJoCo (`qpos/qvel` as state vars) — each a small `EnvAdapter`.
 - [ ] Button-box / MRI-safe response device key remapping.
-- [ ] BIDS-style output layout + `events.tsv` per run.
+- [x] `events.tsv` per run, in a behavioural BIDS dataset (`bids-from-logs`).
+- [ ] BIDS-style layout of the runs' own folders.
 - [ ] A replay/QC utility to render any block to video from its states.
 - [ ] Crash-safe incremental logging (stream frames to disk) for long runs.

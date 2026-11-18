@@ -103,6 +103,9 @@ fmri-ses = "humans.standalone.session_script:fmri_ses_main"
 # The game controller plugged in: calibrate it (each run with that controller reads
 # its newest calibration), see what it sends, and tune how its stick axes are read.
 gamepad-calibration = "humans.standalone.gamepad_calibration:main"
+# A behavioural BIDS dataset made from the runs' logs, by hand: one events table per run,
+# with the dataset's description from the rig's team folder (asked for when missing).
+bids-from-logs = "humans.standalone.bids_from_logs:main"
 
 [tool.setuptools]
 packages = ["humans", "humans.adapters", "humans.config", "humans.inputs",

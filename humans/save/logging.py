@@ -489,7 +489,7 @@ def write_blocks(outdir: str) -> list[str]:
     :return: what is wrong with each block, one line each; empty when every block is whole.
     """
     lines_of_block: dict[str, list[dict]] = {}
-    for line in _read_lines(os.path.join(outdir, EVENTS_FILENAME)):
+    for line in read_lines(os.path.join(outdir, EVENTS_FILENAME)):
         block = line.pop("block")
         if block is not None:
             lines_of_block.setdefault(block, []).append(line)
@@ -557,7 +557,7 @@ def _written(block: str) -> str:
     return block
 
 
-def _read_lines(path: str) -> list[dict]:
+def read_lines(path: str) -> list[dict]:
     """Every line of a ``.jsonl`` file; a partial last line (a crash mid-write) is dropped."""
     lines = []
     with open(path) as f:
@@ -575,7 +575,7 @@ def read_events(block: str) -> list[dict]:
     :param block: the block's folder.
     :return: the records; a partial last line (a crash mid-write) is dropped, not raised.
     """
-    return _read_lines(os.path.join(_written(block), EVENTS_FILENAME))
+    return read_lines(os.path.join(_written(block), EVENTS_FILENAME))
 
 
 def read_state(text: str) -> bytes:

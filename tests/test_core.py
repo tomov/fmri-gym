@@ -637,3 +637,117 @@ def test_the_controls_a_calibration_asked_for_are_not_asked_for_again():
     assert _controls_to_ask([(stopped, {"measured": False}), (no_stick, {"measured": False})]) == {
         button_a: "on the stopped", up: "on the stopped",
         ControlNames.CONTROLLER_BUTTON_B: "on the no_stick"}
+
+
+def _run_folder(data_root: Path, folder: str, lines: list[dict] | None,
+                has_started: bool = True) -> Path:
+    """A run's folder as a run leaves it: its manifest, and its log when ``lines`` is given."""
+    run = data_root / "sub-01" / "ses-001" / "beh" / folder
+    run.mkdir(parents=True)
+    label = folder.split("_run-")[0] + "_run-" + folder.split("_run-")[1][:3]
+    (run / "manifest.json").write_text(json.dumps(
+        {"run": {"label": label}, "start_epoch": 1.0 if has_started else None}))
+    if lines is not None:
+        (run / EVENTS_FILENAME).write_text("".join(json.dumps(line) + "\n" for line in lines))
+    return run
+
+
+def _rig_of_team(tmp_path: Path, data_root: Path, description: dict | None) -> str:
+    """A rig file of team ``lab``, writing into ``data_root``; the team's description, if any."""
+    from humans.config import rig
+    team = tmp_path / "configs" / "lab"
+    path = team / "rigs" / "desk.json"
+    rig.save({**{k: "x" for k in rig.FIELDS}, "site": "lab", "rig": "desk", "pi": "MT",
+              "modality": "fmri", "notes": "", "data_root": str(data_root),
+              "screen": {"geometry": {"width_cm": 30.0, "height_cm": 20.0,
+                                      "distance_cm": 60.0}}}, str(path))
+    if description is not None:
+        (team / "dataset_description.json").write_text(json.dumps(description))
+    return str(path)
+
+
+FIXATION = {"block": None, "type": "screen", "kind": "fixation", "text": None, "run_time": 0.0}
+
+
+def test_bids_from_logs_writes_a_dataset_of_each_started_run(tmp_path, capsys):
+    from humans.standalone.bids_from_logs import main
+    data = tmp_path / "data"
+    _run_folder(data, "sub-01_ses-001_task-x_run-001", [FIXATION])
+    _run_folder(data, "sub-01_ses-001_task-x_run-002", None, has_started=False)  # stopped at start
+    rig_path = _rig_of_team(tmp_path, data, {"Name": "Lab study", "Authors": ["A. B."]})
+    main(["--rig", rig_path])
+    dataset = data / "bids"
+    description = json.loads((dataset / "dataset_description.json").read_text())
+    assert description["Name"] == "Lab study" and description["DatasetType"] == "raw"
+    assert (dataset / "participants.tsv").read_text() == "participant_id\nsub-01\n"
+    table = dataset / "sub-01" / "ses-001" / "beh" / "sub-01_ses-001_task-x_run-001_events.tsv"
+    assert table.read_text().count("fixation") == 1
+    assert (dataset / "README").exists()
+    assert "never reached its trigger" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("second_attempt, problem", [
+    ("sub-01_ses-001_task-x_run-001_02", "2 attempts reached the trigger"),
+    (None, "no events.jsonl"),
+])
+def test_bids_from_logs_writes_nothing_when_it_would_have_to_choose(tmp_path, second_attempt,
+                                                                      problem):
+    from humans.standalone.bids_from_logs import main
+    data = tmp_path / "data"
+    _run_folder(data, "sub-01_ses-001_task-x_run-001", [FIXATION] if second_attempt else None)
+    if second_attempt:
+        _run_folder(data, second_attempt, [FIXATION])
+    rig_path = _rig_of_team(tmp_path, data, {"Name": "Lab study", "Authors": []})
+    with pytest.raises(SystemExit, match=problem):
+        main(["--rig", rig_path])
+    assert not (data / "bids").exists()
+
+
+def test_bids_from_logs_asks_for_a_missing_description_and_saves_it(tmp_path, monkeypatch):
+    from humans.standalone.bids_from_logs import main
+    data = tmp_path / "data"
+    _run_folder(data, "sub-01_ses-001_task-x_run-001", [FIXATION])
+    rig_path = _rig_of_team(tmp_path, data, None)
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    answers = iter(["Lab study", "A. B., C. D."])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    main(["--rig", rig_path])
+    saved = json.loads((tmp_path / "configs" / "lab" / "dataset_description.json").read_text())
+    assert saved == {"Name": "Lab study", "Authors": ["A. B.", "C. D."]}
+
+
+def test_the_events_table_has_a_row_per_screen_block_episode_and_press(tmp_path):
+    from humans.standalone.events_table import EventRow, event_rows, write_events_table
+    block = "block-00_gym_x"
+    lines = [
+        {"block": None, "type": "screen", "kind": "text", "text": "ready", "run_time": None},
+        {"block": None, "type": "scanner_trigger", "run_time": 0.0},
+        {"block": None, "type": "screen", "kind": "fixation", "text": None, "run_time": 0.0},
+        {"block": block, "type": "block_start", "run_time": 1.0},
+        {"block": block, "type": "episode_start", "episode_id": 0, "flip_time": 1.5},
+        {"block": block, "type": "input_event", "name": "A", "down": True, "run_time": 1.6},
+        {"block": block, "type": "screen", "kind": "text", "text": "Paused\nResume",
+         "run_time": 1.7},                                       # a pop-up: its press is not given
+        {"block": block, "type": "input_event", "name": "B", "down": True, "run_time": 1.8},
+        {"block": block, "type": "input_event", "name": "A", "down": False, "run_time": 1.9},
+        {"block": block, "type": "frame", "frame": 0, "controls_pressed": ["A"],
+         "run_time": 2.0, "flip_time": 2.1},
+        {"block": block, "type": "episode_end", "episode_id": 0, "outcome": "won", "score": 1.0,
+         "run_time": 2.5},
+        {"block": block, "type": "block_end", "run_time": 3.0},
+        {"block": None, "type": "run_end", "how": "finished", "run_time": 4.0}]
+    assert sorted(event_rows(lines)) == sorted([
+        EventRow(0.0, 1.5, "fixation", text=None),
+        EventRow(1.0, 2.0, "block", block=block),
+        EventRow(1.5, 1.0, "episode", block=block, episode=0, outcome="won", score=1.0),
+        EventRow(1.6, pytest.approx(0.3), "press", block=block, episode=0, frame=0, control="A"),
+        EventRow(1.7, pytest.approx(0.4), "text", block=block, text="Paused\nResume"),
+        EventRow(1.8, None, "press", block=block, episode=0, control="B")])
+    (tmp_path / EVENTS_FILENAME).write_text("".join(json.dumps(line) + "\n" for line in lines))
+    table = Path(write_events_table(str(tmp_path / EVENTS_FILENAME), str(tmp_path / "beh"),
+                                     "sub-01_task-x_run-001"))
+    header, *rows = [row.split("\t") for row in table.read_text().splitlines()]
+    assert header[:3] == ["onset", "duration", "trial_type"] and len(rows) == 6
+    assert rows[-1][:3] == ["1.800000", "n/a", "press"]
+    sidecar = json.loads((tmp_path / "beh" / "sub-01_task-x_run-001_events.json").read_text())
+    assert set(sidecar) == set(header) and sidecar["onset"]["Units"] == "s"
