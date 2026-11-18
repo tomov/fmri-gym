@@ -737,7 +737,7 @@ class Run:
         outcome, message = _final_outcome(adapter, outcome, terminated, truncated)
         result = EpisodeResult(episode_id, outcome, bool(terminated), bool(truncated), score,
                                n_pacing_resets)
-        self.logger.log(type="episode_end", **result.record())
+        self.logger.log(type="episode_end", run_time=self.clock.run_time(), **result.record())
         if message and game_phase.show_outcome_duration > 0 and not self._time_up():
             self.audio.stop()               # the episode's last sounds, still queued
             self.display.draw_text(f"Final score: {score:g}\n{message}")

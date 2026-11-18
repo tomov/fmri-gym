@@ -23,9 +23,9 @@ a block read before then is cut first. One block is open at a time (a run plays 
 curriculum in order).
 
 Every line in ``events.jsonl`` has a ``type``. The logger writes the first
-and last itself -- ``block_start`` (``format``, ``version``, ``subject``,
+and last itself -- ``block_start`` (``run_time``, ``format``, ``version``, ``subject``,
 ``block_index``, ``backend``, ``game``, ``phase``: the config, ``base_seed``)
-and ``block_end`` (whatever summary :meth:`Logger.close_block` is given) --
+and ``block_end`` (``run_time`` and whatever summary :meth:`Logger.close_block` is given) --
 and stamps each ``frame`` with its index in the block, also ``frame``. The
 other lines are written as given (:meth:`Logger.log`).
 
@@ -183,10 +183,14 @@ class Logger:
         self._block = name
         self.n_frames = 0
         self._frame_stride = int(phase.get("frame_stride", 1))
-        self.log(type="block_start", format=FORMAT, version=VERSION,
+        self.log(type="block_start", run_time=self._run_time(), format=FORMAT, version=VERSION,
                  subject=self.manifest["subject"], block_index=index, backend=backend,
                  game=game, phase=phase, base_seed=base_seed)
         return name
+
+    def _run_time(self) -> float | None:
+        """The run clock now; None before the trigger."""
+        return None if self.clock.t0_perf is None else self.clock.run_time()
 
     def log(self, **record: Any) -> None:
         """Append one line to the run's ``events.jsonl``, in the open block if there is one.
@@ -230,7 +234,7 @@ class Logger:
             played none.
         :param summary: the line's fields (episode and frame counts, totals, …).
         """
-        self.log(type="block_end", **summary)
+        self.log(type="block_end", run_time=self._run_time(), **summary)
         if audio is not None:
             in_run_time = [(chunk, self.clock.from_perf(t)) for chunk, t in audio.onsets]
             self._queue.put({"op": "audio_summary", "block": self._block,
