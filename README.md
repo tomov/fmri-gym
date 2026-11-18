@@ -52,7 +52,7 @@ Atari ROMs ship with `ale-py`. For the `retro` backend you must supply and impor
 
 ## Quick start
 
-Every command here plays on a laptop as it is: `--rig configs/examples/rigs/laptop.json` (`configs/examples/rigs/laptop.json`) is a 1024x768 window with the game's sound on the laptop's speakers, the keyboard, and no scanner, so the run starts at the experimenter screen's SPACE. `--dummy-trigger` skips that screen too, and every key wait after it: drop it to read the instructions and play at your own pace. A run that stops before it starts says what is wrong; what to do about each message is in [.claude/skills/troubleshooting/SKILL.md](.claude/skills/troubleshooting/SKILL.md).
+Every command here plays on a laptop as it is: `--rig configs/examples/rigs/laptop.json` (`configs/examples/rigs/laptop.json`) is a 1024x768 window with the game's sound on the laptop's speakers, the keyboard, and no scanner, so the run starts at the experimenter's SPACE, asked for on the console. `--dummy-trigger` skips that screen too, and every key wait after it: drop it to read the instructions and play at your own pace. A run that stops before it starts says what is wrong; what to do about each message is in [.claude/skills/troubleshooting/SKILL.md](.claude/skills/troubleshooting/SKILL.md).
 
 ```bash
 # --- per-family demo curricula (all tested end-to-end; ~15 s per block) ---
@@ -142,7 +142,7 @@ These were tried and do not play here, so nothing in `configs/` names them:
 - **Tile Match**: `Discrete(84)` swaps, no keyboard play.
 - **2048** (its own `reset()` crashes), **Pathery** and **Wordle** (text or placement actions, no real-time frame), **Mastermind** (needs Python ≥ 3.13).
 
-Runtime flow: experimenter screen (**SPACE**) → "Waiting for scanner..." → scanner **trigger `=`** (anchors the session clock) → the rig's start fixation, if it has one → curriculum phases → the rig's end fixation, if it has one → done. `ESC` quits early but still saves. Before the window opens, the run builds, resets and closes each distinct game of its curriculum once (`games:` on the console, with the seconds each took): a game that cannot start -- a backend whose extra is not synced, a missing game file -- stops the run there with the run's other problems, naming the phase and the fix, and each backend's first-launch cost is paid at the desk rather than in the first block.
+Runtime flow: ready screen, the experimenter's prompt on the console (**SPACE**) → wait for the scanner, said on the console → scanner **trigger `=`** (anchors the session clock) → the rig's start fixation, if it has one → curriculum phases → the rig's end fixation, if it has one → done. `ESC` quits early but still saves. Before the window opens, the run builds, resets and closes each distinct game of its curriculum once (`games:` on the console, with the seconds each took): a game that cannot start -- a backend whose extra is not synced, a missing game file -- stops the run there with the run's other problems, naming the phase and the fix, and each backend's first-launch cost is paid at the desk rather than in the first block.
 
 **Rigs: how a run is played.** A curriculum says what is played, and plays the same on every rig. How it is played is the rig's: a **rig** is one setup -- a monitor, a scanner, a response device, a trigger line -- and a team can have several. Each has its own **rig file** in the repo, `configs/<team>/rigs/<rig>.json` (see `configs/examples/rigs/README.md`), which every run played on that rig reads:
 
@@ -647,7 +647,7 @@ Which of these a rig needs varies: the scanner may type a key at every volume, o
 | the recording is started by hand, the PC gets the scanner's key | `wait` | `serial` / `parallel` / `hid` / `lsl` |
 | bench test, nothing connected | `none` | `null` |
 
-Leaving `sync.mode` or `backend` out defaults to `wait` / `null`, and says so: the experimenter screen, the console and the manifest all report it (`NOT SET in the rig file: sync.mode, backend`), as they do for `--dummy-trigger`.
+Leaving `sync.mode` or `backend` out defaults to `wait` / `null`, and says so: the console, at start-up and again at the ready prompt, and the manifest report it (`NOT SET in the rig file: sync.mode, backend`), as they do for `--dummy-trigger`.
 
 What is sent: `task_start` when the clock anchors, `episode_start` at each reset, one code per frame (`"frame_every": N` to thin, `"on_frame": false` to drop), `task_stop` at the end. Codes never share bits, so two triggers on the same sample still decode: frames cycle 1–7 in the low 3 bits, `task_start`=8, `task_stop`=16, `episode_start`=32, `scanner_start`=64, and a lifecycle code is OR'd with the current frame code (all under `"codes"`; overlaps are refused). Every value sent is logged: per frame as `trigger` on the block's `frame` lines, lifecycle events with their `run_time` under `triggers` in `manifest.json`.
 

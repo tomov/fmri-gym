@@ -428,28 +428,27 @@ class Run:
     def _trigger(self) -> None:
         """Wait for experimenter ready, sync with the scanner, start the clock.
 
-        Draws the readiness screen -- with the trigger status on it, so the
-        experimenter sees what this run will do before pressing SPACE -- then
-        either waits for the trigger key, sends the start code (``sync.mode``),
-        or neither; then calls :meth:`Clock.trigger`, records the trigger time
-        on the logger and sends ``task_start``.
+        Shows the participant the readiness screen and tells the experimenter on
+        stderr what this run will do and what to press; then either waits for the
+        trigger key, sends the start code (``sync.mode``), or neither; then calls
+        :meth:`Clock.trigger`, records the trigger time on the logger and sends
+        ``task_start``.
         """
-        self.display.draw_text(
-            "Please keep your head as still as possible.\n\n"
-            "(experimenter: press SPACE when ready)\n\n"
-            f"triggers: {self.triggers.status()}\n"
-            f"audio: {self.audio.status()}")
+        self.display.draw_text("Please keep your head as still as possible.")
+        print(f"\n>>> READY: press {EXPERIMENTER_KEY} to start the run\n"
+              f"    triggers: {self.triggers.status()}\n"
+              f"    audio:    {self.audio.status()}", file=sys.stderr)
         self.display.take_focus()
         _wait_for_control(self.inputs, self.display, EXPERIMENTER_KEY,
                       dummy_trigger=self.config.dummy_trigger)
         if self.sync.mode == "wait":
-            self.display.draw_text(f"Waiting for the scanner...\n\n(its trigger key: "
-                                   f"{self.sync.key!r})")
+            print(f">>> WAITING for the scanner's trigger key {self.sync.key!r}",
+                  file=sys.stderr)
             self.display.take_focus()
             _wait_for_control(self.inputs, self.display, self.sync.key,
                           dummy_trigger=self.config.dummy_trigger)
         elif self.sync.mode == "send":
-            self.display.draw_text("Starting the recording...")
+            print(">>> STARTING the recording: scanner_start sent", file=sys.stderr)
             self.triggers.lifecycle("scanner_start")
             _wait_for_duration(self.inputs, self.display, self.sync.delay)
 
@@ -768,11 +767,14 @@ class Run:
         # oldest is rewind_frames before the ending.
         recent_states = (deque(maxlen=game_phase.rewind_frames + 1)
                          if game_phase.rewind_on else None)
+        print(f">>> block {index}: {game_phase.backend} {game_phase.game}"
+              f"{'' if block_progress is None else ', resumed from an earlier run'}",
+              file=sys.stderr)
         instructions = self._instructions(game_phase, resumed=block_progress is not None)
 
         # Some backends (nle, browser games) take several seconds to start;
         # show a Loading screen so the previous fixation "+" doesn't freeze.
-        self.display.draw_text(f"Loading {game_phase.text or game_phase.game} …")
+        self.display.draw_text(f"Loading {game_phase.text} …" if game_phase.text else "Loading …")
         adapter = get_adapter(game_phase.backend, spec)
         speed = ({} if game_phase.is_turn_based
                  else self._speed(adapter, game_phase.fps, index, game_phase.game))
