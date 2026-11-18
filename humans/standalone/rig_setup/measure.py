@@ -62,7 +62,7 @@ from ...inputs import (CONTROLLER_CLASSES_BY_NAME, QUIT, CalibrationError, Contr
                       Edge, InputDevice, InputDevices, open_input_devices)
 from ...inputs.keyboard import KEYCODES
 from ...outputs.audio import Audio
-from ...outputs.display import Display, check_monitor, is_locked, quit_like_esc
+from ...outputs.display import Display, PhotodiodePatch, check_monitor, is_locked, quit_like_esc
 from ...run import EXPERIMENTER_KEY, _wait_for_control, _wait_for_duration, read_input_events
 from ...save.bids import next_session, run_output
 from ...sync.triggers import HID_DEVICES, LIFECYCLE_EVENTS, Codes, TriggerError, Triggers
@@ -580,9 +580,14 @@ def _held(inputs: InputDevice, name: str, pressed: float, pending: list[tuple[bo
 # -- photodiode and audio --------------------------------------------------------
 
 
+#: Where a rig with no photodiode flashes: the flashes time its sound, and no diode reads them.
+_FLASHES_WITHOUT_PHOTODIODE = PhotodiodePatch(**rig_file.PHOTODIODE_PATCH_DEFAULTS)
+
+
 def _measure_photodiode(rig_measurement: RigMeasurement, summary: dict, arrays: dict,
                         tests: dict) -> None:
     rig = rig_measurement.rig.rig_measurement
+    patch = rig_measurement.rig.photodiode_patch or _FLASHES_WITHOUT_PHOTODIODE
     settings = rig_measurement.settings
     readout = rig.photodiode
     clicks = rig_measurement.audio.enabled
@@ -591,7 +596,7 @@ def _measure_photodiode(rig_measurement: RigMeasurement, summary: dict, arrays: 
                                  "the rig plays no game audio (its \"has_audio\": false)")
     summary.update(display=rig_measurement.display.describe(), readout=readout, mic=rig.has_mic,
                    n=settings.flashes, on_ms=settings.flash_on_ms,
-                   gap_ms=list(settings.flash_gap_ms), corner=rig.corner, patch_px=rig.patch_px)
+                   gap_ms=list(settings.flash_gap_ms), corner=patch.corner, patch_px=patch.size_px)
     if readout == "none":
         tests["photodiode"] = Verdict("not run", "the rig has no photodiode (rig-setup, "
                                                  "Rig measurement equipment step)")

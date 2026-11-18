@@ -67,14 +67,11 @@ import numpy as np
 import pygame
 
 from ..outputs.sound import Sound
-from ..outputs.display import Display
+from ..outputs.display import PHOTODIODE_CORNERS, Display, PhotodiodePatch
 from ..sync.triggers import TriggerSettings, Triggers
 
 if TYPE_CHECKING:
     from ..outputs.audio import Audio
-
-CORNERS = ("br", "bl", "tr", "tl")
-
 
 # ---------------------------------------------------------------------------
 # Stimulus
@@ -90,13 +87,6 @@ class Verdict(NamedTuple):
     why: str | None
 
 
-def _patch_rect(size: tuple[int, int], corner: str, px: int) -> pygame.Rect:
-    """The patch rectangle in a corner of the screen."""
-    x = size[0] - px if corner[1] == "r" else 0
-    y = size[1] - px if corner[0] == "b" else 0
-    return pygame.Rect(x, y, px, px)
-
-
 def _show_patch(display: Display, on: bool, corner: str, px: int,
                 caption: str | None = None) -> float:
     """Draw the patch white or black on a black canvas, with a caption top-left, and
@@ -106,7 +96,7 @@ def _show_patch(display: Display, on: bool, corner: str, px: int,
     """
     display.canvas.fill((0, 0, 0))
     if on:
-        display.canvas.fill((255, 255, 255), _patch_rect(display.size, corner, px))
+        display.canvas.fill((255, 255, 255), PhotodiodePatch(corner, px).rect(display.size))
     if caption:
         display.canvas.blit(_caption_font().render(caption, True, (160, 160, 160)), (16, 16))
     return display.redraw()
@@ -354,7 +344,7 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--on-ms", type=float, default=100.0, help="white duration per flash")
     p.add_argument("--gap-ms", type=float, nargs=2, default=(400.0, 800.0),
                    metavar=("MIN", "MAX"), help="black gap before each flash, uniform")
-    p.add_argument("--corner", choices=CORNERS, default="br")
+    p.add_argument("--corner", choices=PHOTODIODE_CORNERS, default="br")
     p.add_argument("--patch-px", type=int, default=120)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--settle-ms", type=float, default=1000.0,

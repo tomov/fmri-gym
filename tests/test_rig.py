@@ -12,6 +12,7 @@ from humans.config import rig
 from humans.config.phases import phase_problems
 from humans.config.rig import RigConfig
 from humans.inputs import ControlNames
+from humans.outputs.display import PhotodiodePatch
 
 FIELDS = {**{k: "x" for k in rig.FIELDS}, "site": "site1", "pi": "MT", "modality": "fmri",
           "notes": ""}
@@ -221,9 +222,25 @@ def test_a_teams_rig_is_filed_under_the_team(tmp_path):
     ({"rig_measurement": {"has_mic": True}}, '"has_mic" needs'),
     ({"rig_measurement": {"frame_rates": [0]}}, '"frame_rates"'),
     ({"rig_measurement": {"what": 1}}, "unknown key"),
+    ({"rig_measurement": {"corner": "tl"}}, "unknown key 'corner': the photodiode's square is "
+                                            'the rig\'s "photodiode_patch"'),
+    ({"rig_measurement": {"photodiode": "soundcard"}}, 'so the rig needs a "photodiode_patch"'),
+    ({"photodiode_patch": {"corner": "middle"}}, '"corner" must be one of'),
+    ({"photodiode_patch": {"size_px": 0}}, '"size_px" must be a whole number of pixels'),
+    ({"photodiode_patch": {"size_px": 120.5}}, '"size_px" must be a whole number of pixels'),
+    ({"photodiode_patch": {"colour": "white"}}, "unknown key 'colour'"),
+    ({"photodiode_patch": "tl"}, "expected {\"corner\", \"size_px\"} or null"),
 ])
 def test_a_wrong_rig_measurement_section_is_refused(values, problem):
     assert any(problem in p for p in rig.problems(values))
+
+
+def test_the_photodiode_patch_is_the_rigs_with_defaults_for_what_it_leaves_out():
+    assert RigConfig.open(write("desk")).photodiode_patch is None
+    meg = RigConfig.open(write("meg", photodiode_patch={"corner": "tl"},
+                               rig_measurement={"photodiode": "recording"}))
+    assert meg.photodiode_patch == PhotodiodePatch("tl", rig.PHOTODIODE_PATCH_DEFAULTS["size_px"])
+    assert meg.record()["photodiode_patch"] == {"corner": "tl", "size_px": 120}
 
 
 @pytest.mark.parametrize("geometry, problem", [

@@ -212,6 +212,37 @@ def test_an_image_line_is_drawn_as_its_image_between_the_text(monkeypatch):
         display.close()
 
 
+def test_the_photodiode_patch_alternates_with_each_game_frame_and_is_black_on_text(monkeypatch):
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
+    import numpy as np
+    import pygame
+
+    from humans.outputs.display import Display, PhotodiodePatch
+    patch = PhotodiodePatch("tl", 10)
+    assert PhotodiodePatch("br", 10).rect((200, 150)) == pygame.Rect(190, 140, 10, 10)
+    display = Display(size=(200, 150), vsync=False, photodiode_patch=patch)
+
+    def patch_colour() -> tuple:
+        return tuple(display.screen.get_at((5, 5)))[:3]
+    try:
+        white_game = np.full((15, 20, 3), 255, dtype=np.uint8)   # the patch is not the game's
+        display.draw_frame(white_game)
+        assert patch_colour() == (0, 0, 0)
+        display.alternate_photodiode_patch()
+        display.draw_frame(white_game)
+        assert patch_colour() == (255, 255, 255)
+        display.redraw()                                          # the same frame: no edge
+        assert patch_colour() == (255, 255, 255)
+        display.alternate_photodiode_patch()
+        display.draw_frame(white_game)
+        assert patch_colour() == (0, 0, 0)
+        display.alternate_photodiode_patch()
+        display.draw_fixation()
+        assert patch_colour() == (0, 0, 0)
+    finally:
+        display.close()
+
+
 def test_a_window_without_the_keyboard_focus_says_so(monkeypatch, capsys):
     monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
     from humans.outputs.display import Display

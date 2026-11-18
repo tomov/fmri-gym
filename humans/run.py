@@ -404,7 +404,8 @@ class Run:
         print(f"inputs: {inputs.status()}", file=sys.stderr)
         screen = config.rig.screen
         display = Display(size=screen.size, fullscreen=screen.is_fullscreen,
-                          vsync=screen.has_vsync, monitor=screen.monitor)
+                          vsync=screen.has_vsync, monitor=screen.monitor,
+                          photodiode_patch=config.rig.photodiode_patch)
         run = cls(config, display, out.folder, audio, triggers, inputs, resume_from)
         run.logger.set_extra("run", {"label": out.label, "attempt": out.attempt})
         run.logger.set_extra("seeds", {"derived_from": out.label, "phases": how})
@@ -653,8 +654,10 @@ class Run:
                     raise ValueError(f"rewind_on: the {adapter.name} adapter's capture "
                                      "returns no savestate to go back to")
                 recent_states.append(fs.blob)
-            # The frame trigger goes out on the flip that shows this frame.
+            # The frame trigger goes out on the flip that shows this frame, which the
+            # photodiode sees as the patch's next edge.
             self.display.call_on_flip(self.triggers.frame)
+            self.display.alternate_photodiode_patch()
             flip_t, frame, sound = self._show(adapter, game_phase.has_audio, score, block_end)
             # More than a frame behind (a stall): drop the debt, or it is repaid
             # as a burst of one-refresh frames. The frame of slack is what a

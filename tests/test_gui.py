@@ -128,9 +128,18 @@ def test_only_the_options_that_apply_are_shown(qt):
     assert not visible(window.trigger_form, "port") and not visible(window.trigger_form,
                                                                      "on_frame")
     assert not visible(window.measurement_form, "recording_hz")
+    assert not window.patch_box.isHidden()
     window.measurement_form.write("photodiode", "none")
-    assert not visible(window.measurement_form, "corner") and not visible(window.measurement_form,
-                                                                    "input_device")
+    assert window.patch_box.isHidden() and not visible(window.measurement_form, "input_device")
+
+
+def test_the_photodiode_patch_is_written_for_a_rig_whose_photodiode_is_read(qt):
+    window, written = _rig_window("meg")
+    assert window.rig["photodiode_patch"] == written["photodiode_patch"]
+    window.patch_form.write("corner", "tl")
+    assert window.rig["photodiode_patch"] == {**written["photodiode_patch"], "corner": "tl"}
+    window.measurement_form.write("photodiode", "none")
+    assert "photodiode_patch" not in window.rig
 
 
 def test_a_new_rig_is_filled_step_by_step_then_saved_then_measured(qt, tmp_path):

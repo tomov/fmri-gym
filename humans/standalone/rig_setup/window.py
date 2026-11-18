@@ -113,17 +113,24 @@ RIG_MEASUREMENT_FIELDS = [
     Field("has_mic", "microphone at the ear", "bool", default=False,
           tip="A microphone at the participant's ear, on the sound card's second input: the "
               "rig measurement then measures when the sound is heard, not only when it is sent."),
-    Field("corner", "photodiode corner", "choice", rig_file.CORNERS,
-          tip="The corner of the screen the photodiode is taped to: br bottom right, bl bottom "
-              "left, tr top right, tl top left. The rig measurement flashes a square there."),
-    Field("patch_px", "flashing square (px)", "int",
-          tip="The side of the flashing square, in pixels: big enough to cover the photodiode."),
     Field("recording_hz", "recording rate (Hz)", "float",
           tip="Your MEG/EEG system's sampling rate. The rig measurement checks each frame "
               "code lasts long enough to be seen in the recording. Blank if this rig records nothing."),
     Field("frame_rates", "more frame rates (fps)", "list",
           tip="Frame rates your games play at that the rig measurement also tests, separated by "
               "commas (e.g. 35). Every rig measurement already tests 60 and 30 fps."),
+]
+
+#: The rig file's ``"photodiode_patch"``, as a form
+#: (:class:`~humans.outputs.display.PhotodiodePatch`).
+PHOTODIODE_PATCH_FIELDS = [
+    Field("corner", "photodiode corner", "choice", rig_file.PHOTODIODE_CORNERS,
+          tip="The corner of the screen the photodiode is taped to: br bottom right, bl bottom "
+              "left, tr top right, tl top left. Every run paints a square there, white and "
+              "black in turn from one game frame to the next, and the rig measurement flashes "
+              "it."),
+    Field("size_px", "square's side (px)", "int",
+          tip="The side of the square, in pixels: big enough to cover the photodiode."),
 ]
 
 #: Window sizes offered when not fullscreen (those that fit the monitor).
@@ -311,9 +318,10 @@ def measurement_plan_by_measurement(rig: rig_file.RigConfig) -> dict[str, str]:
                          f"{', '.join(keys)}." if keys else "• Responses: not tested -- no "
                                                             "controller listed and no response "
                                                             "keys.")
+    corner = f" (corner {rig.photodiode_patch.corner})" if rig.photodiode_patch else ""
     photodiode = {"none": "• Photodiode: not tested -- this rig has none.",
                   "soundcard": f"• Photodiode: the delay before each image appears, measured "
-                               f"on the {c.input_device or 'default'} input (corner {c.corner}).",
+                               f"on the {c.input_device or 'default'} input{corner}.",
                   "recording": "• Photodiode: flashes for you to compare with the frame codes "
                                "in your recording."}[c.photodiode]
     sound = (("• Sound: the delay before each click leaves the sound card"
@@ -565,7 +573,9 @@ class _RigWindow(QtWidgets.QDialog):
             lambda: self._about_page(values), lambda: self._screen_page(values),
             lambda: self._responses_page(values),
             lambda: self._triggers_page(values.get("triggers", {})),
-            lambda: self._measurement_page(values.get("rig_measurement", {})), self._save_page]
+            lambda: self._measurement_page(values.get("rig_measurement", {}),
+                                           values.get("photodiode_patch")),
+            self._save_page]
         for build in builders:
             scroll = QtWidgets.QScrollArea()
             scroll.setWidgetResizable(True)
@@ -659,8 +669,8 @@ class _RigWindow(QtWidgets.QDialog):
         if diode != "soundcard" and self._value(self.measurement_form, "has_mic"):
             self.measurement_form.write("has_mic", False)  # a microphone is read beside the diode
         sound = self.switches["has_audio"].isChecked()
+        self.patch_box.setVisible(diode != "none")
         self.measurement_form.show_rows(["photodiode", "frame_rates"]
-                                  + ["corner", "patch_px"] * (diode != "none")
                                   + ["input_device"] * (diode == "soundcard")
                                   + ["has_mic"] * (diode == "soundcard" and sound)
                                   + ["recording_hz"] * on_frame)
@@ -1268,7 +1278,7 @@ class _RigWindow(QtWidgets.QDialog):
 
     # -- step 5: rig measurement equipment ------------------------------------------------
 
-    def _measurement_page(self, section: Any) -> QtWidgets.QWidget:
+    def _measurement_page(self, section: Any, patch: Any) -> QtWidgets.QWidget:
         page, layout = self._page()
         self.measurement_form = ui.Form(RIG_MEASUREMENT_FIELDS)
         self.measurement_form.set_choices("input_device", _sound_inputs())
@@ -1276,6 +1286,13 @@ class _RigWindow(QtWidgets.QDialog):
         self.measurement_form.set({**rig_file.RIG_MEASUREMENT_DEFAULTS, **given})
         self.measurement_form.changed.connect(self._check)
         layout.addWidget(ui.group("This rig's equipment", self.measurement_form))
+        self.patch_form = ui.Form(PHOTODIODE_PATCH_FIELDS)
+        self.patch_form.set({**rig_file.PHOTODIODE_PATCH_DEFAULTS,
+                             **(patch if isinstance(patch, dict) else {})})
+        self.patch_form.changed.connect(self._check)
+        self.patch_box = ui.group("The square under the photodiode, in every run",
+                                  self.patch_form)
+        layout.addWidget(self.patch_box)
         self.plan = QtWidgets.QLabel()
         self.plan.setObjectName("report")
         self.plan.setWordWrap(True)
@@ -1291,9 +1308,20 @@ class _RigWindow(QtWidgets.QDialog):
         values = self.measurement_form.get()
         return {k: v for k, v in values.items() if v != rig_file.RIG_MEASUREMENT_DEFAULTS.get(k)}
 
+    def _photodiode_patch(self) -> dict | None:
+        """The square form as the file's ``"photodiode_patch"``; ``None`` for a rig whose
+        photodiode is not read.
+
+        :raises ValueError: a number half typed, named in the message.
+        """
+        if self._value(self.measurement_form, "photodiode") == "none":
+            return None
+        return self.patch_form.get()
+
     def _measurement_problems(self) -> list[str]:
         try:
-            return rig_file.problems({"rig_measurement": self._rig_measurement()})
+            return rig_file.problems({"rig_measurement": self._rig_measurement(),
+                                      "photodiode_patch": self._photodiode_patch()})
         except ValueError as exc:
             return [str(exc)]
 
@@ -1421,6 +1449,9 @@ class _RigWindow(QtWidgets.QDialog):
         equipment = self._rig_measurement()
         if equipment:
             out["rig_measurement"] = equipment
+        patch = self._photodiode_patch()
+        if patch is not None:
+            out["photodiode_patch"] = patch
         return {**out, **self._kept}
 
     def accept(self) -> None:
