@@ -134,3 +134,32 @@ class Keyboard(InputDevice):
             elif event.type == pygame.WINDOWFOCUSLOST:  # its key-ups go to the window in focus
                 out += [e for name in sorted(self._held) for e in self._release(name)]
         return out
+
+
+class ExperimenterKeys(Keyboard):
+    """The keyboard of a rig whose participant has none: only the keys the experimenter and
+    the scanner press are read, every other key is ignored."""
+
+    name = "experimenter_keys"
+
+    def __init__(self, experimenter_keys: frozenset[str]) -> None:
+        super().__init__()
+        self.experimenter_keys = experimenter_keys
+
+    @classmethod
+    def open(cls) -> ExperimenterKeys:
+        """One that reads no key: the keys are given to the constructor."""
+        return cls(frozenset())
+
+    def handle(self, events: list[pygame.event.Event], now: float) -> list[InputEvent]:
+        return super().handle([e for e in events if e.type not in (pygame.KEYDOWN, pygame.KEYUP)
+                               or NAMES.get(e.key) in self.experimenter_keys], now)
+
+    def controls(self) -> frozenset[str]:
+        return self.experimenter_keys
+
+    def status(self) -> str:
+        return f"keyboard: experimenter keys only ({', '.join(sorted(self.experimenter_keys))})"
+
+    def record(self) -> dict[str, list[str]]:
+        return {"input": self.name, "experimenter_keys": sorted(self.experimenter_keys)}

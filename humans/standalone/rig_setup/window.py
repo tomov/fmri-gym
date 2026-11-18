@@ -260,6 +260,15 @@ def rig_summary(path: str | None) -> str:
                       "run the long rig measurement once."])
 
 
+def _experimenter_keyboard(rig: rig_file.RigConfig) -> str:
+    """How the run starts, and which keys the keyboard reads when it is no input of the rig."""
+    starts = f"; start with {rig.start_keys_in_words}"
+    if "keyboard" in rig.inputs:
+        return starts
+    experimenter_keys = ", ".join(sorted(rig.experimenter_keys))
+    return f"{starts}; keyboard: experimenter keys only ({experimenter_keys})"
+
+
 def _describe(rig: rig_file.RigConfig, triggers: dict | None) -> str:
     """What every run on ``rig`` gets, in a few lines."""
     screen = rig.screen
@@ -273,7 +282,7 @@ def _describe(rig: rig_file.RigConfig, triggers: dict | None) -> str:
         f".   WARNING: {rig.fixation_warning}" if rig.fixation_warning else "")
     return "\n".join([
         f"Screen: {window} on monitor {screen.monitor}, vsync {'on' if screen.has_vsync else 'off'}",
-        f"Inputs: {', '.join(('keyboard', *rig.inputs))}{responses}",
+        f"Inputs: {', '.join(rig.inputs)}{responses}{_experimenter_keyboard(rig)}",
         f"Game sound: {'on' if rig.has_audio else 'off'}.   Data saved in: {rig.data_root}",
         fixation,
         describe_triggers(triggers) if triggers else
@@ -1067,6 +1076,8 @@ class _RigWindow(QtWidgets.QDialog):
             self.controller_text, ui.row(self.calibrate, look))))
         layout.addWidget(self._inputs_box(values.get("inputs", rig_file.DEFAULTS["inputs"])))
         layout.addWidget(self._response_keys_box(values.get("response_keys", {})))
+        layout.addWidget(self._start_keys_box(values.get("start_keys",
+                                                         rig_file.DEFAULTS["start_keys"])))
         layout.addStretch(1)
         return page
 
@@ -1176,9 +1187,48 @@ class _RigWindow(QtWidgets.QDialog):
                 out[key.text().strip().upper()] = label.text().strip() if label else ""
         return out
 
+    def _start_keys_box(self, given: Any) -> QtWidgets.QGroupBox:
+        box = QtWidgets.QGroupBox("Start keys: the experimenter starts each run with one of them")
+        layout = QtWidgets.QVBoxLayout(box)
+        hint = QtWidgets.QLabel("Read on the keyboard even when it is not one of the input "
+                                "devices above, with ESCAPE (quit) and the scanner's trigger key; "
+                                "every other key is then ignored.")
+        hint.setObjectName("hint")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        self.start_keys = QtWidgets.QListWidget()
+        self.start_keys.addItems([str(k) for k in (given if isinstance(given, list) else ())])
+        self.start_keys.setMaximumHeight(70)
+        add = ui.button("Press a key...", self._capture_start_key)
+        add.setToolTip("Press a key: it is added to the start keys.")
+        remove = ui.button("Remove", self._remove_start_key)
+        remove.setToolTip("Remove the selected key.")
+        layout.addWidget(self.start_keys)
+        layout.addLayout(ui.row(add, remove))
+        return box
+
+    def _start_key_names(self) -> list[str]:
+        return [self.start_keys.item(row).text() for row in range(self.start_keys.count())]
+
+    def _capture_start_key(self) -> None:
+        dialog = ui.KeyCapture(self)
+        dialog.exec()
+        if dialog.name is not None and dialog.name not in self._start_key_names():
+            self.start_keys.addItem(dialog.name)
+            self._check()
+        elif dialog.refused is not None:
+            self.problems.setText(f"{dialog.refused!r} is not a key the run can read")
+
+    def _remove_start_key(self) -> None:
+        if self.start_keys.currentRow() >= 0:
+            self.start_keys.takeItem(self.start_keys.currentRow())
+            self._check()
+
     def _responses(self) -> dict[str, Any]:
         out: dict[str, Any] = {
             "inputs": [n for n, b in self.input_boxes.items() if b.isChecked()]}
+        if self._start_key_names() != rig_file.DEFAULTS["start_keys"]:
+            out["start_keys"] = self._start_key_names()
         if self._response_keys():
             out["response_keys"] = self._response_keys()
         return out

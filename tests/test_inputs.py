@@ -21,7 +21,7 @@ import pytest
 import humans.inputs as inputs
 from humans.standalone import gamepad_calibration as cal
 from humans.inputs import (QUIT, CalibrationError, ControlNames, CurrentDesignsGamepad3, Edge,
-                             InputDevices, InputEvent, Keyboard, XBoxController)
+                             ExperimenterKeys, InputDevices, InputEvent, Keyboard, XBoxController)
 from humans.inputs import calibration as files
 from humans.inputs.calibration import AxisCalibration
 from humans.inputs.controller import AXIS_CONTROLS, FACE_BUTTONS, Controller, short_name
@@ -447,6 +447,18 @@ def test_the_keyboard_holds_what_its_events_press_until_the_window_loses_focus()
     assert keys.held() == frozenset()
 
 
+def test_the_experimenter_keys_read_their_keys_and_ignore_every_other():
+    keys = ExperimenterKeys(frozenset({"SPACE", "ESCAPE", "EQUALS"}))
+    assert keys.handle([_key(pygame.KEYDOWN, pygame.K_LEFT), _key(pygame.KEYDOWN, pygame.K_SPACE),
+                        _key(pygame.KEYDOWN, pygame.K_LSHIFT),
+                        _key(pygame.KEYDOWN, pygame.K_EQUALS)], 1.0) == [
+        _down("SPACE"), _down("EQUALS")]
+    assert keys.held() == {"SPACE", "EQUALS"}
+    assert keys.handle([_key(pygame.KEYUP, pygame.K_LEFT), _key(pygame.KEYUP, pygame.K_SPACE)],
+                       1.1) == [_up("SPACE")]
+    assert keys.controls() == {"SPACE", "ESCAPE", "EQUALS"}
+
+
 def test_the_runs_inputs_take_the_queue_and_name_the_windows_close(screen):
     from humans.run import read_input_events
     pygame.event.post(_key(pygame.KEYDOWN, pygame.K_SPACE))
@@ -540,6 +552,20 @@ def test_a_tap_inside_one_frame_counts_for_that_frame(screen):
     assert pressed == ["Z"]
 
 
+def test_a_run_starts_on_any_start_key_of_a_rig_without_a_keyboard_and_esc_quits(screen):
+    from humans.run import wait_for_start_key
+    keys = InputDevices([ExperimenterKeys(frozenset({"SPACE", "RETURN", "ESCAPE"}))])
+    display = types.SimpleNamespace(idle=lambda deadline, poll: None)
+    pygame.event.post(_key(pygame.KEYDOWN, pygame.K_LEFT))
+    pygame.event.post(_key(pygame.KEYDOWN, pygame.K_RETURN))
+    wait_for_start_key(keys, display, ("SPACE", "RETURN"))
+    assert keys.held() == {"RETURN"}                          # LEFT: no experimenter key
+    pygame.event.clear()
+    pygame.event.post(_key(pygame.KEYDOWN, pygame.K_ESCAPE))
+    with pytest.raises(KeyboardInterrupt):
+        wait_for_start_key(keys, display, ("SPACE", "RETURN"))
+
+
 @pytest.mark.parametrize("names, says", [
     (["keyboard", "keyboard"], "expected distinct names"),
     (["gmpd3"], "expected distinct names"),
@@ -561,6 +587,19 @@ def test_a_rigs_inputs_open_its_devices_and_say_which_joysticks_they_ignore(sdl,
                                   frozenset({ControlNames.CONTROLLER_AXIS_LEFTX_LEFT}))
     assert [d.name for d in inputs.open_input_devices(["current_designs_gamepad3"]).devices] == [
         "current_designs_gamepad3"]                   # no keyboard unless the rig lists one
+
+
+def test_a_rig_without_a_keyboard_reads_the_experimenters_keys_on_it(sdl, config_home):
+    experimenter_keys = frozenset({"SPACE", "ESCAPE"})
+    pad = inputs.open_input_devices(["current_designs_gamepad3"],
+                                    experimenter_keys=experimenter_keys)
+    assert [d.name for d in pad.devices] == ["current_designs_gamepad3", "experimenter_keys"]
+    assert "keyboard: experimenter keys only (ESCAPE, SPACE)" in pad.status()
+    assert pad.record()["devices"][-1] == {"input": "experimenter_keys",
+                                           "experimenter_keys": ["ESCAPE", "SPACE"]}
+    both = inputs.open_input_devices(["keyboard", "current_designs_gamepad3"],
+                                     experimenter_keys=experimenter_keys)
+    assert [d.name for d in both.devices] == ["keyboard", "current_designs_gamepad3"]
 
 
 def test_a_rigs_controller_is_read_through_the_calibration_file_given(sdl, config_home):

@@ -459,29 +459,32 @@ def test_each_rig_measurement_files_its_latencies_beside_the_rig_under_a_new_num
     assert len(list((tmp_path / "measured").iterdir())) == 2
 
 
-def _measure_laptop_rig(tmp_path, monkeypatch, measurement_names, **rig) -> dict:
+def _measure_laptop_rig(tmp_path, monkeypatch, measurement_names, start_key="SPACE",
+                        **rig) -> dict:
     """A quick rig measurement of a laptop rig (``rig``: more of its file), headless, taking
-    ``measurement_names``; its manifest, once its files are checked."""
+    ``measurement_names`` and started with ``start_key``; its manifest, once its files are
+    checked."""
     monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
     from dataclasses import replace
 
     import pygame
 
     from humans.config.rig import RigConfig
+    from humans.inputs.keyboard import KEYCODES
     from humans.standalone.rig_setup import cli, report
     from humans.standalone.rig_setup import measure as rig_measure
     rig_path = tmp_path / "laptop.json"
     rig_path.write_text(json.dumps({"data_root": str(tmp_path / "data"), "has_audio": False,
                                     "screen": {"geometry": GEOMETRY},
                                     "triggers": {"sync": {"mode": "none"}}, **rig}))
-    wait_for_control = rig_measure._wait_for_control
+    wait_for_start_key = rig_measure.wait_for_start_key
 
-    def press_space_then_wait(inputs, display, control):
-        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE, mod=0,
-                                             unicode=" ", scancode=0))
-        wait_for_control(inputs, display, control)
+    def press_start_key_then_wait(inputs, display, start_keys):
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=KEYCODES[start_key], mod=0,
+                                             unicode="", scancode=0))
+        wait_for_start_key(inputs, display, start_keys)
 
-    monkeypatch.setattr(rig_measure, "_wait_for_control", press_space_then_wait)
+    monkeypatch.setattr(rig_measure, "wait_for_start_key", press_start_key_then_wait)
     monkeypatch.setattr(rig_measure, "lsl_probe", lambda: "not probed in the test")
     monkeypatch.setattr(report, "machine", lambda: {})
     monkeypatch.setattr(rig_measure, "_VERDICT_S", 0.0)
@@ -518,6 +521,14 @@ def test_a_measurement_unticked_is_not_run_and_fails_nothing(tmp_path, monkeypat
     assert m["tests"]["controls"] == {"status": "not run", "why": UNTICKED}
     assert m["summaries"]["frames"] == {} and m["tests"]["display"]["status"] != "not run"
     assert "frames" not in (m["failed_tests"] or "")
+
+
+def test_a_rig_without_a_keyboard_starts_its_measurement_on_the_experimenters_key(
+        tmp_path, monkeypatch):
+    # its controller unticked, nothing of the rig reads keys but the experimenter's
+    m = _measure_laptop_rig(tmp_path, monkeypatch, ("display",), start_key="RETURN",
+                            inputs=["xbox_controller"])
+    assert m["tests"]["display"]["status"] != "not run"
 
 
 def test_the_machine_is_described_and_pygame_left_as_it_was():

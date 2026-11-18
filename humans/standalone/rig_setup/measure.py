@@ -63,7 +63,7 @@ from ...inputs import (CONTROLLER_CLASSES_BY_NAME, QUIT, CalibrationError, Contr
 from ...inputs.keyboard import KEYCODES
 from ...outputs.audio import Audio
 from ...outputs.display import Display, PhotodiodePatch, check_monitor, is_locked, quit_like_esc
-from ...run import EXPERIMENTER_KEY, _wait_for_control, _wait_for_duration, read_input_events
+from ...run import _wait_for_duration, read_input_events, wait_for_start_key
 from ...save.bids import next_session, run_output
 from ...sync.triggers import HID_DEVICES, LIFECYCLE_EVENTS, Codes, TriggerError, Triggers
 from ..gamepad_calibration import calibrate, cue_order
@@ -190,7 +190,8 @@ class RigMeasurement:
         print(f"audio: {audio.status()}", file=sys.stderr)
         inputs = open_input_devices(
             rig.inputs if "controls" in measurement_names else
-            tuple(n for n in rig.inputs if n not in CONTROLLER_CLASSES_BY_NAME), frozenset())
+            tuple(n for n in rig.inputs if n not in CONTROLLER_CLASSES_BY_NAME), frozenset(),
+            experimenter_keys=rig.experimenter_keys)
         print(f"inputs: {inputs.status()}", file=sys.stderr)
         screen = rig.screen
         display = Display(size=screen.size, fullscreen=screen.is_fullscreen,
@@ -259,8 +260,9 @@ def _start_screen(rig_measurement: RigMeasurement) -> None:
     rig_measurement.display.draw_text(
         f"Rig measurement ({rig_measurement.settings.about}) of {rig.path}\n"
         "This is a rig measurement, not a scanner run: no participant plays.\n\n"
-        + "\n".join(ready) + f"\n\nPress {EXPERIMENTER_KEY} to start, ESC to stop.")
-    _wait_for_control(rig_measurement.inputs, rig_measurement.display, EXPERIMENTER_KEY)
+        + "\n".join(ready) + f"\n\nPress {rig.start_keys_in_words} to start, "
+        "ESC to stop.")
+    wait_for_start_key(rig_measurement.inputs, rig_measurement.display, rig.start_keys)
 
 
 def _measure(rig_measurement: RigMeasurement, name: str, measure: Callable[..., None]) -> None:
