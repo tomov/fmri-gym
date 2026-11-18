@@ -99,6 +99,15 @@ def test_response_keys_and_the_rig_measurement_are_the_rig_files(qt):
     assert "1 (index finger)" in window.plan.text()
 
 
+def test_the_eyelink_field_writes_its_section_only_when_filled_in(qt):
+    window, _ = _rig_window("meg")
+    assert "eyelink" not in window.rig and not window._measurement_problems()
+    window.eyelink_form.write("host_ip", "100.1.1.1")
+    assert window.rig["eyelink"] == {"host_ip": "100.1.1.1"}
+    window.eyelink_form.write("host_ip", "the tracker")
+    assert any('"host_ip" must be an IP address' in p for p in window._measurement_problems())
+
+
 def test_a_rig_measurement_waits_for_its_triggers_to_be_chosen(qt):
     window, _ = _rig_window("minimal", need_triggers=True)
     assert window.stack.currentIndex() == 3 and not window.next.isEnabled()

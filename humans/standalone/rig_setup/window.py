@@ -133,6 +133,14 @@ PHOTODIODE_PATCH_FIELDS = [
           tip="The side of the square, in pixels: big enough to cover the photodiode."),
 ]
 
+#: The rig file's ``"eyelink"``, as a form (:class:`~humans.config.rig.EyelinkConfig`); blank:
+#: the rig has no EyeLink.
+EYELINK_FIELDS = [
+    Field("host_ip", "EyeLink Host PC address",
+          tip="The IP address of the EyeLink's Host PC (an EyeLink comes set to 100.1.1.1). "
+              "Blank: this rig has no EyeLink."),
+]
+
 #: Window sizes offered when not fullscreen (those that fit the monitor).
 WINDOW_SIZES = ((800, 600), (1024, 768), (1280, 720), (1280, 1024), (1600, 900), (1920, 1080))
 #: How the window names the fields describing the rig.
@@ -277,7 +285,8 @@ def _describe(rig: rig_file.RigConfig, triggers: dict | None) -> str:
         f"Game sound: {'on' if rig.has_audio else 'off'}.   Data saved in: {rig.data_root}",
         fixation,
         describe_triggers(triggers) if triggers else
-        f"Triggers: NOT SET -- a run waits for {SyncSettings().key!r} and sends no codes."])
+        f"Triggers: NOT SET -- a run waits for {SyncSettings().key!r} and sends no codes.",
+        *([f"EyeLink: its Host PC at {rig.eyelink.host_ip}"] if rig.eyelink else [])])
 
 
 def measurement_plan(rig: rig_file.RigConfig) -> str:
@@ -574,7 +583,8 @@ class _RigWindow(QtWidgets.QDialog):
             lambda: self._responses_page(values),
             lambda: self._triggers_page(values.get("triggers", {})),
             lambda: self._measurement_page(values.get("rig_measurement", {}),
-                                           values.get("photodiode_patch")),
+                                           values.get("photodiode_patch"),
+                                           values.get("eyelink")),
             self._save_page]
         for build in builders:
             scroll = QtWidgets.QScrollArea()
@@ -1278,7 +1288,7 @@ class _RigWindow(QtWidgets.QDialog):
 
     # -- step 5: rig measurement equipment ------------------------------------------------
 
-    def _measurement_page(self, section: Any, patch: Any) -> QtWidgets.QWidget:
+    def _measurement_page(self, section: Any, patch: Any, eyelink: Any) -> QtWidgets.QWidget:
         page, layout = self._page()
         self.measurement_form = ui.Form(RIG_MEASUREMENT_FIELDS)
         self.measurement_form.set_choices("input_device", _sound_inputs())
@@ -1293,6 +1303,11 @@ class _RigWindow(QtWidgets.QDialog):
         self.patch_box = ui.group("The square under the photodiode, in every run",
                                   self.patch_form)
         layout.addWidget(self.patch_box)
+        self.eyelink_form = ui.Form(EYELINK_FIELDS)
+        self.eyelink_form.set(eyelink if isinstance(eyelink, dict) else {})
+        self.eyelink_form.changed.connect(self._check)
+        layout.addWidget(ui.group("EyeLink eye tracker: read by the eye-tracking programs, not "
+                                  "by fmri-play", self.eyelink_form))
         self.plan = QtWidgets.QLabel()
         self.plan.setObjectName("report")
         self.plan.setWordWrap(True)
@@ -1318,10 +1333,15 @@ class _RigWindow(QtWidgets.QDialog):
             return None
         return self.patch_form.get()
 
+    def _eyelink(self) -> dict | None:
+        """The EyeLink form as the file's ``"eyelink"``; ``None`` when blank."""
+        return self.eyelink_form.get() or None
+
     def _measurement_problems(self) -> list[str]:
         try:
             return rig_file.problems({"rig_measurement": self._rig_measurement(),
-                                      "photodiode_patch": self._photodiode_patch()})
+                                      "photodiode_patch": self._photodiode_patch(),
+                                      "eyelink": self._eyelink()})
         except ValueError as exc:
             return [str(exc)]
 
@@ -1452,6 +1472,9 @@ class _RigWindow(QtWidgets.QDialog):
         patch = self._photodiode_patch()
         if patch is not None:
             out["photodiode_patch"] = patch
+        eyelink = self._eyelink()
+        if eyelink is not None:
+            out["eyelink"] = eyelink
         return {**out, **self._kept}
 
     def accept(self) -> None:
