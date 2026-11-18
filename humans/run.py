@@ -706,16 +706,17 @@ class Run:
                                until=self._run_end)
         return result
 
-    def _instructions(self, phase: GamePhase) -> dict | None:
+    def _instructions(self, phase: GamePhase, resumed: bool) -> dict | None:
         """Show a game phase's ``instructions``, if any, as a message headed by its title.
 
+        :param resumed: whether the block carries on from an earlier run.
         :return: for the game's manifest entry, the ``text`` shown with its
             ``onset`` and ``offset``; ``None`` without instructions.
         :raises KeyboardInterrupt: on window close or ESC.
         """
         if phase.instructions is None:
             return None
-        return self._show_message(phase.instructions.message())
+        return self._show_message(phase.instructions.message(resumed))
 
     def _show(
         self, adapter: EnvAdapter, play_sound: bool, score: float, block_end: float
@@ -769,7 +770,7 @@ class Run:
         print(f">>> block {index}: {game_phase.backend} {game_phase.game}"
               f"{'' if block_progress is None else ', resumed from an earlier run'}",
               file=sys.stderr)
-        instructions = self._instructions(game_phase)
+        instructions = self._instructions(game_phase, resumed=block_progress is not None)
 
         # Some backends (nle, browser games) take several seconds to start;
         # show a Loading screen so the previous fixation "+" doesn't freeze.
