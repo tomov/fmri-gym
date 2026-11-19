@@ -701,7 +701,7 @@ def trigger_problems(section: Any) -> list[str]:
         s = TriggerSettings.from_dict(section)
     except (TypeError, ValueError, TriggerError) as exc:
         return [str(exc)]
-    if s.backend in ("serial", "parallel", "hid") and not s.port:
+    if s.backend not in ("null", "lsl") and not s.port:
         return [f"triggers: backend {s.backend!r} needs a port"]
     if s.sync.mode == "wait" and s.sync.key not in Keyboard.CONTROLS:
         return [f"triggers: sync.key {s.sync.key!r} is not a keyboard key name (as in "

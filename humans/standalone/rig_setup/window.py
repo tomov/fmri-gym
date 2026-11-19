@@ -64,7 +64,8 @@ TRIGGER_FIELDS = [
           tip="How codes reach your recording. null: no codes are sent (fMRI, or no recording). "
               "serial: a serial or USB-serial port. parallel: a parallel port. hid: a USB box's "
               "digital port (on a computer with no parallel port, such as a Mac). lsl: a Lab "
-              "Streaming Layer stream on the network."),
+              "Streaming Layer stream on the network. dlpio8: a DLP-IO8 box on a USB-serial "
+              "port. megttlbox: NeuroSpin's MEG TTL box (an Arduino) on a USB-serial port."),
     Field("hid_device", "USB box", "choice", tuple(HID_DEVICES),
           tip="The USB box the trigger cable is plugged into. mcc-1208fs: a Measurement "
               "Computing USB-1208FS."),
@@ -97,7 +98,8 @@ CODE_FIELDS = [
 
 #: Which trigger-line fields each line uses.
 BACKEND_ROWS = {"null": (), "serial": ("port",), "parallel": ("port", "pulse_ms"),
-                "hid": ("hid_device", "port", "pulse_ms"), "lsl": ("lsl_stream_name",)}
+                "hid": ("hid_device", "port", "pulse_ms"), "lsl": ("lsl_stream_name",),
+                "dlpio8": ("port", "pulse_ms"), "megttlbox": ("port", "pulse_ms")}
 
 #: The rig file's ``"rig_measurement"``, as a form
 #: (:class:`~humans.config.rig.RigMeasurementConfig`).

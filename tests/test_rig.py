@@ -136,6 +136,93 @@ def test_a_hid_box_is_set_to_output_zero_then_holds_each_code(monkeypatch):
     assert fake.reports == [[0x04, 1, 1], [0x04, 1, 0], [0x04, 1, 0], ["closed"]]
 
 
+class _FakeSerialPort:
+    """A serial port that keeps what is written and answers each read with the next reply."""
+
+    def __init__(self, url: str, replies: list[bytes]) -> None:
+        self.url, self.replies, self.written, self.dtr = url, replies, bytearray(), False
+
+    def reset_input_buffer(self) -> None:
+        pass
+
+    def write(self, data: bytes) -> None:
+        self.written += data
+
+    def read(self, n: int) -> bytes:
+        return self.replies.pop(0) if self.replies else b""
+
+    def close(self) -> None:
+        self.written += b"<closed>"
+
+
+def _serial_box(monkeypatch, replies: list[bytes]) -> list[_FakeSerialPort]:
+    """The ``serial`` module, faked: each port opened answers ``replies``; the ports opened."""
+    import types
+
+    import humans.sync.triggers as triggers_module
+    opened: list[_FakeSerialPort] = []
+
+    def serial_for_url(url, **settings):
+        assert settings["baudrate"] == 115200
+        opened.append(_FakeSerialPort(url, list(replies)))
+        return opened[-1]
+    monkeypatch.setitem(sys.modules, "serial", types.SimpleNamespace(serial_for_url=serial_for_url))
+    monkeypatch.setattr(triggers_module.time, "sleep", lambda s: None)
+    return opened
+
+
+def test_a_dlpio8_answers_its_ping_then_sets_each_line_with_a_byte_of_its_own(monkeypatch):
+    from humans.sync.triggers import Triggers
+    opened = _serial_box(monkeypatch, [b"Q"])
+    triggers = Triggers.from_dict({"sync": {"mode": "send"}, "backend": "dlpio8",
+                                   "port": "/dev/ttyUSB0"})
+    port, = opened
+    assert triggers.active == "dlpio8:/dev/ttyUSB0" and port.written == b"'QWERTYUI"
+    del port.written[:]
+    triggers.lifecycle("scanner_start")             # 64, pulsed then cleared
+    triggers.close()
+    assert bytes(port.written) == b"QWERTY7I" + b"QWERTYUI" * 2 + b"<closed>"
+
+
+def test_a_meg_ttl_box_sets_its_lines_at_once_when_its_firmware_can(monkeypatch):
+    from humans.sync.triggers import Triggers
+    opened = _serial_box(monkeypatch, [b"MTB\x01\x01"])
+    triggers = Triggers.from_dict({"sync": {"mode": "send"}, "backend": "megttlbox",
+                                   "port": "/dev/ttyACM0"})
+    port, = opened
+    assert port.dtr and triggers.active == "megttlbox:/dev/ttyACM0"
+    assert bytes(port.written) == bytes([1, 14, 0xFF])           # info, then all lines low
+    del port.written[:]
+    triggers.lifecycle("task_start")
+    assert bytes(port.written) == bytes([17, 8, 14, 0xFF])
+
+
+def test_a_meg_ttl_box_with_older_firmware_sets_its_lines_high_then_low(monkeypatch):
+    from humans.sync.triggers import Triggers
+    opened = _serial_box(monkeypatch, [])                          # no answer to get_info
+    triggers = Triggers.from_dict({"sync": {"mode": "send"}, "backend": "megttlbox",
+                                   "port": "/dev/ttyACM0"})
+    assert "firmware sets the lines in two steps" in triggers.active
+    del opened[0].written[:]
+    triggers.lifecycle("task_start")
+    assert bytes(opened[0].written) == bytes([13, 8, 14, 0xF7, 14, 0xFF])
+
+
+@pytest.mark.parametrize("backend, replies, says", [
+    ("dlpio8", [], "no DLP-IO8 answered its ping"),
+    ("megttlbox", [b"OK\r\n!"], "not a MEG TTL box"),
+])
+def test_a_box_that_does_not_answer_as_itself_stops_the_run(monkeypatch, backend, replies, says):
+    from humans.sync.triggers import TriggerError, Triggers
+    opened = _serial_box(monkeypatch, replies)
+    refused = f"cannot open {backend} triggers on /dev/ttyX: .*{says}"
+    with pytest.raises(TriggerError, match=refused):
+        Triggers.from_dict({"sync": {"mode": "send"}, "backend": backend, "port": "/dev/ttyX"})
+    assert opened[0].written.endswith(b"<closed>")
+    with pytest.raises(ValueError, match="needs a port"):
+        RigConfig.open(write("plain", triggers={"backend": backend}))
+
+
 def test_a_game_key_the_scanner_types_is_refused_on_that_rig():
     from humans.config.curriculum import Curriculum
     from humans.config.run import RunConfig

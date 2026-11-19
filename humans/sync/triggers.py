@@ -15,7 +15,9 @@ One section, two concerns:
   systems start recording on it), or ``none``.
 * the rest (:class:`TriggerSettings`) -- which codes go out, over what.
   Backends: ``null`` (default, sends nothing), ``lsl``, ``serial``,
-  ``parallel``, ``hid`` (a USB DAQ's digital port, :data:`HID_DEVICES`). A
+  ``parallel``, ``hid`` (a USB DAQ's digital port, :data:`HID_DEVICES`), and two
+  boxes on a serial port that hold eight lines: ``dlpio8`` (a DLP-IO8 or
+  DLP-IO8-G) and ``megttlbox`` (NeuroSpin's Arduino MEG TTL box). A
   backend that cannot be opened raises :class:`TriggerError` when
   :class:`Triggers` is built, so it can be built before anything is shown:
   better a clear stop at the desk than a silent recording without triggers.
@@ -58,7 +60,7 @@ log = logging.getLogger(__name__)
 
 LIFECYCLE_EVENTS = ("task_start", "task_stop", "episode_start", "scanner_start")
 SYNC_MODES = ("wait", "send", "none")
-TRIGGER_BACKENDS = ("null", "lsl", "serial", "parallel", "hid")
+TRIGGER_BACKENDS = ("null", "lsl", "serial", "parallel", "hid", "dlpio8", "megttlbox")
 
 
 @dataclass(frozen=True)
@@ -350,6 +352,76 @@ class _HID:
         self._dev.close()
 
 
+class _DlpIo8:
+    """A DLP-IO8: each of its eight lines is set by an ASCII byte of its own, so a code's lines
+    change one after the other, within the one write that carries them."""
+
+    holds_level = True
+    _SET_HIGH = b"12345678"
+    _SET_LOW = b"QWERTYUI"
+
+    def __init__(self, port: str) -> None:
+        import serial
+        self._port = serial.serial_for_url(port, baudrate=115200, timeout=0.2)
+        self._port.reset_input_buffer()
+        self._port.write(b"'")                  # its ping, answered with Q
+        if self._port.read(1) != b"Q":
+            self._port.close()
+            raise OSError("no DLP-IO8 answered its ping")
+        self.clear()
+
+    def send(self, value: int) -> None:
+        self._port.write(bytes((self._SET_HIGH if value >> line & 1 else self._SET_LOW)[line]
+                               for line in range(8)))
+
+    def clear(self) -> None:
+        self.send(0)
+
+    def close(self) -> None:
+        self.clear()
+        self._port.close()
+
+
+class _MegTtlBox:
+    """NeuroSpin's MEG TTL box, an Arduino Mega: one opcode sets all eight lines at once when
+    its firmware says it can; older firmware sets them high, then low, in one write."""
+
+    holds_level = True
+    _GET_INFO, _SET_HIGH_MASK, _SET_LOW_MASK, _SET_PORT_MASK = 1, 13, 14, 17
+    _CAN_SET_PORT = 0x01
+    #: the Arduino restarts when the port opens, and reads nothing while it boots
+    _BOOT_S = 2.0
+
+    def __init__(self, port: str) -> None:
+        import serial
+        self._port = serial.serial_for_url(port, baudrate=115200, timeout=0.3)
+        self._port.dtr = True
+        time.sleep(self._BOOT_S)
+        self._port.reset_input_buffer()
+        self._port.write(bytes([self._GET_INFO]))
+        info = self._port.read(5)               # nothing at all from firmware without it
+        if info and info[:3] != b"MTB":
+            self._port.close()
+            raise OSError(f"the device answered {info!r}, not a MEG TTL box")
+        self.can_set_port = len(info) == 5 and bool(info[4] & self._CAN_SET_PORT)
+        self.clear()
+
+    def send(self, value: int) -> None:
+        value &= 0xFF
+        if self.can_set_port:
+            self._port.write(bytes([self._SET_PORT_MASK, value]))
+        else:
+            self._port.write(bytes([self._SET_HIGH_MASK, value, self._SET_LOW_MASK,
+                                    ~value & 0xFF]))
+
+    def clear(self) -> None:
+        self._port.write(bytes([self._SET_LOW_MASK, 0xFF]))
+
+    def close(self) -> None:
+        self.clear()
+        self._port.close()
+
+
 def _open_backend(s: TriggerSettings) -> tuple[_Backend, str]:
     """Open the configured transport.
 
@@ -362,8 +434,8 @@ def _open_backend(s: TriggerSettings) -> tuple[_Backend, str]:
         return _Null(), "null"
     target = {"lsl": s.lsl_stream_name, "hid": f"{s.hid_device}:{s.port}"}.get(s.backend, s.port)
     if s.backend != "lsl" and not s.port:
-        example = ("A or B, the box's digital port" if s.backend == "hid"
-                   else "/dev/ttyUSB0 or /dev/parport0")
+        example = {"hid": "A or B, the box's digital port", "parallel": "/dev/parport0"}.get(
+            s.backend, "/dev/ttyUSB0, /dev/ttyACM0 or COM3")
         raise TriggerError(f"triggers: backend {s.backend!r} needs a port (e.g. {example})")
     try:
         if s.backend == "lsl":
@@ -372,10 +444,16 @@ def _open_backend(s: TriggerSettings) -> tuple[_Backend, str]:
             return _Serial(s.port), f"serial:{target}"
         if s.backend == "hid":
             return _HID(s.hid_device, s.port), f"hid:{target}"
+        if s.backend == "dlpio8":
+            return _DlpIo8(s.port), f"dlpio8:{target}"
+        if s.backend == "megttlbox":
+            box = _MegTtlBox(s.port)
+            how = "" if box.can_set_port else " (firmware sets the lines in two steps)"
+            return box, f"megttlbox:{target}{how}"
         return _Parallel(s.port), f"parallel:{target}"
     except ImportError as exc:
-        pkg = {"lsl": "pylsl", "serial": "pyserial", "parallel": "pyparallel",
-               "hid": "hidapi"}[s.backend]
+        pkg = {"lsl": "pylsl", "parallel": "pyparallel", "hid": "hidapi"}.get(s.backend,
+                                                                             "pyserial")
         raise TriggerError(f"triggers: the {s.backend} backend needs the {pkg} "
                            f"package (pip install {pkg})") from exc
     except Exception as exc:  # noqa: BLE001 -- any device failure, as a TriggerError
