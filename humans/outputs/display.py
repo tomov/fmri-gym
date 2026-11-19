@@ -11,7 +11,8 @@ Everything is composed on an off-screen canvas and shown by one
 ``pygame.display.flip()`` then blocks until the vertical blank at which the
 new image starts scanning out. The stamp taken right after it
 (:attr:`last_flip`, returned by every ``draw_*``) is that onset, and callbacks
-queued with :meth:`call_on_flip` run at it -- where frame triggers are sent.
+queued with :meth:`call_on_flip` run at it -- where frame triggers are sent. Given a
+log, the display writes a line at every flip, with what the flip showed.
 
 A flip only blocks when the swap chain is full, so :meth:`idle` re-presents
 the current canvas every refresh while nothing new is drawn, keeping the chain
@@ -46,6 +47,8 @@ import pygame
 
 if TYPE_CHECKING:
     import numpy as np
+
+    from ..save.logging import Logger
 
 #: A line of a screen's text that is only Markdown's ``![alt](path)`` shows the image at
 #: ``path``, from :data:`IMAGES_ROOT`, in its place. Transparent pixels show the black screen.
@@ -100,6 +103,7 @@ class Display:
         vsync: bool = True,
         monitor: int = 0,
         photodiode_patch: PhotodiodePatch | None = None,
+        logger: Logger | None = None,
     ) -> None:
         """Create and show the display window.
 
@@ -111,6 +115,8 @@ class Display:
         :param monitor: the monitor to open on, by :func:`list_monitors` index.
         :param photodiode_patch: the square painted under the photodiode on every present;
             ``None``: none.
+        :param logger: the log that gets a ``flip`` line at each flip (:meth:`_present`);
+            ``None`` logs nothing.
         """
         self.photodiode_patch = photodiode_patch
         self._is_photodiode_patch_lit = False
@@ -120,6 +126,7 @@ class Display:
         self._caption = caption
         self._want_vsync = vsync
         self._on_flip: list[tuple[Callable[..., Any], tuple]] = []
+        self._logger = logger
         self.last_flip: float | None = None
         self._init_display()
 
@@ -227,9 +234,14 @@ class Display:
         """
         self._on_flip.append((fn, args))
 
-    def _present(self) -> float:
-        """Show the canvas: blit, flip, stamp, run the queued on-flip callbacks.
+    def _present(self, kind: str = "repeat", text: str | None = None) -> float:
+        """Show the canvas: blit, flip, stamp, run the queued on-flip callbacks, then log the
+        flip (a ``flip`` line: ``kind``, the ``text`` of a text screen, and with a photodiode
+        patch whether it was lit).
 
+        :param kind: what the canvas newly shows (``text``, ``fixation``, ``game_frame``), or
+            ``repeat`` for the canvas shown again.
+        :param text: a text screen's text.
         :return: ``perf_counter`` right after the flip returned.
         """
         self.screen.blit(self.canvas, (0, 0))
@@ -242,7 +254,18 @@ class Display:
         callbacks, self._on_flip = self._on_flip, []
         for fn, args in callbacks:
             fn(*args)
+        if self._logger is not None:
+            self._log_flip(t, kind, text)
         return t
+
+    def _log_flip(self, perf_time: float, kind: str, text: str | None) -> None:
+        """Log the flip at ``perf_time``: what it showed, and the photodiode patch's state."""
+        fields: dict[str, Any] = {"kind": kind}
+        if text is not None:
+            fields["text"] = text
+        if self.photodiode_patch is not None:
+            fields["is_photodiode_patch_lit"] = self._is_photodiode_patch_lit
+        self._logger.log_run_event("flip", perf_time, **fields)
 
     def alternate_photodiode_patch(self) -> None:
         """Paint the photodiode patch the other colour from the next present on."""
@@ -314,7 +337,7 @@ class Display:
             self._draw_hud(rows, rect)
         if overlay:
             self._draw_overlay(overlay, rect)
-        return self._present()
+        return self._present("game_frame")
 
     def _draw_hud(self, rows: list[list[pygame.Surface]], rect: pygame.Rect) -> None:
         """Draw the HUD in the strip above the frame, as rows of lines laid out left to right.
@@ -453,7 +476,12 @@ class Display:
         :param align: ``"center"`` or ``"left"`` horizontal alignment mode.
         :return: ``perf_counter`` of the flip that showed it.
         """
-        font = font or self.font
+        self._compose_text(text, color, font or self.font, align)
+        return self._present("text", text)
+
+    def _compose_text(self, text: str, color: tuple[int, int, int], font: pygame.font.Font,
+                      align: str) -> None:
+        """Draw :meth:`draw_text`'s screen on the canvas, without showing it."""
         self._is_photodiode_patch_lit = False
         self.canvas.fill(BG_COLOR)
         rows = self._text_rows(text, font, color, int(self.size[0] * 0.92))
@@ -467,7 +495,6 @@ class Display:
                 rect = surf.get_rect(center=(self.size[0] // 2, y + surf.get_height() // 2))
             self.canvas.blit(surf, rect)
             y += surf.get_height()
-        return self._present()
 
     def _text_rows(self, text: str, font: pygame.font.Font, color: tuple[int, int, int],
                    max_w: int) -> list[tuple[pygame.Surface, bool]]:
@@ -499,7 +526,8 @@ class Display:
 
         :return: ``perf_counter`` of the flip that showed it.
         """
-        return self.draw_text("+", color=FIX_COLOR, font=self.fix_font)
+        self._compose_text("+", FIX_COLOR, self.fix_font, "center")
+        return self._present("fixation")
 
     def describe(self) -> dict[str, Any]:
         """What was actually opened.

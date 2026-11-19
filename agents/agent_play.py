@@ -103,7 +103,7 @@ def play_episode(adapter, policy: Policy, logger: Logger, clock: Clock, *,
     """
     policy.reset()
     observation, info = adapter.reset(seed)
-    logger.log(type="episode_start", episode_id=episode_id, seed=seed)
+    logger.log_block_event(type="episode_start", episode_id=episode_id, seed=seed)
 
     terminated = truncated = False
     score = 0.0                         # the episode's cumulative reward
@@ -165,7 +165,7 @@ def play_episode(adapter, policy: Policy, logger: Logger, clock: Clock, *,
     # the budget cutting the episode off, where a subject's block clock would.
     outcome, _ = adapter.outcome(terminated, truncated)
     end = EpisodeResult(episode_id, outcome, bool(terminated), bool(truncated), score, 0)
-    logger.log(type="episode_end", **end.record())
+    logger.log_block_event(type="episode_end", run_time=clock.run_time(), **end.record())
     return end, skipped, chunks
 
 
@@ -189,7 +189,7 @@ def play_block(game_phase: GamePhase, index: int, args, logger: Logger,
     policy = build_policy(args, adapter)
 
     data_dir = logger.open_block(index, game_phase.backend, game_phase.game, phase,
-                                 game_phase.seed)
+                                 game_phase.seed, clock.run_time())
     episodes: list[EpisodeResult] = []
     skipped = chunks = 0
     for episode_id in range(args.n_episodes):
@@ -218,7 +218,7 @@ def play_block(game_phase: GamePhase, index: int, args, logger: Logger,
         "skipped_frames": skipped, "invalid_replies": policy.invalid,
         "dropped_calls": policy.dropped,
     }
-    logger.close_block(**summary, extra=extra)
+    logger.close_block(**summary, run_time=clock.run_time(), extra=extra)
     logger.log_phase({"index": index, "type": "game", "backend": game_phase.backend,
                       "game": game_phase.game, **summary, "data_dir": data_dir})
     return data_dir
@@ -247,8 +247,8 @@ def main() -> None:
     # No scanner here, so the run's zero is simply when it started: the time
     # columns stay the same shape as a human run's, measured from that.
     clock.trigger()
-    logger = Logger(outdir, args.subject, curriculum.record(), clock)
-    logger.set_trigger_time()
+    logger = Logger(outdir, args.subject, curriculum.record())
+    logger.log_trigger_time(clock.t0_perf, clock.t0_epoch)
 
     for index, phase in enumerate(curriculum.phases):
         if not isinstance(phase, GamePhase):

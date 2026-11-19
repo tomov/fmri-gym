@@ -265,3 +265,26 @@ def test_a_message_is_dismissed_by_a_control_name_not_a_character():
     assert not phase_problems(message) and not phase_problems({**message, "control": "any"})
     assert not phase_problems({**message, "control": ControlNames.CONTROLLER_BUTTON_A})
     assert any("control name" in p for p in phase_problems({**message, "control": " "}))
+
+
+def test_a_start_up_that_stops_leaves_its_console_and_its_error_in_the_run_log(tmp_path):
+    from humans.config.curriculum import Curriculum
+    from humans.config.run import RunConfig
+    from humans.run import Run
+    far = RigConfig.open(write("far", screen={"geometry": GEOMETRY, "monitor": 99}))
+    curriculum = Curriculum.from_dict({"curriculum": [{"type": "fixation", "duration": 1}]},
+                                      "c.json")
+    config = RunConfig(curriculum=curriculum, rig=far, subject="sub-01", ses=1, run=1,
+                       duration=None, resume=False, loop=False, dummy_trigger=True,
+                       skip_load_games=True, calibration_files=())
+    with pytest.raises(ValueError, match="monitor 99"):
+        Run.from_config(config)
+    log, = (tmp_path / "data").rglob("events.jsonl")
+    lines = [json.loads(line) for line in log.read_text().splitlines()]
+    assert [line["type"] for line in lines] == ["run_start", "console", "run_end"]
+    assert lines[1]["text"].startswith("output: ") and lines[1]["stream"] == "stderr"
+    assert lines[2]["how"].startswith("error: ValueError: monitor 99")
+    assert type(sys.stderr).__name__ != "_ConsoleCopy"     # the console is given back
+    manifest = json.loads((log.parent / "manifest.json").read_text())
+    assert {"run", "seeds", "rig", "versions", "platform", "log_format"} <= manifest.keys(), \
+        "the log of a start-up that stopped has nothing to be read with"
