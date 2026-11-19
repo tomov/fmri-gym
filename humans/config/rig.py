@@ -44,6 +44,9 @@ say the same thing:
 - ``"photodiode_patch"``: the square under the rig's photodiode, ``{"corner": "br",
   "size_px": 120}`` (:class:`~humans.outputs.display.PhotodiodePatch`), painted in every run
   and flashed by the rig measurement; left out, the rig has no photodiode at the screen;
+- ``"dbp_meg"``: settings of the rig that only the DBP_MEG programs read, in their names and
+  units (:class:`DbpMegConfig`); no run here reads them, and a key left out is the programs'
+  own default;
 - ``"rig_measurement"``: the equipment the rig's timing is measured with
   (:class:`RigMeasurementConfig`): how the photodiode is read, a microphone, the recording's
   rate, more frame rates.
@@ -105,12 +108,15 @@ DEFAULTS: dict[str, Any] = {
     "screen": {"size": "1024x768", "is_fullscreen": True, "monitor": 0, "has_vsync": True},
     "inputs": ["keyboard"], "has_audio": True, "data_root": "data", "start_fixation": None,
     "end_fixation": None, "triggers": {}, "response_keys": {}, "photodiode_patch": None,
+    "dbp_meg": {},
     "rig_measurement": {},
 }
 #: A rig file's ``"screen"`` ``"geometry"``, each in cm (:class:`ScreenGeometry`).
 GEOMETRY_KEYS = ("width_cm", "height_cm", "distance_cm")
 #: Keys refused with a pointer to ``"inputs"``, which says what they would mean.
 _GONE = {"has_pad", "bindings"}
+#: DBP_MEG's ``exclusive-fullscreen``: as it decides, a fullscreen of its own mode, or not.
+DBP_MEG_EXCLUSIVE_FULLSCREEN = ("auto", "on", "off")
 #: How the rig's photodiode can be read: not at all, on this PC's sound card
 #: (input 0), or in the MEG/EEG recording (matched offline).
 PHOTODIODE_READOUTS = ("none", "soundcard", "recording")
@@ -183,6 +189,40 @@ class RigMeasurementConfig:
     def record(self) -> dict[str, Any]:
         """As a rig file writes it."""
         return {**asdict(self), "frame_rates": list(self.frame_rates)}
+
+
+@dataclass(frozen=True, slots=True)
+class DbpMegConfig:
+    """What only the DBP_MEG programs read of the rig: a rig file's ``"dbp_meg"``.
+
+    Each field is the program's flag of the same name (``center_shift_x`` is its
+    ``center-shift-x``), in its units; ``None``, the program's own default.
+    """
+
+    #: one of :data:`DBP_MEG_EXCLUSIVE_FULLSCREEN`
+    exclusive_fullscreen: str | None
+    #: raise the programs' scheduling priority (their ``no-realtime`` is its opposite)
+    is_realtime: bool | None
+    #: the scheduling priority they ask for, 1 to 99
+    realtime_priority: int | None
+    #: everything drawn moved right (negative: left) and up (negative: down), in screen pixels
+    center_shift_x: int | None
+    center_shift_y: int | None
+    #: everything drawn magnified about the centre of the screen, before the shift
+    magnification: float | None
+
+    @classmethod
+    def from_dict(cls, section: dict) -> DbpMegConfig:
+        """Read a checked ``"dbp_meg"`` (:func:`problems`); ``None`` where it says nothing."""
+        return cls(**{name: section.get(name) for name in DBP_MEG_KEYS})
+
+    def record(self) -> dict[str, Any]:
+        """As a rig file writes it: only what it says."""
+        return {name: value for name, value in asdict(self).items() if value is not None}
+
+
+#: A rig file's ``"dbp_meg"`` keys (:class:`DbpMegConfig`).
+DBP_MEG_KEYS = tuple(DbpMegConfig.__dataclass_fields__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -299,6 +339,8 @@ class RigConfig:
     #: the equipment the rig's timing is measured with.
     #: the square under the rig's photodiode; ``None``: no photodiode at the screen.
     photodiode_patch: PhotodiodePatch | None
+    #: what only the DBP_MEG programs read
+    dbp_meg: DbpMegConfig
     rig_measurement: RigMeasurementConfig
 
     @classmethod
@@ -332,6 +374,7 @@ class RigConfig:
                    photodiode_patch=(PhotodiodePatch(**{**PHOTODIODE_PATCH_DEFAULTS,
                                                          **settings["photodiode_patch"]})
                                      if settings["photodiode_patch"] is not None else None),
+                   dbp_meg=DbpMegConfig.from_dict(settings["dbp_meg"]),
                    rig_measurement=RigMeasurementConfig.from_dict(settings["rig_measurement"]))
 
     @classmethod
@@ -368,6 +411,7 @@ class RigConfig:
                 "triggers": asdict(self.triggers),
                 "photodiode_patch": (asdict(self.photodiode_patch)
                                      if self.photodiode_patch is not None else None),
+                "dbp_meg": self.dbp_meg.record(),
                 "rig_measurement": self.rig_measurement.record()}
 
     def status(self) -> str:
@@ -522,7 +566,8 @@ def problems(rig: dict) -> list[str]:
 
 def _setting_problems(rig: dict) -> list[str]:
     """What is wrong with the file's ``screen``, ``inputs``, ``has_audio``, ``data_root``,
-    fixations, triggers, response keys, ``photodiode_patch`` and ``rig_measurement``."""
+    fixations, triggers, response keys, ``photodiode_patch``, ``dbp_meg`` and
+    ``rig_measurement``."""
     screen = rig.get("screen", {})
     if not isinstance(screen, dict):
         return [f'"screen": expected {{"size", "is_fullscreen", "monitor", "has_vsync", '
@@ -550,6 +595,7 @@ def _setting_problems(rig: dict) -> list[str]:
             if rig.get(k) is not None and not _is_seconds(rig[k])]
     return (out + trigger_problems(rig.get("triggers", {})) + _input_device_problems(rig)
             + _response_key_problems(rig) + _photodiode_patch_problems(rig)
+            + _dbp_meg_problems(rig.get("dbp_meg", {}))
             + _rig_measurement_problems(rig.get("rig_measurement", {})))
 
 
@@ -596,6 +642,30 @@ def _photodiode_patch_problems(rig: dict) -> list[str]:
     if not _is_positive(d["size_px"], int):
         out.append(f'"photodiode_patch": "size_px" must be a whole number of pixels, got '
                    f'{d["size_px"]!r}')
+    return out
+
+
+def _dbp_meg_problems(section: Any) -> list[str]:
+    """``dbp_meg``: :data:`DBP_MEG_KEYS`, each of the kind the DBP_MEG programs take."""
+    if not isinstance(section, dict):
+        return [f'"dbp_meg": expected an object, got {section!r}']
+    out = [f'"dbp_meg": unknown key {k!r}' for k in section if k not in DBP_MEG_KEYS]
+    exclusive = section.get("exclusive_fullscreen", "auto")
+    if exclusive not in DBP_MEG_EXCLUSIVE_FULLSCREEN:
+        out.append(f'"dbp_meg": "exclusive_fullscreen" must be one of '
+                   f"{DBP_MEG_EXCLUSIVE_FULLSCREEN}, got {exclusive!r}")
+    if not isinstance(section.get("is_realtime", True), bool):
+        out.append(f'"dbp_meg": "is_realtime" must be true or false, got '
+                   f'{section["is_realtime"]!r}')
+    priority = section.get("realtime_priority", 1)
+    if not (_is_positive(priority, int) and priority <= 99):
+        out.append(f'"dbp_meg": "realtime_priority" must be 1 to 99, got {priority!r}')
+    out += [f'"dbp_meg": "{k}" must be a whole number of pixels, got {section[k]!r}'
+            for k in ("center_shift_x", "center_shift_y")
+            if k in section and (isinstance(section[k], bool) or not isinstance(section[k], int))]
+    if "magnification" in section and not _is_positive(section["magnification"]):
+        out.append(f'"dbp_meg": "magnification" must be more than 0, got '
+                   f'{section["magnification"]!r}')
     return out
 
 
