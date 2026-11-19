@@ -48,8 +48,8 @@ say the same thing:
   (:class:`RigMeasurementConfig`): how the photodiode is read, a microphone, the recording's
   rate, more frame rates;
 - ``"device_events"``: input devices, by the names the OS gives them, whose every event is
-  to be read from the OS beside the rig's sessions, each with the OS's own time,
-  ``["AT Translated Set 2 keyboard"]``; nothing a run plays reads it; left out, none is.
+  to be read from the OS beside each run, each with the OS's own time,
+  ``["AT Translated Set 2 keyboard"]``; left out, none is.
 
 **Controls and response keys**, never mixed. A curriculum's **controls** (a game
 phase's ``"controls"``) are control names of the rig's input devices
@@ -303,8 +303,8 @@ class RigConfig:
     #: the square under the rig's photodiode; ``None``: no photodiode at the screen.
     photodiode_patch: PhotodiodePatch | None
     rig_measurement: RigMeasurementConfig
-    #: the input devices whose events are read from the OS beside the rig's sessions, by the
-    #: OS's names; ``None``: none.
+    #: the input devices whose events are read from the OS beside each run, by the OS's names;
+    #: ``None``: none.
     device_events: tuple[str, ...] | None
 
     @classmethod

@@ -794,6 +794,15 @@ def test_device_events_stops_on_a_rig_without_devices_or_a_device_missing(
     assert not (tmp_path / "data").exists()
 
 
+def test_a_run_does_not_start_when_its_rigs_device_recording_cannot(tmp_path):
+    import fmri_play
+    from humans.config.rig import RigConfig
+    rig = RigConfig.open(_rig_with_devices(tmp_path, ["No Such Pad"]))
+    with pytest.raises(RuntimeError, match="stopped before recording"):
+        fmri_play._start_device_events(rig, "sub-01", 1)
+    assert not (tmp_path / "data").exists()
+
+
 def test_a_recording_writes_its_events_and_a_manifest_that_says_how_it_ended(tmp_path):
     import json
     import threading

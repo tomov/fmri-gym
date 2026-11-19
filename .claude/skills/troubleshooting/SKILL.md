@@ -42,6 +42,8 @@ A run checks everything it can before the participant screen opens, and stops on
 
 ## Input devices read from the OS (`device-events`)
 
+- **`device-events stopped before recording (exit N): the device events of <rig> are not recorded`** (fmri-play): the recording the rig's `"device_events"` ask for could not start; the line above it, from `device-events`, is one of the errors below.
+- **`device events: WARNING: the recording stopped during the run ...`**: `device-events` died mid-run (a device unplugged on Linux, or a crash: its own message is above); the run's data are whole, its last device events are missing.
 - **`device-events: <rig> names no device_events`**: the rig file lists no device to read. Add their names, as the OS gives them, under `"device_events"`.
 - **`device_events: no input device is named '<name>'; these are: ...`** (Linux) or **`... no HID device is named ...`** (macOS): the rig names a device that is not plugged in, or not by that name. Copy the name from the list in the message into the rig file.
 - **`device_events: /dev/input/eventN (<name>) cannot be read by this user`** (Linux): reading a device's node takes the `input` group. `sudo usermod -aG input $USER`, then log in again (or start it with `sg input -c "..."` until then).

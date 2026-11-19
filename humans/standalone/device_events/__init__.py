@@ -1,11 +1,11 @@
-"""``device-events``: every event of a rig's input devices, read from the OS beside a session,
+"""``device-events``: every event of a rig's input devices, read from the OS beside a run,
 each stamped by the OS when it happened.
 
 pygame collects a run's events only on its window's thread, between flips, so the time a run
 has for a press is when it read it: with a vsync-locked display, up to a refresh late. The OS
-keeps each event's own time. Started beside a session and stopped after it, this command
-reads the devices the rig names (its ``device_events``) beneath pygame, in a process the runs
-never import or wait on, and writes every event they send to
+keeps each event's own time. Started beside a run and stopped after it, this command
+reads the devices the rig names (its ``device_events``) beneath pygame, in a process of its
+own, and writes every event they send to
 ``<subject>/ses-<NNN>/device_events/<start>/events.jsonl`` under the rig's data root:
 ``type`` (``device_event``, or ``device_gone`` for a device unplugged), ``perf_time`` (the
 OS's stamp, on the ``perf_counter`` clock every process on the machine shares until it
@@ -57,7 +57,7 @@ class OpenDevices(Protocol):
 
 def main(argv: list[str] | None = None) -> None:
     """``device-events --rig <rig file> --subject sub-.. --ses N``: record until stopped (Ctrl+C,
-    or the signal a session script ends it with).
+    a SIGTERM, or with ``--until-stdin-closes``, the end of its standard input).
 
     :param argv: the command line; ``None`` reads the process's.
     :raises SystemExit: when the rig names no device, or one cannot be read.
@@ -68,6 +68,9 @@ def main(argv: list[str] | None = None) -> None:
                         "root")
     parser.add_argument("--subject", required=True, help="sub-<label>")
     parser.add_argument("--ses", type=int, required=True, help="the session number, from 1")
+    parser.add_argument("--until-stdin-closes", action="store_true",
+                        help="also stop when standard input closes: the process that started "
+                        "it ends the recording by closing the pipe, or by exiting")
     args = parser.parse_args(argv)
     rig = RigConfig.open(args.rig)
     if rig.device_events is None:
@@ -82,6 +85,9 @@ def main(argv: list[str] | None = None) -> None:
     stop = threading.Event()
     for signal_number in (signal.SIGINT, signal.SIGTERM):
         signal.signal(signal_number, lambda number, frame: stop.set())
+    if args.until_stdin_closes:
+        threading.Thread(target=lambda: (sys.stdin.buffer.read(), stop.set()),
+                         daemon=True).start()
     print(f"device-events: reading {', '.join(rig.device_events)} into {folder}; Ctrl+C stops",
           file=sys.stderr)
     record_device_events(devices, folder, rig, stop)
@@ -108,7 +114,7 @@ def record_device_events(devices: OpenDevices, folder: str, rig: RigConfig,
                          stop: threading.Event) -> None:
     """Write every event ``devices`` read until ``stop``, flushed to disk every
     :data:`FLUSH_INTERVAL_S`, and the manifest that says what they are read with: first when the
-    recording starts, again when it ends.
+    recording starts (then the folder is printed on stdout), again when it ends.
 
     :param devices: the open devices; closed at the end.
     :param folder: the recording's folder, made here.
@@ -121,6 +127,7 @@ def record_device_events(devices: OpenDevices, folder: str, rig: RigConfig,
                 "started": {"wall_time": time.time(), "perf_time": time.perf_counter()},
                 "ended": None}
     _write_manifest(folder, manifest)
+    print(folder, flush=True)       # on stdout: the recording has started, here
     n_events = 0
     with open(os.path.join(folder, EVENTS_FILENAME), "a") as out:
         last_flush = time.monotonic()
