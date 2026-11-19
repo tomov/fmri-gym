@@ -29,7 +29,7 @@ def watch(block: str, backend: Any, token_budget: int | None = 8000, every: int 
          max_steps: int | None = None) -> None:
     """Send a block's frames to ``backend`` one per turn, keeping its notes as a scratchpad.
 
-    :param block: a logged block's folder (``frames.h5`` + ``events.jsonl``).
+    :param block: a logged block's folder (``frames.h5`` + ``game_events.jsonl``).
     :param backend: a backend that can ``generate`` and read images.
     :param token_budget: the scratchpad's cap in estimated tokens; ``None`` or ``0`` for none.
     :param every: use every this-th recorded frame.
@@ -82,7 +82,7 @@ def _parse_rationale(text: str) -> str:
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--block", required=True, help="a logged block (frames.h5 + events.jsonl)")
+    p.add_argument("--block", required=True, help="a logged block (frames.h5 + game_events.jsonl)")
     p.add_argument("--backend", required=True, choices=["transformers", "openrouter"])
     p.add_argument("--model", required=True)
     p.add_argument("--every", type=int, default=1, help="narrate every this-th frame")
