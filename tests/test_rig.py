@@ -243,6 +243,24 @@ def test_the_photodiode_patch_is_the_rigs_with_defaults_for_what_it_leaves_out()
     assert meg.record()["photodiode_patch"] == {"corner": "tl", "size_px": 120}
 
 
+def test_the_eyelink_is_its_host_pcs_address():
+    assert RigConfig.open(write("desk")).eyelink is None
+    meg = RigConfig.open(write("meg", eyelink={"host_ip": "100.1.1.1"}))
+    assert meg.eyelink.host_ip == "100.1.1.1"
+    assert meg.record()["eyelink"] == {"host_ip": "100.1.1.1"}
+
+
+@pytest.mark.parametrize("values, problem", [
+    ({"eyelink": {"host_ip": "eyelink.local"}}, '"host_ip" must be an IP address'),
+    ({"eyelink": {"host_ip": 100}}, '"host_ip" must be an IP address'),
+    ({"eyelink": {}}, 'expected {"host_ip"'),
+    ({"eyelink": {"host_ip": "100.1.1.1", "port": 1}}, 'expected {"host_ip"'),
+    ({"eyelink": "100.1.1.1"}, 'expected {"host_ip"'),
+])
+def test_a_wrong_eyelink_section_is_refused(values, problem):
+    assert any(problem in p for p in rig.problems(values))
+
+
 @pytest.mark.parametrize("geometry, problem", [
     ({**GEOMETRY, "distance_cm": 0}, "more than 0"),
     ({**GEOMETRY, "width_cm": "70"}, "more than 0"),

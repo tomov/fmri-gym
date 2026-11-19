@@ -44,6 +44,8 @@ say the same thing:
 - ``"photodiode_patch"``: the square under the rig's photodiode, ``{"corner": "br",
   "size_px": 120}`` (:class:`~humans.outputs.display.PhotodiodePatch`), painted in every run
   and flashed by the rig measurement; left out, the rig has no photodiode at the screen;
+- ``"eyelink"``: the rig's EyeLink eye tracker, ``{"host_ip": "100.1.1.1"}``, the address of
+  its Host PC (:class:`EyelinkConfig`), for the eye-tracking programs; no run here reads it;
 - ``"rig_measurement"``: the equipment the rig's timing is measured with
   (:class:`RigMeasurementConfig`): how the photodiode is read, a microphone, the recording's
   rate, more frame rates.
@@ -60,6 +62,7 @@ What was measured on the rig is kept beside its file (:func:`measured_latency_fi
 from __future__ import annotations
 
 import glob
+import ipaddress
 import json
 import math
 import os
@@ -105,6 +108,7 @@ DEFAULTS: dict[str, Any] = {
     "screen": {"size": "1024x768", "is_fullscreen": True, "monitor": 0, "has_vsync": True},
     "inputs": ["keyboard"], "has_audio": True, "data_root": "data", "start_fixation": None,
     "end_fixation": None, "triggers": {}, "response_keys": {}, "photodiode_patch": None,
+    "eyelink": None,
     "rig_measurement": {},
 }
 #: A rig file's ``"screen"`` ``"geometry"``, each in cm (:class:`ScreenGeometry`).
@@ -183,6 +187,23 @@ class RigMeasurementConfig:
     def record(self) -> dict[str, Any]:
         """As a rig file writes it."""
         return {**asdict(self), "frame_rates": list(self.frame_rates)}
+
+
+@dataclass(frozen=True, slots=True)
+class EyelinkConfig:
+    """The rig's EyeLink eye tracker: a rig file's ``"eyelink"``."""
+
+    #: the IP address of the tracker's Host PC
+    host_ip: str
+
+    @classmethod
+    def from_dict(cls, section: dict) -> EyelinkConfig:
+        """Read a checked ``"eyelink"`` (:func:`problems`)."""
+        return cls(host_ip=section["host_ip"])
+
+    def record(self) -> dict[str, str]:
+        """As a rig file writes it."""
+        return asdict(self)
 
 
 @dataclass(frozen=True, slots=True)
@@ -299,6 +320,8 @@ class RigConfig:
     #: the equipment the rig's timing is measured with.
     #: the square under the rig's photodiode; ``None``: no photodiode at the screen.
     photodiode_patch: PhotodiodePatch | None
+    #: the rig's EyeLink; ``None``: the rig has none
+    eyelink: EyelinkConfig | None
     rig_measurement: RigMeasurementConfig
 
     @classmethod
@@ -332,6 +355,8 @@ class RigConfig:
                    photodiode_patch=(PhotodiodePatch(**{**PHOTODIODE_PATCH_DEFAULTS,
                                                          **settings["photodiode_patch"]})
                                      if settings["photodiode_patch"] is not None else None),
+                   eyelink=(EyelinkConfig.from_dict(settings["eyelink"])
+                            if settings["eyelink"] is not None else None),
                    rig_measurement=RigMeasurementConfig.from_dict(settings["rig_measurement"]))
 
     @classmethod
@@ -368,6 +393,7 @@ class RigConfig:
                 "triggers": asdict(self.triggers),
                 "photodiode_patch": (asdict(self.photodiode_patch)
                                      if self.photodiode_patch is not None else None),
+                "eyelink": self.eyelink.record() if self.eyelink is not None else None,
                 "rig_measurement": self.rig_measurement.record()}
 
     def status(self) -> str:
@@ -522,7 +548,8 @@ def problems(rig: dict) -> list[str]:
 
 def _setting_problems(rig: dict) -> list[str]:
     """What is wrong with the file's ``screen``, ``inputs``, ``has_audio``, ``data_root``,
-    fixations, triggers, response keys, ``photodiode_patch`` and ``rig_measurement``."""
+    fixations, triggers, response keys, ``photodiode_patch``, ``eyelink`` and
+    ``rig_measurement``."""
     screen = rig.get("screen", {})
     if not isinstance(screen, dict):
         return [f'"screen": expected {{"size", "is_fullscreen", "monitor", "has_vsync", '
@@ -550,6 +577,7 @@ def _setting_problems(rig: dict) -> list[str]:
             if rig.get(k) is not None and not _is_seconds(rig[k])]
     return (out + trigger_problems(rig.get("triggers", {})) + _input_device_problems(rig)
             + _response_key_problems(rig) + _photodiode_patch_problems(rig)
+            + _eyelink_problems(rig.get("eyelink"))
             + _rig_measurement_problems(rig.get("rig_measurement", {})))
 
 
@@ -597,6 +625,26 @@ def _photodiode_patch_problems(rig: dict) -> list[str]:
         out.append(f'"photodiode_patch": "size_px" must be a whole number of pixels, got '
                    f'{d["size_px"]!r}')
     return out
+
+
+def _eyelink_problems(section: Any) -> list[str]:
+    """``eyelink``: null, or the IP address of its Host PC and nothing else."""
+    if section is None:
+        return []
+    if not isinstance(section, dict) or set(section) != {"host_ip"}:
+        return [f'"eyelink": expected {{"host_ip": "<its Host PC\'s address>"}} or null, got '
+                f"{section!r}"]
+    if not _is_ip_address(section["host_ip"]):
+        return [f'"eyelink": "host_ip" must be an IP address such as 100.1.1.1, got '
+                f'{section["host_ip"]!r}']
+    return []
+
+
+def _is_ip_address(v: Any) -> bool:
+    try:
+        return isinstance(v, str) and bool(ipaddress.ip_address(v))
+    except ValueError:
+        return False
 
 
 def _rig_measurement_problems(section: Any) -> list[str]:
