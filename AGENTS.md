@@ -23,7 +23,7 @@ humans/save/                     CORE  the data: bids.py (where), logging.py (ma
 humans/adapters/base.py          CORE  EnvAdapter + FrameState: the seam
 humans/adapters/keymap.py        CORE  the phase's keys, one Keymap per action space
 humans/adapters/<BACKEND>.py     YOU   one small wrapper per game engine
-humans/standalone/                     the commands that are not a run: rig setup, session editor, calibration
+humans/standalone/                     the commands that are not a run: rig setup, session editor, calibration, device events, bids-from-logs
 configs/curricula/<BACKEND>/     YOU   the game's curricula: levels/ one per level, the folder a sequence; common/ the phase they share
 gym/<GAME>/                      YOU   a Gymnasium env for a game that ships none, or a rough one
 gym/replay_state/                      ReplayState: a savestate by replay, for any env

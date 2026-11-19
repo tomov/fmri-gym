@@ -106,6 +106,9 @@ gamepad-calibration = "humans.standalone.gamepad_calibration:main"
 # A behavioural BIDS dataset made from the runs' logs, by hand: one events table per run, and
 # each run's timeline in words.
 bids-from-logs = "humans.standalone.bids_from_logs:main"
+# Every event of the rig's input devices, read from the OS with the OS's own time, beside a
+# session: started before its runs, stopped after them.
+device-events = "humans.standalone.device_events:main"
 
 [tool.setuptools]
 packages = ["humans", "humans.adapters", "humans.config", "humans.inputs",

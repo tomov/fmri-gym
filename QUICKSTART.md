@@ -136,6 +136,14 @@ uv run session-editor --session configs/examples/sessions/pilot.sh   # adapt the
 sh configs/examples/sessions/pilot.sh  # play it: about an hour (edit SUBJECT=, SES=, RUN_DURATION=, and RIG= at the top for your team)
 ```
 
+## Each event's own time (M/EEG)
+
+```bash
+uv run device-events --rig configs/<team>/rigs/<rig>.json --subject sub-01 --ses 1   # before the session's first run, in a terminal of its own; Ctrl+C after its last
+```
+
+It reads the devices the rig names in `"device_events"` from the OS, each event at the time the OS stamped it, into the session's folder; `bids-from-logs` gives each press that time. On Linux it takes the `input` group; on macOS, the Input Monitoring permission for a keyboard-type device.
+
 ## After a session
 
 ```bash

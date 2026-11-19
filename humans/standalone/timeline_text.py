@@ -4,7 +4,8 @@ order, in seconds from the trigger.
 For a person checking a run: the head says what the logs are read with (the code, the
 machine, the rig, the display, which logs there are, how the run ended), the checks say what
 to look at, and the timeline lists the screens, blocks, episodes, presses, scanner pulses,
-codes sent, printed lines and missed refreshes, but not the game frames one by one.
+codes sent, printed lines, missed refreshes and device events no press accounts for, but not
+the game frames one by one.
 """
 
 from __future__ import annotations
@@ -47,6 +48,11 @@ def _head(record: RunRecord, timeline: Timeline) -> list[str]:
         f"{display['refresh_rate']} Hz, driver {display['driver']}",
         f"logs      format {manifest['log_format']['format']} {manifest['log_format']['version']}"
         f": the run's log and {len(record.block_lines)} block log(s)",
+        "devices   " + (
+            f"recording {record.device_recording['folder']}: "
+            f"{len(record.device_recording['devices'])} device(s) "
+            f"({record.device_recording['reader']}), {len(record.device_lines)} events in the run"
+            if record.device_recording else "no device recording covers this run"),
         f"ended     {end.removeprefix('end: ')}, {timeline.end:.3f} s after the trigger"]
 
 
@@ -60,6 +66,7 @@ def _sync_words(sync: dict[str, Any]) -> str:
 def _checks(quality: dict[str, Any]) -> list[str]:
     """The checks, one a line."""
     pulses, refreshes, presses = quality["pulses"], quality["refreshes"], quality["presses"]
+    devices = quality["devices"]
     out = [f"  scanner pulses  {pulses['count']}" + (
         f", every {pulses['median_interval_s']:.3f} s (median; {pulses['min_interval_s']:.3f}"
         f" to {pulses['max_interval_s']:.3f}), {pulses['gaps_missing_a_pulse']} gap(s) missing "
@@ -72,7 +79,15 @@ def _checks(quality: dict[str, Any]) -> list[str]:
     out.append(f"  presses         {presses['count']}, {presses['in_episodes']} in episodes: "
                f"{presses['given_to_a_step']} given to a step, {presses['given_to_none']} "
                "to none")
-    return out
+    if not devices["read"]:
+        return out + ["  devices         not read from the OS"]
+    return out + [f"  devices         {devices['events']} events, {devices['presses_timed']} "
+                  "presses timed by their device" + (
+                      f", read {devices['read_delay_median_ms']:.1f} ms later (median; 95%: "
+                      f"{devices['read_delay_p95_ms']:.1f}, max "
+                      f"{devices['read_delay_max_ms']:.1f})" if devices["presses_timed"] else "")
+                  + f"; {devices['dropped']} drop(s), {devices['gone']} unplugged; recording "
+                  f"{devices['ended']}"]
 
 
 def _events(timeline: Timeline) -> list[tuple[float, int, str, str]]:
@@ -106,10 +121,13 @@ def _text_words(text: str | None) -> str:
 
 
 def _press_words(press: Press) -> str:
-    """A press in words: the control, how long it was held, the step it went to."""
+    """A press in words: the control, how long, the step it went to, when its device sent it."""
     words = [press.control]
     if press.duration is not None:
         words.append(f"held {press.duration:.3f} s")
     if press.frame is not None:
         words.append(f"to frame {press.frame} of episode {press.episode}")
+    if press.device_time is not None:
+        words.append(f"read {1000 * (press.read_time - press.device_time):.1f} ms after its "
+                     "device sent it")
     return ", ".join(words)
