@@ -41,7 +41,7 @@ import pygame
 from .save import bids
 from .adapters import get_adapter
 from .outputs.audio import Audio
-from .save.bids import BlockProgress, RunProgress
+from .save.bids import BlockProgress, RunOutput, RunProgress
 from .save.provenance import platform_info, versions
 from .config.curriculum import Curriculum, game_changes
 from .config.phases import BlockMode, Fixation, GamePhase, Message, Phase, Survey
@@ -50,7 +50,7 @@ from .outputs.display import Display, check_monitor
 from .inputs import (QUIT, QUIT_KEYS, START_KEY, Edge, InputDevice, InputEvent,
                      open_input_devices)
 from .popup import Hint, Menu, PopUp
-from .save.logging import Logger
+from .save.logging import AudioBlockLog, Logger
 from .sync.clock import Clock
 from .sync.triggers import Triggers
 
@@ -96,34 +96,76 @@ def _is_quit(event: InputEvent) -> bool:
     return event.edge is Edge.DOWN and event.name == QUIT
 
 
-def read_input_events(inputs: InputDevice) -> list[InputEvent]:
+def read_input_events(inputs: InputDevice, logger: Logger | None) -> list[InputEvent]:
     """Take every event off pygame's queue and hand it to ``inputs``: the edges they make.
 
     A queue left to fill drops new events, key presses included, so nothing is
     left there; the window's close button comes back as :data:`QUIT`.
+
+    :param inputs: the input devices that make the edges.
+    :param logger: the run's log, which gets each event as pygame gave it (a
+        ``pygame_event`` line), then each edge (an ``input_event`` line), at the time they
+        were read; ``None`` logs nothing.
+    :return: the edges, in order.
     """
-    return inputs.handle(pygame.event.get(), time.perf_counter())
+    events = pygame.event.get()
+    read_time = time.perf_counter()
+    edges = inputs.handle(events, read_time)
+    if logger is not None:
+        _log_read(logger, read_time, events, edges)
+    return edges
 
 
-def _check_quit(inputs: InputDevice) -> bool:
+def _log_read(logger: Logger, read_time: float, events: list[pygame.event.Event],
+              edges: list[InputEvent]) -> None:
+    """Log each event read, its type and every field as pygame gave them, then each edge.
+
+    :param logger: the run's log.
+    :param read_time: ``perf_counter`` of the read.
+    :param events: the events, as pygame gave them.
+    :param edges: the edges the inputs made of them.
+    """
+    for event in events:
+        logger.log_run_event("pygame_event", read_time,
+                             event_name=pygame.event.event_name(event.type),
+                             event={"type": event.type, **_loggable(event.dict)})
+    for name, edge in edges:
+        logger.log_run_event("input_event", read_time, name=name, down=edge is Edge.DOWN)
+
+
+def _loggable(fields: dict[str, Any]) -> dict[str, Any]:
+    """An event's fields as a log line can carry them.
+
+    A pygame ``Window`` cannot be pickled, so a line holding one would never reach the writer.
+
+    :param fields: the event's fields.
+    :return: each plain value as it is, any other as its ``repr``.
+    """
+    plain = (bool, int, float, str, tuple, type(None))
+    return {name: value if isinstance(value, plain) else repr(value)
+            for name, value in fields.items()}
+
+
+def _check_quit(inputs: InputDevice, logger: Logger | None) -> bool:
     """Read the presses waiting and report whether the user requested quit.
 
+    :param inputs: the run's input devices.
+    :param logger: the run's log (:func:`read_input_events`).
     :return: ``True`` if the window was closed or the quit keys pressed.
     """
-    return any(_is_quit(event) for event in read_input_events(inputs))
+    return any(_is_quit(event) for event in read_input_events(inputs, logger))
 
 
 def _poll_keys_until(
     inputs: InputDevice,
     display: Display,
     deadline: float,
-    clock: Clock,
-    logger: Logger,
+    logger: Logger | None,
     pop_ups: Sequence[PopUp] = (),
     stop_on: Collection[str] = (),
     redraw: Callable[[], float] | None = None,
 ) -> tuple[list[str], bool]:
-    """Poll the inputs until ``deadline``, logging every press and release.
+    """Poll the inputs until ``deadline``, logging each read (:func:`read_input_events`).
 
     Replaces a plain sleep between frames: events are time-stamped on arrival
     -- to about a millisecond, or to one refresh when the display is
@@ -137,8 +179,7 @@ def _poll_keys_until(
     :param inputs: the run's input devices.
     :param display: the display, idled between polls.
     :param deadline: ``perf_counter`` at which to stop waiting.
-    :param clock: the run's clock, for the log.
-    :param logger: the run's logger.
+    :param logger: the run's log.
     :param pop_ups: the block's :class:`~.popup.Menu` and :class:`~.popup.Hint`, those it has.
     :param stop_on: control names a press of which ends the wait.
     :param redraw: called every :data:`HUD_REDRAW_S` while waiting, for a
@@ -152,13 +193,12 @@ def _poll_keys_until(
     while True:
         if any(pop_up.armed() for pop_up in pop_ups):
             return pressed, False
-        for name, edge in read_input_events(inputs):
+        for name, edge in read_input_events(inputs, logger):
             down = edge is Edge.DOWN
             if name == QUIT:
                 if down:
                     return pressed, True
                 continue
-            logger.log(type="input_event", run_time=clock.run_time(), name=name, down=down)
             if not down:
                 continue
             pressed.append(name)
@@ -173,8 +213,8 @@ def _poll_keys_until(
 
 
 def _wait_for_control(
-    inputs: InputDevice, display: Display, control: str, dummy_trigger: bool = False,
-    until: float = math.inf
+    inputs: InputDevice, display: Display, control: str, logger: Logger | None,
+    dummy_trigger: bool = False, until: float = math.inf
 ) -> None:
     """Block until ``control`` is pressed (or briefly sleep in dummy mode).
 
@@ -182,6 +222,7 @@ def _wait_for_control(
     :param display: the display, idled between polls (see :meth:`Display.idle`).
     :param control: the control name that unblocks the wait, or ``"any"`` to
         accept every control (a self-paced "press any key" screen).
+    :param logger: the run's log (:func:`read_input_events`).
     :param dummy_trigger: if ``True``, sleep briefly and return without waiting.
     :param until: ``perf_counter`` at which to stop waiting regardless.
     :raises KeyboardInterrupt: on window close or the quit keys.
@@ -190,7 +231,7 @@ def _wait_for_control(
         time.sleep(0.05)
         return
     while time.perf_counter() < until:
-        for event in read_input_events(inputs):
+        for event in read_input_events(inputs, logger):
             if _is_quit(event):
                 raise KeyboardInterrupt
             if event.edge is Edge.DOWN and control in ("any", event.name):
@@ -199,35 +240,37 @@ def _wait_for_control(
 
 
 def _wait_for_duration(inputs: InputDevice, display: Display, duration: float,
-                       until: float = math.inf) -> None:
+                       logger: Logger | None, until: float = math.inf) -> None:
     """Block for ``duration`` seconds.
 
     :param inputs: the run's input devices.
     :param display: the display, idled between polls (see :meth:`Display.idle`).
     :param duration: seconds to wait.
+    :param logger: the run's log (:func:`read_input_events`).
     :param until: ``perf_counter`` at which to stop waiting regardless.
     :raises KeyboardInterrupt: on window close or the quit keys.
     """
     end = min(time.perf_counter() + duration, until)
     while time.perf_counter() < end:
-        if _check_quit(inputs):
+        if _check_quit(inputs, logger):
             raise KeyboardInterrupt
         display.idle(end, poll=0.005)
 
 
 def _wait_for_controls(inputs: InputDevice, display: Display, names: list[str],
-                       deadline: float) -> str | None:
+                       deadline: float, logger: Logger | None) -> str | None:
     """Block until one of the controls ``names`` is pressed, or ``deadline``.
 
     :param inputs: the run's input devices.
     :param display: the display, idled between polls (see :meth:`Display.idle`).
     :param names: control names (:mod:`humans.inputs`) that end the wait.
     :param deadline: ``perf_counter`` at which to stop waiting.
+    :param logger: the run's log (:func:`read_input_events`).
     :return: the control that ended the wait, or ``None`` at the deadline.
     :raises KeyboardInterrupt: on window close or the quit keys.
     """
     while time.perf_counter() < deadline:
-        for event in read_input_events(inputs):
+        for event in read_input_events(inputs, logger):
             if _is_quit(event):
                 raise KeyboardInterrupt
             if event.edge is Edge.DOWN and event.name in names:
@@ -307,6 +350,23 @@ def _run_progress(data_root: str, subject: str, curriculum: Curriculum,
     return progress
 
 
+def _run_context(config: RunConfig, out: RunOutput, seeds_how: dict[int, str]) -> dict[str, Any]:
+    """What a run's logs are read with that is known before anything opens: its name, its
+    seeds, its curriculum, rig and switches, the code and the machine.
+
+    :param config: the run config, its curriculum seeded.
+    :param out: where the run writes, and which attempt it is.
+    :param seeds_how: how each seeded phase got its seed.
+    :return: manifest fields.
+    """
+    return {"run": {"label": out.label, "attempt": out.attempt},
+            "seeds": {"derived_from": out.label, "phases": seeds_how},
+            "curriculum_path": config.curriculum.path, "rig": config.rig.record(),
+            "dummy_trigger": config.dummy_trigger, "skip_load_games": config.skip_load_games,
+            "duration": config.duration, "loop": config.loop,
+            "versions": versions(), "platform": platform_info()}
+
+
 class Run:
     """Plays one curriculum for one subject, dispatching phases to handlers."""
 
@@ -314,18 +374,18 @@ class Run:
         self,
         config: RunConfig,
         display: Display,
-        outdir: str,
+        logger: Logger,
         audio: Audio,
         triggers: Triggers,
         inputs: InputDevice,
         resume_from: RunProgress | None = None,
     ) -> None:
-        """Set up clock, logger, and phase dispatch for one subject.
+        """Set up the run's clock and phase dispatch for one subject, on its open log.
 
         :param config: the run config: its curriculum (seeded), its rig, subject,
-            duration, test switches; the curriculum and the rig go in the manifest.
+            duration, test switches.
         :param display: shared pygame display used by all phases.
-        :param outdir: the run's folder, for its manifest and block logs.
+        :param logger: the run's log, open in its folder.
         :param audio: shared audio output used by all phases.
         :param triggers: shared trigger output (start sync + codes; see
             :mod:`humans.sync.triggers`), opened on the rig's line.
@@ -337,34 +397,25 @@ class Run:
         self.config = config
         self.display = display
         self.audio = audio
+        self.logger = logger
         self.clock = Clock()
-        self.logger = Logger(outdir, config.subject, config.curriculum.record(), self.clock)
-        self.logger.set_extra("curriculum_path", config.curriculum.path)
-        self.logger.set_extra("rig", config.rig.record())
-        self.logger.set_extra("display", display.describe())
-        self.logger.set_extra("dummy_trigger", config.dummy_trigger)
-        self.logger.set_extra("skip_load_games", config.skip_load_games)
-        self.logger.set_extra("audio", self.audio.describe())
-        self.outdir = outdir
+        self.outdir = logger.outdir
         self.triggers = triggers
         self.sync = self.triggers.sync
         self.inputs = inputs
         self.resume_from = resume_from
         #: ``perf_counter`` at which the phases stop for the closing fixation.
         self._run_end = math.inf
-        self.logger.set_extra("duration", config.duration)
-        self.logger.set_extra("loop", config.loop)
-        self.logger.set_extra("resumed_from",
-                              None if resume_from is None else resume_from.record())
 
     @classmethod
     def from_config(cls, config: RunConfig) -> "Run":
         """Everything one run needs, from its run config.
 
-        Works out where the run writes and what seeds it plays, then opens the
-        trigger line, the audio output and the window -- in that order, so a
-        bad section, an unopenable port or an unusable output stops the run
-        before anything is on screen. Each says on stderr what it got.
+        Works out where the run writes and what seeds it plays, and creates the run's log
+        there, its manifest first holding what the logs are read with (:func:`_run_context`).
+        Then it logs the console as well, and opens the inputs and outputs
+        (:meth:`_create_run_with_io`). A start-up that stops leaves the log with its
+        ``run_end`` and the error.
 
         :param config: the curriculum, the rig and the command line, as the run reads them.
         :return: the run, ready to :meth:`play`.
@@ -377,42 +428,68 @@ class Run:
         out = bids.run_output(config.rig.data_root, config.subject,
                               bids.task_label(config.curriculum.path),
                               config.ses, config.run)
-        if out.attempt > 1:
-            print(f"{out.label} already has data: this is attempt {out.attempt} at it, and "
-                  "writes beside the others", file=sys.stderr)
-        print(f"output: {out.folder}", file=sys.stderr)
+        curriculum, how = config.curriculum.with_seeds(lambda i: bids.phase_seed(out.label, i))
+        config = replace(config, curriculum=curriculum)
+        logger = Logger(out.folder, config.subject, curriculum.record())
+        for key, value in _run_context(config, out, how).items():
+            logger.set_extra(key, value)
+        logger.log_run_event("run_start", time.perf_counter(), wall_time=time.time())
+        logger.copy_console()
+        try:
+            if out.attempt > 1:
+                print(f"{out.label} already has data: this is attempt {out.attempt} at it, and "
+                      "writes beside the others", file=sys.stderr)
+            print(f"output: {out.folder}", file=sys.stderr)
+            for i, phase in enumerate(curriculum.phases):
+                if i in how:
+                    print(f"seeds: phase {i} = {phase.seed} ({how[i]})", file=sys.stderr)
+            return cls._create_run_with_io(config, logger)
+        except BaseException as error:
+            logger.log_run_event("run_end", time.perf_counter(),
+                                 how=f"error: {type(error).__name__}: {error}")
+            logger.close()
+            raise
+
+    @classmethod
+    def _create_run_with_io(cls, config: RunConfig, logger: Logger) -> "Run":
+        """The run on ``logger``, with its inputs and outputs open.
+
+        Finds where it resumes from, then opens the trigger line, the audio output, the
+        inputs and the window, in that order, so a bad section, an unopenable port or an
+        unusable output stops the run before anything is on screen. Each says on stderr what
+        it got, and goes in the manifest as it opens; the trigger line and the window log
+        through ``logger``.
+
+        :param config: the run config, its curriculum seeded.
+        :param logger: the run's open log.
+        :return: the run, ready to :meth:`play`.
+        :raises ValueError: on a monitor this machine lacks, or a progress to resume from
+            that this curriculum cannot carry on (see :func:`_run_progress`).
+        """
         resume_from = None
         if config.resume:
             resume_from = _run_progress(config.rig.data_root, config.subject, config.curriculum,
                                         config.loop)
-        curriculum, how = config.curriculum.with_seeds(lambda i: bids.phase_seed(out.label, i))
-        for i, phase in enumerate(curriculum.phases):
-            if i in how:
-                print(f"seeds: phase {i} = {phase.seed} ({how[i]})", file=sys.stderr)
-        config = replace(config, curriculum=curriculum)
+        logger.set_extra("resumed_from", None if resume_from is None else resume_from.record())
         check_monitor(config.rig.screen.monitor)
-
-        triggers = Triggers(config.rig.triggers)
+        triggers = Triggers(config.rig.triggers, logger=logger)
         print(f"triggers: {triggers.status()}", file=sys.stderr)
         if config.dummy_trigger:
             print("triggers: dummy trigger: the experimenter and scanner waits are skipped; "
                   "this is a test run, not a session", file=sys.stderr)
         audio = Audio(enabled=config.rig.has_audio)
         print(f"audio: {audio.status()}", file=sys.stderr)
+        logger.set_extra("audio", audio.describe())
         inputs = open_input_devices(config.rig.inputs, config.required_controls(),
                                     config.calibration_files)
         print(f"inputs: {inputs.status()}", file=sys.stderr)
+        logger.set_extra("inputs", inputs.record())   # which devices answered, and how
         screen = config.rig.screen
         display = Display(size=screen.size, fullscreen=screen.is_fullscreen,
                           vsync=screen.has_vsync, monitor=screen.monitor,
-                          photodiode_patch=config.rig.photodiode_patch)
-        run = cls(config, display, out.folder, audio, triggers, inputs, resume_from)
-        run.logger.set_extra("run", {"label": out.label, "attempt": out.attempt})
-        run.logger.set_extra("seeds", {"derived_from": out.label, "phases": how})
-        run.logger.set_extra("inputs", inputs.record())   # which devices answered, and how
-        run.logger.set_extra("versions", versions())
-        run.logger.set_extra("platform", platform_info())
-        return run
+                          photodiode_patch=config.rig.photodiode_patch, logger=logger)
+        logger.set_extra("display", display.describe())
+        return cls(config, display, logger, audio, triggers, inputs, resume_from)
 
     def close(self) -> None:
         """Close the logger, the inputs, the trigger line, the audio output and the window.
@@ -440,21 +517,23 @@ class Run:
               f"    triggers: {self.triggers.status()}\n"
               f"    audio:    {self.audio.status()}", file=sys.stderr)
         self.display.take_focus()
-        _wait_for_control(self.inputs, self.display, START_KEY,
-                      dummy_trigger=self.config.dummy_trigger)
+        _wait_for_control(self.inputs, self.display, START_KEY, self.logger,
+                          dummy_trigger=self.config.dummy_trigger)
         if self.sync.mode == "wait":
             print(f">>> WAITING for the scanner's trigger key {self.sync.key!r}",
                   file=sys.stderr)
             self.display.take_focus()
-            _wait_for_control(self.inputs, self.display, self.sync.key,
-                          dummy_trigger=self.config.dummy_trigger)
+            _wait_for_control(self.inputs, self.display, self.sync.key, self.logger,
+                              dummy_trigger=self.config.dummy_trigger)
         elif self.sync.mode == "send":
             print(">>> STARTING the recording: scanner_start sent", file=sys.stderr)
             self.triggers.lifecycle("scanner_start")
-            _wait_for_duration(self.inputs, self.display, self.sync.delay)
+            _wait_for_duration(self.inputs, self.display, self.sync.delay, self.logger)
 
         self.clock.trigger()
-        self.logger.set_trigger_time()
+        self.logger.log_trigger_time(self.clock.t0_perf, self.clock.t0_epoch)
+        self.logger.log_run_event("scanner_trigger", self.clock.t0_perf,
+                                  wall_time=self.clock.t0_epoch)
         self.triggers.lifecycle("task_start")
 
     def _fixation(self, phase: Fixation, index: int) -> None:
@@ -463,7 +542,8 @@ class Run:
         :param index: phase index in the curriculum (for the manifest).
         """
         onset = self.clock.from_perf(self.display.draw_fixation())
-        _wait_for_duration(self.inputs, self.display, phase.duration, until=self._run_end)
+        _wait_for_duration(self.inputs, self.display, phase.duration, self.logger,
+                           until=self._run_end)
 
         self.logger.log_phase({"index": index, "type": "fixation",
                                "onset": onset, "offset": self.clock.run_time()})
@@ -489,12 +569,13 @@ class Run:
             if self.config.dummy_trigger:      # a test run skips the waits for a key
                 deadline = min(deadline, time.perf_counter() + 0.05)
             _wait_for_controls(self.inputs, self.display, list(message.controls_to_dismiss),
-                               min(deadline, self._run_end))
+                               min(deadline, self._run_end), self.logger)
         elif duration is None:
-            _wait_for_control(self.inputs, self.display, message.control,
+            _wait_for_control(self.inputs, self.display, message.control, self.logger,
                               dummy_trigger=self.config.dummy_trigger, until=self._run_end)
         else:
-            _wait_for_duration(self.inputs, self.display, duration, until=self._run_end)
+            _wait_for_duration(self.inputs, self.display, duration, self.logger,
+                               until=self._run_end)
         return {"text": text, "onset": onset, "offset": self.clock.run_time()}
 
     def _survey(self, phase: Survey, index: int) -> None:
@@ -525,7 +606,8 @@ class Run:
         scale = points if is_digits else f"{points}\n{names}"
         for q in phase.questions:
             self.display.draw_text(f"{q}\n\nDisagree      Agree\n{scale}")
-            control = _wait_for_controls(self.inputs, self.display, controls, math.inf)
+            control = _wait_for_controls(self.inputs, self.display, controls, math.inf,
+                                         self.logger)
             responses.append({"question": q, "value": controls.index(control) + 1,
                               "key": control, "run_time": self.clock.run_time()})
 
@@ -610,7 +692,7 @@ class Run:
             waits_for_press = game_phase.is_turn_based and auto is None
             deadline = block_end if waits_for_press else next_t
             pressed, user_quit = _poll_keys_until(
-                self.inputs, self.display, deadline, self.clock, self.logger, pop_ups,
+                self.inputs, self.display, deadline, self.logger, pop_ups,
                 stop_on=key_to_action if waits_for_press else (),
                 redraw=redraw if waits_for_press else None)
             if user_quit:
@@ -618,8 +700,8 @@ class Run:
                 break
             pop_up = next((pop_up for pop_up in pop_ups if pop_up.pending), None)
             if pop_up is not None:
-                choice = pop_up.run(self.display, self.clock.run_time, self.logger,
-                                    lambda: read_input_events(self.inputs))
+                choice = pop_up.run(self.display, self.clock.run_time,
+                                    lambda: read_input_events(self.inputs, self.logger))
                 if choice != "resume":
                     outcome = choice
                     break
@@ -678,7 +760,9 @@ class Run:
 
             fields = {
                 "episode_id": episode_id, "ep_frame": ep_frame,
-                "action": action, "reward": reward,
+                "action": action, "controls_pressed": pressed,
+                "controls_held": sorted(self.inputs.held()),
+                "reward": reward,
                 "terminated": bool(terminated), "truncated": bool(truncated),
                 "run_time": t_step, "flip_time": self.clock.from_perf(flip_t),
                 "wall_time": self.clock.wall_time(), "variables": fs.variables,
@@ -701,12 +785,12 @@ class Run:
         outcome, message = _final_outcome(adapter, outcome, terminated, truncated)
         result = EpisodeResult(episode_id, outcome, bool(terminated), bool(truncated), score,
                                n_pacing_resets)
-        self.logger.log(type="episode_end", **result.record())
+        self.logger.log(type="episode_end", run_time=self.clock.run_time(), **result.record())
         if message and game_phase.show_outcome_duration > 0 and not self._time_up():
             self.audio.stop()               # the episode's last sounds, still queued
             self.display.draw_text(f"Final score: {score:g}\n{message}")
             _wait_for_duration(self.inputs, self.display, game_phase.show_outcome_duration,
-                               until=self._run_end)
+                               self.logger, until=self._run_end)
         return result
 
     def _instructions(self, phase: GamePhase, resumed: bool) -> dict | None:
@@ -782,7 +866,7 @@ class Run:
         speed = ({} if game_phase.is_turn_based
                  else self._speed(adapter, game_phase.fps, index, game_phase.game))
         data_dir = self.logger.open_block(index, game_phase.backend, game_phase.game, spec,
-                                          game_phase.seed)
+                                          game_phase.seed, run_time=self.clock.run_time())
 
         ## Init loop over episodes
         locked = self.display.vsync and self.display.refresh_rate
@@ -845,7 +929,7 @@ class Run:
 
         # Logging
         block_extra = adapter.block_extra() # run before closing the adapter to get the last state
-        audio_log = self.audio.block_log()
+        audio_log = self._audio_log_in_run_time()
         summary = {
             "n_episodes": len(episodes), "n_frames": self.logger.n_frames,
             "outcomes": dict(Counter(e.outcome for e in episodes)),
@@ -855,7 +939,8 @@ class Run:
             "num_completed_episodes": num_completed_episodes,
             "block_did_not_finish": block_did_not_finish,
         }
-        self.logger.close_block(**summary, audio=audio_log, extra=block_extra)
+        self.logger.close_block(**summary, run_time=self.clock.run_time(), audio=audio_log,
+                                extra=block_extra)
         self.logger.log_phase({
             "index": index, "type": "game", "backend": game_phase.backend,
             "game": game_phase.game, "mode": game_phase.mode.value,
@@ -874,6 +959,17 @@ class Run:
 
         if user_quit:
             raise KeyboardInterrupt
+
+    def _audio_log_in_run_time(self) -> AudioBlockLog | None:
+        """The block's sound timing, its onsets moved from ``perf_counter`` to run time.
+
+        :return: :meth:`Audio.block_log`'s, in run time; ``None`` for a block that played none.
+        """
+        audio_log = self.audio.block_log()
+        if audio_log is None:
+            return None
+        return replace(audio_log, onsets=[(chunk, self.clock.from_perf(onset))
+                                          for chunk, onset in audio_log.onsets])
 
     def _speed(self, adapter: EnvAdapter, fps: float, index: int, game: str) -> dict:
         """The block's speed against the engine's own clock, said aloud when it is not 1.
@@ -911,6 +1007,7 @@ class Run:
             report a run that stopped early.
         """
         user_quit = False
+        how_the_run_ended = "quit"
         start = 0 if self.resume_from is None else self.resume_from.phase_index
         block_progress = None if self.resume_from is None else self.resume_from.block_progress
         handlers: dict[type, Callable[[Any, int], None]] = {
@@ -944,9 +1041,13 @@ class Run:
             if reached_end:
                 self.display.draw_text("Done. Thank you!")
                 time.sleep(2.0)
+            how_the_run_ended = "finished" if reached_end else "time_up"
         except KeyboardInterrupt:
             user_quit = True
             print("Interrupted -- saving partial data.", file=sys.stderr)
+        except Exception as error:
+            how_the_run_ended = f"error: {type(error).__name__}: {error}"
+            raise
         finally:
             if self.clock.t0_perf is not None:
                 self.triggers.lifecycle("task_stop")
@@ -954,6 +1055,7 @@ class Run:
             manifest_path = self.logger.save_manifest()
             print(f"Saved run to: {self.outdir}")
             print(f"Manifest: {manifest_path}")
+            self.logger.log_run_event("run_end", time.perf_counter(), how=how_the_run_ended)
         return not user_quit
 
     def _schedule(self, start: int) -> Iterator[tuple[int, Phase]]:
@@ -978,6 +1080,6 @@ class Run:
         :param until: the ``perf_counter`` it is cut short at.
         """
         onset = self.clock.from_perf(self.display.draw_fixation())
-        _wait_for_duration(self.inputs, self.display, seconds, until=until)
+        _wait_for_duration(self.inputs, self.display, seconds, self.logger, until=until)
         self.logger.log_phase({"index": None, "type": "fixation", which: True,
                                "onset": onset, "offset": self.clock.run_time()})

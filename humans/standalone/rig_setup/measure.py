@@ -261,7 +261,8 @@ def _start_screen(rig_measurement: RigMeasurement) -> None:
         f"Rig measurement ({rig_measurement.settings.about}) of {rig.path}\n"
         "This is a rig measurement, not a scanner run: no participant plays.\n\n"
         + "\n".join(ready) + f"\n\nPress {START_KEY} to start, {QUIT_KEYS} to stop.")
-    _wait_for_control(rig_measurement.inputs, rig_measurement.display, START_KEY)
+    _wait_for_control(rig_measurement.inputs, rig_measurement.display, START_KEY,
+                      None)
 
 
 def _measure(rig_measurement: RigMeasurement, name: str, measure: Callable[..., None]) -> None:
@@ -291,7 +292,7 @@ def _measure(rig_measurement: RigMeasurement, name: str, measure: Callable[..., 
     lines = [f"{t}: {v.status.upper()}" + (f"\n  {v.why[:160]}" if v.why else "")
              for t, v in tests.items()]
     rig_measurement.display.draw_text("Rig measurement\n\n" + "\n".join(lines))
-    _wait_for_duration(rig_measurement.inputs, rig_measurement.display, _VERDICT_S)
+    _wait_for_duration(rig_measurement.inputs, rig_measurement.display, _VERDICT_S, None)
 
 
 def _leave_out(rig_measurement: RigMeasurement, name: str) -> None:
@@ -313,7 +314,7 @@ def _summary_screen(rig_measurement: RigMeasurement) -> None:
     head = (f"Rig measurement done: {len(failed)} test(s) failed, listed in the report"
             if failed else "Rig measurement done: every test passed")
     rig_measurement.display.draw_text(head + "\n\n" + "\n".join(lines))
-    _wait_for_duration(rig_measurement.inputs, rig_measurement.display, _SUMMARY_S)
+    _wait_for_duration(rig_measurement.inputs, rig_measurement.display, _SUMMARY_S, None)
 
 
 def _title(rig_measurement: RigMeasurement, text: str) -> None:
@@ -330,7 +331,7 @@ def _measure_display(rig_measurement: RigMeasurement, summary: dict, arrays: dic
            f"display\n\n{info['refresh_rate']} Hz, vsync {info['vsync']}: timing {n} "
                   f"flips (about {n / (info['refresh_rate'] or 60):.0f} s)\nthe screen "
                   "flickers grey meanwhile")
-    _wait_for_duration(rig_measurement.inputs, rig_measurement.display, _VERDICT_S)
+    _wait_for_duration(rig_measurement.inputs, rig_measurement.display, _VERDICT_S, None)
     stats = rig_measurement.display.measure_flips(n)
     arrays["intervals_ms"] = np.asarray(stats.pop("intervals_ms"))
     locked = is_locked(info, stats)
@@ -368,7 +369,7 @@ def _measure_triggers(rig_measurement: RigMeasurement, summary: dict, arrays: di
         _title(rig_measurement, f"triggers\n\nsent {summary['sent']['n']} codes on {t.active}\n"
                       + ("all read back from the network" if readback
                          else "check each in the recording: every line alone, then every code"))
-        _wait_for_duration(rig_measurement.inputs, rig_measurement.display, _VERDICT_S)
+        _wait_for_duration(rig_measurement.inputs, rig_measurement.display, _VERDICT_S, None)
     if pulses:
         _count_pulses(rig_measurement, summary, arrays)
     tests["triggers"] = _PASS
@@ -431,11 +432,11 @@ def input_devices() -> list[str]:
 
 def _round_trip(inputs: InputDevice, name: str) -> bool:
     """A synthetic press of the keyboard key ``name`` comes back from ``inputs`` as ``name``."""
-    read_input_events(inputs)
+    read_input_events(inputs, None)
     for kind in (pygame.KEYDOWN, pygame.KEYUP):
         pygame.event.post(pygame.event.Event(kind, key=KEYCODES[name], mod=0, unicode="",
                                              scancode=0))
-    return (name, Edge.DOWN) in read_input_events(inputs)
+    return (name, Edge.DOWN) in read_input_events(inputs, None)
 
 
 def _controllers(inputs: InputDevices) -> list[Controller]:
@@ -529,7 +530,7 @@ def _prompt(rig_measurement: RigMeasurement, name: str, label: str, keys: dict, 
     _title(rig_measurement, f"controls\n\nPress  {name}"
                   f"{f'  ({label})' if label and label != name else ''}\n\n{marks}"
                   f"\n\n({QUIT_KEYS}: skip the rest; they fail)")
-    read_input_events(rig_measurement.inputs)           # what was pressed before the prompt
+    read_input_events(rig_measurement.inputs, None)           # what was pressed before the prompt
     start = time.perf_counter()
     strays: list[str] = []
     while time.perf_counter() - start < timeout:
@@ -555,7 +556,7 @@ def _key_events(inputs: InputDevice, ignore: str | None) -> list[tuple[bool, str
     :raises _Skipped: on the quit keys or window close.
     """
     out = []
-    for name, edge in read_input_events(inputs):
+    for name, edge in read_input_events(inputs, None):
         if name == QUIT and edge is Edge.DOWN:
             raise _Skipped
         if name == ignore:
@@ -709,7 +710,7 @@ def _play_pattern(rig_measurement: RigMeasurement, fps: float,
     pacing_resets = 0
     try:
         while time.perf_counter() < end:
-            _wait_for_duration(rig_measurement.inputs, display, math.inf, until=next_t)
+            _wait_for_duration(rig_measurement.inputs, display, math.inf, None, until=next_t)
             next_t += dt
             env.step(0)
             display.call_on_flip(triggers.frame)
