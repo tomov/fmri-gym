@@ -99,6 +99,20 @@ def test_response_keys_and_the_rig_measurement_are_the_rig_files(qt):
     assert "1 (index finger)" in window.plan.text()
 
 
+def test_the_buttons_marked_are_the_rig_files_each_on_its_bit(qt):
+    window, _ = _rig_window("meg")
+    window.trigger_form.write("on_frame", False)
+    assert not window.input_code_box.isHidden()
+    window.input_boxes["xbox_controller"].setChecked(True)
+    window._add_input_code("CONTROLLER_BUTTON_A", 0)
+    window._add_input_code("CONTROLLER_BUTTON_B", 7)
+    codes = window.rig["triggers"]["codes"]
+    assert codes["inputs"] == {"CONTROLLER_BUTTON_A": 1, "CONTROLLER_BUTTON_B": 128}
+    assert "CONTROLLER_BUTTON_A 1, CONTROLLER_BUTTON_B 128" in window._trigger_report()
+    window.trigger_form.write("on_frame", True)
+    assert window.input_code_box.isHidden()
+
+
 def test_a_rig_measurement_waits_for_its_triggers_to_be_chosen(qt):
     window, _ = _rig_window("minimal", need_triggers=True)
     assert window.stack.currentIndex() == 3 and not window.next.isEnabled()
