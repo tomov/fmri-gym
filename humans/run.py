@@ -56,7 +56,6 @@ from .sync.triggers import Triggers
 if TYPE_CHECKING:
     from .adapters.base import EnvAdapter
 
-EXPERIMENTER_KEY = ControlNames.K_SPACE
 #: How far ``fps`` may sit from the engine's own rate and still count as real
 #: speed: what the audio output absorbs by resampling.
 _SAME_SPEED = 2e-3
@@ -213,6 +212,18 @@ def _wait_for_duration(inputs: InputDevice, display: Display, duration: float,
         if _check_quit(inputs):
             raise KeyboardInterrupt
         display.idle(end, poll=0.005)
+
+
+def wait_for_start_key(inputs: InputDevice, display: Display, start_keys: Sequence[str],
+                       dummy_trigger: bool = False) -> None:
+    """Block until one of ``start_keys`` is pressed (or briefly sleep in dummy mode).
+
+    :raises KeyboardInterrupt: on window close or ESC.
+    """
+    if dummy_trigger:
+        time.sleep(0.05)
+        return
+    _wait_for_controls(inputs, display, list(start_keys), math.inf)
 
 
 def _wait_for_controls(inputs: InputDevice, display: Display, names: list[str],
@@ -400,7 +411,7 @@ class Run:
         audio = Audio(enabled=config.rig.has_audio)
         print(f"audio: {audio.status()}", file=sys.stderr)
         inputs = open_input_devices(config.rig.inputs, config.required_controls(),
-                                    config.calibration_files)
+                                    config.calibration_files, config.rig.experimenter_keys)
         print(f"inputs: {inputs.status()}", file=sys.stderr)
         screen = config.rig.screen
         display = Display(size=screen.size, fullscreen=screen.is_fullscreen,
@@ -436,12 +447,13 @@ class Run:
         ``task_start``.
         """
         self.display.draw_text("Please keep your head as still as possible.")
-        print(f"\n>>> READY: press {EXPERIMENTER_KEY} to start the run\n"
+        rig = self.config.rig
+        print(f"\n>>> READY: press {rig.start_keys_in_words} to start the run\n"
               f"    triggers: {self.triggers.status()}\n"
               f"    audio:    {self.audio.status()}", file=sys.stderr)
         self.display.take_focus()
-        _wait_for_control(self.inputs, self.display, EXPERIMENTER_KEY,
-                      dummy_trigger=self.config.dummy_trigger)
+        wait_for_start_key(self.inputs, self.display, rig.start_keys,
+                           dummy_trigger=self.config.dummy_trigger)
         if self.sync.mode == "wait":
             print(f">>> WAITING for the scanner's trigger key {self.sync.key!r}",
                   file=sys.stderr)

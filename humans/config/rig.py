@@ -33,6 +33,8 @@ say the same thing:
 - ``"response_keys"``: the keys a response device types by itself (a button
   box, a fORP in a key mode), each with what it stands for, ``{"1": "index
   finger", ...}``;
+- ``"start_keys"``: the keyboard keys the experimenter starts a run with, any one of
+  them; read even when ``"inputs"`` has no keyboard, with ``ESCAPE`` and the scanner's key;
 - ``"has_audio"``: play game audio; ``false`` mutes every block;
 - ``"data_root"``: where the BIDS tree goes, ``<root>/sub-XX/ses-NNN/beh/<run>/``;
 - ``"start_fixation"``, ``"end_fixation"``: seconds of fixation cross every run
@@ -68,7 +70,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from ..inputs import INPUT_DEVICE_CLASSES_BY_NAME, Keyboard
+from ..inputs import INPUT_DEVICE_CLASSES_BY_NAME, ControlNames, Keyboard
 from ..outputs.display import PHOTODIODE_CORNERS, PhotodiodePatch
 from ..sync.triggers import TriggerError, TriggerSettings
 
@@ -99,13 +101,13 @@ EXAMPLES = {
     "trigger_hardware": "fORP 932 USB, '=' at each volume",
 }
 #: How a run is played where the rig file says nothing: fullscreen, as a session needs
-#: (a window only when asked for), the keyboard alone, the audio on, no fixation at
-#: either end.
+#: (a window only when asked for), the keyboard alone, started with SPACE or RETURN, the
+#: audio on, no fixation at either end.
 DEFAULTS: dict[str, Any] = {
     "screen": {"size": "1024x768", "is_fullscreen": True, "monitor": 0, "has_vsync": True},
-    "inputs": ["keyboard"], "has_audio": True, "data_root": "data", "start_fixation": None,
-    "end_fixation": None, "triggers": {}, "response_keys": {}, "photodiode_patch": None,
-    "rig_measurement": {},
+    "inputs": ["keyboard"], "start_keys": ["SPACE", "RETURN"], "has_audio": True,
+    "data_root": "data", "start_fixation": None, "end_fixation": None, "triggers": {},
+    "response_keys": {}, "photodiode_patch": None, "rig_measurement": {},
 }
 #: A rig file's ``"screen"`` ``"geometry"``, each in cm (:class:`ScreenGeometry`).
 GEOMETRY_KEYS = ("width_cm", "height_cm", "distance_cm")
@@ -286,6 +288,8 @@ class RigConfig:
     inputs: tuple[str, ...]
     #: the keys a response device types itself -> what each stands for
     response_keys: dict[str, str]
+    #: the keyboard keys that start a run, any one of them
+    start_keys: tuple[str, ...]
     #: play game audio; ``False`` mutes every block and opens no output.
     has_audio: bool
     #: the BIDS tree's root.
@@ -324,6 +328,7 @@ class RigConfig:
                    screen=ScreenConfig.from_dict(rig.get("screen", {})),
                    inputs=tuple(settings["inputs"]),
                    response_keys=dict(settings["response_keys"]),
+                   start_keys=tuple(settings["start_keys"]),
                    has_audio=settings["has_audio"],
                    data_root=settings["data_root"],
                    start_fixation=settings["start_fixation"],
@@ -346,6 +351,18 @@ class RigConfig:
         return cls.from_dict(load(path), path)
 
     @property
+    def experimenter_keys(self) -> frozenset[str]:
+        """The keys the experimenter and the scanner press: the start keys, ``ESCAPE``, and
+        the trigger key when the run waits for one."""
+        scanner_key = {self.triggers.sync.key} if self.triggers.sync.mode == "wait" else set()
+        return frozenset({*self.start_keys, ControlNames.K_ESCAPE, *scanner_key})
+
+    @property
+    def start_keys_in_words(self) -> str:
+        """``SPACE or RETURN``: what the experimenter presses to start a run."""
+        return " or ".join(self.start_keys)
+
+    @property
     def has_trigger_setup(self) -> bool:
         """Whether the file says how the run starts or where codes go (not both defaulted)."""
         return set(self.triggers.defaulted) != {"sync.mode", "backend"}
@@ -363,6 +380,7 @@ class RigConfig:
         """The rig file as the run played it, every default written out: the manifest's."""
         return {"path": self.path, **self.fields, "screen": self.screen.record(),
                 "inputs": list(self.inputs), "response_keys": self.response_keys,
+                "start_keys": list(self.start_keys),
                 "has_audio": self.has_audio, "data_root": self.data_root,
                 "start_fixation": self.start_fixation, "end_fixation": self.end_fixation,
                 "triggers": asdict(self.triggers),
@@ -549,7 +567,8 @@ def _setting_problems(rig: dict) -> list[str]:
             for k in ("start_fixation", "end_fixation")
             if rig.get(k) is not None and not _is_seconds(rig[k])]
     return (out + trigger_problems(rig.get("triggers", {})) + _input_device_problems(rig)
-            + _response_key_problems(rig) + _photodiode_patch_problems(rig)
+            + _response_key_problems(rig) + _start_key_problems(rig)
+            + _photodiode_patch_problems(rig)
             + _rig_measurement_problems(rig.get("rig_measurement", {})))
 
 
@@ -597,6 +616,23 @@ def _photodiode_patch_problems(rig: dict) -> list[str]:
         out.append(f'"photodiode_patch": "size_px" must be a whole number of pixels, got '
                    f'{d["size_px"]!r}')
     return out
+
+
+def _start_key_problems(rig: dict) -> list[str]:
+    """``start_keys``: distinct keyboard key names, none of them a key that means something
+    else at the same time (quitting, the scanner's volume)."""
+    keys = rig.get("start_keys", DEFAULTS["start_keys"])
+    if not (isinstance(keys, list) and keys and all(isinstance(k, str) for k in keys)
+            and set(keys) <= Keyboard.CONTROLS and len(set(keys)) == len(keys)):
+        return [f'"start_keys": expected a list of distinct keyboard key names (as in '
+                f"humans/inputs/keyboard.py), got {keys!r}"]
+    taken = {ControlNames.K_ESCAPE: "quits the run"}
+    triggers = rig.get("triggers", {})
+    if not trigger_problems(triggers):
+        sync = TriggerSettings.from_dict(triggers).sync
+        if sync.mode == "wait":
+            taken[sync.key] = "is the key the scanner types at every volume (triggers.sync.key)"
+    return [f'"start_keys": {k!r} {taken[k]}' for k in keys if k in taken]
 
 
 def _rig_measurement_problems(section: Any) -> list[str]:

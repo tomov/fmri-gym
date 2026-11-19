@@ -16,12 +16,12 @@ from .calibration import CalibrationError, ControllerCalibration, newest, read
 from .control_names import ControlNames
 from .controller import Controller, sdl_joystick_names, start_sdl_joysticks_and_wait_for
 from .current_designs_gamepad3 import CurrentDesignsGamepad3
-from .keyboard import Keyboard
+from .keyboard import ExperimenterKeys, Keyboard
 from .xbox_controller import XBoxController
 
 __all__ = ["INPUT_DEVICE_CLASSES_BY_NAME", "QUIT", "CalibrationError", "ControlNames",
-           "Controller", "CurrentDesignsGamepad3", "Edge", "InputDevice", "InputDevices",
-           "InputEvent",
+           "Controller", "CurrentDesignsGamepad3", "Edge", "ExperimenterKeys", "InputDevice",
+           "InputDevices", "InputEvent",
            "Keyboard", "XBoxController", "controls_of_input_devices", "detect_controllers",
            "first_controller_class_plugged_in", "is_control_of_any_input_device",
            "open_input_devices"]
@@ -73,7 +73,8 @@ def detect_controllers() -> list[dict]:
 
 def open_input_devices(input_device_names: Sequence[str],
                        required_controls: frozenset[str] = frozenset(),
-                       calibration_files: Sequence[Path] = ()) -> InputDevices:
+                       calibration_files: Sequence[Path] = (),
+                       experimenter_keys: frozenset[str] = frozenset()) -> InputDevices:
     """A device of each kind ``input_device_names`` lists, each controller on one plugged in.
 
     :param input_device_names: the kinds of device, by name.
@@ -81,6 +82,8 @@ def open_input_devices(input_device_names: Sequence[str],
         among them needs its controller calibrated. Empty: none needs it.
     :param calibration_files: a calibration file per controller to read it through, matched by
         the device it names; a controller with none is read through its newest.
+    :param experimenter_keys: keyboard keys read even when the keyboard is not among the
+        kinds, every other key then ignored (:class:`ExperimenterKeys`).
     :raises ValueError: for a kind that is not one, listed twice, or not plugged in.
     :raises CalibrationError: for a malformed calibration, a needed axis without one, or a
         calibration file of no controller opened.
@@ -105,6 +108,8 @@ def open_input_devices(input_device_names: Sequence[str],
         device_name, (path, _) = next(iter(calibration_files_by_device.items()))
         raise CalibrationError(f"{path}: a calibration of {device_name!r}, which is not a "
                                f"controller opened ({sorted(opened_device_names)})")
+    if experimenter_keys and Keyboard not in classes:
+        devices.append(ExperimenterKeys(experimenter_keys))
     inputs = InputDevices(devices, [n for n in sdl_joystick_names()
                                     if n not in opened_device_names])
     inputs.require_calibrated_axes_for(required_controls)

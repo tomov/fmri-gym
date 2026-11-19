@@ -42,6 +42,7 @@ def test_defaults_fill_what_the_file_leaves_out():
     assert (screen.size, screen.is_fullscreen, screen.monitor, screen.has_vsync) == (
         (1024, 768), True, 0, True)
     assert (desk.inputs, desk.has_audio, desk.data_root) == (("keyboard",), True, "data")
+    assert desk.start_keys == ("SPACE", "RETURN") and desk.start_keys_in_words == "SPACE or RETURN"
     assert desk.record()["screen"] == {**rig.DEFAULTS["screen"], "geometry": GEOMETRY}
 
 
@@ -194,6 +195,30 @@ def test_inputs_name_the_rigs_devices():
                                              r"from \['current_designs_gamepad3', 'keyboard', "
                                              r"'xbox_controller'\]"):
             RigConfig.open(write("pad", inputs=wrong))
+
+
+def test_the_experimenter_keys_are_the_start_keys_escape_and_the_scanners():
+    scanner = {"sync": {"mode": "wait", "key": "5"}, "backend": "null"}
+    scan = RigConfig.open(write("scan", start_keys=["S"], triggers=scanner))
+    assert scan.start_keys == ("S",) and scan.record()["start_keys"] == ["S"]
+    assert scan.experimenter_keys == {"S", "ESCAPE", "5"}
+    no_scanner = {"sync": {"mode": "none"}, "backend": "null"}
+    assert RigConfig.open(write("desk", triggers=no_scanner)).experimenter_keys == {
+        "SPACE", "RETURN", "ESCAPE"}
+
+
+@pytest.mark.parametrize("start_keys, triggers, problem", [
+    (["ESCAPE"], {}, "'ESCAPE' quits the run"),
+    (["SPACE", "5"], {"sync": {"mode": "wait", "key": "5"}}, "'5' is the key the scanner types"),
+    ([], {}, "expected a list of distinct keyboard key names"),
+    (["SPACE", "SPACE"], {}, "expected a list of distinct keyboard key names"),
+    (["space"], {}, "expected a list of distinct keyboard key names"),
+    ("SPACE", {}, "expected a list of distinct keyboard key names"),
+])
+def test_a_start_key_that_is_no_key_or_means_something_else_is_refused(start_keys, triggers,
+                                                                      problem):
+    with pytest.raises(ValueError, match=f'"start_keys": .*{problem}'):
+        RigConfig.open(write("scan", start_keys=start_keys, triggers=triggers))
 
 
 def test_every_key_is_optional_and_site_and_rig_are_the_files_place(tmp_path):

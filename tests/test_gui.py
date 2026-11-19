@@ -99,6 +99,13 @@ def test_response_keys_and_the_rig_measurement_are_the_rig_files(qt):
     assert "1 (index finger)" in window.plan.text()
 
 
+def test_the_start_keys_are_written_when_they_differ_from_the_default(qt):
+    window, _ = _rig_window("xbox")
+    assert "start_keys" not in window.rig
+    window.start_keys.takeItem(1)
+    assert window.rig["start_keys"] == ["SPACE"]
+
+
 def test_a_rig_measurement_waits_for_its_triggers_to_be_chosen(qt):
     window, _ = _rig_window("minimal", need_triggers=True)
     assert window.stack.currentIndex() == 3 and not window.next.isEnabled()
