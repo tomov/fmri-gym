@@ -12,6 +12,7 @@ import json
 import math
 import os
 import re
+import sys
 import types
 from datetime import datetime, timezone
 
@@ -694,3 +695,132 @@ def test_a_rig_measurement_lets_go_of_its_inputs_before_it_shuts_sdl_down():
                for name in ("inputs", "display", "audio", "triggers")}
     RigMeasurement.close(types.SimpleNamespace(**devices))
     assert closed.index("inputs") < closed.index("display")
+
+
+# -- each device's own events, read from the OS beside a session --------------------------
+
+
+linux_only = pytest.mark.skipif(not sys.platform.startswith("linux"), reason="the Linux reader")
+
+
+@linux_only
+def test_the_linux_reader_writes_each_kernel_record_at_the_kernels_time():
+    from humans.standalone.device_events import linux
+    read_end, write_end = os.pipe()
+    devices = object.__new__(linux.LinuxDevices)
+    devices._devices = [{"name": "Trigger Box"}]
+    devices._fds = {read_end: 0}
+    os.write(write_end, linux._EVENT.pack(12345, 678901, 1, 13, 1)     # EV_KEY KEY_EQUAL down
+             + linux._EVENT.pack(12345, 678901, 0, 0, 0))              # EV_SYN SYN_REPORT
+    try:
+        lines = devices.read(1.0)
+    finally:
+        devices.close()
+        os.close(write_end)
+    event = {"type": "device_event", "perf_time": 12345.678901, "device": 0}
+    assert lines == [{**event, "event_type": 1, "code": 13, "value": 1},
+                     {**event, "event_type": 0, "code": 0, "value": 0}]
+
+
+@linux_only
+def test_the_linux_reader_names_the_devices_it_cannot_find_or_read(monkeypatch):
+    from humans.standalone.device_events import DeviceEventsError, linux
+    present = [{"name": "Trigger Box", "path": "/dev/input/event7"},
+               {"name": "Keyboard", "path": "/dev/input/event2"}]
+    monkeypatch.setattr(linux.glob, "glob", lambda pattern: ["a", "b"])
+    monkeypatch.setattr(linux, "_sysfs_device", lambda node: present[node == "b"])
+    with pytest.raises(DeviceEventsError, match="no input device is named 'Pad'; these are: "
+                                                "'Keyboard', 'Trigger Box'"):
+        linux.LinuxDevices(["Pad"])
+
+    def refuse(path, flags):
+        raise PermissionError(path)
+    monkeypatch.setattr(linux.os, "open", refuse)
+    with pytest.raises(DeviceEventsError, match=re.escape(
+            "/dev/input/event7 (Trigger Box) cannot be read by this user")):
+        linux.LinuxDevices(["Trigger Box"])
+
+
+@linux_only
+def test_the_linux_reader_stops_when_perf_counter_is_not_the_kernels_clock(monkeypatch):
+    from humans.standalone.device_events import DeviceEventsError, linux
+    monkeypatch.setattr(linux.time, "get_clock_info",
+                        lambda name: types.SimpleNamespace(implementation="something else"))
+    with pytest.raises(DeviceEventsError, match="perf_counter reads something else"):
+        linux.LinuxDevices(["Trigger Box"])
+
+
+@pytest.mark.parametrize("device_events, says", [
+    (["Trigger Box"], None),
+    (None, None),
+    ([], "expected the devices' names"),
+    ("Trigger Box", "expected the devices' names"),
+    ([""], "expected the devices' names"),
+])
+def test_a_rigs_device_events_are_the_devices_names(device_events, says):
+    from humans.config import rig as rig_file
+    found = [problem for problem in rig_file.problems({"device_events": device_events})
+             if "device_events" in problem]
+    assert found == ([] if says is None else [found[0]]) and (says is None or says in found[0])
+
+
+def _rig_with_devices(tmp_path, device_events) -> str:
+    """A rig file of team ``lab`` whose data root is ``tmp_path/data``."""
+    from humans.config import rig as rig_file
+    path = tmp_path / "configs" / "lab" / "rigs" / "desk.json"
+    rig_file.save({**{k: "x" for k in rig_file.FIELDS}, "site": "lab", "rig": "desk",
+                   "pi": "MT", "modality": "meg", "notes": "",
+                   "data_root": str(tmp_path / "data"), "device_events": device_events,
+                   "screen": {"geometry": {"width_cm": 30.0, "height_cm": 20.0,
+                                           "distance_cm": 60.0}}}, str(path))
+    return str(path)
+
+
+@pytest.mark.parametrize("device_events, says", [
+    (None, "names no device_events"),
+    (["No Such Pad"], "No Such Pad"),
+])
+def test_device_events_stops_on_a_rig_without_devices_or_a_device_missing(
+        tmp_path, monkeypatch, device_events, says):
+    from humans.standalone import device_events as recorder
+
+    def missing(device_names):
+        raise recorder.DeviceEventsError(f"device_events: no input device is named "
+                                         f"{device_names[0]!r}")
+    monkeypatch.setattr(recorder, "open_devices", missing)
+    with pytest.raises(SystemExit, match=says):
+        recorder.main(["--rig", _rig_with_devices(tmp_path, device_events),
+                       "--subject", "sub-01", "--ses", "1"])
+    assert not (tmp_path / "data").exists()
+
+
+def test_a_recording_writes_its_events_and_a_manifest_that_says_how_it_ended(tmp_path):
+    import json
+    import threading
+
+    from humans.config.rig import RigConfig
+    from humans.standalone.device_events import record_device_events
+    stop = threading.Event()
+    reads = iter([[{"type": "device_event", "perf_time": 1.0, "device": 0, "event_type": 1,
+                    "code": 13, "value": 1}], []])
+
+    class Box:
+        def record(self):
+            return {"reader": "test", "clock": "perf_counter", "devices": [{"name": "Box"}]}
+
+        def read(self, timeout):
+            stop.set()                          # one read, then the session ends
+            return next(reads, [])
+
+        def close(self):
+            self.closed = True
+    box = Box()
+    folder = tmp_path / "data" / "sub-01" / "ses-001" / "device_events" / "20261119T120000"
+    record_device_events(box, str(folder), RigConfig.open(_rig_with_devices(tmp_path, ["Box"])),
+                         stop)
+    manifest = json.loads((folder / "manifest.json").read_text())
+    assert manifest["devices"] == [{"name": "Box"}] and manifest["ended"]["how"] == "stopped"
+    assert manifest["started"]["wall_time"] > manifest["started"]["perf_time"]
+    assert [json.loads(line)["code"] for line in
+            (folder / "events.jsonl").read_text().splitlines()] == [13]
+    assert box.closed
