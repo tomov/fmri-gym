@@ -44,39 +44,26 @@ _CFNumberGetValue = _function(_CF, "CFNumberGetValue", ctypes.c_bool, _POINTER, 
                               _POINTER)
 _CFGetTypeID = _function(_CF, "CFGetTypeID", ctypes.c_ulong, _POINTER)
 _CFStringGetTypeID = _function(_CF, "CFStringGetTypeID", ctypes.c_ulong)
-_CFDictionaryCreate = _function(_CF, "CFDictionaryCreate", _POINTER, _POINTER,
-                                ctypes.POINTER(_POINTER), ctypes.POINTER(_POINTER),
-                                ctypes.c_long, _POINTER, _POINTER)
-_CFArrayCreate = _function(_CF, "CFArrayCreate", _POINTER, _POINTER, ctypes.POINTER(_POINTER),
-                           ctypes.c_long, _POINTER)
 _CFSetGetCount = _function(_CF, "CFSetGetCount", ctypes.c_long, _POINTER)
 _CFSetGetValues = _function(_CF, "CFSetGetValues", None, _POINTER, ctypes.POINTER(_POINTER))
-_CFRelease = _function(_CF, "CFRelease", None, _POINTER)
 _CFRunLoopGetCurrent = _function(_CF, "CFRunLoopGetCurrent", _POINTER)
 _CFRunLoopRunInMode = _function(_CF, "CFRunLoopRunInMode", ctypes.c_int32, _POINTER,
                                 ctypes.c_double, ctypes.c_bool)
 _DEFAULT_MODE = _POINTER.in_dll(_CF, "kCFRunLoopDefaultMode")
-_DICTIONARY_KEY_CALLBACKS = ctypes.addressof(
-    ctypes.c_char.in_dll(_CF, "kCFTypeDictionaryKeyCallBacks"))
-_DICTIONARY_VALUE_CALLBACKS = ctypes.addressof(
-    ctypes.c_char.in_dll(_CF, "kCFTypeDictionaryValueCallBacks"))
-_ARRAY_CALLBACKS = ctypes.addressof(ctypes.c_char.in_dll(_CF, "kCFTypeArrayCallBacks"))
 
 _IOHIDManagerCreate = _function(_IOKIT, "IOHIDManagerCreate", _POINTER, _POINTER,
                                 ctypes.c_uint32)
 _IOHIDManagerSetDeviceMatching = _function(_IOKIT, "IOHIDManagerSetDeviceMatching", None,
                                            _POINTER, _POINTER)
-_IOHIDManagerSetDeviceMatchingMultiple = _function(
-    _IOKIT, "IOHIDManagerSetDeviceMatchingMultiple", None, _POINTER, _POINTER)
 _IOHIDManagerCopyDevices = _function(_IOKIT, "IOHIDManagerCopyDevices", _POINTER, _POINTER)
-_IOHIDManagerOpen = _function(_IOKIT, "IOHIDManagerOpen", ctypes.c_int32, _POINTER,
+_IOHIDDeviceOpen = _function(_IOKIT, "IOHIDDeviceOpen", ctypes.c_int32, _POINTER,
+                             ctypes.c_uint32)
+_IOHIDDeviceClose = _function(_IOKIT, "IOHIDDeviceClose", ctypes.c_int32, _POINTER,
                               ctypes.c_uint32)
-_IOHIDManagerClose = _function(_IOKIT, "IOHIDManagerClose", ctypes.c_int32, _POINTER,
-                               ctypes.c_uint32)
-_IOHIDManagerScheduleWithRunLoop = _function(_IOKIT, "IOHIDManagerScheduleWithRunLoop", None,
-                                             _POINTER, _POINTER, _POINTER)
-_IOHIDManagerUnscheduleFromRunLoop = _function(_IOKIT, "IOHIDManagerUnscheduleFromRunLoop",
-                                               None, _POINTER, _POINTER, _POINTER)
+_IOHIDDeviceScheduleWithRunLoop = _function(_IOKIT, "IOHIDDeviceScheduleWithRunLoop", None,
+                                            _POINTER, _POINTER, _POINTER)
+_IOHIDDeviceUnscheduleFromRunLoop = _function(_IOKIT, "IOHIDDeviceUnscheduleFromRunLoop",
+                                              None, _POINTER, _POINTER, _POINTER)
 _IOHIDDeviceGetProperty = _function(_IOKIT, "IOHIDDeviceGetProperty", _POINTER, _POINTER,
                                     _POINTER)
 _IOHIDDeviceRegisterInputValueCallback = _function(
@@ -95,7 +82,7 @@ _mach_timebase_info = _function(_SYSTEM, "mach_timebase_info", ctypes.c_int,
 
 
 class MacDevices:
-    """The named HID devices, open through an IOKit HID manager on this thread's run loop;
+    """The named HID devices, each open on this thread's run loop;
     their input values as IOKit stamped them."""
 
     def __init__(self, device_names: list[str]) -> None:
@@ -107,30 +94,29 @@ class MacDevices:
             Input Monitoring permission).
         """
         self._seconds_per_tick = _seconds_per_mach_tick()
+        # Every device, kept by name here: IOKit ignores a product name in a matching dictionary.
         self._manager = _IOHIDManagerCreate(None, 0)
-        _IOHIDManagerSetDeviceMatchingMultiple(self._manager, _matching_products(device_names))
-        handles = _devices(self._manager)
+        _IOHIDManagerSetDeviceMatching(self._manager, None)
+        all_handles = _devices(self._manager)
+        handles = [handle for handle in all_handles
+                   if _string_property(handle, "Product") in device_names]
         self._devices = [_identity(handle) for handle in handles]
         missing = sorted(set(device_names) - {device["name"] for device in self._devices})
         if missing:
             raise DeviceEventsError(
                 f"device_events: no HID device is named {', '.join(map(repr, missing))}; "
-                f"these are: {', '.join(sorted(map(repr, _all_product_names())))}")
-        opened = _IOHIDManagerOpen(self._manager, 0)
-        if opened == _NOT_PERMITTED:
-            raise DeviceEventsError("device_events: this app lacks the Input Monitoring "
-                                    "permission, which reading a keyboard-type device takes")
-        if opened != 0:
-            raise DeviceEventsError(f"device_events: IOKit would not open the devices "
-                                    f"(IOReturn {opened:#x})")
+                f"these are: {', '.join(sorted(map(repr, _product_names(all_handles))))}")
+        for handle in handles:
+            _open_device(handle)
+        self._handles = handles
         #: the lines of the values IOKit delivered since the last :meth:`read`
         self._pending: list[dict[str, Any]] = []
         # Kept alive here: IOKit holds only the pointer.
         self._callback = _VALUE_CALLBACK(self._on_value)
+        self._run_loop = _CFRunLoopGetCurrent()
         for index, handle in enumerate(handles):
             _IOHIDDeviceRegisterInputValueCallback(handle, self._callback, index + 1)
-        self._run_loop = _CFRunLoopGetCurrent()
-        _IOHIDManagerScheduleWithRunLoop(self._manager, self._run_loop, _DEFAULT_MODE)
+            _IOHIDDeviceScheduleWithRunLoop(handle, self._run_loop, _DEFAULT_MODE)
 
     def record(self) -> dict[str, Any]:
         """The reader, the clock of its stamps, and each device by its index."""
@@ -148,9 +134,10 @@ class MacDevices:
         return lines
 
     def close(self) -> None:
-        """Take the manager off the run loop and close the devices."""
-        _IOHIDManagerUnscheduleFromRunLoop(self._manager, self._run_loop, _DEFAULT_MODE)
-        _IOHIDManagerClose(self._manager, 0)
+        """Take the devices off the run loop and close them."""
+        for handle in self._handles:
+            _IOHIDDeviceUnscheduleFromRunLoop(handle, self._run_loop, _DEFAULT_MODE)
+            _IOHIDDeviceClose(handle, 0)
 
     def _on_value(self, context: int, result: int, sender: int, value: int) -> None:
         """Keep one input value: its device (``context`` is its index + 1), element and stamp."""
@@ -183,17 +170,19 @@ def _cfstring(text: str) -> int:
     return _CFStringCreateWithCString(None, text.encode(), _UTF8)
 
 
-def _matching_products(device_names: list[str]) -> int:
-    """A CFArray of one matching dictionary per product name."""
-    key = _cfstring("Product")
-    dictionaries = []
-    for name in device_names:
-        keys, values = (_POINTER * 1)(key), (_POINTER * 1)(_cfstring(name))
-        dictionaries.append(_CFDictionaryCreate(None, keys, values, 1,
-                                                _DICTIONARY_KEY_CALLBACKS,
-                                                _DICTIONARY_VALUE_CALLBACKS))
-    array = (_POINTER * len(dictionaries))(*dictionaries)
-    return _CFArrayCreate(None, array, len(dictionaries), _ARRAY_CALLBACKS)
+def _open_device(device: int) -> None:
+    """Open ``device`` for reading.
+
+    :raises DeviceEventsError: if IOKit will not open it (a keyboard-type device without the
+        Input Monitoring permission).
+    """
+    opened = _IOHIDDeviceOpen(device, 0)
+    if opened == _NOT_PERMITTED:
+        raise DeviceEventsError("device_events: this app lacks the Input Monitoring "
+                                "permission, which reading a keyboard-type device takes")
+    if opened != 0:
+        raise DeviceEventsError(f"device_events: IOKit would not open "
+                                f"{_string_property(device, 'Product')!r} (IOReturn {opened:#x})")
 
 
 def _devices(manager: int) -> list[int]:
@@ -207,13 +196,10 @@ def _devices(manager: int) -> list[int]:
     return list(handles)
 
 
-def _all_product_names() -> list[str]:
-    """Every HID device's product name, for an error that has to name them."""
-    manager = _IOHIDManagerCreate(None, 0)
-    _IOHIDManagerSetDeviceMatching(manager, None)
-    names = {_identity(handle)["name"] for handle in _devices(manager)}
-    _CFRelease(manager)
-    return sorted(name for name in names if name)
+def _product_names(devices: list[int]) -> list[str]:
+    """The devices' product names, for an error that has to name them."""
+    return sorted({name for name in map(lambda device: _string_property(device, "Product"),
+                                        devices) if name})
 
 
 def _identity(device: int) -> dict[str, Any]:
