@@ -714,7 +714,7 @@ The task is the config's file name (letters and digits); `--subject` must be `su
 
 Data is never overwritten. A run whose folder is already there writes to `..._02`, then `_03`; the attempt that stopped stays where it is. That suffix names the folder only — the run's label, which the manifest records with the `attempt` number and which keys the seeds, stays canonical, so every attempt at a run plays the same episodes.
 
-The names follow BIDS apart from that suffix, the contents not yet (no `_beh.tsv` / `_events.tsv`). A run's data is one record, read together: the manifest says what the logs are read with; the run's own log holds what the run read, showed, sent and printed, and each block's log what its game did, each line written once, by what produced it. Each folder holds:
+The names follow BIDS apart from that suffix; the folders are fmri-gym's own, and `bids-from-logs` makes a BIDS dataset from them ("A BIDS dataset from the logs", below). A run's data is one record, read together: the manifest says what the logs are read with; the run's own log holds what the run read, showed, sent and printed, and each block's log what its game did, each line written once, by what produced it. Each folder holds:
 
 - **`manifest.json`** — written first, when the run's folder is made, then rewritten as each part opens and each phase ends: the `log_format` (`format`, `version`) the logs follow; the `run` it is (label and `attempt`) and its `seeds` (each game phase derived or pinned); subject, `curriculum` and `curriculum_path`; the `rig` (inputs, triggers and their `sync` key, photodiode patch, …), `dummy_trigger`, the run's `duration`, `loop` and where it was `resumed_from` (see "Resuming a curriculum"); the `versions` of the code (`git`: the commit, `-dirty` if edited), Python, numpy, pygame and SDL; the `platform` (OS, machine, and the clock behind `perf_counter`); then the `audio` output (device, measured device delay, chosen delay), the `inputs` that answered (each device, its calibration file and that file's contents), the `display` actually opened (size, `vsync`, `refresh_rate`, driver); the trigger epoch (`start_epoch`, and `trigger_perf`, the `perf_counter` of the trigger); per-phase onsets/offsets (+ survey responses; onsets are flip times); and at the end the `triggers` settings + lifecycle triggers sent (+ what the config left `defaulted`).
 - **`events.jsonl`** — the run's own log: what the run read, showed, sent and printed, from its start to its end, written as the run plays and forced to disk every second, so a crash, a killed process or a machine reset loses at most the last second. Each line has a `type`, a `perf_time` (the `perf_counter` its source stamped; the run time is `perf_time` minus the manifest's `trigger_perf`) and a `block` (the folder name of the game block open when it was written; `null` outside one):
@@ -745,6 +745,16 @@ The names follow BIDS apart from that suffix, the contents not yet (no `_beh.tsv
   - **`frames.h5`** — the rendered frames, `frames` `(N, H, W, C)` gzip'd one chunk per frame plus `frame_index` `(N,)`, the `frame` of each row: every `frame_stride`-th frame (default every one; `0` keeps none). `humans.save.logging.read_frames` / `read_frame` read them.
 
   The manifest's phase entry carries the same summary and names the folder (`data_dir`).
+
+### A BIDS dataset from the logs
+
+`uv run bids-from-logs --rig configs/<team>/rigs/<rig>.json` reads each run in the rig's data root as one record — its manifest with its log and its blocks' — and writes a behavioural BIDS dataset into `<data root>/bids` (`--out` for another folder; `--subject` for one subject's runs):
+
+- **`sub-*/ses-*/beh/<run>_events.tsv`** and its `_events.json`: one row per screen, game block, episode and press of a control, `onset` and `duration` in seconds from the trigger, `n/a` where a column does not apply. A screen lasts until the next new picture; a press until it is let go, with the `frame` it was given to (`n/a`: none, e.g. a press in a pop-up). The scanner's pulses, each frame and each code sent stay in the logs.
+- **`derivatives/timelines/sub-*/ses-*/beh/<run>_timeline.txt`**: the run in words, for a person checking it. Its head says what the run was (the code's commit, the machine, the rig, the display, its logs, how it ended); its checks give the scanner's pulses and their intervals, the display's missed refreshes, and the presses given to no step; then each event in order: screens, blocks, episodes, presses with the step each went to, pulses, codes sent, printed lines, missed refreshes.
+- **`participants.tsv`** and a **`README`**. The dataset's `dataset_description.json` (its name and authors, which BIDS requires) is yours to add.
+
+The logs are only read. The conversion writes nothing, and says which runs and why, when it would have to choose: two attempts at one run that both reached the trigger (BIDS keeps one run; move the other out of the data root), or a run in a log format older than 2 (recorded before runs kept a log of their own). A run that never reached its trigger has nothing to convert, and is listed and skipped. Both outputs are written from one join of the logs, `humans.standalone.run_timeline.build_timeline`, which an analysis of its own can call.
 
 ### Reconstruction (all verified bit-exact)
 
@@ -835,6 +845,7 @@ Many games already expose a Gymnasium API and drop straight into the `gym` backe
 - [ ] Per-subject deterministic curriculum generation; multi-run structure with one trigger per fMRI run.
 - [ ] More adapters: ViZDoom/COOM, MiniHack, crafter, MuJoCo (`qpos/qvel` as state vars) — each a small `EnvAdapter`.
 - [ ] Button-box / MRI-safe response device key remapping.
-- [ ] BIDS-style output layout + `events.tsv` per run.
+- [x] `events.tsv` per run, in a behavioural BIDS dataset (`bids-from-logs`).
+- [ ] BIDS-style layout of the runs' own folders.
 - [ ] A replay/QC utility to render any block to video from its states.
 - [ ] Crash-safe incremental logging (stream frames to disk) for long runs.
