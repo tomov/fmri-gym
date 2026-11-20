@@ -3,7 +3,7 @@
 A run's data is one record (:class:`RunRecord`): the manifest says what the logs are read
 with -- the trigger's ``perf_counter`` (``trigger_perf``), the rig and its scanner key, the
 display, the log format -- the run's ``pygame_events.jsonl`` holds what the run read, showed,
-sent and printed, and each block's ``events.jsonl`` what its game did. :func:`build_timeline`
+sent and printed, and each block's ``game_events.jsonl`` what its game did. :func:`build_timeline`
 joins them once, in seconds from the trigger: screens, blocks, episodes, presses with the step
 each was given to, the scanner's pulses, the codes sent, what was printed, and the numbers a
 run is checked by. When the rig's devices were read from the OS beside it
@@ -26,7 +26,9 @@ from pathlib import Path
 from typing import Any
 
 from ..inputs.keyboard import NAMES
-from ..save.logging import EVENTS_FILENAME, RUN_EVENTS_FILENAME, read_lines
+from ..save.logging import (
+    EVENTS_FILENAME, GAME_EVENTS_FILENAME, RUN_EVENTS_FILENAME, read_lines,
+)
 from .device_events import DEVICE_EVENTS_FILENAME
 from .key_codes import (
     EV_KEY, EV_SYN, EVDEV_AXES, EVDEV_BUTTONS, EVDEV_KEYS, HID_BUTTON_PAGE, HID_KEYBOARD_PAGE,
@@ -60,7 +62,7 @@ class RunRecord:
     manifest: dict[str, Any]
     #: the run's ``pygame_events.jsonl``
     run_lines: list[dict[str, Any]]
-    #: each block's ``events.jsonl``, by its folder's name
+    #: each block's ``game_events.jsonl``, by its folder's name
     block_lines: dict[str, list[dict[str, Any]]]
     #: the run's device recording: its ``recording_start`` line, with its ``recording_end``
     #: line as ``ended`` (``None`` when it was cut short); ``None`` when the run has none
@@ -81,9 +83,10 @@ class RunRecord:
         if version < OLDEST_LOG_FORMAT:
             raise LogFormatError(f"{folder}: log format {version}, recorded before runs kept a "
                                  f"log of their own; these tools read {OLDEST_LOG_FORMAT} on")
-        blocks = {Path(path).parent.name: read_lines(path) for path in
-                  sorted(glob.glob(os.path.join(folder, "block-*", EVENTS_FILENAME)))}
-        run_log = EVENTS_FILENAME if version == 2 else RUN_EVENTS_FILENAME
+        old = version == 2
+        blocks = {Path(path).parent.name: read_lines(path) for path in sorted(glob.glob(
+            os.path.join(folder, "block-*", EVENTS_FILENAME if old else GAME_EVENTS_FILENAME)))}
+        run_log = EVENTS_FILENAME if old else RUN_EVENTS_FILENAME
         run_lines = read_lines(os.path.join(folder, run_log))
         recording, device_lines = _device_recording(folder, run_lines)
         return cls(folder, manifest, run_lines, blocks, recording, device_lines)

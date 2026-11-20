@@ -15,7 +15,7 @@ writer falls behind (`logging.py:83-84`).
 
 Per block, the output is one folder with up to three files (`logging.py:5-8`):
 
-- `events.jsonl`: one JSON line per event. Savestates live inside the `frame`
+- `game_events.jsonl` (`events.jsonl` before log format 3): one JSON line per event. Savestates live inside the `frame`
   lines here, not in a separate file.
 - `frames.h5`: rendered frames, HDF5 with SWMR (single-writer multiple-reader)
   so flushed frames are durable.
@@ -56,7 +56,7 @@ queues a `close` op and the writer just closes the block's handles
 
 ## How each thing is stored
 
-**States and actions (events.jsonl).** Actions, reward, times, and `variables`
+**States and actions (game_events.jsonl).** Actions, reward, times, and `variables`
 go verbatim into each `frame` line (`run.py:597-611`). The savestate blob rides
 along in the queue record as raw bytes and the *writer process* does
 `zlib.compress(blob, 1)` then base64 and stuffs it into the line's `"state"`
@@ -88,7 +88,7 @@ dataset, uncompressed, chunked at 4096 rows, and appends one entry to
 append at `logging.py:275-285`). At `close_block`, the audio summary from
 `Audio.block_log` lands as attrs and two small datasets (`onset_chunk`,
 `onset_time`) (`logging.py:286-294`, produced at `run.py:758-773`). The
-per-frame `audio_chunk` field in events.jsonl links a frame to its row in
+per-frame `audio_chunk` field in game_events.jsonl links a frame to its row in
 `chunk_len` (`run.py:608-611`).
 
 ## Ballpark overhead, from reading the code
@@ -145,7 +145,7 @@ The `variables` dict is JSON-encoded every frame via `_json_default`'s
 bytes of JSON text. For retro it is the full console RAM
 (`adapters/retro.py:55`): a Genesis has 64 KB of work RAM, which as a JSON list
 of ints is ~250 KB of text per frame, or ~15 MB/s at 60 fps, all in the writer
-process's `json.dumps` and in events.jsonl. If that is what the retro
+process's `json.dumps` and in game_events.jsonl. If that is what the retro
 `get_ram()` returns, it dwarfs the frames, the states, and the audio combined,
 and is likely the single largest write cost in the system. The README's
 storage note only calls out savestates, not this. Measure before trusting the

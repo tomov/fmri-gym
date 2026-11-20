@@ -651,7 +651,7 @@ Which of these a rig needs varies: the scanner may type a key at every volume, o
 
 Leaving `sync.mode` or `backend` out defaults to `wait` / `null`, and says so: the console, at start-up and again at the ready prompt, and the manifest report it (`NOT SET in the rig file: sync.mode, backend`), as they do for `--dummy-trigger`.
 
-What is sent: `task_start` when the clock anchors, `episode_start` at each reset, one code per frame (`"frame_every": N` to thin, `"on_frame": false` to drop), `task_stop` at the end. Codes never share bits, so two triggers on the same sample still decode: frames cycle 1–7 in the low 3 bits, `task_start`=8, `task_stop`=16, `episode_start`=32, `scanner_start`=64, and a lifecycle code is OR'd with the current frame code (all under `"codes"`; overlaps are refused). Every value sent is logged: each as a `trigger_sent` line of the run's `events.jsonl` as it goes out (the line cleared included), per frame as `trigger` on the block's `frame` lines, and lifecycle events with their `run_time` under `triggers` in `manifest.json`.
+What is sent: `task_start` when the clock anchors, `episode_start` at each reset, one code per frame (`"frame_every": N` to thin, `"on_frame": false` to drop), `task_stop` at the end. Codes never share bits, so two triggers on the same sample still decode: frames cycle 1–7 in the low 3 bits, `task_start`=8, `task_stop`=16, `episode_start`=32, `scanner_start`=64, and a lifecycle code is OR'd with the current frame code (all under `"codes"`; overlaps are refused). Every value sent is logged: each as a `trigger_sent` line of the run's `pygame_events.jsonl` as it goes out (the line cleared included), per frame as `trigger` on the block's `frame` lines, and lifecycle events with their `run_time` under `triggers` in `manifest.json`.
 
 ## Timing
 
@@ -732,7 +732,7 @@ The names follow BIDS apart from that suffix; the folders are fmri-gym's own, an
     | `run_end` | `how`: `finished`, `time_up`, `quit`, or `error: ...` (a start-up that stopped included: its folder then holds only the manifest and this log); the last line |
 
 - **`block-NN_<backend>_<game>/`** — one folder per game block: what happened in its game, written as the block plays (so a crash loses at most the last second), holding:
-  - **`events.jsonl`** — one JSON object per line, in order; `type` says which:
+  - **`game_events.jsonl`** — one JSON object per line, in order; `type` says which:
 
     | `type` | fields |
     |--------|--------|

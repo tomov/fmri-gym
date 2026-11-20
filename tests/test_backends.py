@@ -47,7 +47,7 @@ import pytest
 from humans.adapters import get_adapter
 from humans.inputs import QUIT, ControlNames
 from humans.save.logging import (
-    AUDIO_FILENAME, EVENTS_FILENAME, FRAMES_FILENAME, RUN_EVENTS_FILENAME, _json_default,
+    AUDIO_FILENAME, FRAMES_FILENAME, GAME_EVENTS_FILENAME, RUN_EVENTS_FILENAME, _json_default,
     read_audio, read_events, read_frames, read_lines,
 )
 from tests import tap, verify_replay
@@ -300,7 +300,7 @@ def test_headless_run(session):
         f"the closing fixation ended at {end[0]['offset']:.2f} s, past --duration"
     assert games and games[0]["n_frames"] > 0, "the game block logged no frame: were the keys read?"
     block = _game_block(session.run)
-    assert (block / EVENTS_FILENAME).exists() and (block / FRAMES_FILENAME).exists()
+    assert (block / GAME_EVENTS_FILENAME).exists() and (block / FRAMES_FILENAME).exists()
     events = read_events(str(block))
     frames = [e for e in events if e["type"] == "frame"]
     assert len(frames) == games[0]["n_frames"]

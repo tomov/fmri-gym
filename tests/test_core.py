@@ -23,7 +23,8 @@ from humans.config.curriculum import (
     shared_overrides, validate_curriculum,
 )
 from humans.save.logging import (
-    AUDIO_FILENAME, EVENTS_FILENAME, FORMAT, FRAMES_FILENAME, RUN_EVENTS_FILENAME, VERSION,
+    AUDIO_FILENAME, EVENTS_FILENAME, FORMAT, FRAMES_FILENAME, GAME_EVENTS_FILENAME,
+    RUN_EVENTS_FILENAME, VERSION,
     AudioBlockLog, Logger, read_audio, read_events, read_frames, read_lines, read_state,
 )
 from humans.save.replay import frame_arrays, reconstruction_plan
@@ -709,8 +710,10 @@ def _run_folder(data_root: Path, folder: str = LABEL, has_started: bool = True,
          "flip_time": 2.01},
         {"type": "episode_end", "episode_id": 0, "outcome": "won", "score": 1.0, "run_time": 2.5},
         {"type": "block_end", "run_time": 3.0}]
-    run_log = RUN_EVENTS_FILENAME if (log_format or 1) > 2 else EVENTS_FILENAME
-    for path, lines in ((run / run_log, run_lines), (run / BLOCK / EVENTS_FILENAME, block_lines)):
+    new = (log_format or 1) > 2
+    for path, lines in ((run / (RUN_EVENTS_FILENAME if new else EVENTS_FILENAME), run_lines),
+                        (run / BLOCK / (GAME_EVENTS_FILENAME if new else EVENTS_FILENAME),
+                         block_lines)):
         path.write_text("".join(json.dumps(each) + "\n" for each in lines))
     return run
 
@@ -861,6 +864,11 @@ def test_a_run_of_log_format_2_is_read_from_its_events_jsonl(tmp_path):
     from humans.standalone.run_timeline import RunRecord
     run = _run_folder(tmp_path, log_format=2)
     assert not (run / RUN_EVENTS_FILENAME).exists()
-    assert RunRecord.read(str(run)).run_lines[0]["type"] == "run_start"
+    assert not (run / BLOCK / GAME_EVENTS_FILENAME).exists()
+    record = RunRecord.read(str(run))
+    assert record.run_lines[0]["type"] == "run_start"
+    assert record.block_lines[BLOCK][0]["type"] == "block_start"
+    assert read_events(str(run / BLOCK))[0]["type"] == "block_start", \
+        "resume reads a block of before format 3 from its events.jsonl"
 
 

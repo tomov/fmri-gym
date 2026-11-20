@@ -2,12 +2,12 @@
 
 ::
 
-    <outdir>/manifest.json                            the run: what it played, on what, with which code
-    <outdir>/pygame_events.jsonl                      the run's log: what the run read, showed, sent, printed
-    <outdir>/device_events.jsonl                      its devices' events from the OS, when the rig names any
-    <outdir>/block-NN_<backend>_<game>/events.jsonl   one block's log: what its game did
-    <outdir>/block-NN_<backend>_<game>/frames.h5      the rendered frames, when the phase keeps them
-    <outdir>/block-NN_<backend>_<game>/audio.h5       the queued PCM, when the block played any
+    <outdir>/manifest.json                                the run: what it played, on what, with which code
+    <outdir>/pygame_events.jsonl                          the run's log: what the run read, showed, sent, printed
+    <outdir>/device_events.jsonl                          its devices' events from the OS, when the rig names any
+    <outdir>/block-NN_<backend>_<game>/game_events.jsonl  one block's log: what its game did
+    <outdir>/block-NN_<backend>_<game>/frames.h5          the rendered frames, when the phase keeps them
+    <outdir>/block-NN_<backend>_<game>/audio.h5           the queued PCM, when the block played any
 
 A phase played again in the same run writes ``block-NN_<backend>_<game>_2``, ``_3``...
 
@@ -24,7 +24,7 @@ run's log.
 
 A run line has a ``type``, the ``perf_counter`` time it happened (``perf_time``, given by its
 source; the logger converts no time) and the folder name of the block open when it was
-written (``block``, ``None`` outside one). A block's ``events.jsonl`` starts with
+written (``block``, ``None`` outside one). A block's ``game_events.jsonl`` starts with
 ``block_start`` (``format``, ``version``, ``subject``, ``block_index``, ``backend``,
 ``game``, ``phase``: the config, ``base_seed``, then what :meth:`Logger.open_block` is
 given besides: a run's ``run_time``) and ends with ``block_end``
@@ -65,9 +65,12 @@ import numpy as np
 
 FORMAT = "fmri-gym-log"
 #: 2: the run's own ``events.jsonl``, beside its blocks'. 3: the run's log is
-#: ``pygame_events.jsonl``, beside the devices' ``device_events.jsonl``.
+#: ``pygame_events.jsonl``, beside the devices' ``device_events.jsonl``, and a block's
+#: ``game_events.jsonl``.
 VERSION = 3
 #: A block's log.
+GAME_EVENTS_FILENAME = "game_events.jsonl"
+#: The run's log and a block's, before log format 3.
 EVENTS_FILENAME = "events.jsonl"
 #: The run's log.
 RUN_EVENTS_FILENAME = "pygame_events.jsonl"
@@ -222,7 +225,7 @@ class Logger:
         return name
 
     def log(self, **record: Any) -> None:
-        """Append one line to the open block's ``events.jsonl``.
+        """Append one line to the open block's ``game_events.jsonl``.
 
         :param record: the line's fields; give it a ``type``.
         :raises RuntimeError: if no block is open.
@@ -399,7 +402,7 @@ def _writer_main(q: mp.Queue, outdir: str) -> None:
         elif op == "line":
             if block not in lines:
                 os.makedirs(os.path.join(outdir, block), exist_ok=True)
-                lines[block] = open(os.path.join(outdir, block, EVENTS_FILENAME), "a")
+                lines[block] = open(os.path.join(outdir, block, GAME_EVENTS_FILENAME), "a")
             line = rec["line"]
             if rec.get("state") is not None:
                 # Savestates are large and mostly redundant (a crafter pickle is
@@ -522,13 +525,22 @@ def read_lines(path: str) -> list[dict]:
     return lines
 
 
+def block_log(block: str) -> str:
+    """A block's log: its ``game_events.jsonl``, or its ``events.jsonl`` before log format 3.
+
+    :param block: the block's folder.
+    """
+    path = os.path.join(block, GAME_EVENTS_FILENAME)
+    return path if os.path.exists(path) else os.path.join(block, EVENTS_FILENAME)
+
+
 def read_events(block: str) -> list[dict]:
-    """Every line of a block's ``events.jsonl``, in order.
+    """Every line of a block's log (:func:`block_log`), in order.
 
     :param block: the block's folder.
     :return: the records; a partial last line (a crash mid-write) is dropped, not raised.
     """
-    return read_lines(os.path.join(block, EVENTS_FILENAME))
+    return read_lines(block_log(block))
 
 
 def read_state(text: str) -> bytes:
