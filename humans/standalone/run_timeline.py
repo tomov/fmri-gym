@@ -2,14 +2,14 @@
 
 A run's data is one record (:class:`RunRecord`): the manifest says what the logs are read
 with -- the trigger's ``perf_counter`` (``trigger_perf``), the rig and its scanner key, the
-display, the log format -- the run's ``events.jsonl`` holds what the run read, showed, sent and
-printed, and each block's what its game did. :func:`build_timeline` joins them once, in
-seconds from the trigger: screens, blocks, episodes, presses with the step each was given to,
-the scanner's pulses, the codes sent, what was printed, and the numbers a run is checked by.
-When the session's devices were read from the OS beside it (:mod:`.device_events`), the
-recording on the run's clock gives each key press the time its device sent it. The events
-table (:mod:`.events_table`) and the readable timeline (:mod:`.timeline_text`) are both
-written from it.
+display, the log format -- the run's ``pygame_events.jsonl`` holds what the run read, showed,
+sent and printed, and each block's ``events.jsonl`` what its game did. :func:`build_timeline`
+joins them once, in seconds from the trigger: screens, blocks, episodes, presses with the step
+each was given to, the scanner's pulses, the codes sent, what was printed, and the numbers a
+run is checked by. When the rig's devices were read from the OS beside it
+(:mod:`.device_events`), the run's ``device_events.jsonl`` gives each key press the time its
+device sent it. The events table (:mod:`.events_table`) and the readable timeline
+(:mod:`.timeline_text`) are both written from it.
 """
 
 from __future__ import annotations
@@ -26,9 +26,8 @@ from pathlib import Path
 from typing import Any
 
 from ..inputs.keyboard import NAMES
-from ..save.logging import EVENTS_FILENAME, read_lines
-from .device_events import DEVICE_EVENTS_FOLDER, MANIFEST_FILENAME
-from .device_events import EVENTS_FILENAME as DEVICE_EVENTS_FILENAME
+from ..save.logging import EVENTS_FILENAME, RUN_EVENTS_FILENAME, read_lines
+from .device_events import DEVICE_EVENTS_FILENAME
 from .key_codes import (
     EV_KEY, EV_SYN, EVDEV_AXES, EVDEV_BUTTONS, EVDEV_KEYS, HID_BUTTON_PAGE, HID_KEYBOARD_PAGE,
     KEY_NAME_OF_USAGE, SYN_DROPPED,
@@ -42,9 +41,6 @@ MISSED_REFRESH = 1.5
 MISSED_PULSE = 1.5
 #: Seconds a device's event may precede the read of the press it made, and still be its.
 MAX_READ_DELAY_S = 1.0
-#: Seconds two wall-clock-minus-perf_counter offsets may differ and still be one clock: more,
-#: and the machine restarted (or its clock was set) between them.
-SAME_CLOCK_S = 1.0
 _KEY_DOWN = 768        # pygame.KEYDOWN: SDL's number, the same on every OS
 
 #: ``perf_counter`` time to run time.
@@ -62,12 +58,12 @@ class RunRecord:
     #: the run's folder
     folder: str
     manifest: dict[str, Any]
-    #: the run's ``events.jsonl``
+    #: the run's ``pygame_events.jsonl``
     run_lines: list[dict[str, Any]]
     #: each block's ``events.jsonl``, by its folder's name
     block_lines: dict[str, list[dict[str, Any]]]
-    #: the session's device recording on the run's clock (its manifest, and ``folder``);
-    #: ``None`` when none covers the run
+    #: the run's device recording: its ``recording_start`` line, with its ``recording_end``
+    #: line as ``ended`` (``None`` when it was cut short); ``None`` when the run has none
     device_recording: dict[str, Any] | None
     #: the recording's events from the run's first line to its last
     device_lines: list[dict[str, Any]]
@@ -87,38 +83,33 @@ class RunRecord:
                                  f"log of their own; these tools read {OLDEST_LOG_FORMAT} on")
         blocks = {Path(path).parent.name: read_lines(path) for path in
                   sorted(glob.glob(os.path.join(folder, "block-*", EVENTS_FILENAME)))}
-        run_lines = read_lines(os.path.join(folder, EVENTS_FILENAME))
-        recording, device_lines = _device_recording(folder, manifest, run_lines)
+        run_log = EVENTS_FILENAME if version == 2 else RUN_EVENTS_FILENAME
+        run_lines = read_lines(os.path.join(folder, run_log))
+        recording, device_lines = _device_recording(folder, run_lines)
         return cls(folder, manifest, run_lines, blocks, recording, device_lines)
 
 
-def _device_recording(folder: str, manifest: dict[str, Any], run_lines: list[dict[str, Any]]
+def _device_recording(folder: str, run_lines: list[dict[str, Any]]
                       ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
-    """The device recording of the run's session on the run's clock, and its events in the
-    run's span (its first line to its last).
+    """The run's device recording, and its events in the run's span (its first line to its
+    last).
 
-    :param folder: the run's folder, in its session's ``beh/``.
-    :param manifest: the run's manifest.
+    :param folder: the run's folder.
     :param run_lines: the run's log.
-    :return: the recording's manifest (with ``folder``) and those events; ``None`` and none
-        when no recording on that clock overlaps the run.
+    :return: the recording's ``recording_start`` line, with ``ended`` (its ``recording_end``,
+        ``None`` when it was cut short), and those events; ``None`` and none when the run has
+        no recording.
     """
-    if manifest.get("trigger_perf") is None or not run_lines:
+    path = os.path.join(folder, DEVICE_EVENTS_FILENAME)
+    if not run_lines or not os.path.exists(path):
         return None, []
-    run_offset = manifest["start_epoch"] - manifest["trigger_perf"]
     first, last = run_lines[0]["perf_time"], max(line["perf_time"] for line in run_lines)
-    session = Path(folder).parents[1]
-    for path in sorted(session.glob(f"{DEVICE_EVENTS_FOLDER}/*/{MANIFEST_FILENAME}")):
-        recording = {**json.loads(path.read_text()), "folder": path.parent.name}
-        started, ended = recording["started"], recording["ended"]
-        if abs(started["wall_time"] - started["perf_time"] - run_offset) > SAME_CLOCK_S:
-            continue
-        if started["perf_time"] > last or (ended is not None and ended["perf_time"] < first):
-            continue
-        lines = [line for line in read_lines(str(path.parent / DEVICE_EVENTS_FILENAME))
-                 if first <= line["perf_time"] <= last]
-        return recording, lines
-    return None, []
+    lines = read_lines(path)
+    ends = [line for line in lines if line["type"] == "recording_end"]
+    recording = {**lines[0], "ended": ends[0] if ends else None}
+    return recording, [line for line in lines
+                       if line["type"] in ("device_event", "device_gone")
+                       and first <= line["perf_time"] <= last]
 
 
 @dataclass(frozen=True, slots=True)
@@ -522,7 +513,6 @@ def _device_quality(record: RunRecord, timeline: Timeline) -> dict[str, Any]:
         "dropped": sum(line.get("event_type") == EV_SYN and line["code"] == SYN_DROPPED
                        for line in record.device_lines),
         "gone": sum(line["type"] == "device_gone" for line in record.device_lines),
-        "recording": record.device_recording["folder"],
         "ended": (record.device_recording["ended"] or {}).get("how", "without saying how")}
     if delays:
         out.update({"read_delay_median_ms": 1000 * statistics.median(delays),

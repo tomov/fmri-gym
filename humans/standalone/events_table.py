@@ -3,7 +3,7 @@
 ``<label>_events.tsv`` and its sidecar ``<label>_events.json``, where ``<label>`` is the run's
 BIDS name: one row per screen, game block, episode and press of a control, from the trigger on
 (:mod:`.run_timeline`). ``onset`` and ``duration`` are seconds of the run clock, whose zero is
-the trigger; a press's onset is when its device sent it if the session's devices were read
+the trigger; a press's onset is when its device sent it if the run's devices were read
 from the OS, else when the run read it, which ``read_onset`` always gives. The scanner's
 pulses, each frame and each code sent stay in the logs and the readable timeline.
 """
@@ -19,7 +19,7 @@ from .run_timeline import Timeline
 #: The table's columns, in order, each with its sidecar description.
 COLUMNS = {
     "onset": "Seconds from the trigger to the start of the event; for a press, when its device "
-             "sent it if the session's devices were read from the OS, else when the run read it.",
+             "sent it if the run's devices were read from the OS, else when the run read it.",
     "duration": "Seconds the event lasted.",
     "trial_type": "What the event is.",
     "block": "The game block it belongs to: the folder holding its frames.",

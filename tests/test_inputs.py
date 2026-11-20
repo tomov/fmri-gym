@@ -790,7 +790,8 @@ def test_device_events_stops_on_a_rig_without_devices_or_a_device_missing(
     monkeypatch.setattr(recorder, "open_devices", missing)
     with pytest.raises(SystemExit, match=says):
         recorder.main(["--rig", _rig_with_devices(tmp_path, device_events),
-                       "--subject", "sub-01", "--ses", "1"])
+                       "--out", str(tmp_path / "device_events.jsonl")])
+    assert not (tmp_path / "device_events.jsonl").exists()
     assert not (tmp_path / "data").exists()
 
 
@@ -799,37 +800,58 @@ def test_a_run_does_not_start_when_its_rigs_device_recording_cannot(tmp_path):
     from humans.config.rig import RigConfig
     rig = RigConfig.open(_rig_with_devices(tmp_path, ["No Such Pad"]))
     with pytest.raises(RuntimeError, match="stopped before recording"):
-        fmri_play._start_device_events(rig, "sub-01", 1)
+        fmri_play._start_device_events(rig)
     assert not (tmp_path / "data").exists()
 
 
-def test_a_recording_writes_its_events_and_a_manifest_that_says_how_it_ended(tmp_path):
-    import json
-    import threading
-
-    from humans.config.rig import RigConfig
-    from humans.standalone.device_events import record_device_events
-    stop = threading.Event()
-    reads = iter([[{"type": "device_event", "perf_time": 1.0, "device": 0, "event_type": 1,
-                    "code": 13, "value": 1}], []])
+def _box(stop, reads):
+    """Open devices whose reads are ``reads``, then nothing; the last read sets ``stop``."""
+    reads = iter(reads)
 
     class Box:
+        closed = False
+
         def record(self):
             return {"reader": "test", "clock": "perf_counter", "devices": [{"name": "Box"}]}
 
         def read(self, timeout):
-            stop.set()                          # one read, then the session ends
-            return next(reads, [])
+            line = next(reads, None)
+            if line is None:
+                stop.set()
+            return [] if line is None else line
 
         def close(self):
             self.closed = True
-    box = Box()
-    folder = tmp_path / "data" / "sub-01" / "ses-001" / "device_events" / "20261119T120000"
-    record_device_events(box, str(folder), RigConfig.open(_rig_with_devices(tmp_path, ["Box"])),
-                         stop)
-    manifest = json.loads((folder / "manifest.json").read_text())
-    assert manifest["devices"] == [{"name": "Box"}] and manifest["ended"]["how"] == "stopped"
-    assert manifest["started"]["wall_time"] > manifest["started"]["perf_time"]
-    assert [json.loads(line)["code"] for line in
-            (folder / "events.jsonl").read_text().splitlines()] == [13]
+    return Box()
+
+
+def test_a_recording_writes_its_events_between_a_start_and_an_end_line(tmp_path):
+    import json
+    import threading
+
+    from humans.standalone.device_events import record_device_events
+    stop = threading.Event()
+    event = {"type": "device_event", "perf_time": 1.0, "device": 0, "event_type": 1,
+             "code": 13, "value": 1}
+    told = iter([None, None, str(tmp_path / "device_events.jsonl")])
+    box = _box(stop, [[event], [], [{**event, "code": 14}]])
+    record_device_events(box, lambda: next(told, str(tmp_path / "device_events.jsonl")), stop)
+    lines = [json.loads(line) for line in
+             (tmp_path / "device_events.jsonl").read_text().splitlines()]
+    assert [line["type"] for line in lines] == [
+        "recording_start", "device_event", "device_event", "recording_end"]
+    assert lines[0]["devices"] == [{"name": "Box"}] and lines[-1]["how"] == "stopped"
+    assert lines[0]["wall_time"] > lines[0]["perf_time"]
+    assert [line["code"] for line in lines[1:3]] == [13, 14], \
+        "the events read before it was told where to write come first"
     assert box.closed
+
+
+def test_a_recording_stopped_before_it_is_told_where_writes_nothing(tmp_path):
+    import threading
+
+    from humans.standalone.device_events import record_device_events
+    stop = threading.Event()
+    box = _box(stop, [[]])
+    record_device_events(box, lambda: None, stop)
+    assert list(tmp_path.iterdir()) == [] and box.closed

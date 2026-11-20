@@ -138,10 +138,10 @@ sh configs/examples/sessions/pilot.sh  # play it: about an hour (edit SUBJECT=, 
 
 ## Each event's own time (M/EEG)
 
-Name the devices in the rig's `"device_events"`: each run then records their events from the OS, each at the time the OS stamped it, into the session's folder; `bids-from-logs` gives each press that time. To find the names, or to record on its own:
+Name the devices in the rig's `"device_events"`: each run then records their events from the OS, each at the time the OS stamped it, into its own folder (`device_events.jsonl`, beside the run's `pygame_events.jsonl`); `bids-from-logs` gives each press that time. To find the names, or to record on its own:
 
 ```bash
-uv run device-events --rig configs/<team>/rigs/<rig>.json --subject sub-01 --ses 1   # Ctrl+C stops it; a wrong name lists the devices' names
+uv run device-events --rig configs/<team>/rigs/<rig>.json --out test.jsonl   # Ctrl+C stops it; a wrong name lists the devices' names
 ``` On Linux it takes the `input` group; on macOS, the Input Monitoring permission for a keyboard-type device.
 
 ## After a session

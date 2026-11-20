@@ -3,7 +3,8 @@
 ::
 
     <outdir>/manifest.json                            the run: what it played, on what, with which code
-    <outdir>/events.jsonl                             the run's log: what the run read, showed, sent, printed
+    <outdir>/pygame_events.jsonl                      the run's log: what the run read, showed, sent, printed
+    <outdir>/device_events.jsonl                      its devices' events from the OS, when the rig names any
     <outdir>/block-NN_<backend>_<game>/events.jsonl   one block's log: what its game did
     <outdir>/block-NN_<backend>_<game>/frames.h5      the rendered frames, when the phase keeps them
     <outdir>/block-NN_<backend>_<game>/audio.h5       the queued PCM, when the block played any
@@ -63,9 +64,13 @@ from typing import Any
 import numpy as np
 
 FORMAT = "fmri-gym-log"
-#: 2: the run's own ``events.jsonl``, beside its blocks'.
-VERSION = 2
+#: 2: the run's own ``events.jsonl``, beside its blocks'. 3: the run's log is
+#: ``pygame_events.jsonl``, beside the devices' ``device_events.jsonl``.
+VERSION = 3
+#: A block's log.
 EVENTS_FILENAME = "events.jsonl"
+#: The run's log.
+RUN_EVENTS_FILENAME = "pygame_events.jsonl"
 FRAMES_FILENAME = "frames.h5"
 AUDIO_FILENAME = "audio.h5"
 #: Seconds between flushes of the files to the OS, and of the run's log to disk.
@@ -169,9 +174,9 @@ class Logger:
     # -- the run's log ---------------------------------------------------------
 
     def log_run_event(self, line_type: str, perf_time: float, **fields: Any) -> None:
-        """Append one line to the run's ``events.jsonl``: its ``type``, ``perf_time``, the open
-        block's folder name (``block``, ``None`` between blocks), then ``fields``. Safe to call
-        from any thread.
+        """Append one line to the run's ``pygame_events.jsonl``: its ``type``, ``perf_time``,
+        the open block's folder name (``block``, ``None`` between blocks), then ``fields``. Safe
+        to call from any thread.
 
         :param line_type: the line's ``type``.
         :param perf_time: ``perf_counter`` when it happened.
@@ -389,7 +394,7 @@ def _writer_main(q: mp.Queue, outdir: str) -> None:
             return True
         if op == "run_line":
             if not run_lines:
-                run_lines.append(open(os.path.join(outdir, EVENTS_FILENAME), "a"))
+                run_lines.append(open(os.path.join(outdir, RUN_EVENTS_FILENAME), "a"))
             run_lines[0].write(json.dumps(rec["line"], default=_json_default) + "\n")
         elif op == "line":
             if block not in lines:
@@ -502,7 +507,7 @@ def _json_default(o: Any) -> Any:
 # --------------------------------------------------------------------------- #
 
 def read_lines(path: str) -> list[dict]:
-    """Every line of an ``events.jsonl``, the run's or a block's, in order.
+    """Every line of a ``.jsonl`` log, the run's, a block's or the devices', in order.
 
     :param path: the file.
     :return: the records; a partial last line (a crash mid-write) is dropped, not raised.

@@ -12,8 +12,8 @@ which ``session-editor`` writes and any shell plays.
 How it is played -- the window, the input devices, the audio, where the data
 goes -- is the rig's, not the command's: each rig has a file
 (:mod:`humans.config.rig`), and ``--rig`` names it. A rig that names
-``device_events`` has them recorded beside the run, by ``device-events`` in a
-process of its own, started before the window and stopped after the run.
+``device_events`` has them recorded into the run's folder, by ``device-events``
+in a process of its own, started before the window and stopped after the run.
 
 Usage (--ses and --run say which run of which session this is; a session
 script passes the same --ses to all of its runs, each with its own --run):
@@ -30,6 +30,7 @@ and README.md for the config schema.
 from __future__ import annotations
 
 import argparse
+import os
 import signal
 import subprocess
 import sys
@@ -40,6 +41,7 @@ from humans.config.curriculum import Curriculum
 from humans.outputs.display import quit_like_esc
 from humans.config.rig import RigConfig
 from humans.config.run import RunConfig
+from humans.standalone import device_events
 
 #: Exit status when the run was quit (ESC) before its end; a session script
 #: (``set -e``) stops on it instead of starting the next run.
@@ -96,29 +98,33 @@ def _parser() -> argparse.ArgumentParser:
     return p
 
 
-def _start_device_events(rig: RigConfig, subject: str,
-                         session: int) -> tuple[subprocess.Popen, str]:
-    """``device-events`` on the rig's ``device_events``, in a process of its own, recording;
-    and the recording's folder.
+def _start_device_events(rig: RigConfig) -> subprocess.Popen:
+    """``device-events`` on the rig's ``device_events``, in a process of its own, its devices
+    open: it keeps their events until :func:`_record_device_events_into` says where to write.
 
     It runs in a session of its own, so a terminal's Ctrl+C does not stop it before the run
     ends, and stops when its standard input closes: when :func:`_stop_device_events` closes
     it, or when this process exits however it does.
 
-    :raises RuntimeError: if it stops before recording (a device missing or unreadable: its
-        own message, on stderr, says which).
+    :raises RuntimeError: if it stops before its devices are open (one missing or unreadable:
+        its own message, on stderr, says which).
     """
     recorder = subprocess.Popen(
         [sys.executable, "-m", "humans.standalone.device_events", "--rig", rig.path,
-         "--subject", subject, "--ses", str(session), "--until-stdin-closes"],
+         "--out", "-"],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, start_new_session=True)
-    folder = recorder.stdout.readline().strip()
-    if not folder:
+    if recorder.stdout.readline().strip() != device_events.READY:
         raise RuntimeError(f"device-events stopped before recording (exit {recorder.wait()}): "
                            f"the device events of {rig.path} are not recorded")
-    print(f"device events: recording {', '.join(rig.device_events)} into {folder}",
-          file=sys.stderr)
-    return recorder, folder
+    return recorder
+
+
+def _record_device_events_into(recorder: subprocess.Popen, run_folder: str) -> None:
+    """Tell the recording to write into ``run_folder``, beside the run's own log."""
+    path = os.path.join(run_folder, device_events.DEVICE_EVENTS_FILENAME)
+    recorder.stdin.write(path + "\n")
+    recorder.stdin.flush()
+    print(f"device events: recording into {path}", file=sys.stderr)
 
 
 def _stop_device_events(recorder: subprocess.Popen) -> None:
@@ -153,12 +159,11 @@ def main() -> None:
     problems = run_config.problems(load_games=not run_config.skip_load_games)
     if problems:
         raise ValueError(f"{args.curriculum} on {rig.path}: " + "; ".join(problems))
-    recorder, recording_folder = (
-        _start_device_events(rig, run_config.subject, run_config.ses)
-        if rig.device_events is not None else (None, None))
+    recorder = _start_device_events(rig) if rig.device_events is not None else None
     try:
         run = Run.from_config(run_config)
-        run.logger.set_extra("device_events_recording", recording_folder)
+        if recorder is not None:
+            _record_device_events_into(recorder, run.logger.outdir)
         previous = signal.signal(signal.SIGINT, quit_like_esc)
         try:
             completed = run.play()

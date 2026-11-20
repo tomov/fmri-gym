@@ -47,8 +47,8 @@ import pytest
 from humans.adapters import get_adapter
 from humans.inputs import QUIT, ControlNames
 from humans.save.logging import (
-    AUDIO_FILENAME, EVENTS_FILENAME, FRAMES_FILENAME, _json_default, read_audio, read_events,
-    read_frames, read_lines,
+    AUDIO_FILENAME, EVENTS_FILENAME, FRAMES_FILENAME, RUN_EVENTS_FILENAME, _json_default,
+    read_audio, read_events, read_frames, read_lines,
 )
 from tests import tap, verify_replay
 from tests.backends import BACKENDS, REPO, game_phases
@@ -307,7 +307,7 @@ def test_headless_run(session):
     assert not any(e["type"] == "input_event" for e in events), "a run line in the block's log"
     if any(e.get("audio_chunk", -1) >= 0 for e in frames):
         assert (block / AUDIO_FILENAME).exists(), "sound was played but audio.h5 is missing"
-    run_lines = read_lines(str(session.run / EVENTS_FILENAME))
+    run_lines = read_lines(str(session.run / RUN_EVENTS_FILENAME))
     types = [line["type"] for line in run_lines]
     assert types[0] == "run_start" and types[-1] == "run_end", f"{types[:3]} ... {types[-3:]}"
     assert run_lines[-1]["how"] in ("finished", "time_up"), run_lines[-1]
@@ -328,7 +328,7 @@ def test_each_step_names_the_presses_read_since_the_step_before(session):
     trigger_perf = json.loads((session.run / "manifest.json").read_text())["trigger_perf"]
     block = _game_block(session.run)
     presses = [(line["perf_time"] - trigger_perf, line)
-               for line in read_lines(str(session.run / EVENTS_FILENAME))
+               for line in read_lines(str(session.run / RUN_EVENTS_FILENAME))
                if line["type"] == "input_event" and line["down"] and line["block"] == block.name
                and line["name"] not in (QUIT, ControlNames.K_ESCAPE)]
     block_lines = [(line["run_time"] if line["type"] == "frame" else line["flip_time"], line)

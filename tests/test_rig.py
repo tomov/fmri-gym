@@ -279,7 +279,7 @@ def test_a_start_up_that_stops_leaves_its_console_and_its_error_in_the_run_log(t
                        skip_load_games=True, calibration_files=())
     with pytest.raises(ValueError, match="monitor 99"):
         Run.from_config(config)
-    log, = (tmp_path / "data").rglob("events.jsonl")
+    log, = (tmp_path / "data").rglob("pygame_events.jsonl")
     lines = [json.loads(line) for line in log.read_text().splitlines()]
     assert [line["type"] for line in lines] == ["run_start", "console", "run_end"]
     assert lines[1]["text"].startswith("output: ") and lines[1]["stream"] == "stderr"

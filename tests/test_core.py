@@ -23,8 +23,8 @@ from humans.config.curriculum import (
     shared_overrides, validate_curriculum,
 )
 from humans.save.logging import (
-    AUDIO_FILENAME, EVENTS_FILENAME, FORMAT, FRAMES_FILENAME, VERSION, AudioBlockLog, Logger,
-    read_audio, read_events, read_frames, read_lines, read_state,
+    AUDIO_FILENAME, EVENTS_FILENAME, FORMAT, FRAMES_FILENAME, RUN_EVENTS_FILENAME, VERSION,
+    AudioBlockLog, Logger, read_audio, read_events, read_frames, read_lines, read_state,
 )
 from humans.save.replay import frame_arrays, reconstruction_plan
 from tests.changed import select
@@ -88,7 +88,7 @@ def test_logger_round_trip(tmp_path):
     assert plan.seed == 7 and plan.actions == [0, 1, 0]
     assert manifest["phases"][0]["data_dir"] == name
     assert (manifest["trigger_perf"], manifest["start_epoch"]) == (100.0, 1.7e9)
-    assert not (tmp_path / EVENTS_FILENAME).exists(), \
+    assert not (tmp_path / RUN_EVENTS_FILENAME).exists(), \
         "a run that logs no run line (an agent's) has no run's log"
 
 
@@ -116,7 +116,7 @@ def test_each_line_goes_once_to_the_log_of_what_produced_it(tmp_path):
     logger.log_frame({"episode_id": 0}, frame=np.zeros((2, 2, 3), np.uint8))
     logger.close_block(n_frames=1)
     logger.close()
-    assert read_lines(str(tmp_path / EVENTS_FILENAME)) == [
+    assert read_lines(str(tmp_path / RUN_EVENTS_FILENAME)) == [
         {"type": "input_event", "perf_time": 1.0, "block": None, "name": "5", "down": True},
         {"type": "input_event", "perf_time": 2.0, "block": name, "name": "5", "down": False}]
     assert [line["type"] for line in read_events(str(tmp_path / name))] == [
@@ -134,7 +134,7 @@ def test_the_console_is_logged_line_by_line_until_the_log_closes(tmp_path):
     finally:
         logger.close()
     print("after")
-    lines = read_lines(str(tmp_path / EVENTS_FILENAME))
+    lines = read_lines(str(tmp_path / RUN_EVENTS_FILENAME))
     assert [(line["type"], line["stream"], line["text"]) for line in lines] == [
         ("console", "stdout", "one"), ("console", "stdout", "two"), ("console", "stderr", "half")]
     assert all(isinstance(line["perf_time"], float) for line in lines)
@@ -659,7 +659,7 @@ BLOCK = "block-00_gym_x"
 
 
 def _run_folder(data_root: Path, folder: str = LABEL, has_started: bool = True,
-                log_format: int | None = 2) -> Path:
+                log_format: int | None = VERSION) -> Path:
     """A run's folder as a run leaves it: its manifest, its log and a block's.
 
     The trigger is at perf_counter 100; the display refreshes at 100 Hz; LEFT is pressed in the
@@ -709,8 +709,8 @@ def _run_folder(data_root: Path, folder: str = LABEL, has_started: bool = True,
          "flip_time": 2.01},
         {"type": "episode_end", "episode_id": 0, "outcome": "won", "score": 1.0, "run_time": 2.5},
         {"type": "block_end", "run_time": 3.0}]
-    for path, lines in ((run / EVENTS_FILENAME, run_lines), (run / BLOCK / EVENTS_FILENAME,
-                                                             block_lines)):
+    run_log = RUN_EVENTS_FILENAME if (log_format or 1) > 2 else EVENTS_FILENAME
+    for path, lines in ((run / run_log, run_lines), (run / BLOCK / EVENTS_FILENAME, block_lines)):
         path.write_text("".join(json.dumps(each) + "\n" for each in lines))
     return run
 
@@ -805,34 +805,32 @@ def test_bids_from_logs_writes_nothing_when_it_would_have_to_choose(tmp_path, lo
     assert not (data / "bids").exists()
 
 
-def _device_recording(session: Path, clock_shift: float = 0.0) -> Path:
-    """A device recording in ``session``, from perf_counter 95 to 110: on the run's clock
-    (:func:`_run_folder`'s) unless ``clock_shift`` moves its wall time. Its device saw the
-    scanner's = and LEFT before the run read them, and an A the run never read."""
-    folder = session / "device_events" / "20261119T120000"
-    folder.mkdir(parents=True)
-    run_offset = 1.7e9 - 100.0                       # the run's start_epoch - trigger_perf
-    (folder / "manifest.json").write_text(json.dumps({
-        "reader": "linux evdev", "clock": "CLOCK_MONOTONIC", "devices": [{"name": "Box"}],
-        "started": {"perf_time": 95.0, "wall_time": 95.0 + run_offset + clock_shift},
-        "ended": {"how": "stopped", "perf_time": 110.0,
-                  "wall_time": 110.0 + run_offset + clock_shift}}))
+def _device_recording(run: Path, cut_short: bool = False) -> Path:
+    """The run's device recording (:func:`_run_folder`'s run), from perf_counter 95 to 110. Its
+    device saw the scanner's = and LEFT before the run read them, and an A the run never read;
+    ``cut_short``: it has no ``recording_end``."""
     event = {"type": "device_event", "device": 0, "event_type": 1}
-    lines = [{**event, "perf_time": 99.9995, "code": 13, "value": 1},     # KEY_EQUAL
+    lines = [{"type": "recording_start", "reader": "linux evdev", "clock": "CLOCK_MONOTONIC",
+              "devices": [{"name": "Box"}], "perf_time": 95.0, "wall_time": 1.7e9 - 5.0},
+             {**event, "perf_time": 99.9995, "code": 13, "value": 1},     # KEY_EQUAL
              {**event, "perf_time": 101.615, "code": 105, "value": 1},    # KEY_LEFT
              {"type": "device_event", "perf_time": 101.615, "device": 0, "event_type": 0,
               "code": 0, "value": 0},
              {**event, "perf_time": 102.5, "code": 30, "value": 1}]       # KEY_A
-    (folder / "events.jsonl").write_text("".join(json.dumps(line) + "\n" for line in lines))
-    return folder
+    if not cut_short:
+        lines.append({"type": "recording_end", "how": "stopped", "perf_time": 110.0,
+                      "wall_time": 1.7e9 + 10.0})
+    path = run / "device_events.jsonl"
+    path.write_text("".join(json.dumps(line) + "\n" for line in lines))
+    return path
 
 
-def test_a_session_device_recording_gives_each_press_its_devices_time(tmp_path):
+def test_a_runs_device_recording_gives_each_press_its_devices_time(tmp_path):
     from humans.standalone.events_table import event_rows
     from humans.standalone.run_timeline import RunRecord, build_timeline
     from humans.standalone.timeline_text import timeline_text
     run = _run_folder(tmp_path)
-    _device_recording(run.parents[1])
+    _device_recording(run)
     record = RunRecord.read(str(run))
     timeline = build_timeline(record)
     left = next(press for press in timeline.presses if press.control == "LEFT")
@@ -847,13 +845,22 @@ def test_a_session_device_recording_gives_each_press_its_devices_time(tmp_path):
     assert (press_row.onset, press_row.read_onset) == (pytest.approx(1.615), pytest.approx(1.62))
     text = timeline_text(record, timeline)
     assert "read 5.0 ms after its device sent it" in text
-    assert "devices   recording 20261119T120000: 1 device(s) (linux evdev)" in text
+    assert "devices   1 device(s) (linux evdev)" in text
 
 
-def test_a_device_recording_on_another_clock_is_not_the_runs(tmp_path):
+def test_a_device_recording_cut_short_says_so_and_still_times_the_presses(tmp_path):
     from humans.standalone.run_timeline import RunRecord, build_timeline
     run = _run_folder(tmp_path)
-    _device_recording(run.parents[1], clock_shift=3600.0)    # the machine restarted between
-    record = RunRecord.read(str(run))
-    assert record.device_recording is None and record.device_lines == []
-    assert all(press.device_time is None for press in build_timeline(record).presses)
+    _device_recording(run, cut_short=True)
+    timeline = build_timeline(RunRecord.read(str(run)))
+    assert timeline.quality["devices"]["ended"] == "without saying how"
+    assert timeline.quality["devices"]["presses_timed"] == 2
+
+
+def test_a_run_of_log_format_2_is_read_from_its_events_jsonl(tmp_path):
+    from humans.standalone.run_timeline import RunRecord
+    run = _run_folder(tmp_path, log_format=2)
+    assert not (run / RUN_EVENTS_FILENAME).exists()
+    assert RunRecord.read(str(run)).run_lines[0]["type"] == "run_start"
+
+

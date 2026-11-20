@@ -49,10 +49,9 @@ def _head(record: RunRecord, timeline: Timeline) -> list[str]:
         f"logs      format {manifest['log_format']['format']} {manifest['log_format']['version']}"
         f": the run's log and {len(record.block_lines)} block log(s)",
         "devices   " + (
-            f"recording {record.device_recording['folder']}: "
             f"{len(record.device_recording['devices'])} device(s) "
             f"({record.device_recording['reader']}), {len(record.device_lines)} events in the run"
-            if record.device_recording else "no device recording covers this run"),
+            if record.device_recording else "no device recording in this run"),
         f"ended     {end.removeprefix('end: ')}, {timeline.end:.3f} s after the trigger"]
 
 
