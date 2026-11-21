@@ -58,12 +58,13 @@ import pygame
 from gymnasium import spaces
 
 from ...config import rig as rig_file
-from ...inputs import (CONTROLLER_CLASSES_BY_NAME, QUIT, CalibrationError, ControlNames, Controller,
-                      Edge, InputDevice, InputDevices, open_input_devices)
+from ...inputs import (CONTROLLER_CLASSES_BY_NAME, QUIT, QUIT_KEYS, START_KEY, CalibrationError,
+                      Controller, Edge, InputDevice, InputDevices, is_quit_request,
+                      open_input_devices)
 from ...inputs.keyboard import KEYCODES
 from ...outputs.audio import Audio
 from ...outputs.display import Display, PhotodiodePatch, check_monitor, is_locked, quit_like_esc
-from ...run import EXPERIMENTER_KEY, _wait_for_control, _wait_for_duration, read_input_events
+from ...run import _wait_for_control, _wait_for_duration, read_input_events
 from ...save.bids import next_session, run_output
 from ...sync.triggers import HID_DEVICES, LIFECYCLE_EVENTS, Codes, TriggerError, Triggers
 from ..gamepad_calibration import calibrate, cue_order
@@ -216,8 +217,8 @@ class RigMeasurement:
 
 def take_measurements(rig_measurement: RigMeasurement) -> None:
     """The start screen, each measurement it takes and its verdict, every verdict; then close
-    the devices. A measurement it does not take is recorded as not run. ESC or Ctrl+C stops the
-    measurements, and what they measured stays recorded."""
+    the devices. A measurement it does not take is recorded as not run. The quit keys or Ctrl+C
+    stop the measurements, and what they measured stays recorded."""
     previous_handler = signal.signal(signal.SIGINT, quit_like_esc)
     try:
         _start_screen(rig_measurement)
@@ -243,7 +244,7 @@ def _start_screen(rig_measurement: RigMeasurement) -> None:
     """Say what this is and what to have ready for the measurements it takes; wait for the
     experimenter's key.
 
-    :raises KeyboardInterrupt: on ESC or window close.
+    :raises KeyboardInterrupt: on the quit keys or window close.
     """
     rig, measurement_names = rig_measurement.rig, rig_measurement.measurement_names
     ready = []
@@ -259,14 +260,14 @@ def _start_screen(rig_measurement: RigMeasurement) -> None:
     rig_measurement.display.draw_text(
         f"Rig measurement ({rig_measurement.settings.about}) of {rig.path}\n"
         "This is a rig measurement, not a scanner run: no participant plays.\n\n"
-        + "\n".join(ready) + f"\n\nPress {EXPERIMENTER_KEY} to start, ESC to stop.")
-    _wait_for_control(rig_measurement.inputs, rig_measurement.display, EXPERIMENTER_KEY)
+        + "\n".join(ready) + f"\n\nPress {START_KEY} to start, {QUIT_KEYS} to stop.")
+    _wait_for_control(rig_measurement.inputs, rig_measurement.display, START_KEY)
 
 
 def _measure(rig_measurement: RigMeasurement, name: str, measure: Callable[..., None]) -> None:
     """Take one measurement: record its tests' verdicts, save its arrays, show the verdicts.
 
-    :raises KeyboardInterrupt: on ESC or window close; the measurement is recorded first,
+    :raises KeyboardInterrupt: on the quit keys or window close; the measurement is recorded first,
         with what it measured.
     """
     onset = rig_measurement.now()
@@ -395,7 +396,7 @@ def _count_pulses(rig_measurement: RigMeasurement, summary: dict, arrays: dict) 
 
 
 class _Skipped(Exception):
-    """ESC during the controls prompts: the keys left are skipped."""
+    """The quit keys during the controls prompts: the keys left are skipped."""
 
 
 #: Devices the kernel files as keyboards that no one presses: power keys, lid, video, sound.
@@ -512,7 +513,7 @@ def _calibrate(rig_measurement: RigMeasurement, device: Controller) -> dict[str,
 
 def _key_problem(name: str, result: dict | None) -> str:
     if result is None:
-        return f"{name}: skipped (ESC)"
+        return f"{name}: skipped ({QUIT_KEYS})"
     got = f" (got {', '.join(result['strays'])})" if result["strays"] else ""
     return f"{name}: never pressed{got}"
 
@@ -522,12 +523,12 @@ def _prompt(rig_measurement: RigMeasurement, name: str, label: str, keys: dict, 
             ignore: str | None) -> dict[str, Any]:
     """Ask for ``name`` on screen; wait for it, noting any other key that comes instead.
 
-    :raises _Skipped: on ESC.
+    :raises _Skipped: on the quit keys.
     """
     marks = "   ".join(f"{k}{' ok' if done.get(k, {}).get('pressed') else ''}" for k in keys)
     _title(rig_measurement, f"controls\n\nPress  {name}"
                   f"{f'  ({label})' if label and label != name else ''}\n\n{marks}"
-                  "\n\n(ESC: skip the rest; they fail)")
+                  f"\n\n({QUIT_KEYS}: skip the rest; they fail)")
     read_input_events(rig_measurement.inputs)           # what was pressed before the prompt
     start = time.perf_counter()
     strays: list[str] = []
@@ -551,11 +552,11 @@ def _key_events(inputs: InputDevice, ignore: str | None) -> list[tuple[bool, str
     """Presses and releases since the last call, in order: ``(down, name)``; the
     scanner's key left out.
 
-    :raises _Skipped: on ESC or window close.
+    :raises _Skipped: on the quit keys or window close.
     """
     out = []
     for name, edge in read_input_events(inputs):
-        if name in (QUIT, ControlNames.K_ESCAPE) and edge is Edge.DOWN:
+        if name == QUIT and edge is Edge.DOWN:
             raise _Skipped
         if name == ignore:
             continue
@@ -693,7 +694,7 @@ def _play_pattern(rig_measurement: RigMeasurement, fps: float,
 
     :return: each step's flip time, its frame code (0: none; ``None`` when the rig sends
         no codes), and how many times the pacing dropped a debt of over a frame.
-    :raises KeyboardInterrupt: on ESC or window close.
+    :raises KeyboardInterrupt: on the quit keys or window close.
     """
     display, triggers = rig_measurement.display, rig_measurement.triggers
     env = TestPattern(caption=f"Rig measurement: frames at {fps:g} fps"
@@ -951,13 +952,12 @@ def discover() -> dict[str, Any]:
 def _pulses(key: str) -> list[float]:
     """Drain events; the arrival times of ``key`` presses.
 
-    :raises KeyboardInterrupt: on ESC or window close.
+    :raises KeyboardInterrupt: on the quit keys or window close.
     """
     now = time.perf_counter()
     times = []
     for event in pygame.event.get():
-        if event.type == pygame.QUIT or (
-                event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+        if is_quit_request(event):
             raise KeyboardInterrupt
         if event.type == pygame.KEYDOWN and event.key == KEYCODES[key]:
             times.append(now)

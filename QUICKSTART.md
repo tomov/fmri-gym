@@ -23,7 +23,7 @@ uv run gamepad-calibration                      # calibrate the game controller 
 uv run rig-setup --rig configs/examples/rigs/minimal.json --measure   # measure the rig (--long: at length, once per rig)
 ```
 
-Press **SPACE**, then **=** (the scanner trigger; on a laptop you press it). **ESC** quits; the data is saved under `data/`. Any other level: swap in another file from `configs/curricula/<backend>/levels/`.
+Press **RETURN**, then **=** (the scanner trigger; on a laptop you press it). **CTRL+ESCAPE** (hold CTRL, press ESCAPE) quits; the data is saved under `data/`. Any other level: swap in another file from `configs/curricula/<backend>/levels/`.
 
 ## 3. Every game
 

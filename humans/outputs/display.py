@@ -601,7 +601,7 @@ def check_monitor(monitor: int) -> None:
 
 
 def quit_like_esc(_signum: int, _frame: object) -> None:
-    """A SIGINT handler: Ctrl+C becomes the window's quit event, handled where ESC is.
+    """A SIGINT handler: Ctrl+C becomes the window's quit event, handled as the quit keys are.
 
     Python's own KeyboardInterrupt lands anywhere: between two fields of a
     frame, before a game block is saved. The quit event is read between frames.

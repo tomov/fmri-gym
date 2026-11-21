@@ -15,8 +15,8 @@ Phase fields::
 
     "menu": {"control": "X", "hold": 5.0, "after": 15.0,
              "options": ["reset", "forfeit", "resume"],
-             "move": ["UP", "DOWN"], "confirm": "RETURN",
-             "text": ["arrows up / down   choose", "return   select"]}
+             "move": ["UP", "DOWN"], "confirm": "SPACE",
+             "text": ["arrows up / down   choose", "space   select"]}
     "hint": {"control": "Y", "hold": 3.0, "after": 0.0,
              "text": ["![controls](images/controls/<backend>/<name>.png)", "", "..."]}
 
@@ -39,7 +39,7 @@ from dataclasses import asdict
 from typing import TYPE_CHECKING
 
 from .config.phases import HintSettings, MenuSettings
-from .inputs import QUIT, ControlNames, Edge, InputEvent
+from .inputs import QUIT, Edge, InputEvent
 
 if TYPE_CHECKING:
     from .outputs.display import Display
@@ -96,7 +96,7 @@ class PopUp(ABC):
         :param logger: the run's logger; the presses meanwhile are logged like any other.
         :param read_input_events: the edges since it was last called (the run's).
         :return: ``"resume"``, another of the menu's options, or ``"quit"`` on
-            window close / ESC.
+            window close / the quit keys.
         """
 
 
@@ -121,7 +121,7 @@ class Menu(PopUp):
         :param logger: the run's logger; the menu's own presses are
             logged like any other.
         :param read_input_events: the edges since it was last called (the run's).
-        :return: the chosen option, or ``"quit"`` on window close / ESC.
+        :return: the chosen option, or ``"quit"`` on window close / the quit keys.
         """
         self.pending, self._held_since = False, None
         s = self.settings
@@ -131,7 +131,7 @@ class Menu(PopUp):
         while True:
             for name, edge in read_input_events():
                 down = edge is Edge.DOWN
-                if name in (QUIT, ControlNames.K_ESCAPE):
+                if name == QUIT:
                     if down:
                         return "quit"
                     continue
@@ -178,14 +178,14 @@ class Hint(PopUp):
         :param run_time: the run clock, for the log.
         :param logger: the run's logger; the presses meanwhile are logged like any other.
         :param read_input_events: the edges since it was last called (the run's).
-        :return: ``"resume"``, or ``"quit"`` on window close / ESC.
+        :return: ``"resume"``, or ``"quit"`` on window close / the quit keys.
         """
         self.pending, self._held_since = False, None
         opened = run_time()
         display.draw_text(self.settings.text, align="left")
         while self.settings.control in self._held():
             for name, edge in read_input_events():
-                if name in (QUIT, ControlNames.K_ESCAPE):
+                if name == QUIT:
                     if edge is Edge.DOWN:
                         return "quit"
                     continue

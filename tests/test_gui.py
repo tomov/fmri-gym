@@ -295,11 +295,12 @@ def test_the_controller_line_says_what_to_do(gui):
 
 def test_the_inputs_ticked_are_the_rigs(qt):
     window, _ = _rig_window("xbox")
-    assert window.rig["inputs"] == ["keyboard", "xbox_controller"]
+    assert window.rig["inputs"] == ["xbox_controller"]
+    assert "keyboard" not in window.input_boxes, "the keyboard is always read"
     window.input_boxes["xbox_controller"].setChecked(False)
-    assert window.rig["inputs"] == ["keyboard"]
+    assert window.rig["inputs"] == []
     window.input_boxes["current_designs_gamepad3"].setChecked(True)
-    assert window.rig["inputs"] == ["keyboard", "current_designs_gamepad3"]
+    assert window.rig["inputs"] == ["current_designs_gamepad3"]
 
 
 def test_a_games_keys_are_edited_in_its_phase(qt):
@@ -318,7 +319,7 @@ def test_a_new_rig_has_the_keyboard_alone(qt, tmp_path):
     from humans.standalone.rig_setup.window import _RigWindow
 
     window = _RigWindow({}, str(tmp_path / "site" / "rig.json"))
-    assert window.rig["inputs"] == ["keyboard"]
+    assert window.rig["inputs"] == []
 
 
 def test_a_run_opens_on_its_game(qt):

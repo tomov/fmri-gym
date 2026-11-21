@@ -18,8 +18,12 @@ from typing import Any, ClassVar, NamedTuple
 
 import pygame
 
-#: The name the run's inputs give the window's close button.
+#: The name the run's inputs give a request to stop the run: the window's close button, or
+#: :data:`QUIT_KEYS`.
 QUIT = "QUIT"
+#: The keys that stop a run, held together, as the experimenter is told them: ESCAPE with
+#: CTRL held, so that no single stray press stops it.
+QUIT_KEYS = "CTRL+ESCAPE"
 
 
 class Edge(Enum):
@@ -113,7 +117,7 @@ class InputDevices(InputDevice):
     """Several input devices read as one: a run's keyboard and controllers together.
 
     Its edges are each device's, in the devices' order, after the window's
-    close button as :data:`QUIT`.
+    close button and each press of :data:`QUIT_KEYS` as :data:`QUIT`.
     """
 
     name = "inputs"
@@ -135,7 +139,7 @@ class InputDevices(InputDevice):
         return cls([])
 
     def handle(self, events: list[pygame.event.Event], now: float) -> list[InputEvent]:
-        out = [InputEvent(QUIT, Edge.DOWN) for e in events if e.type == pygame.QUIT]
+        out = [InputEvent(QUIT, Edge.DOWN) for e in events if is_quit_request(e)]
         for device in self.devices:
             out += device.handle(events, now)
         return out
@@ -165,3 +169,10 @@ class InputDevices(InputDevice):
     def close(self) -> None:
         for device in self.devices:
             device.close()
+
+
+def is_quit_request(event: pygame.event.Event) -> bool:
+    """Whether ``event`` is the window's close button, or ESCAPE pressed with CTRL held."""
+    return event.type == pygame.QUIT or (
+        event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
+        and bool(getattr(event, "mod", 0) & pygame.KMOD_CTRL))

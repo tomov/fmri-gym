@@ -29,7 +29,7 @@ from PySide6.QtCore import Qt
 
 from ...config import rig as rig_file
 from ...outputs.display import list_monitors, monitor_label
-from ...inputs import CONTROLLER_CLASSES_BY_NAME, INPUT_DEVICE_CLASSES_BY_NAME
+from ...inputs import CONTROLLER_CLASSES_BY_NAME, INPUT_DEVICE_CLASSES_BY_NAME, START_KEY, Keyboard
 from ...sync.triggers import (HID_DEVICES, SYNC_MODES, TRIGGER_BACKENDS, Codes, SyncSettings,
                         TriggerError, Triggers, TriggerSettings)
 from ..forms import Field
@@ -41,9 +41,9 @@ if TYPE_CHECKING:
 
 SYNC_FIELDS = [
     Field("mode", "how a run starts", "choice", SYNC_MODES,
-          tip="What happens after the experimenter presses SPACE. wait: the run waits for the "
-              "key your scanner's trigger box types at each volume (fMRI). send: the run sends "
-              "a start code on the trigger line, which starts your recording (MEG, EEG). none: "
+          tip=f"What happens after the experimenter presses {START_KEY}. wait: the run waits "
+              "for the key your scanner's trigger box types at each volume (fMRI). send: the run "
+              "sends a start code on the trigger line, which starts your recording (MEG, EEG). none: "
               "the run starts at once (no scanner)."),
     Field("key", "trigger key", tip="The name of the key your trigger box types at each "
                                     "volume, usually EQUALS or 5. The run starts at the first "
@@ -233,12 +233,13 @@ def describe_triggers(section: dict) -> str:
     where = {"lsl": m.lsl_stream_name,
              "hid": f"{m.hid_device} port {m.port}"}.get(m.backend, m.port)
     if sync.mode == "wait":
-        start = f"After SPACE, the run waits for {sync.key!r} from the trigger box, then starts."
+        start = (f"After {START_KEY}, the run waits for {sync.key!r} from the trigger box, "
+                 "then starts.")
     elif sync.mode == "send":
-        start = (f"After SPACE, the run sends the start code {m.codes.scanner_start} on "
+        start = (f"After {START_KEY}, the run sends the start code {m.codes.scanner_start} on "
                  f"{m.backend} {where}, waits {sync.delay:g} s, then starts.")
     else:
-        start = "After SPACE, the run starts at once."
+        start = f"After {START_KEY}, the run starts at once."
     if m.backend == "null":
         return start + "\nNo codes are sent: the timing is in the run's log files only."
     frames = (f"a frame code (1 to {m.codes.frame_mask}) every {m.frame_every} frame(s)"
@@ -1083,9 +1084,10 @@ class _RigWindow(QtWidgets.QDialog):
         return page
 
     def _inputs_box(self, given: Any) -> QtWidgets.QGroupBox:
-        """One checkbox per kind of input device a rig can list; the keyboard on by default."""
+        """One checkbox per kind of input device a rig can list besides the keyboard."""
         box = QtWidgets.QGroupBox("Input devices")
         column = QtWidgets.QVBoxLayout(box)
+        column.addWidget(QtWidgets.QLabel(f"{Keyboard.name}: always read"))
         given = given if isinstance(given, list) else []
         self.input_boxes: dict[str, QtWidgets.QCheckBox] = {}
         for name, cls in INPUT_DEVICE_CLASSES_BY_NAME.items():

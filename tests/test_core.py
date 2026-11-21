@@ -153,6 +153,20 @@ def test_validate_config_refuses(phase, problem):
     assert problems and any(problem in p for p in problems), problems
 
 
+@pytest.mark.parametrize("phase, problem", [
+    ({**PHASE, "controls": {"": 0, "LSHIFT": 1}}, "['LSHIFT'] are the experimenter's keys"),
+    ({**PHASE, "controls": {"": 0, "UP+RETURN": 1}}, "['RETURN'] are the experimenter's keys"),
+    ({**PHASE, "controls": {"": 0, "F5": 1}}, "['F5'] are the experimenter's keys"),
+    ({**PHASE, "menu": {"control": "X", "confirm": "RETURN"}}, "menu.confirm: ['RETURN']"),
+    ({**PHASE, "hint": {"control": "LCTRL", "text": "hi"}}, "hint.control: ['LCTRL']"),
+    ({"type": "message", "text": "hi", "control": "ESCAPE"}, "control: expected a control name"),
+    ({"type": "message", "text": "hi", "controls_to_dismiss": ["RALT"]}, "controls_to_dismiss"),
+])
+def test_no_curriculum_may_bind_an_experimenters_key(phase, problem):
+    problems = validate_curriculum({"curriculum": [phase]})
+    assert any(problem in p for p in problems), problems
+
+
 def test_validate_config_accepts_a_plain_game_phase():
     assert validate_curriculum({"curriculum": [PHASE]}) == []
     hud = {"show_score": False, "show_time_remaining": True}
@@ -476,12 +490,12 @@ def _measure_laptop_rig(tmp_path, monkeypatch, measurement_names, **rig) -> dict
                                     "triggers": {"sync": {"mode": "none"}}, **rig}))
     wait_for_control = rig_measure._wait_for_control
 
-    def press_space_then_wait(inputs, display, control):
-        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE, mod=0,
-                                             unicode=" ", scancode=0))
+    def press_return_then_wait(inputs, display, control):
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, mod=0,
+                                             unicode="\r", scancode=0))
         wait_for_control(inputs, display, control)
 
-    monkeypatch.setattr(rig_measure, "_wait_for_control", press_space_then_wait)
+    monkeypatch.setattr(rig_measure, "_wait_for_control", press_return_then_wait)
     monkeypatch.setattr(rig_measure, "lsl_probe", lambda: "not probed in the test")
     monkeypatch.setattr(report, "machine", lambda: {})
     monkeypatch.setattr(rig_measure, "_VERDICT_S", 0.0)
@@ -513,7 +527,7 @@ def test_a_measurement_unticked_is_not_run_and_fails_nothing(tmp_path, monkeypat
 
     # the rig's controller is not plugged in: with its test unticked, it is not looked for
     m = _measure_laptop_rig(tmp_path, monkeypatch, ("display",),
-                            inputs=["keyboard", "xbox_controller"])
+                            inputs=["xbox_controller"])
     assert m["tests"]["frames"] == {"status": "not run", "why": UNTICKED}
     assert m["tests"]["controls"] == {"status": "not run", "why": UNTICKED}
     assert m["summaries"]["frames"] == {} and m["tests"]["display"]["status"] != "not run"

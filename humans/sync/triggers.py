@@ -592,7 +592,7 @@ class Triggers:
         sync = self.sync
         start = {"wait": f"wait for scanner key {sync.key!r}",
                  "send": f"send scanner_start, then wait {sync.delay:g} s",
-                 "none": "no scanner sync (start on SPACE)"}[sync.mode]
+                 "none": "no scanner sync (start on the experimenter's key)"}[sync.mode]
         out = (f"codes over {self.active}" if self.enabled
                else "no trigger codes sent (backend null)")
         parts = [start, out]
