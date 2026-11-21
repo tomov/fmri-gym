@@ -1,0 +1,45 @@
+{
+  "type": "game", "backend": "vizdoom",
+  "instructions": {
+    "align": "left", "controls_to_dismiss": ["CONTROLLER_BUTTON_A"],
+    "text": [
+      "Find your way to the exit of the level. Doors and",
+      "switches open when you press Y in front of them.",
+      "Watch out for monsters.",
+      "",
+      "![controls](images/controls/vizdoom/freedoom-GMPD3-stick-nav.png)",
+      "",
+      "Controls:",
+      "   stick up / down      move forward / back",
+      "   stick left / right   turn left / right",
+      "   X / B                move left / right",
+      "   RT                   shoot",
+      "   Y                    open doors, press switches",
+      "   LT                   next weapon",
+      "   A                    run",
+      "   hold LT              pause menu (restart / give up / resume)",
+      "   hold Y               show the controls",
+      "",
+      "Press A to start."
+    ]
+  },
+  "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true, "automap_buffer_enabled": false},
+  "controls": {"CONTROLLER_AXIS_LEFTY_UP": 7, "CONTROLLER_AXIS_LEFTY_DOWN": 6, "CONTROLLER_AXIS_LEFTX_LEFT": 9, "CONTROLLER_AXIS_LEFTX_RIGHT": 8, "CONTROLLER_BUTTON_X": 5, "CONTROLLER_BUTTON_B": 4, "CONTROLLER_AXIS_TRIGGERRIGHT": 0, "CONTROLLER_BUTTON_Y": 3, "CONTROLLER_AXIS_TRIGGERLEFT": 17, "CONTROLLER_BUTTON_A": 1},
+  "menu": {
+    "control": "CONTROLLER_AXIS_TRIGGERLEFT", "hold": 3.0, "after": 180.0, "options": ["reset", "forfeit", "resume"], "move": ["CONTROLLER_AXIS_LEFTY_UP", "CONTROLLER_AXIS_LEFTY_DOWN"], "confirm": "CONTROLLER_BUTTON_A",
+    "text": [
+      "   stick up / down   choose",
+      "   A                 select"
+    ]
+  },
+  "hint": {
+    "control": "CONTROLLER_BUTTON_Y", "hold": 3.0, "after": 0.0,
+    "text": [
+      "![controls](images/controls/vizdoom/freedoom-GMPD3-stick-nav.png)",
+      "",
+      "Let go of Y to go back to the game."
+    ]
+  },
+  "hud": {"show_score": false, "show_time_remaining": false},
+  "mode": "episode", "n_episodes": 1, "advance_on": ["terminated"], "fps": 35
+}

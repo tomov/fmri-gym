@@ -12,12 +12,20 @@
       "   stick left / right   highlight a tube",
       "   RT                   select / pour",
       "   X                    undo",
+      "   hold LT              pause menu (restart / give up / resume)",
       "   hold Y               show the controls",
       "",
       "Press A to start."
     ]
   },
   "controls": {"CONTROLLER_AXIS_LEFTX_LEFT": 0, "CONTROLLER_AXIS_LEFTX_RIGHT": 1, "CONTROLLER_AXIS_TRIGGERRIGHT": 2, "CONTROLLER_BUTTON_X": 3},
+  "menu": {
+    "control": "CONTROLLER_AXIS_TRIGGERLEFT", "hold": 3.0, "after": 180.0, "options": ["reset", "forfeit", "resume"], "move": ["CONTROLLER_AXIS_LEFTY_UP", "CONTROLLER_AXIS_LEFTY_DOWN"], "confirm": "CONTROLLER_BUTTON_A",
+    "text": [
+      "   stick up / down   choose",
+      "   A                 select"
+    ]
+  },
   "hint": {
     "control": "CONTROLLER_BUTTON_Y", "hold": 0.0, "after": 0.0,
     "text": [

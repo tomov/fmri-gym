@@ -1,0 +1,9 @@
+{
+  "curriculum": [
+    {
+      "__include": "../common/freedoom2-GMPD3-stick-nav.json",
+      "game": "VizdoomFreedoom2MAP09-S2-v0",
+      "instructions": {"title": "Freedoom: Datacenter"}
+    }
+  ]
+}

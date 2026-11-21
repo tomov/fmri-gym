@@ -1,0 +1,9 @@
+{
+  "curriculum": [
+    {
+      "__include": "../common/freedoom1-GMPD3-stick-nav.json",
+      "game": "VizdoomFreedoom1E3M9-S2-v0",
+      "instructions": {"title": "Freedoom: Acquainted With Grief"}
+    }
+  ]
+}

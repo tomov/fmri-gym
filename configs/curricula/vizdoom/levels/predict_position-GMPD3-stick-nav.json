@@ -1,0 +1,5 @@
+{
+  "curriculum": [
+    {"__include": "../common/predict_position-GMPD3-stick-nav.json"}
+  ]
+}
