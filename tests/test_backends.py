@@ -45,9 +45,10 @@ import numpy as np
 import pytest
 
 from humans.adapters import get_adapter
+from humans.inputs import QUIT, ControlNames
 from humans.save.logging import (
-    AUDIO_FILENAME, EVENTS_FILENAME, FRAMES_FILENAME, _json_default, read_audio, read_events,
-    read_frames,
+    AUDIO_FILENAME, FRAMES_FILENAME, GAME_EVENTS_FILENAME, RUN_EVENTS_FILENAME, _json_default,
+    read_audio, read_events, read_frames, read_lines,
 )
 from tests import tap, verify_replay
 from tests.backends import BACKENDS, REPO, game_phases
@@ -299,13 +300,50 @@ def test_headless_run(session):
         f"the closing fixation ended at {end[0]['offset']:.2f} s, past --duration"
     assert games and games[0]["n_frames"] > 0, "the game block logged no frame: were the keys read?"
     block = _game_block(session.run)
-    assert (block / EVENTS_FILENAME).exists() and (block / FRAMES_FILENAME).exists()
+    assert (block / GAME_EVENTS_FILENAME).exists() and (block / FRAMES_FILENAME).exists()
     events = read_events(str(block))
     frames = [e for e in events if e["type"] == "frame"]
     assert len(frames) == games[0]["n_frames"]
-    assert any(e["type"] == "input_event" for e in events), "no key press was logged"
+    assert not any(e["type"] == "input_event" for e in events), "a run line in the block's log"
     if any(e.get("audio_chunk", -1) >= 0 for e in frames):
         assert (block / AUDIO_FILENAME).exists(), "sound was played but audio.h5 is missing"
+    run_lines = read_lines(str(session.run / RUN_EVENTS_FILENAME))
+    types = [line["type"] for line in run_lines]
+    assert types[0] == "run_start" and types[-1] == "run_end", f"{types[:3]} ... {types[-3:]}"
+    assert run_lines[-1]["how"] in ("finished", "time_up"), run_lines[-1]
+    assert types.count("scanner_trigger") == 1
+    assert any(line["type"] == "input_event" and line["block"] == block.name
+               for line in run_lines), "no key press was logged in the block"
+    flips = [line for line in run_lines if line["type"] == "flip"]
+    assert {"text", "fixation", "game_frame"} <= {line["kind"] for line in flips}
+    game_flips = {line["perf_time"] - manifest["trigger_perf"] for line in flips
+                  if line["kind"] == "game_frame"}
+    assert {frame["flip_time"] for frame in frames} <= game_flips, \
+        "a frame's flip_time is not a game_frame flip of the run log"
+
+
+def test_each_step_names_the_presses_read_since_the_step_before(session):
+    """A frame line's ``controls_pressed`` are the presses the run log has between that step and
+    the step before it in its episode: the two logs, joined on the run clock."""
+    trigger_perf = json.loads((session.run / "manifest.json").read_text())["trigger_perf"]
+    block = _game_block(session.run)
+    presses = [(line["perf_time"] - trigger_perf, line)
+               for line in read_lines(str(session.run / RUN_EVENTS_FILENAME))
+               if line["type"] == "input_event" and line["down"] and line["block"] == block.name
+               and line["name"] not in (QUIT, ControlNames.K_ESCAPE)]
+    block_lines = [(line["run_time"] if line["type"] == "frame" else line["flip_time"], line)
+                   for line in read_events(str(block))
+                   if line["type"] in ("frame", "episode_start")]
+    pressed_since_step: list[str] | None = None        # None: no step yet in this episode
+    for _, line in sorted(presses + block_lines, key=lambda timed: timed[0]):
+        if line["type"] == "episode_start":
+            pressed_since_step = None
+        elif line["type"] == "input_event" and pressed_since_step is not None:
+            pressed_since_step.append(line["name"])
+        elif line["type"] == "frame":
+            if pressed_since_step is not None:
+                assert line["controls_pressed"] == pressed_since_step, line["frame"]
+            pressed_since_step = []
 
 
 def test_headless_log_is_what_was_shown(session):

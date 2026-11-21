@@ -60,9 +60,9 @@ def record(curriculum: str, outdir: str, max_frames: int, n_episodes: int) -> No
 
 def _game_blocks(outdir: str) -> list[Path]:
     """The block folders of a run, in order."""
-    from humans.save.logging import EVENTS_FILENAME
+    from humans.save.logging import GAME_EVENTS_FILENAME
 
-    return sorted(p.parent for p in Path(outdir).glob(f"block-*/{EVENTS_FILENAME}"))
+    return sorted(p.parent for p in Path(outdir).glob(f"block-*/{GAME_EVENTS_FILENAME}"))
 
 
 def check_run(outdir: str) -> bool:

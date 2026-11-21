@@ -374,7 +374,7 @@ humans/
     triggers.py     # run-start sync (wait/send/none) + MEG/EEG trigger codes over lsl/serial/parallel/hid
   save/
     bids.py         # where a run's data goes, BIDS-style, and the numbers in its name
-    logging.py      # manifest.json + one crash-safe JSONL/HDF5 log per game block
+    logging.py      # manifest.json, the run's crash-safe JSONL log, one JSONL/HDF5 log per game block
     replay.py       # replay an episode from a block's log; its frame fields as arrays
   standalone/       # the commands that are not a run; nothing outside imports them
     rig_setup/      # `rig-setup`: a rig file in a form (window.py); with --measure, the rig measured (measure.py, report.py)
@@ -651,11 +651,11 @@ Which of these a rig needs varies: the scanner may type a key at every volume, o
 
 Leaving `sync.mode` or `backend` out defaults to `wait` / `null`, and says so: the console, at start-up and again at the ready prompt, and the manifest report it (`NOT SET in the rig file: sync.mode, backend`), as they do for `--dummy-trigger`.
 
-What is sent: `task_start` when the clock anchors, `episode_start` at each reset, one code per frame (`"frame_every": N` to thin, `"on_frame": false` to drop), `task_stop` at the end. Codes never share bits, so two triggers on the same sample still decode: frames cycle 1–7 in the low 3 bits, `task_start`=8, `task_stop`=16, `episode_start`=32, `scanner_start`=64, and a lifecycle code is OR'd with the current frame code (all under `"codes"`; overlaps are refused). Every value sent is logged: per frame as `trigger` on the block's `frame` lines, lifecycle events with their `run_time` under `triggers` in `manifest.json`.
+What is sent: `task_start` when the clock anchors, `episode_start` at each reset, one code per frame (`"frame_every": N` to thin, `"on_frame": false` to drop), `task_stop` at the end. Codes never share bits, so two triggers on the same sample still decode: frames cycle 1–7 in the low 3 bits, `task_start`=8, `task_stop`=16, `episode_start`=32, `scanner_start`=64, and a lifecycle code is OR'd with the current frame code (all under `"codes"`; overlaps are refused). Every value sent is logged: each as a `trigger_sent` line of the run's `pygame_events.jsonl` as it goes out (the line cleared included), per frame as `trigger` on the block's `frame` lines, and lifecycle events with their `run_time` under `triggers` in `manifest.json`.
 
 ## Timing
 
-Frames are shown with a vsync-locked flip and each frame's onset is logged as `flip_time`; message/fixation onsets in the manifest are flip times too. Key presses and releases are logged as they arrive (`key_time`, `key_name`, `key_down`), independent of the frame grid. The manifest records the display actually obtained (`vsync`, measured at start-up; `refresh_rate`).
+Frames are shown with a vsync-locked flip and each frame's onset is logged as `flip_time`; every flip, a game frame's or any other screen's, is a `flip` line of the run's log at its onset. Presses and releases are stamped when the run reads them, which it does between flips: with a vsync-locked display, at most one refresh after they happened (11.8 ms at 85 Hz), and later when a frame runs late (issue #43). Each `frame` line names the presses its step was given. The manifest records the display actually obtained (`vsync`, measured at start-up; `refresh_rate`).
 
 - A frame is shown at the next refresh after its step, so an `fps` that divides the refresh rate (30 or 60 on a 60 Hz screen) shows every frame for the same number of refreshes; otherwise frames alternate between one and two and each onset can be up to one refresh late. `flip_time` records what happened either way. Some cores' own rate is 59.92: close enough to 60 Hz that one frame in ~800 is shown twice.
 - Check that the rig locks to the refresh before a session: `python -m humans.outputs.display --fullscreen` (verdict LOCKED / NOT locked; if not, use fullscreen and disable the desktop compositor). `--no-vsync` turns the request off. Pass the rig's monitor (its `"screen"` `"monitor"`) here and to the photodiode as `--monitor`: refresh, vsync and the photon offset belong to the monitor.
@@ -715,25 +715,47 @@ The task is the config's file name (letters and digits); `--subject` must be `su
 
 Data is never overwritten. A run whose folder is already there writes to `..._02`, then `_03`; the attempt that stopped stays where it is. That suffix names the folder only — the run's label, which the manifest records with the `attempt` number and which keys the seeds, stays canonical, so every attempt at a run plays the same episodes.
 
-The names follow BIDS apart from that suffix, the contents not yet (no `_beh.tsv` / `_events.tsv`). Each folder holds:
+The names follow BIDS apart from that suffix; the folders are fmri-gym's own, and `bids-from-logs` makes a BIDS dataset from them ("A BIDS dataset from the logs", below). A run's data is one record, read together: the manifest says what the logs are read with; the run's own log holds what the run read, showed, sent and printed, and each block's log what its game did, each line written once, by what produced it. Each folder holds:
 
-- **`manifest.json`** — subject, curriculum, trigger epoch, per-phase onsets/offsets (+ survey responses; onsets are flip times), the `display` actually opened (size, `vsync`, `refresh_rate`, driver), the `triggers` settings + lifecycle triggers sent (+ what the config left `defaulted`), the `audio` output (device, measured device delay, chosen delay), `dummy_trigger`, the `run` it is (label and `attempt`), the `seeds` (each game phase derived or pinned), the `versions` of pygame and SDL, the run's `duration` and where it was `resumed_from` (see "Resuming a curriculum").
-- **`block-NN_<backend>_<game>/`** — one folder per game block, written as the block plays (so a crash loses at most the last second), holding:
-  - **`events.jsonl`** — one JSON object per line, in order; `type` says which:
+- **`manifest.json`** — written first, when the run's folder is made, then rewritten as each part opens and each phase ends: the `log_format` (`format`, `version`) the logs follow; the `run` it is (label and `attempt`) and its `seeds` (each game phase derived or pinned); subject, `curriculum` and `curriculum_path`; the `rig` (inputs, triggers and their `sync` key, photodiode patch, …), `dummy_trigger`, the run's `duration`, `loop` and where it was `resumed_from` (see "Resuming a curriculum"); the `versions` of the code (`git`: the commit, `-dirty` if edited), Python, numpy, pygame and SDL; the `platform` (OS, machine, and the clock behind `perf_counter`); then the `audio` output (device, measured device delay, chosen delay), the `inputs` that answered (each device, its calibration file and that file's contents), the `display` actually opened (size, `vsync`, `refresh_rate`, driver); the trigger epoch (`start_epoch`, and `trigger_perf`, the `perf_counter` of the trigger); per-phase onsets/offsets (+ survey responses; onsets are flip times); and at the end the `triggers` settings + lifecycle triggers sent (+ what the config left `defaulted`).
+- **`pygame_events.jsonl`** — the run's own log: what the run read, showed, sent and printed, from its start to its end, written as the run plays and forced to disk every second, so a crash, a killed process or a machine reset loses at most the last second. Each line has a `type`, a `perf_time` (the `perf_counter` its source stamped; the run time is `perf_time` minus the manifest's `trigger_perf`) and a `block` (the folder name of the game block open when it was written; `null` outside one):
 
     | `type` | fields |
     |--------|--------|
-    | `block_start` | first line: `format`, `version`, `subject`, `block_index`, `backend`, `game`, `phase` (the config), `base_seed` |
-    | `episode_start` | `episode_id`, `seed`, `initial_state` (the savestate an episode carried on from an earlier run starts from, as a frame's `state`; `null` otherwise) |
-    | `frame` | `frame` (index in the block), `episode_id`, `ep_frame` (index in the episode), `action`, `reward`, `terminated`, `truncated`, `run_time` (seconds since the trigger, after the step), `flip_time` (of the **flip that showed the frame**: its onset; vsync-locked when the display reports `vsync: true`), `wall_time` (Unix), `variables` (the backend's: `ram` for ale/retro, `info_*` for retro, `obs` for gym, …), and when present `env_action` (an adapter's own reading of the keys, e.g. Rush Hour), `trigger` (the code sent on that flip), `audio_chunk` (the chunk this frame's sound was queued as, -1 none; in blocks that play sound), `state` (a savestate, zlib'd then base64, every `state_stride` frames) |
-    | `input_event` | `run_time`, `name`, `down`: every key press/release during the block, stamped on arrival (~1 ms), independent of the frame grid; the pause menu's included |
+    | `run_start` | `wall_time`: the first line, written once the manifest holds the run's context, before the trigger line, sound, inputs and window are opened |
+    | `console` | `stream` (`stdout` or `stderr`), `text`: each line the run printed, the experimenter's prompts included |
+    | `scanner_trigger` | `wall_time`: the run clock's zero |
+    | `flip` | `kind` (`text`, `fixation`, `game_frame`, or `repeat`: the same screen shown again), `text` (a text screen's), `is_photodiode_patch_lit` (with a photodiode patch): every flip of the window, at its onset |
+    | `pygame_event` | `event_name`, `event` (the event's `type` and every field as pygame gave it: a stick's `value` unscaled, a key's `key` and `scancode`): every event the run read off pygame's queue |
+    | `input_event` | `name`, `down`: each press or release of a control the rig's inputs made of those events, at the same read; the scanner's pulses are the presses of the key the rig's `triggers.sync` names |
+    | `trigger_sent` | `name` (a lifecycle event, `frame`, `pulse`, or `clear`), `value` (0 for `clear`): each code put on the trigger line (none on a `null` line) |
+    | `run_end` | `how`: `finished`, `time_up`, `quit`, or `error: ...` (a start-up that stopped included: its folder then holds only the manifest and this log); the last line |
+
+- **`block-NN_<backend>_<game>/`** — one folder per game block: what happened in its game, written as the block plays (so a crash loses at most the last second), holding:
+  - **`game_events.jsonl`** — one JSON object per line, in order; `type` says which:
+
+    | `type` | fields |
+    |--------|--------|
+    | `block_start` | first line: `run_time`, `format`, `version`, `subject`, `block_index`, `backend`, `game`, `phase` (the config), `base_seed` |
+    | `episode_start` | `episode_id`, `seed`, `initial_state` (the savestate an episode carried on from an earlier run starts from, as a frame's `state`; `null` otherwise), `flip_time` |
+    | `frame` | `frame` (index in the block), `episode_id`, `ep_frame` (index in the episode), `action`, `controls_pressed` (the controls pressed since the step before, in order: the run log's `input_event` presses read since then), `controls_held` (held at the step), `reward`, `terminated`, `truncated`, `run_time` (seconds since the trigger, after the step), `flip_time` (of the **flip that showed the frame**: its onset, the run log's `game_frame` flip; vsync-locked when the display reports `vsync: true`), `wall_time` (Unix), `variables` (the backend's: `ram` for ale/retro, `info_*` for retro, `obs` for gym, …), and when present `env_action` (an adapter's own reading of the keys, e.g. Rush Hour), `trigger` (the code sent on that flip), `audio_chunk` (the chunk this frame's sound was queued as, -1 none; in blocks that play sound), `state` (a savestate, zlib'd then base64, every `state_stride` frames) |
     | `pacing_reset` | `flip_time`, `late`: a flip that ended a stall of more than a frame, and how many seconds late it was; the frame schedule restarted there instead of catching up with a burst of short frames (none in a clean block; why frames fall behind is open, issue #43) |
-    | `episode_end` | `episode_id`, `outcome` (`won`, `lost`, `terminated`, `truncated`, `playing` for the block's clock; `quit`, `reset`, `forfeit` for the subject's) , `terminated`, `truncated`, `score`, `n_pacing_resets` |
-    | `block_end` | last line: `n_episodes`, `n_frames`, `outcomes`, `n_pacing_resets`, `total_reward`, `block_time_elapsed` and `num_completed_episodes` (earlier runs' included, for a block carried on), `block_did_not_finish` (stopped by the run's clock or ESC before its own end) (the manifest entry's summary), `audio` (when the block played sound: `onsets`, `[chunk, run_time]` when each chunk reached the DAC, so a frame's sound onset is the entry for its `audio_chunk` and `onset - flip_time` the audio delay achieved; `delay_ms`, `resyncs`, `trimmed_samples`), `extra` (the adapter's block extras, e.g. an ALE palette, and `state`, the savestate the block ended in) |
+    | `episode_end` | `run_time`, `episode_id`, `outcome` (`won`, `lost`, `terminated`, `truncated`, `playing` for the block's clock; `quit`, `reset`, `forfeit` for the subject's) , `terminated`, `truncated`, `score`, `n_pacing_resets` |
+    | `block_end` | last line: `run_time`, `n_episodes`, `n_frames`, `outcomes`, `n_pacing_resets`, `total_reward`, `block_time_elapsed` and `num_completed_episodes` (earlier runs' included, for a block carried on), `block_did_not_finish` (stopped by the run's clock or ESC before its own end) (the manifest entry's summary), `audio` (when the block played sound: `onsets`, `[chunk, run_time]` when each chunk reached the DAC, so a frame's sound onset is the entry for its `audio_chunk` and `onset - flip_time` the audio delay achieved; `delay_ms`, `resyncs`, `trimmed_samples`), `extra` (the adapter's block extras, e.g. an ALE palette, and `state`, the savestate the block ended in) |
 
   - **`frames.h5`** — the rendered frames, `frames` `(N, H, W, C)` gzip'd one chunk per frame plus `frame_index` `(N,)`, the `frame` of each row: every `frame_stride`-th frame (default every one; `0` keeps none). `humans.save.logging.read_frames` / `read_frame` read them.
 
   The manifest's phase entry carries the same summary and names the folder (`data_dir`).
+
+### A BIDS dataset from the logs
+
+`uv run bids-from-logs --rig configs/<team>/rigs/<rig>.json` reads each run in the rig's data root as one record — its manifest with its log and its blocks' — and writes a behavioural BIDS dataset into `<data root>/bids` (`--out` for another folder; `--subject` for one subject's runs):
+
+- **`sub-*/ses-*/beh/<run>_events.tsv`** and its `_events.json`: one row per screen, game block, episode and press of a control, `onset` and `duration` in seconds from the trigger, `n/a` where a column does not apply. A screen lasts until the next new picture; a press until it is let go, with the `frame` it was given to (`n/a`: none, e.g. a press in a pop-up). The scanner's pulses, each frame and each code sent stay in the logs.
+- **`derivatives/timelines/sub-*/ses-*/beh/<run>_timeline.txt`**: the run in words, for a person checking it. Its head says what the run was (the code's commit, the machine, the rig, the display, its logs, how it ended); its checks give the scanner's pulses and their intervals, the display's missed refreshes, and the presses given to no step; then each event in order: screens, blocks, episodes, presses with the step each went to, pulses, codes sent, printed lines, missed refreshes.
+- **`participants.tsv`** and a **`README`**. The dataset's `dataset_description.json` (its name and authors, which BIDS requires) is yours to add.
+
+The logs are only read. The conversion writes nothing, and says which runs and why, when it would have to choose: two attempts at one run that both reached the trigger (BIDS keeps one run; move the other out of the data root), or a run in a log format older than 2 (recorded before runs kept a log of their own). A run that never reached its trigger has nothing to convert, and is listed and skipped. Both outputs are written from one join of the logs, `humans.standalone.run_timeline.build_timeline`, which an analysis of its own can call.
 
 ### Reconstruction (all verified bit-exact)
 
@@ -824,6 +846,7 @@ Many games already expose a Gymnasium API and drop straight into the `gym` backe
 - [ ] Per-subject deterministic curriculum generation; multi-run structure with one trigger per fMRI run.
 - [ ] More adapters: ViZDoom/COOM, MiniHack, crafter, MuJoCo (`qpos/qvel` as state vars) — each a small `EnvAdapter`.
 - [ ] Button-box / MRI-safe response device key remapping.
-- [ ] BIDS-style output layout + `events.tsv` per run.
+- [x] `events.tsv` per run, in a behavioural BIDS dataset (`bids-from-logs`).
+- [ ] BIDS-style layout of the runs' own folders.
 - [ ] A replay/QC utility to render any block to video from its states.
 - [ ] Crash-safe incremental logging (stream frames to disk) for long runs.

@@ -51,9 +51,12 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import asdict, dataclass, field
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from .clock import Clock
+
+if TYPE_CHECKING:
+    from ..save.logging import Logger
 
 
 log = logging.getLogger(__name__)
@@ -479,10 +482,13 @@ class Triggers:
     :ivar events: every lifecycle trigger sent, with its value and times.
     """
 
-    def __init__(self, settings: TriggerSettings) -> None:
+    def __init__(self, settings: TriggerSettings, logger: Logger | None = None) -> None:
         """Open the backend.
 
         :param settings: validated trigger settings.
+        :param logger: the log that gets a ``trigger_sent`` line (``name``, ``value``) for
+            each code a backend puts on the line, and for each clear (``value`` 0); ``None``
+            logs nothing.
         :raises TriggerError: if the backend cannot be opened.
         """
         self.settings = settings
@@ -495,18 +501,30 @@ class Triggers:
         self.last_frame = 0
         self._level = 0     # frame code currently on the lines (0 between blocks)
         self._n_sent = 0    # frame triggers sent in the current block
+        self._logger = logger
 
     @classmethod
-    def from_dict(cls, section: dict | None) -> Triggers:
+    def from_dict(cls, section: dict | None, logger: Logger | None = None) -> Triggers:
         """Build from a ``triggers`` section.
 
         :param section: the dict, or ``None`` for the defaults (``null``
             backend, wait for the scanner key).
+        :param logger: the log of what is sent (see :meth:`__init__`); ``None`` logs nothing.
         :return: an open :class:`Triggers`.
         :raises TriggerError: if the backend cannot be opened.
         :raises ValueError: on an invalid section.
         """
-        return cls(TriggerSettings.from_dict(section))
+        return cls(TriggerSettings.from_dict(section), logger)
+
+    def _log_sent(self, perf_time: float, name: str, value: int) -> None:
+        """Log a code put on the line, when there is a log and a backend that sends.
+
+        :param perf_time: ``perf_counter`` when it was sent.
+        :param name: the lifecycle event, ``frame``, ``pulse``, or ``clear``.
+        :param value: the code; 0 for ``clear``.
+        """
+        if self._logger is not None and self.enabled:
+            self._logger.log_run_event("trigger_sent", perf_time, name=name, value=value)
 
     def lifecycle(self, name: str) -> int:
         """Send a lifecycle trigger, OR'd with the frame level in force.
@@ -519,11 +537,14 @@ class Triggers:
         """
         value = self.codes.lifecycle(name) | self._level
         self._backend.send(value)
+        perf_time = time.perf_counter()
         self.events.append({"name": name, "value": value,
-                            "wall_time": time.time(), "perf_time": time.perf_counter()})
+                            "wall_time": time.time(), "perf_time": perf_time})
+        self._log_sent(perf_time, name, value)
         if self._backend.holds_level and self._level == 0:
             time.sleep(self.settings.pulse_ms / 1000.0)
             self._backend.clear()
+            self._log_sent(time.perf_counter(), "clear", 0)
         return value
 
     def frame(self) -> int:
@@ -540,6 +561,7 @@ class Triggers:
             return 0
         self._level = self.codes.frame(n // s.frame_every)
         self._backend.send(self._level)
+        self._log_sent(time.perf_counter(), "frame", self._level)
         self.last_frame = self._level
         return self._level
 
@@ -557,6 +579,7 @@ class Triggers:
         self._level = 0
         self._n_sent = 0
         self._backend.clear()
+        self._log_sent(time.perf_counter(), "clear", 0)
 
     def close(self) -> None:
         """Close the transport."""
@@ -575,8 +598,10 @@ class Triggers:
         t0 = time.perf_counter()
         self._backend.send(value)
         took = time.perf_counter() - t0
+        self._log_sent(t0 + took, "pulse", value)
         time.sleep(hold_s)
         self._backend.clear()
+        self._log_sent(time.perf_counter(), "clear", 0)
         return took
 
     def status(self) -> str:
