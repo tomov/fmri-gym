@@ -223,6 +223,59 @@ def test_a_box_that_does_not_answer_as_itself_stops_the_run(monkeypatch, backend
         RigConfig.open(write("plain", triggers={"backend": backend}))
 
 
+_INPUT_CODES = {"sync": {"mode": "send"}, "backend": "hid", "port": "B", "on_frame": False,
+                "codes": {"inputs": {"CONTROLLER_BUTTON_A": 1, "CONTROLLER_BUTTON_B": 128}}}
+
+
+def test_each_input_holds_its_bit_while_held_and_the_lifecycle_codes_add_theirs(monkeypatch):
+    from humans.sync.triggers import Triggers
+    fake = _FakeHid()
+    monkeypatch.setitem(sys.modules, "hid", fake)
+    triggers = Triggers.from_dict(_INPUT_CODES)
+    del fake.reports[:]
+    assert triggers.hold_input_codes(frozenset({"CONTROLLER_BUTTON_A", "LEFT"})) == 1
+    assert triggers.hold_input_codes(frozenset({"CONTROLLER_BUTTON_A"})) == 1  # sends nothing
+    assert triggers.hold_input_codes(frozenset({"CONTROLLER_BUTTON_A",
+                                                "CONTROLLER_BUTTON_B"})) == 129
+    assert triggers.frame() == 0                                   # no frame codes
+    triggers.lifecycle("task_stop")                    # pulsed, then the held bits again
+    triggers.block_end()
+    assert triggers.hold_input_codes(frozenset()) == 0
+    assert [r[2] for r in fake.reports] == [1, 129, 129 | 16, 129, 129, 0]
+    assert "inputs marked, not frames: CONTROLLER_BUTTON_A=1, CONTROLLER_BUTTON_B=128" in (
+        triggers.status())
+
+
+@pytest.mark.parametrize("change, problem", [
+    ({"on_frame": True}, "so on_frame must be false"),
+    ({"codes": {"inputs": {"CONTROLLER_BUTTON_A": 3}}}, "must be one bit"),
+    ({"codes": {"inputs": {"CONTROLLER_BUTTON_A": 16}}}, "shares its bit with task_stop"),
+    ({"codes": {"inputs": {"CONTROLLER_BUTTON_A": 1, "CONTROLLER_BUTTON_B": 1}}},
+     "CONTROLLER_BUTTON_B=1 shares its bit with CONTROLLER_BUTTON_A"),
+    ({"codes": {"inputs": {"CONTROLLER_BUTTON_A": 1}}, "sync": {"mode": "wait", "key": "5"}}, None),
+])
+def test_an_input_code_that_is_no_bit_of_its_own_or_no_button_is_refused(change, problem):
+    triggers = {**_INPUT_CODES, **change}
+    problems = rig.problems({"inputs": ["xbox_controller"], "triggers": triggers})
+    assert (problems == []) if problem is None else any(problem in p for p in problems), problems
+
+
+def test_an_input_code_of_a_control_neither_the_keyboard_nor_the_rigs_inputs_has_is_refused():
+    triggers = {**_INPUT_CODES, "codes": {"inputs": {"CONTROLLER_BUTTON_A": 1, "UP": 2}}}
+    problems = rig.problems({"inputs": [], "triggers": triggers})
+    assert problems == ["triggers: input code 'CONTROLLER_BUTTON_A' is no control of the keyboard "
+                        "or the rig's inputs (none)"], problems
+
+
+def test_the_scanner_key_and_the_experimenters_keys_mark_no_input():
+    triggers = {**_INPUT_CODES, "sync": {"mode": "wait", "key": "5"},
+                "codes": {"inputs": {"5": 1, "ESCAPE": 2, "RETURN": 4}}}
+    problems = rig.problems({"inputs": [], "triggers": triggers})
+    assert any("'5' is the key the scanner types" in p for p in problems)
+    assert any("'ESCAPE' is an experimenter's key" in p for p in problems)
+    assert any("'RETURN' is an experimenter's key" in p for p in problems)
+
+
 def test_a_game_key_the_scanner_types_is_refused_on_that_rig():
     from humans.config.curriculum import Curriculum
     from humans.config.run import RunConfig

@@ -96,7 +96,8 @@ def _is_quit(event: InputEvent) -> bool:
     return event.edge is Edge.DOWN and event.name == QUIT
 
 
-def read_input_events(inputs: InputDevice, logger: Logger | None) -> list[InputEvent]:
+def read_input_events(inputs: InputDevice, logger: Logger | None,
+                      triggers: Triggers | None = None) -> list[InputEvent]:
     """Take every event off pygame's queue and hand it to ``inputs``: the edges they make.
 
     A queue left to fill drops new events, key presses included, so nothing is
@@ -106,6 +107,8 @@ def read_input_events(inputs: InputDevice, logger: Logger | None) -> list[InputE
     :param logger: the run's log, which gets each event as pygame gave it (a
         ``pygame_event`` line), then each edge (an ``input_event`` line), at the time they
         were read; ``None`` logs nothing.
+    :param triggers: the trigger lines, which get the input codes of the controls held after
+        the read (:meth:`Triggers.hold_input_codes`); ``None`` sends nothing.
     :return: the edges, in order.
     """
     events = pygame.event.get()
@@ -113,6 +116,8 @@ def read_input_events(inputs: InputDevice, logger: Logger | None) -> list[InputE
     edges = inputs.handle(events, read_time)
     if logger is not None:
         _log_read(logger, read_time, events, edges)
+    if triggers is not None and triggers.codes.inputs and edges:
+        triggers.hold_input_codes(inputs.held())
     return edges
 
 
@@ -146,14 +151,16 @@ def _loggable(fields: dict[str, Any]) -> dict[str, Any]:
             for name, value in fields.items()}
 
 
-def _check_quit(inputs: InputDevice, logger: Logger | None) -> bool:
+def _check_quit(inputs: InputDevice, logger: Logger | None,
+                triggers: Triggers | None = None) -> bool:
     """Read the presses waiting and report whether the user requested quit.
 
     :param inputs: the run's input devices.
     :param logger: the run's log (:func:`read_input_events`).
+    :param triggers: the trigger lines (:func:`read_input_events`); ``None`` sends nothing.
     :return: ``True`` if the window was closed or the quit keys pressed.
     """
-    return any(_is_quit(event) for event in read_input_events(inputs, logger))
+    return any(_is_quit(event) for event in read_input_events(inputs, logger, triggers))
 
 
 def _poll_keys_until(
@@ -161,6 +168,7 @@ def _poll_keys_until(
     display: Display,
     deadline: float,
     logger: Logger | None,
+    triggers: Triggers | None = None,
     pop_ups: Sequence[PopUp] = (),
     stop_on: Collection[str] = (),
     redraw: Callable[[], float] | None = None,
@@ -193,7 +201,7 @@ def _poll_keys_until(
     while True:
         if any(pop_up.armed() for pop_up in pop_ups):
             return pressed, False
-        for name, edge in read_input_events(inputs, logger):
+        for name, edge in read_input_events(inputs, logger, triggers):
             down = edge is Edge.DOWN
             if name == QUIT:
                 if down:
@@ -214,7 +222,7 @@ def _poll_keys_until(
 
 def _wait_for_control(
     inputs: InputDevice, display: Display, control: str, logger: Logger | None,
-    dummy_trigger: bool = False, until: float = math.inf
+    triggers: Triggers | None = None, dummy_trigger: bool = False, until: float = math.inf
 ) -> None:
     """Block until ``control`` is pressed (or briefly sleep in dummy mode).
 
@@ -223,6 +231,7 @@ def _wait_for_control(
     :param control: the control name that unblocks the wait, or ``"any"`` to
         accept every control (a self-paced "press any key" screen).
     :param logger: the run's log (:func:`read_input_events`).
+    :param triggers: the trigger lines (:func:`read_input_events`); ``None`` sends nothing.
     :param dummy_trigger: if ``True``, sleep briefly and return without waiting.
     :param until: ``perf_counter`` at which to stop waiting regardless.
     :raises KeyboardInterrupt: on window close or the quit keys.
@@ -231,7 +240,7 @@ def _wait_for_control(
         time.sleep(0.05)
         return
     while time.perf_counter() < until:
-        for event in read_input_events(inputs, logger):
+        for event in read_input_events(inputs, logger, triggers):
             if _is_quit(event):
                 raise KeyboardInterrupt
             if event.edge is Edge.DOWN and control in ("any", event.name):
@@ -240,25 +249,28 @@ def _wait_for_control(
 
 
 def _wait_for_duration(inputs: InputDevice, display: Display, duration: float,
-                       logger: Logger | None, until: float = math.inf) -> None:
+                       logger: Logger | None, triggers: Triggers | None = None,
+                       until: float = math.inf) -> None:
     """Block for ``duration`` seconds.
 
     :param inputs: the run's input devices.
     :param display: the display, idled between polls (see :meth:`Display.idle`).
     :param duration: seconds to wait.
     :param logger: the run's log (:func:`read_input_events`).
+    :param triggers: the trigger lines (:func:`read_input_events`); ``None`` sends nothing.
     :param until: ``perf_counter`` at which to stop waiting regardless.
     :raises KeyboardInterrupt: on window close or the quit keys.
     """
     end = min(time.perf_counter() + duration, until)
     while time.perf_counter() < end:
-        if _check_quit(inputs, logger):
+        if _check_quit(inputs, logger, triggers):
             raise KeyboardInterrupt
         display.idle(end, poll=0.005)
 
 
 def _wait_for_controls(inputs: InputDevice, display: Display, names: list[str],
-                       deadline: float, logger: Logger | None) -> str | None:
+                       deadline: float, logger: Logger | None,
+                       triggers: Triggers | None = None) -> str | None:
     """Block until one of the controls ``names`` is pressed, or ``deadline``.
 
     :param inputs: the run's input devices.
@@ -266,11 +278,12 @@ def _wait_for_controls(inputs: InputDevice, display: Display, names: list[str],
     :param names: control names (:mod:`humans.inputs`) that end the wait.
     :param deadline: ``perf_counter`` at which to stop waiting.
     :param logger: the run's log (:func:`read_input_events`).
+    :param triggers: the trigger lines (:func:`read_input_events`); ``None`` sends nothing.
     :return: the control that ended the wait, or ``None`` at the deadline.
     :raises KeyboardInterrupt: on window close or the quit keys.
     """
     while time.perf_counter() < deadline:
-        for event in read_input_events(inputs, logger):
+        for event in read_input_events(inputs, logger, triggers):
             if _is_quit(event):
                 raise KeyboardInterrupt
             if event.edge is Edge.DOWN and event.name in names:
@@ -517,18 +530,19 @@ class Run:
               f"    triggers: {self.triggers.status()}\n"
               f"    audio:    {self.audio.status()}", file=sys.stderr)
         self.display.take_focus()
-        _wait_for_control(self.inputs, self.display, START_KEY, self.logger,
+        _wait_for_control(self.inputs, self.display, START_KEY, self.logger, self.triggers,
                           dummy_trigger=self.config.dummy_trigger)
         if self.sync.mode == "wait":
             print(f">>> WAITING for the scanner's trigger key {self.sync.key!r}",
                   file=sys.stderr)
             self.display.take_focus()
-            _wait_for_control(self.inputs, self.display, self.sync.key, self.logger,
+            _wait_for_control(self.inputs, self.display, self.sync.key, self.logger, self.triggers,
                               dummy_trigger=self.config.dummy_trigger)
         elif self.sync.mode == "send":
             print(">>> STARTING the recording: scanner_start sent", file=sys.stderr)
             self.triggers.lifecycle("scanner_start")
-            _wait_for_duration(self.inputs, self.display, self.sync.delay, self.logger)
+            _wait_for_duration(self.inputs, self.display, self.sync.delay, self.logger,
+                               self.triggers)
 
         self.clock.trigger()
         self.logger.log_trigger_time(self.clock.t0_perf, self.clock.t0_epoch)
@@ -542,7 +556,7 @@ class Run:
         :param index: phase index in the curriculum (for the manifest).
         """
         onset = self.clock.from_perf(self.display.draw_fixation())
-        _wait_for_duration(self.inputs, self.display, phase.duration, self.logger,
+        _wait_for_duration(self.inputs, self.display, phase.duration, self.logger, self.triggers,
                            until=self._run_end)
 
         self.logger.log_phase({"index": index, "type": "fixation",
@@ -569,12 +583,13 @@ class Run:
             if self.config.dummy_trigger:      # a test run skips the waits for a key
                 deadline = min(deadline, time.perf_counter() + 0.05)
             _wait_for_controls(self.inputs, self.display, list(message.controls_to_dismiss),
-                               min(deadline, self._run_end), self.logger)
+                               min(deadline, self._run_end), self.logger, self.triggers)
         elif duration is None:
             _wait_for_control(self.inputs, self.display, message.control, self.logger,
-                              dummy_trigger=self.config.dummy_trigger, until=self._run_end)
+                              self.triggers, dummy_trigger=self.config.dummy_trigger,
+                              until=self._run_end)
         else:
-            _wait_for_duration(self.inputs, self.display, duration, self.logger,
+            _wait_for_duration(self.inputs, self.display, duration, self.logger, self.triggers,
                                until=self._run_end)
         return {"text": text, "onset": onset, "offset": self.clock.run_time()}
 
@@ -607,7 +622,7 @@ class Run:
         for q in phase.questions:
             self.display.draw_text(f"{q}\n\nDisagree      Agree\n{scale}")
             control = _wait_for_controls(self.inputs, self.display, controls, math.inf,
-                                         self.logger)
+                                         self.logger, self.triggers)
             responses.append({"question": q, "value": controls.index(control) + 1,
                               "key": control, "run_time": self.clock.run_time()})
 
@@ -692,7 +707,7 @@ class Run:
             waits_for_press = game_phase.is_turn_based and auto is None
             deadline = block_end if waits_for_press else next_t
             pressed, user_quit = _poll_keys_until(
-                self.inputs, self.display, deadline, self.logger, pop_ups,
+                self.inputs, self.display, deadline, self.logger, self.triggers, pop_ups,
                 stop_on=key_to_action if waits_for_press else (),
                 redraw=redraw if waits_for_press else None)
             if user_quit:
@@ -700,8 +715,8 @@ class Run:
                 break
             pop_up = next((pop_up for pop_up in pop_ups if pop_up.pending), None)
             if pop_up is not None:
-                choice = pop_up.run(self.display, self.clock.run_time,
-                                    lambda: read_input_events(self.inputs, self.logger))
+                choice = pop_up.run(self.display, self.clock.run_time, lambda: read_input_events(
+                    self.inputs, self.logger, self.triggers))
                 if choice != "resume":
                     outcome = choice
                     break
@@ -790,7 +805,7 @@ class Run:
             self.audio.stop()               # the episode's last sounds, still queued
             self.display.draw_text(f"Final score: {score:g}\n{message}")
             _wait_for_duration(self.inputs, self.display, game_phase.show_outcome_duration,
-                               self.logger, until=self._run_end)
+                               self.logger, self.triggers, until=self._run_end)
         return result
 
     def _instructions(self, phase: GamePhase, resumed: bool) -> dict | None:
@@ -1080,6 +1095,7 @@ class Run:
         :param until: the ``perf_counter`` it is cut short at.
         """
         onset = self.clock.from_perf(self.display.draw_fixation())
-        _wait_for_duration(self.inputs, self.display, seconds, self.logger, until=until)
+        _wait_for_duration(self.inputs, self.display, seconds, self.logger, self.triggers,
+                           until=until)
         self.logger.log_phase({"index": None, "type": "fixation", which: True,
                                "onset": onset, "offset": self.clock.run_time()})

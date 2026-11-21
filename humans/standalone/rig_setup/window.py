@@ -29,7 +29,8 @@ from PySide6.QtCore import Qt
 
 from ...config import rig as rig_file
 from ...outputs.display import list_monitors, monitor_label
-from ...inputs import CONTROLLER_CLASSES_BY_NAME, INPUT_DEVICE_CLASSES_BY_NAME, START_KEY, Keyboard
+from ...inputs import (CONTROLLER_CLASSES_BY_NAME, EXPERIMENTER_KEYS, INPUT_DEVICE_CLASSES_BY_NAME,
+                       START_KEY, Keyboard, controls_of_input_devices)
 from ...sync.triggers import (HID_DEVICES, SYNC_MODES, TRIGGER_BACKENDS, Codes, SyncSettings,
                         TriggerError, Triggers, TriggerSettings)
 from ..forms import Field
@@ -205,18 +206,20 @@ def window_sizes(width: int, height: int) -> list[str]:
     return [*fits, f"{width}x{height}"] if f"{width}x{height}" not in fits else fits
 
 
-def triggers_section(sync: dict, trigger: dict, codes: dict) -> dict:
-    """Assemble the ``triggers`` section from the three forms.
+def triggers_section(sync: dict, trigger: dict, codes: dict,
+                     input_codes: dict[str, int] | None = None) -> dict:
+    """Assemble the ``triggers`` section from the three forms and the input codes.
 
     Bools are written even at their default; the sync form's start code goes to
-    ``codes``; ``sync`` keeps only its mode's rows (an unknown mode keeps all,
-    for :class:`TriggerSettings` to refuse by name).
+    ``codes``, and so do ``input_codes`` when there are any; ``sync`` keeps only its
+    mode's rows (an unknown mode keeps all, for :class:`TriggerSettings` to refuse by name).
     """
     sync = dict(sync)
     start = sync.pop("scanner_start", None)
     if sync["mode"] in SYNC_ROWS:
         sync = {k: v for k, v in sync.items() if k == "mode" or k in SYNC_ROWS[sync["mode"]]}
     codes = codes if start is None else {**codes, "scanner_start": start}
+    codes = {**codes, "inputs": input_codes} if input_codes else codes
     stated = {f.key: f.default for f in TRIGGER_FIELDS if f.kind == "bool"} | trigger
     ordered = {f.key: stated[f.key] for f in TRIGGER_FIELDS if f.key in stated}
     return {"sync": sync, **ordered, "codes": codes}
@@ -242,8 +245,10 @@ def describe_triggers(section: dict) -> str:
         start = f"After {START_KEY}, the run starts at once."
     if m.backend == "null":
         return start + "\nNo codes are sent: the timing is in the run's log files only."
+    inputs = ", ".join(f"{control} {code}" for control, code in m.codes.inputs.items())
     frames = (f"a frame code (1 to {m.codes.frame_mask}) every {m.frame_every} frame(s)"
-              if m.on_frame else "no frame codes")
+              if m.on_frame else f"each response button's bit while it is held ({inputs})"
+              if inputs else "no frame codes")
     return "\n".join([
         start,
         f"Codes on {m.backend} {where}: run start {m.codes.task_start}, episode start "
@@ -674,6 +679,7 @@ class _RigWindow(QtWidgets.QDialog):
                                     + ["on_frame", "on_episode_start"] * codes
                                     + ["frame_every"] * on_frame)
         self.code_box.setVisible(codes)
+        self.input_code_box.setVisible(codes and not on_frame)
         self.code_form.show_rows(["task_start", "task_stop"] + ["frame_bits"] * on_frame
                                  + ["episode_start"] * bool(
                                      self._value(self.trigger_form, "on_episode_start")))
@@ -1222,6 +1228,10 @@ class _RigWindow(QtWidgets.QDialog):
         layout.addWidget(ui.group("Codes sent to the recording", self.trigger_form))
         self.code_box = ui.group("Code values", self.code_form)
         layout.addWidget(self.code_box)
+        section = dict(section) if isinstance(section, dict) else {}
+        codes = {**asdict(Codes()), **section.pop("codes", {})}
+        self.input_code_box = self._input_codes_box(codes.pop("inputs"))
+        layout.addWidget(self.input_code_box)
         self.test_button = ui.button("Test: send the run start code", self._test_triggers)
         self.test_button.setToolTip("Open the trigger line as a run would and send the run start "
                                     "code once: check that your recording shows it.")
@@ -1232,12 +1242,70 @@ class _RigWindow(QtWidgets.QDialog):
         self.trigger_text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         layout.addWidget(self.trigger_text)
         layout.addStretch(1)
-        section = dict(section) if isinstance(section, dict) else {}
-        codes = {**asdict(Codes()), **section.pop("codes", {})}
         self._set_sync(section.pop("sync", {}), codes["scanner_start"])
         self.code_form.set(codes)
         self.trigger_form.set({**trigger_defaults(), **section})
         return page
+
+    def _input_codes_box(self, given: Any) -> QtWidgets.QGroupBox:
+        box = QtWidgets.QGroupBox("Response buttons marked in the recording, one bit each")
+        layout = QtWidgets.QVBoxLayout(box)
+        hint = QtWidgets.QLabel("With frame codes off, each button below holds its own bit of "
+                                "the line for as long as it is pressed. A bit is 0 to 7, and "
+                                "none may be a code value's above.")
+        hint.setObjectName("hint")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        self.input_codes = QtWidgets.QTableWidget(0, 2)
+        self.input_codes.setHorizontalHeaderLabels(["button", "bit"])
+        self.input_codes.horizontalHeader().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.Stretch)
+        self.input_codes.verticalHeader().hide()
+        self.input_codes.setMaximumHeight(160)
+        for control, code in (given.items() if isinstance(given, dict) else ()):
+            self._add_input_code(str(control), int(code).bit_length() - 1)
+        add = ui.button("Add a button", self._add_input_code_row)
+        add.setToolTip("Add a row: choose the button, then its bit.")
+        remove = ui.button("Remove", self._remove_input_code)
+        remove.setToolTip("Remove the selected button.")
+        layout.addWidget(self.input_codes)
+        layout.addLayout(ui.row(add, remove))
+        return box
+
+    def _add_input_code(self, control: str | None = None, bit: int | None = None) -> None:
+        """A row: the button, among the participant's controls of the rig's devices, and its bit."""
+        checked = [n for n, b in self.input_boxes.items() if b.isChecked()]
+        controls = QtWidgets.QComboBox()
+        participant_controls = controls_of_input_devices(checked) - EXPERIMENTER_KEYS
+        controls.addItems(sorted(participant_controls | {control or ""} - {""}))
+        if control is not None:
+            controls.setCurrentText(control)
+        used = {self.input_codes.cellWidget(r, 1).value()
+                for r in range(self.input_codes.rowCount())}
+        spin = QtWidgets.QSpinBox()
+        spin.setRange(0, 7)
+        spin.setValue(bit if bit is not None else min(set(range(8)) - used, default=0))
+        row = self.input_codes.rowCount()
+        self.input_codes.insertRow(row)
+        self.input_codes.setCellWidget(row, 0, controls)
+        self.input_codes.setCellWidget(row, 1, spin)
+        controls.currentTextChanged.connect(lambda _text: self._triggers_edited())
+        spin.valueChanged.connect(lambda _value: self._triggers_edited())
+
+    def _add_input_code_row(self) -> None:
+        self._add_input_code()
+        self._triggers_edited()
+
+    def _remove_input_code(self) -> None:
+        if self.input_codes.currentRow() >= 0:
+            self.input_codes.removeRow(self.input_codes.currentRow())
+            self._triggers_edited()
+
+    def _input_code_values(self) -> dict[str, int]:
+        """Each button of the table and its code, the bit as a value."""
+        return {self.input_codes.cellWidget(r, 0).currentText():
+                1 << self.input_codes.cellWidget(r, 1).value()
+                for r in range(self.input_codes.rowCount())}
 
     def _apply_preset(self) -> None:
         if self.preset.currentIndex() < 0:
@@ -1258,7 +1326,7 @@ class _RigWindow(QtWidgets.QDialog):
     def _triggers(self) -> dict:
         """:raises ValueError: a number half typed, named in the message."""
         return triggers_section(self.sync_form.get(), self.trigger_form.get(),
-                                self.code_form.get())
+                                self.code_form.get(), self._input_code_values())
 
     def _triggers_problems(self) -> list[str]:
         if not self.has_triggers:

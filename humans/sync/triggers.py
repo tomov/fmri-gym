@@ -38,9 +38,11 @@ OR'd together. The scheme therefore never shares bits between events:
   as ``16 | 5`` and both survive. :meth:`Codes.validate` refuses any scheme
   where two codes overlap.
 
-Action triggers are deliberately absent: every action is already logged per
-frame with its run time, which is enough to realign it to the frame
-triggers and the emulator state.
+* **inputs**, in place of the frames (``on_frame`` off): each control of
+  ``codes.inputs`` owns one bit of its own, held on the lines for as long as
+  the control is held, so every press and release of each button is an edge
+  of its own line. A line has eight bits, the lifecycle events take four, so
+  a recording marks frames or inputs, never both.
 
 Backend deps (pylsl, pyserial, pyparallel, hidapi) are imported lazily, in the
 backend that needs them, so the core stays dependency-free.
@@ -62,6 +64,8 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 LIFECYCLE_EVENTS = ("task_start", "task_stop", "episode_start", "scanner_start")
+#: The codes of one bit: what each input's code must be.
+_ONE_BIT_CODES = tuple(1 << bit for bit in range(8))
 SYNC_MODES = ("wait", "send", "none")
 TRIGGER_BACKENDS = ("null", "lsl", "serial", "parallel", "hid", "dlpio8", "megttlbox")
 
@@ -109,6 +113,8 @@ class Codes:
     task_stop: int = 1 << 4
     episode_start: int = 1 << 5
     scanner_start: int = 1 << 6
+    #: control name -> its own bit, held while the control is held
+    inputs: dict[str, int] = field(default_factory=dict)
 
     @property
     def frame_mask(self) -> int:
@@ -135,7 +141,8 @@ class Codes:
         """Refuse any scheme in which two triggers could not be told apart.
 
         :raises ValueError: if a code leaves one byte, overlaps the frame
-            field, or overlaps another lifecycle code.
+            field, or overlaps another lifecycle code; or if an input's code is
+            not one bit, or shares it with another input or a lifecycle code.
         """
         if not 1 <= self.frame_bits <= 7:
             raise ValueError(f"triggers: frame_bits must be in 1..7, got {self.frame_bits}")
@@ -152,6 +159,20 @@ class Codes:
                 if codes[a] & codes[b]:
                     raise ValueError(f"triggers: codes {a}={codes[a]} and {b}={codes[b]} "
                                      "share a bit; coincident triggers could not be decoded")
+        self._validate_inputs(codes)
+
+    def _validate_inputs(self, lifecycle_codes: dict[str, int]) -> None:
+        """Each input's code is one bit of the byte that no other input or lifecycle code has."""
+        owners = {code: name for name, code in lifecycle_codes.items()}
+        for control, code in self.inputs.items():
+            if isinstance(code, bool) or not isinstance(code, int) or code not in _ONE_BIT_CODES:
+                raise ValueError(f"triggers: input code {control}={code!r} must be one bit, "
+                                 f"one of {_ONE_BIT_CODES}")
+            taken = [owner for owned, owner in owners.items() if owned & code]
+            if taken:
+                raise ValueError(f"triggers: input code {control}={code} shares its bit with "
+                                 f"{taken[0]}; each input needs a bit of its own")
+            owners[code] = control
 
 
 @dataclass(frozen=True)
@@ -236,6 +257,9 @@ class TriggerSettings:
                                  f"expected one of {tuple(ports)}")
         if s.frame_every < 1:
             raise ValueError("triggers: frame_every must be >= 1")
+        if codes.inputs and s.on_frame:
+            raise ValueError("triggers: codes.inputs marks the inputs in place of the frames, "
+                             "so on_frame must be false")
         if sync.mode == "send" and s.backend == "null":
             raise TriggerError('triggers: sync.mode "send" sends scanner_start on the trigger '
                                'line, so triggers.backend must not be "null"')
@@ -502,6 +526,7 @@ class Triggers:
         self._level = 0     # frame code currently on the lines (0 between blocks)
         self._n_sent = 0    # frame triggers sent in the current block
         self._logger = logger
+        self._held_inputs_level = 0     # the bits of the inputs held
 
     @classmethod
     def from_dict(cls, section: dict | None, logger: Logger | None = None) -> Triggers:
@@ -520,7 +545,7 @@ class Triggers:
         """Log a code put on the line, when there is a log and a backend that sends.
 
         :param perf_time: ``perf_counter`` when it was sent.
-        :param name: the lifecycle event, ``frame``, ``pulse``, or ``clear``.
+        :param name: the lifecycle event, ``frame``, ``pulse``, ``inputs`` or ``clear``.
         :param value: the code; 0 for ``clear``.
         """
         if self._logger is not None and self.enabled:
@@ -535,7 +560,7 @@ class Triggers:
         :param name: one of :data:`LIFECYCLE_EVENTS`.
         :return: the value sent.
         """
-        value = self.codes.lifecycle(name) | self._level
+        value = self.codes.lifecycle(name) | self._level | self._held_inputs_level
         self._backend.send(value)
         perf_time = time.perf_counter()
         self.events.append({"name": name, "value": value,
@@ -543,9 +568,33 @@ class Triggers:
         self._log_sent(perf_time, name, value)
         if self._backend.holds_level and self._level == 0:
             time.sleep(self.settings.pulse_ms / 1000.0)
-            self._backend.clear()
-            self._log_sent(time.perf_counter(), "clear", 0)
+            self._restore_held_inputs_level()
         return value
+
+    def hold_input_codes(self, held_controls: frozenset[str]) -> int:
+        """Put the bit of each input in ``held_controls`` on the lines, and drop the others'.
+
+        :param held_controls: every control held now; those without a code are ignored.
+        :return: the bits now held; sent only when they changed.
+        """
+        level = 0
+        for control, code in self.codes.inputs.items():
+            if control in held_controls:
+                level |= code
+        if level != self._held_inputs_level:
+            self._held_inputs_level = level
+            self._backend.send(level)       # a release too: on serial and LSL, a value is an event
+            self._log_sent(time.perf_counter(), "inputs", level)
+        return level
+
+    def _restore_held_inputs_level(self) -> None:
+        """Leave only the bits of the inputs held on the lines, on a transport that holds them."""
+        if self._held_inputs_level and self._backend.holds_level:
+            self._backend.send(self._held_inputs_level)
+            self._log_sent(time.perf_counter(), "inputs", self._held_inputs_level)
+            return
+        self._backend.clear()
+        self._log_sent(time.perf_counter(), "clear", 0)
 
     def frame(self) -> int:
         """Send the next frame trigger of the block, if this frame gets one.
@@ -578,8 +627,7 @@ class Triggers:
         """Drop the frame level at the end of a game block."""
         self._level = 0
         self._n_sent = 0
-        self._backend.clear()
-        self._log_sent(time.perf_counter(), "clear", 0)
+        self._restore_held_inputs_level()
 
     def close(self) -> None:
         """Close the transport."""
@@ -621,6 +669,9 @@ class Triggers:
         out = (f"codes over {self.active}" if self.enabled
                else "no trigger codes sent (backend null)")
         parts = [start, out]
+        if self.codes.inputs and self.enabled:
+            parts.append("inputs marked, not frames: " + ", ".join(
+                f"{control}={code}" for control, code in self.codes.inputs.items()))
         if self.settings.defaulted:
             parts.append("NOT SET: " + ", ".join(self.settings.defaulted))
         return " | ".join(parts)

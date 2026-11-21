@@ -447,6 +447,20 @@ def test_the_keyboard_holds_what_its_events_press_until_the_window_loses_focus()
     assert keys.held() == frozenset()
 
 
+def test_each_read_that_makes_an_edge_gives_the_triggers_every_control_held(screen):
+    from humans.run import read_input_events
+    held: list[frozenset[str]] = []
+    triggers = types.SimpleNamespace(codes=types.SimpleNamespace(inputs={"LEFT": 1}),
+                                     hold_input_codes=held.append)
+    keys = InputDevices([Keyboard()])
+    for events in ([_key(pygame.KEYDOWN, pygame.K_LEFT)], [],
+                   [_key(pygame.KEYDOWN, pygame.K_UP), _key(pygame.KEYUP, pygame.K_LEFT)]):
+        for event in events:
+            pygame.event.post(event)
+        read_input_events(keys, None, triggers)
+    assert held == [{"LEFT"}, {"UP"}], "a read without an edge sends nothing"
+
+
 def test_the_runs_inputs_take_the_queue_and_name_the_windows_close(screen):
     from humans.run import read_input_events
     pygame.event.post(_key(pygame.KEYDOWN, pygame.K_SPACE))
