@@ -164,7 +164,7 @@ include_external_packages = true
 name = "humans's layers: each imports only the ones below it"
 type = "layers"
 containers = ["humans"]
-layers = ["standalone", "run", "popup", "config", "adapters", "outputs", "save", "sync | inputs"]
+layers = ["standalone", "run", "popup", "config", "adapters", "outputs", "sync | inputs", "save"]
 
 [[tool.importlinter.contracts]]
 name = "Only the adapters import a game engine or a gym/ package"
