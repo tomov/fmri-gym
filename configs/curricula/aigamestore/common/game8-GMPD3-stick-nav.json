@@ -8,16 +8,10 @@
       "",
       "![controls](images/controls/aigamestore/game8-GMPD3-stick-nav.png)",
       "",
-      "Controls:",
-      "   stick left / right   aim",
-      "   RT                   fire",
-      "   Y                    swap current / next",
-      "   hold Y               show the controls",
-      "",
       "Press A to start."
     ]
   },
-  "controls": {"CONTROLLER_AXIS_LEFTX_LEFT": 0, "CONTROLLER_AXIS_LEFTX_RIGHT": 1, "CONTROLLER_AXIS_TRIGGERRIGHT": 2, "CONTROLLER_BUTTON_Y": 3},
+  "controls": {"CONTROLLER_AXIS_LEFTX_LEFT": 0, "CONTROLLER_AXIS_LEFTX_RIGHT": 1, "CONTROLLER_AXIS_TRIGGERRIGHT": 2, "CONTROLLER_AXIS_TRIGGERLEFT": 3},
   "hint": {
     "control": "CONTROLLER_BUTTON_Y", "hold": 3.0, "after": 0.0,
     "text": [

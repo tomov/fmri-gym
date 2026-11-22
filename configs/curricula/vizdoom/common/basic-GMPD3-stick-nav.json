@@ -9,12 +9,6 @@
       "",
       "![controls](images/controls/vizdoom/basic-GMPD3-stick-nav.png)",
       "",
-      "Controls:",
-      "   X / B                move left / right",
-      "   RT                   shoot",
-      "   hold LT              pause menu (restart / give up / resume)",
-      "   hold Y               show the controls",
-      "",
       "Press A to start."
     ]
   },

@@ -9,13 +9,6 @@
       "",
       "![controls](images/controls/vizdoom/my_way_home-GMPD3-stick-nav.png)",
       "",
-      "Controls:",
-      "   stick up             move forward",
-      "   stick left / right   turn left / right",
-      "   X / B                move left / right",
-      "   hold LT              pause menu (restart / give up / resume)",
-      "   hold Y               show the controls",
-      "",
       "Press A to start."
     ]
   },

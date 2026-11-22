@@ -8,16 +8,6 @@
       "",
       "![controls](images/controls/vizdoom/deathmatch-GMPD3-stick-nav.png)",
       "",
-      "Controls:",
-      "   stick up / down      move forward / back",
-      "   stick left / right   turn left / right",
-      "   X / B                move left / right",
-      "   RT                   shoot",
-      "   LT                   next weapon",
-      "   A                    run",
-      "   hold LT              pause menu (restart / give up / resume)",
-      "   hold Y               show the controls",
-      "",
       "Press A to start."
     ]
   },

@@ -9,14 +9,6 @@
       "",
       "![controls](images/controls/vizdoom/deadly_corridor-GMPD3-stick-nav.png)",
       "",
-      "Controls:",
-      "   stick up / down      move forward / back",
-      "   stick left / right   turn left / right",
-      "   X / B                move left / right",
-      "   RT                   shoot",
-      "   hold LT              pause menu (restart / give up / resume)",
-      "   hold Y               show the controls",
-      "",
       "Press A to start."
     ]
   },

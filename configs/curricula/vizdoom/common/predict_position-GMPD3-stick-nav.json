@@ -9,12 +9,6 @@
       "",
       "![controls](images/controls/vizdoom/predict_position-GMPD3-stick-nav.png)",
       "",
-      "Controls:",
-      "   stick left / right   turn left / right",
-      "   RT                   fire rocket",
-      "   hold LT              pause menu (restart / give up / resume)",
-      "   hold Y               show the controls",
-      "",
       "Press A to start."
     ]
   },

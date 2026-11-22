@@ -9,12 +9,6 @@
       "",
       "![controls](images/controls/vizdoom/health_gathering_supreme-GMPD3-stick-nav.png)",
       "",
-      "Controls:",
-      "   stick up             move forward",
-      "   stick left / right   turn left / right",
-      "   hold LT              pause menu (restart / give up / resume)",
-      "   hold Y               show the controls",
-      "",
       "Press A to start."
     ]
   },

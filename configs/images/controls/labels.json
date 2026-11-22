@@ -52,7 +52,8 @@
     "aigamestore/game8-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["left / right:", "aim"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["fire"],
-      "CONTROLLER_BUTTON_Y": ["swap current", "/ next", "hold: show controls"]
+      "CONTROLLER_AXIS_TRIGGERLEFT": ["swap current / next"],
+      "CONTROLLER_BUTTON_Y": ["hold: show controls"]
     },
     "baba_auto/baba_auto-GMPD3-ABXY-nav.png": {
       "CONTROLLER_BUTTON_X": ["move left"],
@@ -124,7 +125,7 @@
       "CONTROLLER_BUTTON_X": ["move left"],
       "CONTROLLER_BUTTON_B": ["move right"],
       "CONTROLLER_BUTTON_A": ["run"],
-      "CONTROLLER_BUTTON_Y": ["open doors,", "press switches", "hold: show controls"],
+      "CONTROLLER_BUTTON_Y": ["doors, switches", "hold: show controls"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["shoot"],
       "CONTROLLER_AXIS_TRIGGERLEFT": ["next weapon", "hold: pause menu"]
     },
