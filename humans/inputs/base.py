@@ -1,12 +1,12 @@
-"""What every input device is: named controls, their edges, and the devices as one.
+"""What every input device is: named controls, their input events, and the devices as one.
 
 Every key, button and stick direction a participant can touch has one name,
 unique across devices: its value in
 :class:`~humans.inputs.control_names.ControlNames`. A device lists its names at
 the top of its own file, and its :meth:`InputDevice.handle` turns the pygame
-events that are its own into :class:`InputEvent` edges; it never reads pygame's
-queue itself. As in a game engine, a control is read two ways: an edge the frame
-it happens, and held state (:meth:`InputDevice.held`) at the tick. Several
+events that are its own into input events (:class:`InputEvent`); it never reads
+pygame's queue itself. As in a game engine, a control is read two ways: an input
+event the frame it happens, and held state (:meth:`InputDevice.held`) at the tick. Several
 devices together are one :class:`InputDevices`, which is itself a device.
 """
 
@@ -34,7 +34,7 @@ class Edge(Enum):
 
 
 class InputEvent(NamedTuple):
-    """One edge of a control."""
+    """A control that went down or up: its name, and which way."""
 
     name: str
     edge: Edge
@@ -66,7 +66,7 @@ class InputDevice(ABC):
 
     @abstractmethod
     def handle(self, events: list[pygame.event.Event], now: float) -> list[InputEvent]:
-        """The edges ``events`` make on this device, in order; the events of others it ignores.
+        """The input events ``events`` make on this device, in order; other devices' it ignores.
 
         :param now: ``perf_counter`` when the events were taken off the queue.
         """
@@ -99,14 +99,14 @@ class InputDevice(ABC):
         """Let go of the device."""
 
     def _press(self, name: str) -> list[InputEvent]:
-        """Press ``name``: its down edge, or nothing when it is already down."""
+        """Press ``name``: its down input event, or nothing when it is already down."""
         if name in self._held:
             return []
         self._held.add(name)
         return [InputEvent(name, Edge.DOWN)]
 
     def _release(self, name: str) -> list[InputEvent]:
-        """Release ``name``: its up edge, or nothing when it is already up."""
+        """Release ``name``: its up input event, or nothing when it is already up."""
         if name not in self._held:
             return []
         self._held.discard(name)
@@ -116,7 +116,7 @@ class InputDevice(ABC):
 class InputDevices(InputDevice):
     """Several input devices read as one: a run's keyboard and controllers together.
 
-    Its edges are each device's, in the devices' order, after the window's
+    Its input events are each device's, in the devices' order, after the window's
     close button and each press of :data:`QUIT_KEYS` as :data:`QUIT`.
     """
 

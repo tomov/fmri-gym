@@ -224,6 +224,59 @@ def test_a_box_that_does_not_answer_as_itself_stops_the_run(monkeypatch, backend
         RigConfig.open(write("plain", triggers={"backend": backend}))
 
 
+_INPUT_CODES = {"sync": {"mode": "send"}, "backend": "hid", "port": "B", "on_frame": False,
+                "codes": {"inputs": {"CONTROLLER_BUTTON_A": 1, "CONTROLLER_BUTTON_B": 128}}}
+
+
+def test_each_input_holds_its_bit_while_held_and_the_lifecycle_codes_add_theirs(monkeypatch):
+    from humans.sync.triggers import Triggers
+    fake = _FakeHid()
+    monkeypatch.setitem(sys.modules, "hid", fake)
+    triggers = Triggers.from_dict(_INPUT_CODES)
+    del fake.reports[:]
+    assert triggers.hold_input_codes(frozenset({"CONTROLLER_BUTTON_A", "LEFT"})) == 1
+    assert triggers.hold_input_codes(frozenset({"CONTROLLER_BUTTON_A"})) == 1  # sends nothing
+    assert triggers.hold_input_codes(frozenset({"CONTROLLER_BUTTON_A",
+                                                "CONTROLLER_BUTTON_B"})) == 129
+    assert triggers.frame() == 0                                   # no frame codes
+    triggers.lifecycle("task_stop")                    # pulsed, then the held bits again
+    triggers.block_end()
+    assert triggers.hold_input_codes(frozenset()) == 0
+    assert [r[2] for r in fake.reports] == [1, 129, 129 | 16, 129, 129, 0]
+    assert "inputs marked, not frames: CONTROLLER_BUTTON_A=1, CONTROLLER_BUTTON_B=128" in (
+        triggers.status())
+
+
+@pytest.mark.parametrize("change, problem", [
+    ({"on_frame": True}, "so on_frame must be false"),
+    ({"codes": {"inputs": {"CONTROLLER_BUTTON_A": 3}}}, "must be one bit"),
+    ({"codes": {"inputs": {"CONTROLLER_BUTTON_A": 16}}}, "shares its bit with task_stop"),
+    ({"codes": {"inputs": {"CONTROLLER_BUTTON_A": 1, "CONTROLLER_BUTTON_B": 1}}},
+     "CONTROLLER_BUTTON_B=1 shares its bit with CONTROLLER_BUTTON_A"),
+    ({"codes": {"inputs": {"CONTROLLER_BUTTON_A": 1}}, "sync": {"mode": "wait", "key": "5"}}, None),
+])
+def test_an_input_code_that_is_no_bit_of_its_own_or_no_button_is_refused(change, problem):
+    triggers = {**_INPUT_CODES, **change}
+    problems = rig.problems({"inputs": ["keyboard", "xbox_controller"], "triggers": triggers})
+    assert (problems == []) if problem is None else any(problem in p for p in problems), problems
+
+
+def test_an_input_code_of_a_control_none_of_the_rigs_inputs_has_is_refused():
+    triggers = {**_INPUT_CODES, "codes": {"inputs": {"CONTROLLER_BUTTON_A": 1, "UP": 2}}}
+    problems = rig.problems({"inputs": ["keyboard"], "triggers": triggers})
+    assert problems == ["triggers: input code 'CONTROLLER_BUTTON_A' is no control of the rig's "
+                        "inputs (keyboard)"], problems
+
+
+def test_the_scanner_key_and_the_experimenters_keys_mark_no_input():
+    triggers = {**_INPUT_CODES, "sync": {"mode": "wait", "key": "5"},
+                "codes": {"inputs": {"5": 1, "ESCAPE": 2, "RETURN": 4}}}
+    problems = rig.problems({"inputs": ["keyboard"], "triggers": triggers})
+    assert any("'5' is the key the scanner types" in p for p in problems)
+    assert any("'ESCAPE' is an experimenter's key" in p for p in problems)
+    assert any("'RETURN' is an experimenter's key" in p for p in problems)
+
+
 def test_a_game_key_the_scanner_types_is_refused_on_that_rig():
     from humans.config.curriculum import Curriculum
     from humans.config.run import RunConfig
@@ -398,3 +451,26 @@ def test_a_message_is_dismissed_by_a_control_name_not_a_character():
     assert not phase_problems(message) and not phase_problems({**message, "control": "any"})
     assert not phase_problems({**message, "control": ControlNames.CONTROLLER_BUTTON_A})
     assert any("control name" in p for p in phase_problems({**message, "control": " "}))
+
+
+def test_a_start_up_that_stops_leaves_its_console_and_its_error_in_the_run_log(tmp_path):
+    from humans.config.curriculum import Curriculum
+    from humans.config.run import RunConfig
+    from humans.run import Run
+    far = RigConfig.open(write("far", screen={"geometry": GEOMETRY, "monitor": 99}))
+    curriculum = Curriculum.from_dict({"curriculum": [{"type": "fixation", "duration": 1}]},
+                                      "c.json")
+    config = RunConfig(curriculum=curriculum, rig=far, subject="sub-01", ses=1, run=1,
+                       duration=None, resume=False, loop=False, dummy_trigger=True,
+                       skip_load_games=True, calibration_files=())
+    with pytest.raises(ValueError, match="monitor 99"):
+        Run.from_config(config)
+    log, = (tmp_path / "data").rglob("pygame_events.jsonl")
+    lines = [json.loads(line) for line in log.read_text().splitlines()]
+    assert [line["type"] for line in lines] == ["run_start", "console", "run_end"]
+    assert lines[1]["text"].startswith("output: ") and lines[1]["stream"] == "stderr"
+    assert lines[2]["how"].startswith("error: ValueError: monitor 99")
+    assert type(sys.stderr).__name__ != "_ConsoleCopy"     # the console is given back
+    manifest = json.loads((log.parent / "manifest.json").read_text())
+    assert {"run", "seeds", "rig", "versions", "platform", "log_format"} <= manifest.keys(), \
+        "the log of a start-up that stopped has nothing to be read with"

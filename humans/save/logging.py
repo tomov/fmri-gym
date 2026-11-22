@@ -2,27 +2,33 @@
 
 ::
 
-    <outdir>/manifest.json                            the run: subject, curriculum, one entry per phase, rig
-    <outdir>/block-NN_<backend>_<game>/events.jsonl   one JSON object per line, in order
-    <outdir>/block-NN_<backend>_<game>/frames.h5      the rendered frames, when the phase keeps them
-    <outdir>/block-NN_<backend>_<game>/audio.h5       the queued PCM, when the block played any
+    <outdir>/manifest.json                                the run: what it played, on what, with which code
+    <outdir>/pygame_events.jsonl                          the run's log: what the run read, showed, sent, printed
+    <outdir>/block-NN_<backend>_<game>/game_events.jsonl  one block's log: what its game did
+    <outdir>/block-NN_<backend>_<game>/frames.h5          the rendered frames, when the phase keeps them
+    <outdir>/block-NN_<backend>_<game>/audio.h5           the queued PCM, when the block played any
 
 A phase played again in the same run writes ``block-NN_<backend>_<game>_2``, ``_3``...
 
-There is one :class:`Logger` per run and it writes all three. The manifest is
-rewritten (atomically) whenever a phase entry or a run-level field lands, so
-it is current at every phase boundary. A block's lines and frames go through
-a queue to a writer process that owns the file handles, flushes on a timer
-and finishes on its own if the run dies: a crash mid-block loses at most the
-last flush interval, and a partial last line is skipped on read. One block is
-open at a time (a run plays its curriculum in order).
+There is one :class:`Logger` per run. The manifest is written when the logger is created,
+with the log format, and rewritten (atomically) whenever a field or a phase entry lands: it
+says what the logs are read with. Each line is written once, by what produced it: the run's
+log (:meth:`Logger.log_run_event`) holds what the run read, showed, sent and printed, a
+block's (:meth:`Logger.log`) what its game did. Lines, frames and PCM go
+through a queue to a writer process that owns the file handles, flushes them on a timer (the
+run's log to disk) and finishes on its own if the run dies: a crash loses at most the last
+flush interval, and a partial last line is skipped on read. One block is open at a time (a
+run plays its curriculum in order). A run that logs no run line (an agent's) has no
+run's log.
 
-Every line in ``events.jsonl`` has a ``type``. The logger writes the first
-and last itself -- ``block_start`` (``format``, ``version``, ``subject``,
-``block_index``, ``backend``, ``game``, ``phase``: the config, ``base_seed``)
-and ``block_end`` (whatever summary :meth:`Logger.close_block` is given) --
-and stamps each ``frame`` with its index in the block, also ``frame``. The
-other lines are written as given (:meth:`Logger.log`).
+A run line has a ``type``, the ``perf_counter`` time it happened (``perf_time``, given by its
+source; the logger converts no time) and the folder name of the block open when it was
+written (``block``, ``None`` outside one). A block's ``game_events.jsonl`` starts with
+``block_start`` (``format``, ``version``, ``subject``, ``block_index``, ``backend``,
+``game``, ``phase``: the config, ``base_seed``, then what :meth:`Logger.open_block` is
+given besides: a run's ``run_time``) and ends with ``block_end``
+(whatever summary :meth:`Logger.close_block` is given); each ``frame`` line is stamped with its
+index in the block, also ``frame``; the other lines are written as given.
 
 ``frames.h5`` holds ``frames`` ``(N, H, W, C)``, one gzip'd chunk per frame
 so any one reads alone, and ``frame_index`` ``(N,)``, the ``frame`` of each
@@ -46,23 +52,28 @@ import json
 import multiprocessing as mp
 import os
 import queue as queue_mod
+import sys
+import threading
 import time
 import zlib
 from collections import Counter
-from dataclasses import asdict, dataclass, replace
-from typing import TYPE_CHECKING, Any
+from dataclasses import asdict, dataclass
+from typing import Any
 
 import numpy as np
 
-if TYPE_CHECKING:
-    from ..sync.clock import Clock
-
 FORMAT = "fmri-gym-log"
-VERSION = 1
+#: 2: the run's own ``pygame_events.jsonl``, beside its blocks' ``game_events.jsonl``.
+VERSION = 2
+#: The run's log.
+RUN_EVENTS_FILENAME = "pygame_events.jsonl"
+#: A block's log.
+GAME_EVENTS_FILENAME = "game_events.jsonl"
+#: A block's log before log format 2.
 EVENTS_FILENAME = "events.jsonl"
 FRAMES_FILENAME = "frames.h5"
 AUDIO_FILENAME = "audio.h5"
-#: Seconds between flushes of a block's files to the OS (not every frame).
+#: Seconds between flushes of the files to the OS, and of the run's log to disk.
 FLUSH_INTERVAL = 1.0
 
 
@@ -70,9 +81,8 @@ FLUSH_INTERVAL = 1.0
 class AudioBlockLog:
     """One block's sound timing: what ``audio.h5`` keeps besides the samples."""
 
-    #: ``(chunk, time)``: when each queued chunk started playing, on the
-    #: ``perf_counter`` clock; a chunk that never played has no entry.
-    #: :meth:`Logger.close_block` writes them in run time.
+    #: ``(chunk, time)``: when each queued chunk started playing, in seconds; a chunk that
+    #: never played has no entry
     onsets: list[tuple[int, float]]
     #: milliseconds from a frame's flip to its sound's first sample at the DAC
     delay_ms: float
@@ -92,40 +102,47 @@ class AudioBlockLog:
 
 
 class Logger:
-    """Writes one run's ``manifest.json`` and its per-block logs."""
+    """Writes one run's ``manifest.json``, its own log and its blocks' logs."""
 
-    def __init__(self, outdir: str, subject: str, phases: list[dict], clock: Clock) -> None:
-        """Create the run's output directory, an empty manifest and the writer process.
+    def __init__(self, outdir: str, subject: str, phases: list[dict]) -> None:
+        """Create the run's folder, its manifest (written at once, with the log format) and the
+        writer process.
 
         :param outdir: the run's folder.
         :param subject: subject identifier stored in the manifest and each block.
         :param phases: the curriculum's phases, stored whole in the manifest (``curriculum``).
-        :param clock: the run's clock (used for trigger epoch / perf times).
         """
         self.outdir = outdir
-        self.clock = clock
         os.makedirs(outdir, exist_ok=True)
         self.manifest: dict = {
             "subject": subject, "curriculum": phases, "start_epoch": None, "phases": [],
+            "log_format": {"format": FORMAT, "version": VERSION},
         }
+        self.save_manifest()
+        #: the open block's folder name; ``None`` between blocks.
         self._block: str | None = None
         #: how many blocks of each folder name this run has opened.
         self._block_names: Counter[str] = Counter()
         #: frames recorded in the open block so far.
         self.n_frames = 0
         self._frame_stride = 1
+        self._console_copies: list[_ConsoleCopy] = []
         # Unbounded queue: a full one would silently stall put(), the exact
         # invisible data loss this exists to avoid.
         self._queue: mp.Queue = mp.Queue()
-        self._process = mp.Process(target=_writer_main, args=(self._queue,), daemon=True)
+        self._process = mp.Process(target=_writer_main, args=(self._queue, outdir), daemon=True)
         self._process.start()
 
     # -- the manifest --------------------------------------------------------
 
-    def set_trigger_time(self) -> None:
-        """Record the scanner-trigger wall and perf times on the manifest."""
-        self.manifest["start_epoch"] = self.clock.t0_epoch
-        self.manifest["trigger_perf"] = self.clock.t0_perf
+    def log_trigger_time(self, perf_time: float, wall_time: float) -> None:
+        """Record the run clock's zero on the manifest (``trigger_perf``, ``start_epoch``).
+
+        :param perf_time: ``perf_counter`` at the trigger.
+        :param wall_time: ``time.time()`` at the trigger.
+        """
+        self.manifest["start_epoch"] = wall_time
+        self.manifest["trigger_perf"] = perf_time
         self.save_manifest()
 
     def log_phase(self, entry: dict) -> None:
@@ -154,9 +171,31 @@ class Logger:
         _atomic_write(path, json.dumps(self.manifest, indent=2, default=_json_default).encode())
         return path
 
+    # -- the run's log ---------------------------------------------------------
+
+    def log_run_event(self, line_type: str, perf_time: float, **fields: Any) -> None:
+        """Append one line to the run's ``pygame_events.jsonl``: its ``type``, ``perf_time``,
+        the open block's folder name (``block``, ``None`` between blocks), then ``fields``. Safe
+        to call from any thread.
+
+        :param line_type: the line's ``type``.
+        :param perf_time: ``perf_counter`` when it happened.
+        :param fields: the rest of the line, written as given.
+        """
+        self._queue.put({"op": "run_line", "line": {
+            "type": line_type, "perf_time": perf_time, "block": self._block, **fields}})
+
+    def copy_console(self) -> None:
+        """Until :meth:`close`, log each line printed to stdout or stderr as well, as a
+        ``console`` line (``stream``, ``text``) at the time it was printed."""
+        self._console_copies = [_ConsoleCopy(sys.stdout, "stdout", self),
+                                _ConsoleCopy(sys.stderr, "stderr", self)]
+        sys.stdout, sys.stderr = self._console_copies
+
     # -- one game block ------------------------------------------------------
 
-    def open_block(self, index: int, backend: str, game: str, phase: dict, base_seed: int) -> str:
+    def open_block(self, index: int, backend: str, game: str, phase: dict, base_seed: int,
+                   **fields: Any) -> str:
         """Start a block's log; its ``block_start`` line is queued at once.
 
         :param index: the phase's index in the curriculum (in the folder name).
@@ -165,6 +204,8 @@ class Logger:
         :param phase: the game-phase config; its ``frame_stride`` (1 by
             default) says which rendered frames this block keeps.
         :param base_seed: the phase's base seed.
+        :param fields: the rest of the ``block_start`` line (a run gives ``run_time``, the
+            run clock as the block opens).
         :return: the block's folder name, for the manifest.
         """
         safe_game = game.split("/")[-1].replace(":", "_")
@@ -172,19 +213,22 @@ class Logger:
         self._block_names[name] += 1
         if self._block_names[name] > 1:
             name += f"_{self._block_names[name]}"
-        self._block = os.path.join(self.outdir, name)
+        self._block = name
         self.n_frames = 0
         self._frame_stride = int(phase.get("frame_stride", 1))
         self.log(type="block_start", format=FORMAT, version=VERSION,
                  subject=self.manifest["subject"], block_index=index, backend=backend,
-                 game=game, phase=phase, base_seed=base_seed)
+                 game=game, phase=phase, base_seed=base_seed, **fields)
         return name
 
     def log(self, **record: Any) -> None:
-        """Append one line to the open block's ``events.jsonl``.
+        """Append one line to the open block's ``game_events.jsonl``.
 
         :param record: the line's fields; give it a ``type``.
+        :raises RuntimeError: if no block is open.
         """
+        if self._block is None:
+            raise RuntimeError(f"a {record.get('type')!r} block line, with no block open")
         self._queue.put({"op": "line", "block": self._block, "line": record})
 
     def log_frame(self, fields: dict, frame: Any = None, state: bytes | None = None) -> None:
@@ -217,25 +261,70 @@ class Logger:
     def close_block(self, audio: AudioBlockLog | None = None, **summary: Any) -> None:
         """Append the ``block_end`` line and release the block's files.
 
-        :param audio: the block's sound timing, its onsets on ``perf_counter``; written to
-            ``audio.h5`` in run time rather than to the line; ``None`` for a block that
-            played none.
-        :param summary: the line's fields (episode and frame counts, totals, …).
+        :param audio: the block's sound timing, its onsets in run time; written to
+            ``audio.h5`` rather than to the line; ``None`` for a block that played none.
+        :param summary: the line's fields (when it ended, episode and frame counts, totals, …).
         """
         self.log(type="block_end", **summary)
         if audio is not None:
-            in_run_time = [(chunk, self.clock.from_perf(t)) for chunk, t in audio.onsets]
             self._queue.put({"op": "audio_summary", "block": self._block,
-                             "audio": replace(audio, onsets=in_run_time).record()})
+                             "audio": audio.record()})
         self._queue.put({"op": "close", "block": self._block})
         self._block = None
 
     def close(self) -> None:
-        """Flush everything and stop the writer process. Safe to call more than once."""
+        """Stop copying the console, flush everything and stop the writer process. Safe to call
+        more than once."""
         if not self._process.is_alive():
             return
+        for copy in self._console_copies:
+            copy.stop()
         self._queue.put({"op": "shutdown"})
         self._process.join()
+
+
+class _ConsoleCopy:
+    """A console stream that also logs each whole line written to it."""
+
+    def __init__(self, stream: Any, name: str, logger: Logger) -> None:
+        """Wrap ``stream``.
+
+        :param stream: the console stream written to.
+        :param name: ``stdout`` or ``stderr``: the stream's name, and the line's ``stream``.
+        :param logger: the log that gets each line.
+        """
+        self.stream = stream
+        self.name = name
+        self._logger = logger
+        self._partial_line = ""
+        self._lock = threading.Lock()   # a line printed from another thread stays whole
+
+    def write(self, text: str) -> int:
+        """Write ``text`` to the stream, then log each line it completes.
+
+        :param text: what was printed.
+        :return: what the stream's own ``write`` returned.
+        """
+        written = self.stream.write(text)
+        now = time.perf_counter()
+        with self._lock:
+            *lines, self._partial_line = (self._partial_line + text).split("\n")
+        for line in lines:
+            self._logger.log_run_event("console", now, stream=self.name, text=line)
+        return written
+
+    def stop(self) -> None:
+        """Log what is left of an unfinished line, and give the console its stream back."""
+        if self._partial_line:
+            self._logger.log_run_event("console", time.perf_counter(), stream=self.name,
+                                       text=self._partial_line)
+            self._partial_line = ""
+        if getattr(sys, self.name) is self:
+            setattr(sys, self.name, self.stream)
+
+    def __getattr__(self, attribute: str) -> Any:
+        """Everything else is the stream's."""
+        return getattr(self.stream, attribute)
 
 
 # --------------------------------------------------------------------------- #
@@ -246,9 +335,17 @@ class Logger:
 _ORPHAN_GRACE = 1.0
 
 
-def _writer_main(q: mp.Queue) -> None:
-    """Consume queued ops, owning every file handle; flush on a timer; exit on
-    ``shutdown`` or, having drained the queue, when the parent is gone."""
+def _writer_main(q: mp.Queue, outdir: str) -> None:
+    """Consume queued ops, owning every file handle, until ``shutdown`` or, the queue drained,
+    the parent is gone.
+
+    Files are flushed every :data:`FLUSH_INTERVAL`, the run's log to disk.
+
+    :param q: the logger's queue.
+    :param outdir: the run's folder.
+    """
+    #: the run's log, opened by its first line.
+    run_lines: list[Any] = []
     lines: dict[str, Any] = {}
     h5: dict[str, Any] = {}
     audio: dict[str, Any] = {}
@@ -256,6 +353,9 @@ def _writer_main(q: mp.Queue) -> None:
     last_flush = time.monotonic()
 
     def _flush() -> None:
+        for fh in run_lines:
+            fh.flush()
+            os.fsync(fh.fileno())
         for fh in lines.values():
             fh.flush()
         for f in h5.values():
@@ -263,10 +363,10 @@ def _writer_main(q: mp.Queue) -> None:
         for f in audio.values():
             f.flush()
 
-    def _open_h5(block: str, frame: np.ndarray) -> Any:
+    def _open_h5(folder: str, frame: np.ndarray) -> Any:
         """Sized from the first frame; SWMR mode must be set after every dataset exists."""
         import h5py
-        f = h5py.File(os.path.join(block, FRAMES_FILENAME), "w", libver="latest")
+        f = h5py.File(os.path.join(folder, FRAMES_FILENAME), "w", libver="latest")
         f.create_dataset("frames", shape=(0, *frame.shape), maxshape=(None, *frame.shape),
                          dtype=frame.dtype, chunks=(1, *frame.shape),
                          compression="gzip", compression_opts=1)
@@ -275,10 +375,10 @@ def _writer_main(q: mp.Queue) -> None:
         f.swmr_mode = True
         return f
 
-    def _open_audio_h5(block: str, pcm: np.ndarray, sample_rate: float) -> Any:
+    def _open_audio_h5(folder: str, pcm: np.ndarray, sample_rate: float) -> Any:
         """Sized from the first chunk; SWMR mode must be set after every dataset exists."""
         import h5py
-        f = h5py.File(os.path.join(block, AUDIO_FILENAME), "w", libver="latest")
+        f = h5py.File(os.path.join(folder, AUDIO_FILENAME), "w", libver="latest")
         f.create_dataset("samples", shape=(0, pcm.shape[1]), maxshape=(None, pcm.shape[1]),
                          dtype=pcm.dtype, chunks=(4096, pcm.shape[1]))
         f.create_dataset("chunk_len", shape=(0,), maxshape=(None,), dtype="int64",
@@ -292,10 +392,14 @@ def _writer_main(q: mp.Queue) -> None:
         op, block = rec["op"], rec.get("block")
         if op == "shutdown":
             return True
-        if op == "line":
+        if op == "run_line":
+            if not run_lines:
+                run_lines.append(open(os.path.join(outdir, RUN_EVENTS_FILENAME), "a"))
+            run_lines[0].write(json.dumps(rec["line"], default=_json_default) + "\n")
+        elif op == "line":
             if block not in lines:
-                os.makedirs(block, exist_ok=True)
-                lines[block] = open(os.path.join(block, EVENTS_FILENAME), "a")
+                os.makedirs(os.path.join(outdir, block), exist_ok=True)
+                lines[block] = open(os.path.join(outdir, block, GAME_EVENTS_FILENAME), "a")
             line = rec["line"]
             if rec.get("state") is not None:
                 # Savestates are large and mostly redundant (a crafter pickle is
@@ -305,7 +409,7 @@ def _writer_main(q: mp.Queue) -> None:
             lines[block].write(json.dumps(line, default=_json_default) + "\n")
         elif op == "frame":
             if block not in h5:
-                h5[block] = _open_h5(block, rec["frame"])
+                h5[block] = _open_h5(os.path.join(outdir, block), rec["frame"])
             for name, value in (("frames", rec["frame"]), ("frame_index", rec["index"])):
                 ds = h5[block][name]
                 n = ds.shape[0]
@@ -314,7 +418,8 @@ def _writer_main(q: mp.Queue) -> None:
         elif op == "audio":
             pcm = rec["pcm"]
             if block not in audio:
-                audio[block] = _open_audio_h5(block, pcm, rec["sample_rate"])
+                audio[block] = _open_audio_h5(os.path.join(outdir, block), pcm,
+                                              rec["sample_rate"])
             samples, chunk_len = audio[block]["samples"], audio[block]["chunk_len"]
             n = samples.shape[0]
             samples.resize(n + len(pcm), axis=0)
@@ -344,6 +449,8 @@ def _writer_main(q: mp.Queue) -> None:
 
     def _finish() -> None:
         _flush()
+        for fh in run_lines:
+            fh.close()
         for handles in (lines, h5, audio):
             for fh in handles.values():
                 fh.close()
@@ -396,23 +503,41 @@ def _json_default(o: Any) -> Any:
 
 
 # --------------------------------------------------------------------------- #
-# Reading a block back
+# Reading the logs back
 # --------------------------------------------------------------------------- #
 
+def read_lines(path: str) -> list[dict]:
+    """Every line of a ``.jsonl`` log, the run's or a block's, in order.
+
+    :param path: the file.
+    :return: the records; a partial last line (a crash mid-write) is dropped, not raised.
+    """
+    lines = []
+    with open(path) as f:
+        for line in f:
+            try:
+                lines.append(json.loads(line))
+            except json.JSONDecodeError:
+                break
+    return lines
+
+
+def block_log(block: str) -> str:
+    """A block's log: its ``game_events.jsonl``, or its ``events.jsonl`` before log format 2.
+
+    :param block: the block's folder.
+    """
+    path = os.path.join(block, GAME_EVENTS_FILENAME)
+    return path if os.path.exists(path) else os.path.join(block, EVENTS_FILENAME)
+
+
 def read_events(block: str) -> list[dict]:
-    """Every line of a block's ``events.jsonl``, in order.
+    """Every line of a block's log (:func:`block_log`), in order.
 
     :param block: the block's folder.
     :return: the records; a partial last line (a crash mid-write) is dropped, not raised.
     """
-    events = []
-    with open(os.path.join(block, EVENTS_FILENAME)) as f:
-        for line in f:
-            try:
-                events.append(json.loads(line))
-            except json.JSONDecodeError:
-                break
-    return events
+    return read_lines(block_log(block))
 
 
 def read_state(text: str) -> bytes:

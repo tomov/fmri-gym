@@ -75,7 +75,8 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from ..inputs import INPUT_DEVICE_CLASSES_BY_NAME, Keyboard
+from ..inputs import (EXPERIMENTER_KEYS, INPUT_DEVICE_CLASSES_BY_NAME, Keyboard,
+                      controls_of_input_devices)
 from ..outputs.display import PHOTODIODE_CORNERS, PhotodiodePatch
 from ..sync.triggers import TriggerError, TriggerSettings
 
@@ -621,10 +622,30 @@ def _setting_problems(rig: dict) -> list[str]:
             for k in ("start_fixation", "end_fixation")
             if rig.get(k) is not None and not _is_seconds(rig[k])]
     return (out + trigger_problems(rig.get("triggers", {})) + _input_device_problems(rig)
+            + _input_code_problems(rig)
             + _response_key_problems(rig) + _photodiode_patch_problems(rig)
             + _eyelink_problems(rig.get("eyelink"))
             + _dbp_meg_problems(rig.get("dbp_meg", {}))
             + _rig_measurement_problems(rig.get("rig_measurement", {})))
+
+
+def _input_code_problems(rig: dict) -> list[str]:
+    """``triggers.codes.inputs``: controls of the rig's input devices that only the participant
+    presses (not the scanner's key, nor an experimenter's key)."""
+    triggers = rig.get("triggers", {})
+    names = rig.get("inputs", DEFAULTS["inputs"])
+    if trigger_problems(triggers) or _input_device_problems(rig):
+        return []
+    settings = TriggerSettings.from_dict(triggers)
+    provided = controls_of_input_devices(names)
+    out = [f"triggers: input code {c!r} is no control of the rig's inputs ({', '.join(names)})"
+           for c in settings.codes.inputs if c not in provided]
+    out += [f"triggers: input code {c!r} is an experimenter's key, not a participant's"
+            for c in settings.codes.inputs if c in EXPERIMENTER_KEYS]
+    if settings.sync.mode == "wait" and settings.sync.key in settings.codes.inputs:
+        out.append(f"triggers: input code {settings.sync.key!r} is the key the scanner types "
+                   "at every volume (triggers.sync.key)")
+    return out
 
 
 def _input_device_problems(rig: dict) -> list[str]:

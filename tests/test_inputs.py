@@ -447,11 +447,25 @@ def test_the_keyboard_holds_what_its_events_press_until_the_window_loses_focus()
     assert keys.held() == frozenset()
 
 
+def test_each_read_that_makes_an_input_event_gives_the_triggers_every_control_held(screen):
+    from humans.run import read_input_events
+    held: list[frozenset[str]] = []
+    triggers = types.SimpleNamespace(codes=types.SimpleNamespace(inputs={"LEFT": 1}),
+                                     hold_input_codes=held.append)
+    keys = InputDevices([Keyboard()])
+    for events in ([_key(pygame.KEYDOWN, pygame.K_LEFT)], [],
+                   [_key(pygame.KEYDOWN, pygame.K_UP), _key(pygame.KEYUP, pygame.K_LEFT)]):
+        for event in events:
+            pygame.event.post(event)
+        read_input_events(keys, None, triggers)
+    assert held == [{"LEFT"}, {"UP"}], "a read without an input event sends nothing"
+
+
 def test_the_runs_inputs_take_the_queue_and_name_the_windows_close(screen):
     from humans.run import read_input_events
     pygame.event.post(_key(pygame.KEYDOWN, pygame.K_SPACE))
     pygame.event.post(pygame.event.Event(pygame.QUIT))
-    assert read_input_events(InputDevices([Keyboard()])) == [_down(QUIT), _down("SPACE")]
+    assert read_input_events(InputDevices([Keyboard()]), None) == [_down(QUIT), _down("SPACE")]
     assert pygame.event.peek() is False
 
 
@@ -459,10 +473,45 @@ def test_ctrl_escape_asks_to_stop_the_run_and_escape_alone_does_not(screen):
     from humans.run import read_input_events
     keys = InputDevices([Keyboard()])
     pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, mod=0))
-    assert QUIT not in [name for name, _ in read_input_events(keys)]
+    assert QUIT not in [name for name, _ in read_input_events(keys, None)]
     for ctrl in (pygame.KMOD_LCTRL, pygame.KMOD_RCTRL):
         pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, mod=ctrl))
-        assert read_input_events(keys)[0] == _down(QUIT)
+        assert read_input_events(keys, None)[0] == _down(QUIT)
+
+
+def test_the_run_logs_each_event_read_as_pygame_gave_it_then_each_input_event(screen):
+    from humans.run import read_input_events
+    logged: list[tuple[str, float, dict]] = []
+    logger = types.SimpleNamespace(log_run_event=lambda line_type, perf_time, **fields:
+                                   logged.append((line_type, perf_time, fields)))
+    events = [_key(pygame.KEYDOWN, pygame.K_LEFT),
+              pygame.event.Event(pygame.JOYAXISMOTION, joy=0, instance_id=3, axis=1, value=-0.73),
+              pygame.event.Event(pygame.MOUSEMOTION, pos=(3, 4), rel=(1, 1), buttons=(0, 0, 0)),
+              pygame.event.Event(pygame.WINDOWFOCUSLOST),
+              pygame.event.Event(pygame.QUIT)]
+    for event in events:
+        pygame.event.post(event)
+    input_events = read_input_events(InputDevices([Keyboard()]), logger)
+    assert input_events == [_down(QUIT), _down("LEFT"), _up("LEFT")]
+    assert logged == [("pygame_event", logged[0][1], {"event_name": pygame.event.event_name(e.type),
+                                                      "event": {"type": e.type, **e.dict}})
+                      for e in events] + [
+        ("input_event", logged[0][1], {"name": name, "down": edge is Edge.DOWN})
+        for name, edge in input_events]
+
+
+def test_a_value_a_log_line_cannot_carry_is_written_as_its_repr():
+    from humans.run import _loggable
+    window = object()
+    assert _loggable({"key": 97, "pos": (1, 2), "window": window, "text": None}) == {
+        "key": 97, "pos": (1, 2), "window": repr(window), "text": None}
+
+
+def test_a_value_a_log_line_cannot_carry_inside_a_dict_is_written_as_its_repr():
+    from humans.run import _loggable
+    window = object()
+    assert _loggable({"touch": {"x": 0.5, "window": window}}) == {
+        "touch": {"x": 0.5, "window": repr(window)}}
 
 
 @pytest.fixture
@@ -509,10 +558,9 @@ def test_closing_a_run_saves_every_frame_and_closes_a_controller_before_the_wind
     import numpy as np
     from humans.run import Run
     from humans.save.logging import Logger, read_frames
-    from humans.sync.clock import Clock
     monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")
     pygame.init()                                           # the window's close quits it
-    logger = Logger(str(tmp_path), "sub-test", [], Clock())
+    logger = Logger(str(tmp_path), "sub-test", [])
     block = str(tmp_path / logger.open_block(0, "gym", "CartPole-v1", {}, base_seed=0))
     for i in range(200):                                    # a backlog for the writer
         logger.log_frame({"frame": i}, frame=np.full((360, 640, 3), i % 256, dtype=np.uint8))
@@ -535,18 +583,18 @@ def test_a_tap_inside_one_frame_counts_for_that_frame(screen):
     keys = InputDevices([Keyboard()])
     logged: list[dict] = []
     display = types.SimpleNamespace(idle=lambda deadline: None)
-    clock = types.SimpleNamespace(run_time=lambda: 0.0)
-    logger = types.SimpleNamespace(log=lambda **r: logged.append(r))
+    logger = types.SimpleNamespace(log_run_event=lambda line_type, perf_time, **fields:
+                                   logged.append({"type": line_type, **fields}))
     pygame.event.post(_key(pygame.KEYDOWN, pygame.K_LEFT))
     pygame.event.post(_key(pygame.KEYUP, pygame.K_LEFT))
     pygame.event.post(_key(pygame.KEYDOWN, pygame.K_SPACE))
-    pressed, quit_ = _poll_keys_until(keys, display, 0.0, clock, logger)
+    pressed, quit_ = _poll_keys_until(keys, display, 0.0, logger)
     assert (pressed, quit_, keys.held()) == (["LEFT", "SPACE"], False, {"SPACE"})
-    assert [(r["name"], r["down"]) for r in logged] == [
+    assert [(r["name"], r["down"]) for r in logged if r["type"] == "input_event"] == [
         ("LEFT", True), ("LEFT", False), ("SPACE", True)]
     pygame.event.post(_key(pygame.KEYDOWN, pygame.K_z))     # turn-based: the wait ends at Z
     pygame.event.post(_key(pygame.KEYDOWN, pygame.K_x))
-    pressed, _ = _poll_keys_until(keys, display, math.inf, clock, logger, stop_on={"Z"})
+    pressed, _ = _poll_keys_until(keys, display, math.inf, logger, stop_on={"Z"})
     assert pressed == ["Z"]
 
 

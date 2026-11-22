@@ -43,7 +43,6 @@ from .inputs import QUIT, Edge, InputEvent
 
 if TYPE_CHECKING:
     from .outputs.display import Display
-    from .save.logging import Logger
 
 _LABELS = {"reset": "Restart the level", "forfeit": "Give up this level", "resume": "Resume"}
 
@@ -87,14 +86,13 @@ class PopUp(ABC):
         return True
 
     @abstractmethod
-    def run(self, display: Display, run_time: Callable[[], float], logger: Logger,
+    def run(self, display: Display, run_time: Callable[[], float],
             read_input_events: Callable[[], list[InputEvent]]) -> str:
         """Show the pop-up until it closes, and say how it closed.
 
         :param display: the display to draw on.
         :param run_time: the run clock, for the log.
-        :param logger: the run's logger; the presses meanwhile are logged like any other.
-        :param read_input_events: the edges since it was last called (the run's).
+        :param read_input_events: returns the input events since its last call.
         :return: ``"resume"``, another of the menu's options, or ``"quit"`` on
             window close / the quit keys.
         """
@@ -112,15 +110,13 @@ class Menu(PopUp):
                  held: Callable[[], frozenset[str]]) -> None:
         super().__init__(MenuSettings.from_dict(spec), block_start, held)
 
-    def run(self, display: Display, run_time: Callable[[], float], logger: Logger,
+    def run(self, display: Display, run_time: Callable[[], float],
             read_input_events: Callable[[], list[InputEvent]]) -> str:
         """Show the pop-up until an option is confirmed, and return it.
 
         :param display: the display to draw on.
         :param run_time: the run clock, for the log.
-        :param logger: the run's logger; the menu's own presses are
-            logged like any other.
-        :param read_input_events: the edges since it was last called (the run's).
+        :param read_input_events: returns the input events since its last call.
         :return: the chosen option, or ``"quit"`` on window close / the quit keys.
         """
         self.pending, self._held_since = False, None
@@ -135,7 +131,6 @@ class Menu(PopUp):
                     if down:
                         return "quit"
                     continue
-                logger.log(type="input_event", run_time=run_time(), name=name, down=down)
                 if not down:
                     continue
                 if name in s.move:
@@ -170,14 +165,13 @@ class Hint(PopUp):
                  held: Callable[[], frozenset[str]]) -> None:
         super().__init__(HintSettings.from_dict(spec), block_start, held)
 
-    def run(self, display: Display, run_time: Callable[[], float], logger: Logger,
+    def run(self, display: Display, run_time: Callable[[], float],
             read_input_events: Callable[[], list[InputEvent]]) -> str:
         """Show the text until the control is let go.
 
         :param display: the display to draw on.
         :param run_time: the run clock, for the log.
-        :param logger: the run's logger; the presses meanwhile are logged like any other.
-        :param read_input_events: the edges since it was last called (the run's).
+        :param read_input_events: returns the input events since its last call.
         :return: ``"resume"``, or ``"quit"`` on window close / the quit keys.
         """
         self.pending, self._held_since = False, None
@@ -189,8 +183,6 @@ class Hint(PopUp):
                     if edge is Edge.DOWN:
                         return "quit"
                     continue
-                logger.log(type="input_event", run_time=run_time(), name=name,
-                           down=edge is Edge.DOWN)
             display.idle(time.perf_counter() + 0.005, poll=0.005)
         self.events.append({"opened": opened, "closed": run_time()})
         return "resume"

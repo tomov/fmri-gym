@@ -247,8 +247,8 @@ def main() -> None:
     # No scanner here, so the run's zero is simply when it started: the time
     # columns stay the same shape as a human run's, measured from that.
     clock.trigger()
-    logger = Logger(outdir, args.subject, curriculum.record(), clock)
-    logger.set_trigger_time()
+    logger = Logger(outdir, args.subject, curriculum.record())
+    logger.log_trigger_time(clock.t0_perf, clock.t0_epoch)
 
     for index, phase in enumerate(curriculum.phases):
         if not isinstance(phase, GamePhase):
