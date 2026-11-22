@@ -35,10 +35,8 @@ Timing: the game is lock-stepped, one ``step`` per fmri-gym frame, so
 Measured on an Intel Arc laptop at 640x360 with four karts: 2.5 ms per step
 mean, 2.9 ms p95 -- well inside 16.7 ms.
 
-Needs a real OpenGL display (the frame is the game's own rendering) and the
-game itself, which ``pip install supertuxkart-gym`` brings: the wheel fetches a
-prebuilt binary and a trimmed asset pack once, for its own version.
-``STK_ENV_BIN`` overrides that binary.
+Needs a real OpenGL display (the frame is the game's own rendering) and
+``pip install supertuxkart-gym``, which brings the game itself.
 Not supported: a different track per episode (one process, one track):
 a curriculum that wants several tracks uses one game phase per track. Arenas
 and soccer fields need game modes this adapter never sets.
