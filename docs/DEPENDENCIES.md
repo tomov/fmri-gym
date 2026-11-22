@@ -19,7 +19,7 @@ flowchart TD
 
 From the top:
 
-1. **`standalone/`**: the commands that are not a run (rig setup, gamepad calibration, the session editor, the photodiode test). They may import anything below them; nothing outside `standalone/` imports from it.
+1. **`standalone/`**: the commands that are not a run (rig setup, gamepad calibration, the session editor, the photodiode test, the session logger). They may import anything below them; nothing outside `standalone/` imports from it.
 2. **`run.py`, then `popup.py`**: one run's loop, and the pop-ups it opens (the pause menu, the hint).
 3. **`config/`**: the curriculum, the rig config and the run config, checked against the leaves below.
 4. **The leaves, an ordered stack**: `adapters/` over `outputs/` over `sync/` over `save/`; `inputs/` sits beside `sync/` and imports none of them. Each leaf imports only the leaves below it, so `save/` and `inputs/` can be read, tested and reused alone. `save/` only writes and reads the data: what it writes is handed to it, times included, by the layers above, which are given the run's `Logger` when they are built.

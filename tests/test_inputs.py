@@ -12,6 +12,7 @@ import json
 import math
 import os
 import re
+import sys
 import types
 from datetime import datetime, timezone
 
@@ -725,3 +726,322 @@ def test_a_rig_measurement_lets_go_of_its_inputs_before_it_shuts_sdl_down():
                for name in ("inputs", "display", "audio", "triggers")}
     RigMeasurement.close(types.SimpleNamespace(**devices))
     assert closed.index("inputs") < closed.index("display")
+
+
+# -- a session's recording: each device's own events, read from the OS --------------------------
+
+
+linux_only = pytest.mark.skipif(not sys.platform.startswith("linux"), reason="the Linux reader")
+
+
+@linux_only
+def test_the_linux_reader_writes_each_kernel_record_at_the_kernels_time():
+    from humans.standalone.session_logger import linux
+    read_end, write_end = os.pipe()
+    devices = object.__new__(linux.LinuxDevices)
+    devices._devices = [{"name": "Trigger Box"}]
+    devices._fds = {read_end: 0}
+    os.write(write_end, linux._EVENT.pack(12345, 678901, 1, 13, 1)     # EV_KEY KEY_EQUAL down
+             + linux._EVENT.pack(12345, 678901, 0, 0, 0))              # EV_SYN SYN_REPORT
+    try:
+        lines = devices.read(1.0)
+    finally:
+        devices.close()
+        os.close(write_end)
+    event = {"type": "device_event", "perf_time": 12345.678901, "device": 0}
+    assert lines == [{**event, "event_type": 1, "code": 13, "value": 1},
+                     {**event, "event_type": 0, "code": 0, "value": 0}]
+
+
+@linux_only
+def test_the_linux_reader_names_the_devices_it_cannot_find_or_read(monkeypatch):
+    from humans.standalone.session_logger import SessionLoggerError, linux
+    present = [{"name": "Trigger Box", "path": "/dev/input/event7"},
+               {"name": "Keyboard", "path": "/dev/input/event2"}]
+    monkeypatch.setattr(linux.glob, "glob", lambda pattern: ["a", "b"])
+    monkeypatch.setattr(linux, "_sysfs_device", lambda node: present[node == "b"])
+    with pytest.raises(SessionLoggerError, match="no input device is named 'Pad'; these are: "
+                                                "'Keyboard', 'Trigger Box'"):
+        linux.LinuxDevices(["Pad"])
+
+    def refuse(path, flags):
+        raise PermissionError(path)
+    monkeypatch.setattr(linux.os, "open", refuse)
+    with pytest.raises(SessionLoggerError, match=re.escape(
+            "/dev/input/event7 (Trigger Box) cannot be read by this user")):
+        linux.LinuxDevices(["Trigger Box"])
+
+
+@linux_only
+def test_the_linux_reader_stops_when_perf_counter_is_not_the_kernels_clock(monkeypatch):
+    from humans.standalone.session_logger import SessionLoggerError, linux
+    monkeypatch.setattr(linux.time, "get_clock_info",
+                        lambda name: types.SimpleNamespace(implementation="something else"))
+    with pytest.raises(SessionLoggerError, match="perf_counter reads something else"):
+        linux.LinuxDevices(["Trigger Box"])
+
+
+@pytest.mark.parametrize("device_events, says", [
+    (["Trigger Box"], None),
+    (None, None),
+    ([], "expected the devices' names"),
+    ("Trigger Box", "expected the devices' names"),
+    ([""], "expected the devices' names"),
+])
+def test_a_rigs_device_events_are_the_devices_names(device_events, says):
+    from humans.config import rig as rig_file
+    found = [problem for problem in rig_file.problems({"device_events": device_events})
+             if "device_events" in problem]
+    assert found == ([] if says is None else [found[0]]) and (says is None or says in found[0])
+
+
+def _rig_with_devices(tmp_path, device_events) -> str:
+    """A rig file of team ``lab`` whose data root is ``tmp_path/data``."""
+    from humans.config import rig as rig_file
+    path = tmp_path / "configs" / "lab" / "rigs" / "desk.json"
+    rig_file.save({**{k: "x" for k in rig_file.FIELDS}, "site": "lab", "rig": "desk",
+                   "pi": "MT", "modality": "meg", "notes": "",
+                   "data_root": str(tmp_path / "data"), "device_events": device_events,
+                   "screen": {"geometry": {"width_cm": 30.0, "height_cm": 20.0,
+                                           "distance_cm": 60.0}}}, str(path))
+    return str(path)
+
+
+def test_a_session_is_recorded_from_start_to_stop_with_its_marks(tmp_path):
+    import json
+
+    from humans.standalone import session_logger
+    folder = session_logger.start_recording(_rig_with_devices(tmp_path, None), "sub-01", 2)
+    try:
+        assert folder.endswith(os.path.join("data", "session_events", "sub-01", "ses-002",
+                                            os.path.basename(folder)))
+        assert session_logger.is_recording(folder)
+        session_logger.mark_recording(folder, "run 1: the localizer, été")
+    finally:
+        assert session_logger.stop_recording(folder)
+    lines = [json.loads(line) for line in
+             open(os.path.join(folder, "session_events.jsonl"), encoding="utf-8")]
+    first, last = lines[0], lines[-1]
+    assert first["type"] == "recording_start" and last["type"] == "recording_end"
+    assert first["devices"] == [] and first["subject"] == "sub-01"
+    assert first["wall_time"] > first["perf_time"]
+    assert set(first["sources"]) == {"device_event", "window_focus", "stall", "clock", "mark"}
+    marks = [line for line in lines if line["type"] == "mark"]
+    assert [mark["text"] for mark in marks] == ["run 1: the localizer, été"]
+    assert last["how"] == "stopped" and last["counts"]["mark"] == 1
+    assert last["devices_gone"] == []
+    assert not session_logger.is_recording(folder)
+    assert not (tmp_path / "data" / "sub-01").exists(), "a recording takes no session number"
+    assert session_logger.stop_recording(folder), "stopping a stopped recording is harmless"
+
+
+def test_a_recording_does_not_start_when_a_device_the_rig_names_is_missing(tmp_path):
+    from humans.standalone import session_logger
+    with pytest.raises(session_logger.SessionLoggerError, match="No Such Pad|no device reader"):
+        session_logger.start_recording(_rig_with_devices(tmp_path, ["No Such Pad"]), "sub-01", 1)
+
+
+def test_a_recording_writes_each_line_as_it_comes_between_a_first_and_a_last(tmp_path):
+    import json
+    import queue
+    import threading
+
+    from humans.standalone.session_logger.recorder import record_session_events
+    path = tmp_path / "session_events.jsonl"
+    stop = threading.Event()
+    side_lines = queue.Queue()
+    side_lines.put({"type": "mark", "perf_time": 2.0, "text": "run 1"})
+    reads = iter([[{"type": "device_event", "perf_time": 1.0, "device": 0, "event_type": 1,
+                    "code": 13, "value": 1}], []])
+
+    class Box:
+        closed = False
+
+        def read(self, timeout):
+            assert json.loads(path.read_text().splitlines()[0])["type"] == "recording_start", \
+                "the first line is on disk before any device is read"
+            stop.set()                          # one read, then the session ends
+            return next(reads, [])
+
+        def close(self):
+            self.closed = True
+    box = Box()
+    record_session_events(box, str(path), {"type": "recording_start", "perf_time": 0.5},
+                          side_lines, stop)
+    lines = [json.loads(line) for line in path.read_text().splitlines()]
+    assert [line["type"] for line in lines] == [
+        "recording_start", "device_event", "mark", "recording_end"]
+    assert lines[-1]["counts"] == {"device_event": 1, "mark": 1} and box.closed
+    with pytest.raises(FileExistsError):
+        record_session_events(Box(), str(path), {"type": "recording_start"}, side_lines, stop)
+
+
+def test_a_recording_lists_the_devices_unplugged_and_stop_says_so(tmp_path, capsys):
+    import json
+    import queue
+    import threading
+
+    from humans.standalone import session_logger
+    from humans.standalone.session_logger.recorder import record_session_events
+    stop = threading.Event()
+    reads = iter([[{"type": "device_gone", "perf_time": 3.0, "device": 0}]])
+
+    class Box:
+        def read(self, timeout):
+            stop.set()
+            return next(reads, [])
+
+        def close(self):
+            pass
+    first_line = {"type": "recording_start", "perf_time": 0.5, "wall_time": 1.7e9,
+                  "devices": [{"name": "Trigger Box"}], "recorder_pid": os.getpid()}
+    record_session_events(Box(), str(tmp_path / "session_events.jsonl"), first_line,
+                          queue.Queue(), stop)
+    last = json.loads((tmp_path / "session_events.jsonl").read_text().splitlines()[-1])
+    assert last["devices_gone"] == [{"device": 0, "perf_time": 3.0}]
+    assert session_logger.stop_recording(str(tmp_path))
+    assert "'Trigger Box' (device 0) was unplugged at" in capsys.readouterr().err
+
+
+def test_a_stall_is_a_sleep_that_woke_late(monkeypatch):
+    import queue
+    import threading
+    import time
+
+    from humans.standalone.session_logger import recorder
+    side_lines = queue.Queue()
+    stop = threading.Event()
+    sleeps, real_sleep = iter([0.001, 0.031]), time.sleep
+
+    def sleep(seconds):
+        time_slept = next(sleeps, None)
+        if time_slept is None:
+            stop.set()
+            return
+        real_sleep(time_slept)
+    monkeypatch.setattr(recorder.time, "sleep", sleep)
+    recorder.watch_stalls(side_lines, stop)
+    stalls = [side_lines.get_nowait() for _ in range(side_lines.qsize())]
+    assert [line["type"] for line in stalls] == ["stall"]
+    assert 25.0 < stalls[0]["duration_ms"] < 200.0
+
+
+def test_a_focus_line_is_written_each_time_another_application_has_the_focus(monkeypatch):
+    import queue
+    import threading
+
+    from humans.standalone.session_logger import FrontApplication, recorder
+    kitty, game = FrontApplication("kitty", 10), FrontApplication("python3", 20)
+    answers = iter([kitty, kitty, None, game, game])
+    side_lines = queue.Queue()
+    stop = threading.Event()
+
+    def front_application():
+        answer = next(answers, None)
+        if answer is None and not stop.is_set() and side_lines.qsize() == 2:
+            stop.set()
+        return answer
+    monkeypatch.setattr(recorder, "FOCUS_POLL_S", 0.0)
+    recorder.watch_focus(front_application, side_lines, stop)
+    lines = [side_lines.get_nowait() for _ in range(side_lines.qsize())]
+    assert [(line["process"], line["pid"]) for line in lines] == [("kitty", 10), ("python3", 20)]
+
+
+def test_the_linux_front_application_is_the_active_windows_process(monkeypatch):
+    from humans.standalone.session_logger import FrontApplication, linux
+    answers = {("-root", "_NET_ACTIVE_WINDOW"): "_NET_ACTIVE_WINDOW(WINDOW): window id # 0x4a00007",
+               ("-id", "0x4a00007", "_NET_WM_PID"): "_NET_WM_PID(CARDINAL) = 4242"}
+    monkeypatch.setattr(linux, "_xprop", lambda *arguments: answers.get(arguments, ""))
+    monkeypatch.setattr(linux, "_process_name", lambda pid: "python3")
+    monkeypatch.setattr(linux, "_last_front_application", ("", None))
+    assert linux.front_application() == FrontApplication("python3", 4242)
+    answers[("-root", "_NET_ACTIVE_WINDOW")] = "_NET_ACTIVE_WINDOW(WINDOW): window id # 0x0"
+    assert linux.front_application() is None, "no window is active"
+    monkeypatch.setattr(linux, "_xprop", lambda *arguments: "")
+    assert linux.front_application() is None, "no X display"
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="the macOS reader")
+def test_the_macos_front_application_is_what_launchservices_puts_in_front(monkeypatch):
+    from humans.standalone.session_logger import FrontApplication, macos
+    answers = {("front",): "ASN:0x0-0x77077:\n",
+               ("info", "-only", "name,pid", "ASN:0x0-0x77077:"):
+                   '"LSDisplayName"="kitty"\n"pid"=1324\n'}
+    monkeypatch.setattr(macos, "_lsappinfo", lambda *arguments: answers.get(arguments, ""))
+    monkeypatch.setattr(macos, "_last_front_application", ("", None))
+    assert macos.front_application() == FrontApplication("kitty", 1324)
+    assert macos.front_application() == FrontApplication("kitty", 1324)
+
+def _raw_input(kind, body: bytes) -> bytes:
+    """A Windows ``RAWINPUT`` of ``kind`` (0 mouse, 1 keyboard, 2 HID) from device handle 7."""
+    import ctypes
+
+    from humans.standalone.session_logger import windows
+    header = windows._RawInputHeader(type=kind, device=7, wparam=0)
+    header.size = ctypes.sizeof(header) + len(body)
+    return bytes(header) + body
+
+
+def test_a_windows_keys_raw_input_is_a_line_with_its_scancode_and_whether_it_went_down():
+    from humans.standalone.session_logger import windows
+
+    def key(make_code, flags):
+        return _raw_input(1, bytes(windows._RawKeyboard(make_code=make_code, flags=flags,
+                                                        vkey=0x25)))
+    keys_down = set()
+    lines = [line for data in (key(0x4B, 2), key(0x4B, 2), key(0x4B, 3), key(0x0D, 0))
+             for line in windows.lines_of_raw_input(data, 0, 5.0, None, keys_down)]
+    assert [(line["make_code"], line["flags"], line["value"]) for line in lines] == [
+        (0x4B, 2, 1), (0x4B, 2, 2), (0x4B, 3, 0), (0x0D, 0, 1)], "down, repeated, up, down"
+    assert lines[0] == {"type": "device_event", "perf_time": 5.0, "device": 0,
+                        "make_code": 0x4B, "flags": 2, "vkey": 0x25, "value": 1}
+    assert keys_down == {(0, 0x0D, 0)}
+
+
+def test_a_windows_mouse_and_hid_raw_input_are_lines_as_windows_gives_them():
+    from humans.standalone.session_logger import windows
+    mouse = _raw_input(0, bytes(windows._RawMouse(button_flags=1, last_x=-3, last_y=4)))
+    [line] = windows.lines_of_raw_input(mouse, 1, 2.0, None, set())
+    assert (line["button_flags"], line["last_x"], line["last_y"]) == (1, -3, 4)
+    reports = bytes(windows._RawHid(report_size=3, report_count=2)) + bytes([1, 2, 3, 1, 2, 4])
+    hid = _raw_input(2, reports)
+    assert [line["report"] for line in windows.lines_of_raw_input(hid, 2, 3.0, None, set())] \
+        == ["010203", "010204"], "a report no parser reads is kept whole"
+
+    class Buttons:
+        def lines(self, report, device, arrived):
+            return [{"type": "device_event", "perf_time": arrived, "device": device,
+                     "usage_page": 9, "usage": report[2], "value": 1}]
+    assert [line["usage"] for line in windows.lines_of_raw_input(hid, 2, 3.0, Buttons(), set())] \
+        == [3, 4]
+
+
+@pytest.mark.parametrize("make_code, flags, name", [
+    (0x0D, 0, "EQUAL"), (0x1E, 0, "A"), (0x4B, 2, "LEFT"), (0x4B, 0, "KP4"),
+    (0x1D, 4, "PAUSE"), (0x64, 0, "F13"), (0x60, 0, None), (0x2A, 2, None),
+])
+def test_a_windows_key_is_named_by_its_evdev_code(make_code, flags, name):
+    from humans.standalone.key_codes import EVDEV_KEYS, evdev_code_of_windows_key
+    code = evdev_code_of_windows_key(make_code, flags)
+    assert (None if code is None else EVDEV_KEYS[code][1]) == name
+
+def test_the_control_file_passes_on_each_line_once_and_whole(tmp_path):
+    import json
+    import queue
+    import threading
+
+    from humans.standalone.session_logger.recorder import follow_control_file
+    path = tmp_path / "control.jsonl"
+    side_lines = queue.Queue()
+    stop = threading.Event()
+    follower = threading.Thread(target=follow_control_file, args=(str(path), side_lines, stop))
+    follower.start()
+    mark = json.dumps({"type": "mark", "perf_time": 1.0, "text": "café"}).encode()
+    with open(path, "ab") as control:
+        control.write(mark[:20])               # a line still being written
+        control.flush()
+        stop.wait(0.2)
+        control.write(mark[20:] + b"\n" + json.dumps({"type": "stop"}).encode() + b"\n")
+    follower.join(timeout=5)
+    assert stop.is_set() and not follower.is_alive()
+    assert [side_lines.get_nowait()["text"]] == ["café"] and side_lines.empty()

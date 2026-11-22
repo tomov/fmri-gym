@@ -4,9 +4,11 @@ A session is a shell script (:func:`write_session`). Its head sets three
 variables once: ``SUBJECT`` and ``RIG``, each fixed in the script or required
 from whoever starts it (``SUBJECT=sub-01 RIG=configs/<team>/rigs/<rig>.json sh
 <script>``), and ``SES``, the script's own argument or the subject's next free
-session (``fmri-ses``, :func:`fmri_ses_main`). Each line after it plays one run with them, or
-is any command of yours. The session editor (:mod:`humans.standalone.session_editor`) writes
-and reads them; any shell plays them, so nothing in Python loops over runs.
+session (``fmri-ses``, :func:`fmri_ses_main`). Then it starts the session's recording
+(:mod:`humans.standalone.session_logger`), which it stops however it ends. Each line after it
+plays one run with them, or is any command of yours. The session editor
+(:mod:`humans.standalone.session_editor`) writes and reads them; any shell plays them, so
+nothing in Python loops over runs.
 """
 
 from __future__ import annotations
@@ -26,6 +28,15 @@ SES_TOOL = "uv run fmri-ses"
 #: The head's variables, as a run's line spells them: written as typed, not
 #: quoted, since the shell has to expand them.
 SUBJECT_VAR, RIG_VAR, SES_VAR = '"$SUBJECT"', '"$RIG"', '"$SES"'
+LOGGER = "uv run session-logger"
+#: The lines after the head that record the session: started before anything else, stopped
+#: however the script ends. A signal is trapped so that dash, which does not run the exit trap
+#: on one it leaves untrapped, runs it too.
+RECORDING_LINES = [
+    "# The session's recording (session-logger): started first, stopped when the script ends.",
+    f"RECORDING=$({LOGGER} start --subject {SUBJECT_VAR} --ses {SES_VAR} --rig {RIG_VAR})",
+    f"trap '{LOGGER} stop \"$RECORDING\"' EXIT",
+    "trap 'exit 130' INT TERM HUP"]
 #: How a script that leaves a variable to its launch says how to start it.
 USAGE = "run as: SUBJECT=sub-01 RIG=configs/<team>/rigs/<rig>.json sh $0 [session]"
 #: The flags of ``fmri-play`` a run's line may carry besides where it is filed, as
@@ -63,6 +74,10 @@ def write_session(session: Session) -> str:
         SUBJECT=sub-01
         RIG=${RIG:?run as: SUBJECT=sub-01 RIG=configs/<team>/rigs/<rig>.json sh $0 [session]}
         SES=${1:-$(uv run fmri-ses --subject "$SUBJECT" --rig "$RIG")}
+        # The session's recording (session-logger): started first, stopped when the script ends.
+        RECORDING=$(uv run session-logger start --subject "$SUBJECT" --ses "$SES" --rig "$RIG")
+        trap 'uv run session-logger stop "$RECORDING"' EXIT
+        trap 'exit 130' INT TERM HUP
         uv run fmri-play --curriculum configs/pong.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG"
         ./scripts/localizer.sh "$SES"
         # uv run fmri-play --curriculum configs/mario.json --subject "$SUBJECT" --ses "$SES" ...
@@ -70,14 +85,16 @@ def write_session(session: Session) -> str:
     A subject or rig the session leaves open must be given when it is started,
     or the script stops at once, saying how. ``SES=`` picks the session once for
     all the runs: the script's own argument (``sh ses1.sh 003`` resumes that
-    session), else the number fixed here, else the subject's next free one.
+    session), else the number fixed here, else the subject's next free one. The
+    recording starts before the first line, and a device it cannot read stops the
+    script there; it stops when the script ends, however it ends.
     Each run's ``--run`` is :func:`run_number`, its place among the lines that
     play its task -- fixed by the design, so skipping a line renumbers nothing.
     A commented line is a skipped run. ``set -e`` stops the session at the
     first line that fails or is quit.
     """
     lines = [*HEADER, _head_line("SUBJECT", session.subject),
-             _head_line("RIG", session.rig), _ses_line(session.ses)]
+             _head_line("RIG", session.rig), _ses_line(session.ses), *RECORDING_LINES]
     for i, step in enumerate(session.steps):
         line = (step["command"] if "command" in step
                 else _shell(play_command(step["config"], SUBJECT_VAR, SES_VAR,
@@ -104,7 +121,8 @@ def run_number(steps: list[dict], index: int) -> int:
 
 
 def read_session(text: str) -> Session:
-    """The session a script holds (see :func:`write_session`).
+    """The session a script holds (see :func:`write_session`); its recording's lines are its
+    head's.
 
     A script whose run lines spell out the subject and the rig instead of using
     the head's variables is read as fixing them, when every run says the same.
@@ -112,7 +130,8 @@ def read_session(text: str) -> Session:
     flags, another subject or rig, or a ``--run`` other than the one its place
     gives it (:func:`run_number`) -- is kept as a command, as typed.
     """
-    body = [line for line in text.splitlines() if line.strip() and line not in HEADER]
+    body = [line for line in text.splitlines()
+            if line.strip() and line not in HEADER and line not in RECORDING_LINES]
     head = {m[1]: m[2] for line in body if (m := _HEAD.fullmatch(line))}
     # What each run line must say: the head's variable, or (no head) one literal for all.
     wanted = {"subject": SUBJECT_VAR.strip('"') if "SUBJECT" in head else None,

@@ -101,11 +101,14 @@ gamepad-calibration = "humans.standalone.gamepad_calibration:main"
 # A behavioural BIDS dataset made from the runs' logs, by hand: one events table per run, and
 # each run's timeline in words.
 bids-from-logs = "humans.standalone.bids_from_logs:main"
+# A session's own recording, beside whatever it runs: the rig's input devices read from the OS
+# with the OS's own time, its marks and the clock. start, mark, stop.
+session-logger = "humans.standalone.session_logger:main"
 
 [tool.setuptools]
 packages = ["humans", "humans.adapters", "humans.config", "humans.inputs",
             "humans.outputs", "humans.save", "humans.standalone",
-            "humans.standalone.rig_setup", "humans.sync"]
+            "humans.standalone.rig_setup", "humans.standalone.session_logger", "humans.sync"]
 py-modules = ["fmri_play"]
 
 # `uv sync` installs the `dev` group by default, so every checkout can run the

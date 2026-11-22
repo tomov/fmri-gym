@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import os
+import shutil
+import signal
 import subprocess
+import time
 
 import pytest
 
@@ -68,16 +71,73 @@ def test_a_run_is_numbered_by_its_place_among_its_task():
     assert [run_number(steps, i) for i in range(3)] == [1, 1, 2]
 
 
+def _uv_that_logs(tmp_path) -> dict[str, str]:
+    """An environment whose ``uv`` only writes what it is asked into ``uv.log``, and answers
+    ``session-logger start`` with a recording's folder."""
+    (tmp_path / "bin").mkdir()
+    uv = tmp_path / "bin" / "uv"
+    uv.write_text(f'#!/bin/sh\necho "$*" >> "{tmp_path / "uv.log"}"\n'
+                  'case "$*" in "run session-logger start"*) echo /recordings/1;; esac\n')
+    uv.chmod(0o755)
+    return {**os.environ, "PATH": f"{tmp_path / 'bin'}{os.pathsep}{os.environ['PATH']}"}
+
+
+def _asked_of_uv(tmp_path) -> list[str]:
+    return (tmp_path / "uv.log").read_text().splitlines() if (tmp_path / "uv.log").exists() \
+        else []
+
+
 def test_a_session_left_open_stops_until_its_launch_names_the_rig(tmp_path):
     script = tmp_path / "ses.sh"
     text = write_session(Session([{"command": 'echo "$SUBJECT $RIG $SES"', "skip": False}],
                                  "sub-01", None, 4))
     script.write_text(text)
-    stopped = subprocess.run(["sh", script], capture_output=True, text=True)
+    environment = _uv_that_logs(tmp_path)
+    stopped = subprocess.run(["sh", script], capture_output=True, text=True, env=environment)
     assert stopped.returncode != 0 and "RIG=" in stopped.stderr
+    assert _asked_of_uv(tmp_path) == [], "no recording starts before the head is whole"
     ran = subprocess.run(["sh", script], capture_output=True, text=True,
-                         env={**os.environ, "RIG": RIG})
+                         env={**environment, "RIG": RIG})
     assert ran.stdout.strip() == f"sub-01 {RIG} 004"
+
+
+@pytest.mark.parametrize("last_line, status", [("true", 0), ("false", 1)],
+                         ids=["ends", "fails"])
+def test_a_session_is_recorded_from_before_its_first_line_until_it_ends(tmp_path, last_line,
+                                                                          status):
+    script = tmp_path / "ses.sh"
+    script.write_text(write_session(Session(
+        [{"command": f"echo played >> {tmp_path / 'uv.log'}; {last_line}", "skip": False}],
+        "sub-01", RIG, 4)))
+    ran = subprocess.run(["sh", script], env=_uv_that_logs(tmp_path))
+    assert ran.returncode == status
+    assert _asked_of_uv(tmp_path) == [
+        f"run session-logger start --subject sub-01 --ses 004 --rig {RIG}", "played",
+        "run session-logger stop /recordings/1"]
+
+
+@pytest.mark.parametrize("shell", [
+    "sh", pytest.param("dash", marks=pytest.mark.skipif(shutil.which("dash") is None,
+                                                        reason="no dash here"))])
+def test_a_session_interrupted_stops_its_recording(tmp_path, shell):
+    script = tmp_path / "ses.sh"
+    script.write_text(write_session(Session([{"command": "sleep 30", "skip": False}],
+                                            "sub-01", RIG, 4)))
+    session = subprocess.Popen([shell, script], env=_uv_that_logs(tmp_path),
+                               start_new_session=True)
+    deadline = time.monotonic() + 10
+    while len(_asked_of_uv(tmp_path)) < 1 and time.monotonic() < deadline:
+        time.sleep(0.05)
+    time.sleep(0.2)                                    # the sleep has started
+    os.killpg(session.pid, signal.SIGINT)              # Ctrl+C, to the terminal's group
+    assert session.wait(timeout=10) != 0
+    assert _asked_of_uv(tmp_path)[-1] == "run session-logger stop /recordings/1"
+
+
+def test_the_recording_lines_are_read_as_the_heads():
+    text = write_session(Session([{"config": PONG, "skip": False}], "sub-01", RIG, None))
+    assert "session-logger start" in text and "session-logger stop" in text
+    assert read_session(text).steps == [{"config": PONG, "skip": False}]
 
 
 def test_play_command_names_the_run():
