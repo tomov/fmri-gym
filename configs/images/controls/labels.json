@@ -40,7 +40,6 @@
       "CONTROLLER_BUTTON_A": ["sprint"],
       "CONTROLLER_BUTTON_B": ["take cover"],
       "CONTROLLER_AXIS_TRIGGERLEFT": ["next weapon"],
-      "CONTROLLER_BUTTON_X": [["hold 3 s: menu", "(after 2 min)"]],
       "CONTROLLER_BUTTON_Y": ["hold: show controls"]
     },
     "aigamestore/game8-GMPD3-ABXY-nav.png": {
