@@ -53,6 +53,7 @@ A run checks everything it can before the participant screen opens, and stops on
 - **`resume: phase N, the last game <run> played, is not the same game in this curriculum (... changed)`**: the curriculum was edited since that run. Put the named fields back, or start over without `--resume`.
 - **`<run> stopped phase N mid-episode, and the <backend> backend keeps no savestate to carry it on`**: that backend cannot restore an episode. Start over without `--resume`, or start at a later phase.
 - **`loop: plays the curriculum until the run's duration, and it has none`**: `--loop` needs a `--duration`.
+- **`an endless game block plays until the run's duration, and it has none`**: a game phase in mode `endless` ends only with the run, so the run needs a `--duration`.
 
 ## The data folder
 

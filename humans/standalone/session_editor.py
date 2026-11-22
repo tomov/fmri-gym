@@ -110,9 +110,13 @@ RUN_FLAG_FIELDS = [
 #: The phase fields that apply, given what the phase says so far; a kind not here shows all.
 PHASE_ROWS: dict[str, Callable[[dict], list[str]]] = {
     "game": lambda v: [f.key for f in _GAME_FIELDS
-                       if v.get("mode") == "episode" or f.key not in ("n_episodes", "advance_on")],
+                       if f.key not in _GAME_FIELDS_NOT_IN_MODE.get(v.get("mode", "duration"), ())],
     "message": lambda v: ["text", "duration", "align"] + ["control"] * (not v.get("duration")),
 }
+
+#: The game fields a block of each mode has no use for.
+_GAME_FIELDS_NOT_IN_MODE = {"duration": ("n_episodes", "advance_on"),
+                            "endless": ("duration", "n_episodes", "advance_on")}
 
 _GAME_FIELDS = [
     Field("backend", "backend", "combo", BACKENDS,
@@ -121,12 +125,13 @@ _GAME_FIELDS = [
           tip="The game, by its name in that engine. The list holds the games already set up "
               "for it, with keys and speed that work; pick one, then 'Fill this phase from that "
               "config' below."),
-    Field("mode", "mode", "choice", ("duration", "episode"),
+    Field("mode", "mode", "choice", ("duration", "episode", "endless"),
           tip="duration: the block lasts a set time, starting a new game whenever one ends. "
-              "episode: the block lasts a set number of games (episodes)."),
+              "episode: the block lasts a set number of games (episodes). endless: the block "
+              "starts a new game whenever one ends, until the run ends."),
     Field("duration", "duration (s)", "float",
-          tip="duration mode: how long the block lasts, in seconds (default 30). episode mode: the "
-              "longest it may last, in seconds (default 300)."),
+          tip="duration mode: how long the block lasts, in seconds (required). episode mode: the "
+              "longest it may last, in seconds (blank: no limit)."),
     Field("n_episodes", "n_episodes", "int", tip="episode mode: how many episodes."),
     Field("advance_on", "advance_on", "list",
           tip="Which endings count as a played episode, e.g. won: any other ending replays the "
@@ -253,8 +258,9 @@ def phase_label(index: int, phase: dict) -> str:
     """One line for the curriculum list: ``"03  game  ale ALE/Pong-v5 (60 s)"``."""
     kind = phase["type"]
     if kind == "game":
-        length = (f"{phase.get('duration', 30.0):g}s" if phase.get("mode", "duration") == "duration"
-                  else f"{phase.get('n_episodes', 1)}ep")
+        mode = phase.get("mode", "duration")
+        length = ("endless" if mode == "endless" else f"{phase.get('n_episodes', 1)}ep"
+                  if mode == "episode" else f"{phase.get('duration', 0):g}s")
         detail = f"{str(phase.get('game', '?')).split('/')[-1]} {length}"
     elif kind == "message":
         text = phase.get("text", "")

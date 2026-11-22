@@ -239,7 +239,7 @@ def test_flags_fmri_play_would_refuse_are_problems(gui):
     assert _flag_problems({"loop": True})  # looping needs a length
 
 
-CARTPOLE = {"curriculum": [{"type": "game", "backend": "gym", "game": "CartPole-v1", "fps": 30,
+CARTPOLE = {"curriculum": [{"type": "game", "backend": "gym", "game": "CartPole-v1", "fps": 30, "duration": 30.0,
                             "controls": {"": 0, "Q": 1}}]}
 
 

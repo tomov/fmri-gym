@@ -438,6 +438,22 @@ def test_a_curriculum_loads_once_into_typed_phases(tmp_path):
         Curriculum.from_dict({"curriculum": [{**PHASE, "fps": 0}]}, "bad.json")
 
 
+def test_a_game_phase_has_the_clock_its_mode_says():
+    """duration mode needs one, episode mode may cap with one, endless mode has none."""
+    from humans.config.curriculum import Curriculum
+    from humans.config.phases import BlockMode, phase_problems
+    uncapped = Curriculum.from_dict({"curriculum": [PHASE]}, "c.json").phases[0]
+    assert uncapped.mode is BlockMode.EPISODE and uncapped.duration is None
+    timed = {**PHASE, "mode": "duration"}
+    del timed["n_episodes"]
+    assert any("required in mode 'duration'" in p for p in phase_problems(timed))
+    assert not phase_problems({**timed, "duration": 30.0})
+    endless = {**timed, "mode": "endless"}
+    assert not phase_problems(endless)
+    assert len(phase_problems({**endless, "duration": 30.0, "n_episodes": 2})) == 2
+    assert any("advance_on" in p for p in phase_problems({**endless, "advance_on": ["won"]}))
+
+
 def test_every_phase_type_is_a_phase():
     from humans.config.phases import PHASE_CLASSES, Phase
     assert all(issubclass(cls, Phase) and cls.type == name for name, cls in PHASE_CLASSES.items())

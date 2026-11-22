@@ -374,6 +374,9 @@ class Run:
         """
         if config.loop and config.duration is None:
             raise ValueError("loop: plays the curriculum until the run's duration, and it has none")
+        if config.duration is None and any(
+                getattr(phase, "mode", None) is BlockMode.ENDLESS for phase in config.curriculum.phases):
+            raise ValueError("an endless game block plays until the run's duration, and it has none")
         out = bids.run_output(config.rig.data_root, config.subject,
                               bids.task_label(config.curriculum.path),
                               config.ses, config.run)
@@ -792,7 +795,8 @@ class Run:
             flip_period=flip_period)
         onset = self.clock.run_time()
         block_start = time.perf_counter()
-        own_end = block_start + game_phase.duration - block_time_elapsed
+        own_end = (math.inf if game_phase.duration is None
+                   else block_start + game_phase.duration - block_time_elapsed)
         block_end = min(own_end, self._run_end)
         # The hold-a-key pause menu (reset / forfeit / resume) and hint, those the phase has.
         menu = Menu(spec["menu"], block_start, self.inputs.held) if "menu" in spec else None

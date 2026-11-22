@@ -13,6 +13,6 @@
     ]
   },
   "controls": {"SPACE": 0, "UP": 1},
-  "mode": "episode", "n_episodes": 1000, "duration": 3600.0,
+  "mode": "endless",
   "fps": 30, "frame_skip": 2
 }

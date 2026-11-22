@@ -42,12 +42,14 @@ _HINT_DEFAULTS = {"hold": 3.0, "after": 0.0}
 
 
 class BlockMode(str, Enum):
-    """What ends a game block: its clock, or its count of episodes."""
+    """What ends a game block: its clock, its count of episodes, or nothing of its own."""
 
     #: the block lasts ``duration`` seconds
     DURATION = "duration"
-    #: the block lasts ``n_episodes`` episodes, or ``duration`` seconds at most
+    #: the block lasts ``n_episodes`` episodes, or ``duration`` seconds at most if it has one
     EPISODE = "episode"
+    #: the block plays episode after episode until the run ends
+    ENDLESS = "endless"
 
 
 @dataclass(frozen=True, slots=True)
@@ -293,9 +295,9 @@ class GamePhase(Phase):
     #: the env id, as the backend reads it
     game: str
     mode: BlockMode
-    #: seconds the block lasts (``mode`` ``duration``, default 30) or lasts
-    #: at most (``mode`` ``episode``, default 300)
-    duration: float
+    #: seconds the block lasts (``mode`` ``duration``) or lasts at most
+    #: (``mode`` ``episode``); ``None``: no clock of its own
+    duration: float | None
     #: episodes an ``episode`` block lasts
     n_episodes: int
     #: A blocking block: only an episode whose outcome is listed (usually
@@ -348,13 +350,13 @@ class GamePhase(Phase):
     @classmethod
     def from_dict(cls, d: dict, index: int) -> GamePhase:
         """Read a game phase's dict, filling in the defaults (:meth:`problems` checked it)."""
-        mode = BlockMode(d.get("mode", "duration"))
+        mode = BlockMode(d.get("mode", BlockMode.DURATION.value))
         advance_on = d.get("advance_on")
         instructions = d.get("instructions")
         return cls(
             spec=d, include_on_resume=False,     # a game phase is never replayed on resume
             backend=d.get("backend", "gym"), game=d["game"], mode=mode,
-            duration=d.get("duration", 30.0 if mode is BlockMode.DURATION else 300.0),
+            duration=d.get("duration"),
             n_episodes=d.get("n_episodes", 1),
             advance_on=None if advance_on is None else tuple(advance_on),
             rewind_on=tuple(d.get("rewind_on", ())),
@@ -372,9 +374,10 @@ class GamePhase(Phase):
         out = []
         if not d.get("game"):
             out.append("game: missing env id")
-        if d.get("mode", "duration") not in [mode.value for mode in BlockMode]:
-            out.append(f"mode: expected 'duration' or 'episode', got {d.get('mode')!r}")
-        out += (_fps_problems(d) + _controls_problems(d) + _advance_problems(d)
+        modes = [mode.value for mode in BlockMode]
+        if d.get("mode", BlockMode.DURATION.value) not in modes:
+            out.append(f"mode: expected one of {modes}, got {d.get('mode')!r}")
+        out += (_block_end_problems(d) + _fps_problems(d) + _controls_problems(d) + _advance_problems(d)
                 + _rewind_problems(d))
         out += _bool_problems(d, ("is_turn_based", "has_audio"))
         seconds = d.get("show_outcome_duration", 0)
@@ -480,6 +483,18 @@ def _fps_problems(d: dict) -> list[str]:
     return []
 
 
+def _block_end_problems(d: dict) -> list[str]:
+    """``duration`` and ``n_episodes`` as the block's ``mode`` reads them."""
+    mode = d.get("mode", BlockMode.DURATION.value)
+    out = _positive_problems(d, ("duration", "n_episodes"))
+    if mode == BlockMode.DURATION.value and "duration" not in d:
+        out.append("duration: required in mode 'duration', the seconds the block lasts")
+    if mode == BlockMode.ENDLESS.value:
+        out += [f"{key}: not in mode 'endless' (the block ends with the run)"
+                for key in ("duration", "n_episodes") if key in d]
+    return out
+
+
 def _advance_problems(d: dict) -> list[str]:
     """``advance_on`` gates ``n_episodes``, so it means nothing to a block that ends on the clock."""
     if "advance_on" not in d:
@@ -490,8 +505,8 @@ def _advance_problems(d: dict) -> list[str]:
     if set(names) - OUTCOMES:
         return [f"advance_on: unknown {sorted(set(names) - OUTCOMES)}; the names are "
                 f"{sorted(OUTCOMES)}"]
-    if d.get("mode", "duration") != "episode":
-        return ["advance_on: only in mode 'episode' (a duration block ends on the clock)"]
+    if d.get("mode", BlockMode.DURATION.value) != BlockMode.EPISODE.value:
+        return ["advance_on: only in mode 'episode' (no other block counts episodes)"]
     return []
 
 
