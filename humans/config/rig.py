@@ -593,8 +593,8 @@ def _input_code_problems(rig: dict) -> list[str]:
         return []
     settings = TriggerSettings.from_dict(triggers)
     provided = controls_of_input_devices(names)
-    out = [f"triggers: input code {c!r} is no control of the keyboard or the rig's inputs "
-           f"({', '.join(names) or 'none'})" for c in settings.codes.inputs if c not in provided]
+    out = [f"triggers: input code {c!r} is no control of the rig's inputs ({', '.join(names)})"
+           for c in settings.codes.inputs if c not in provided]
     out += [f"triggers: input code {c!r} is an experimenter's key, not a participant's"
             for c in settings.codes.inputs if c in EXPERIMENTER_KEYS]
     if settings.sync.mode == "wait" and settings.sync.key in settings.codes.inputs:
