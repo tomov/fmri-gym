@@ -406,6 +406,29 @@ def test_a_wrong_eyelink_section_is_refused(values, problem):
     assert any(problem in p for p in rig.problems(values))
 
 
+
+def test_the_dbp_meg_settings_are_kept_as_written_and_nothing_else():
+    assert RigConfig.open(write("desk")).dbp_meg.record() == {}
+    written = {"exclusive_fullscreen": "on", "is_realtime": False, "center_shift_x": -40,
+               "magnification": 0.9}
+    meg = RigConfig.open(write("meg", dbp_meg=written))
+    assert meg.dbp_meg.center_shift_y is None and meg.dbp_meg.record() == written
+    assert meg.record()["dbp_meg"] == written
+
+
+@pytest.mark.parametrize("values, problem", [
+    ({"dbp_meg": {"exclusive_fullscreen": "yes"}}, '"exclusive_fullscreen" must be one of'),
+    ({"dbp_meg": {"is_realtime": "no"}}, '"is_realtime" must be true or false'),
+    ({"dbp_meg": {"realtime_priority": 100}}, '"realtime_priority" must be 1 to 99'),
+    ({"dbp_meg": {"center_shift_x": 1.5}}, '"center_shift_x" must be a whole number of pixels'),
+    ({"dbp_meg": {"magnification": 0}}, '"magnification" must be more than 0'),
+    ({"dbp_meg": {"ttl": "parallel:/dev/parport1"}}, "unknown key 'ttl'"),
+    ({"dbp_meg": []}, "expected an object"),
+])
+def test_a_wrong_dbp_meg_section_is_refused(values, problem):
+    assert any(problem in p for p in rig.problems(values))
+
+
 @pytest.mark.parametrize("geometry, problem", [
     ({**GEOMETRY, "distance_cm": 0}, "more than 0"),
     ({**GEOMETRY, "width_cm": "70"}, "more than 0"),

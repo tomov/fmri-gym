@@ -144,6 +144,30 @@ EYELINK_FIELDS = [
               "Blank: this rig has no EyeLink."),
 ]
 
+#: The rig file's ``"dbp_meg"``, as a form (:class:`~humans.config.rig.DbpMegConfig`): each
+#: row a DBP_MEG flag of the same name; blank, the program's own default.
+DBP_MEG_FIELDS = [
+    Field("exclusive_fullscreen", "exclusive fullscreen", "choice",
+          rig_file.DBP_MEG_EXCLUSIVE_FULLSCREEN,
+          tip="on: the programs switch the monitor to their resolution; off: they cover the "
+              "desktop at its own; auto: they decide. Blank: the programs' default."),
+    Field("is_realtime", "real-time priority", "bool", default=True,
+          tip="The programs raise their scheduling priority, for steadier frame timing (their "
+              "no-realtime, unticked)."),
+    Field("realtime_priority", "real-time priority level", "int",
+          tip="1 to 99, no higher than the RLIMIT_RTPRIO granted to the user. Blank: the "
+              "programs' default."),
+    Field("center_shift_x", "center shift right (px)", "int",
+          tip="Everything drawn moves right by this many screen pixels (negative: left), for a "
+              "projector whose image is not centred where the participant looks. The "
+              "photodiode square does not move. DBP_MEG's MEG-display-calibration finds it."),
+    Field("center_shift_y", "center shift up (px)", "int",
+          tip="Everything drawn moves up by this many screen pixels (negative: down)."),
+    Field("magnification", "magnification", "float",
+          tip="Everything drawn is magnified about the centre of the screen by this factor, "
+              "before the shift (1: none)."),
+]
+
 #: Window sizes offered when not fullscreen (those that fit the monitor).
 WINDOW_SIZES = ((800, 600), (1024, 768), (1280, 720), (1280, 1024), (1600, 900), (1920, 1080))
 #: How the window names the fields describing the rig.
@@ -294,7 +318,9 @@ def _describe(rig: rig_file.RigConfig, triggers: dict | None) -> str:
         fixation,
         describe_triggers(triggers) if triggers else
         f"Triggers: NOT SET -- a run waits for {SyncSettings().key!r} and sends no codes.",
-        *([f"EyeLink: its Host PC at {rig.eyelink.host_ip}"] if rig.eyelink else [])])
+        *([f"EyeLink: its Host PC at {rig.eyelink.host_ip}"] if rig.eyelink else []),
+        *(["DBP_MEG only: " + ", ".join(f"{k} {v}" for k, v in rig.dbp_meg.record().items())]
+          if rig.dbp_meg.record() else [])])
 
 
 def measurement_plan(rig: rig_file.RigConfig) -> str:
@@ -823,6 +849,12 @@ class _RigWindow(QtWidgets.QDialog):
         self.fixation_note.setStyleSheet("color: #d35400")
         form.addRow("", self.fixation_note)
         layout.addLayout(form)
+        self.dbp_meg_form = ui.Form(DBP_MEG_FIELDS)
+        self.dbp_meg_form.set(values.get("dbp_meg", {}) if isinstance(values.get("dbp_meg"),
+                                                                     dict) else {})
+        self.dbp_meg_form.changed.connect(self._check)
+        layout.addWidget(ui.group("Read by the DBP_MEG programs only: fmri-play does not use "
+                                  "these", self.dbp_meg_form))
         layout.addStretch(1)
         return page
 
@@ -1049,7 +1081,8 @@ class _RigWindow(QtWidgets.QDialog):
         self.size_pick.blockSignals(False)
 
     def _screen(self) -> dict[str, Any]:
-        """:raises ValueError: a fixation or a measurement half typed, named in the message."""
+        """:raises ValueError: a fixation, a measurement or a DBP_MEG number half typed, named
+        in the message."""
         geometry = self._geometry()
         return {"screen": {"size": self.size_pick.currentText().strip(),
                            "is_fullscreen": self.switches["is_fullscreen"].isChecked(),
@@ -1058,7 +1091,8 @@ class _RigWindow(QtWidgets.QDialog):
                            **({"geometry": geometry} if len(geometry) == len(_GEOMETRY_FIELDS)
                               else {})},
                 "has_audio": self.switches["has_audio"].isChecked(),
-                "data_root": self.data_root.text().strip(), **self._fixation_seconds()}
+                "data_root": self.data_root.text().strip(), **self._fixation_seconds(),
+                **({"dbp_meg": dbp_meg} if (dbp_meg := self.dbp_meg_form.get()) else {})}
 
     def _screen_problems(self) -> list[str]:
         missing = [label for key, (label, _tip) in _GEOMETRY_FIELDS.items()

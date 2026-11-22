@@ -122,6 +122,14 @@ def test_the_buttons_marked_are_the_rig_files_each_on_its_bit(qt):
     assert window.input_code_box.isHidden()
 
 
+def test_the_dbp_meg_box_writes_only_what_is_filled_in(qt):
+    window, _ = _rig_window("meg")
+    assert "dbp_meg" not in window.rig
+    window.dbp_meg_form.write("center_shift_x", "-40")
+    window.dbp_meg_form.write("is_realtime", False)
+    assert window.rig["dbp_meg"] == {"is_realtime": False, "center_shift_x": -40}
+
+
 def test_a_rig_measurement_waits_for_its_triggers_to_be_chosen(qt):
     window, _ = _rig_window("minimal", need_triggers=True)
     assert window.stack.currentIndex() == 3 and not window.next.isEnabled()
