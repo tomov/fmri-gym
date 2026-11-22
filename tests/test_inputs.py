@@ -507,6 +507,13 @@ def test_a_value_a_log_line_cannot_carry_is_written_as_its_repr():
         "key": 97, "pos": (1, 2), "window": repr(window), "text": None}
 
 
+def test_a_value_a_log_line_cannot_carry_inside_a_dict_is_written_as_its_repr():
+    from humans.run import _loggable
+    window = object()
+    assert _loggable({"touch": {"x": 0.5, "window": window}}) == {
+        "touch": {"x": 0.5, "window": repr(window)}}
+
+
 @pytest.fixture
 def sdl(monkeypatch):
     """SDL's joystick list, faked: ``sdl.names`` is what it sees; no SDL touched."""

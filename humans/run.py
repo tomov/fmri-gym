@@ -144,11 +144,19 @@ def _loggable(fields: dict[str, Any]) -> dict[str, Any]:
     A pygame ``Window`` cannot be pickled, so a line holding one would never reach the writer.
 
     :param fields: the event's fields.
-    :return: each plain value as it is, any other as its ``repr``.
+    :return: each plain value as it is, a dict made loggable the same way, any other value as
+        its ``repr``.
     """
-    plain = (bool, int, float, str, tuple, type(None))
-    return {name: value if isinstance(value, plain) else repr(value)
-            for name, value in fields.items()}
+    return {name: _loggable_value(value) for name, value in fields.items()}
+
+
+def _loggable_value(value: Any) -> Any:
+    """``value`` if a log line can carry it, a dict's values made loggable, else its ``repr``."""
+    if isinstance(value, (bool, int, float, str, tuple, type(None))):
+        return value
+    if isinstance(value, dict):
+        return _loggable(value)
+    return repr(value)
 
 
 def _check_quit(inputs: InputDevice, logger: Logger | None,
