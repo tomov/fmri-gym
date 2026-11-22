@@ -1,0 +1,26 @@
+{
+  "type": "game", "backend": "aigamestore",
+  "instructions": {
+    "align": "left", "controls_to_dismiss": ["CONTROLLER_BUTTON_A"],
+    "text": [
+      "Auto-scroll runner. Hold thrust to fly,",
+      "dodge zappers and missiles, grab coins.",
+      "",
+      "![controls](BC/images/controls/aigamestore/game4-GMPD3-stick-nav.png)",
+      "",
+      "Press A to start."
+    ]
+  },
+  "controls": {"CONTROLLER_BUTTON_A": 0, "CONTROLLER_AXIS_LEFTY_UP": 1},
+  "hint": {
+    "control": "CONTROLLER_BUTTON_Y", "hold": 0.0, "after": 0.0,
+    "text": [
+      "![controls](BC/images/controls/aigamestore/game4-GMPD3-stick-nav.png)",
+      "",
+      "Let go of Y to go back to the game."
+    ]
+  },
+  "hud": {"show_score": false, "show_time_remaining": false},
+  "mode": "episode", "n_episodes": 10, "duration": 300.0,
+  "fps": 30, "frame_skip": 2
+}
