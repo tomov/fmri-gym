@@ -6,14 +6,14 @@
       "CONTROLLER_BUTTON_X": ["highlight", "tube left"],
       "CONTROLLER_BUTTON_B": ["highlight", "tube right"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["select / pour"],
-      "CONTROLLER_AXIS_TRIGGERLEFT": ["undo", "hold: pause menu"],
+      "CONTROLLER_AXIS_TRIGGERLEFT": ["undo", ["hold 3 s: menu", "(after 3 min)"]],
       "CONTROLLER_BUTTON_Y": ["hold: show controls"]
     },
     "aigamestore/game1-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["left / right:", "highlight a tube"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["select / pour"],
       "CONTROLLER_BUTTON_X": ["undo"],
-      "CONTROLLER_AXIS_TRIGGERLEFT": ["hold: pause menu"],
+      "CONTROLLER_AXIS_TRIGGERLEFT": [["hold 3 s: menu", "(after 3 min)"]],
       "CONTROLLER_BUTTON_Y": ["hold: show controls"]
     },
     "aigamestore/game4-GMPD3-ABXY-nav.png": {
@@ -32,7 +32,7 @@
       "CONTROLLER_BUTTON_Y": ["move up"],
       "CONTROLLER_BUTTON_A": ["move down"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["shoot"],
-      "CONTROLLER_AXIS_TRIGGERLEFT": ["next weapon", "hold: show controls"]
+      "CONTROLLER_AXIS_TRIGGERLEFT": ["next weapon", "hold 3 s: show controls"]
     },
     "aigamestore/game7-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["move"],
@@ -53,42 +53,42 @@
       "LEFT_STICK": ["left / right:", "aim"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["fire"],
       "CONTROLLER_AXIS_TRIGGERLEFT": ["swap current / next"],
-      "CONTROLLER_BUTTON_Y": ["hold: show controls"]
+      "CONTROLLER_BUTTON_Y": ["hold 3 s: show controls"]
     },
     "baba_auto/baba_auto-GMPD3-ABXY-nav.png": {
       "CONTROLLER_BUTTON_X": ["move left"],
       "CONTROLLER_BUTTON_B": ["move right"],
-      "CONTROLLER_BUTTON_Y": ["move up", "hold: show controls"],
+      "CONTROLLER_BUTTON_Y": ["move up", "hold 3 s: show controls"],
       "CONTROLLER_BUTTON_A": ["move down"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["wait a turn"],
-      "CONTROLLER_AXIS_TRIGGERLEFT": ["hold:", "pause menu"]
+      "CONTROLLER_AXIS_TRIGGERLEFT": [["hold 3 s: menu", "(after 8 min)"]]
     },
     "baba_auto/baba_auto-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["move"],
       "CONTROLLER_BUTTON_A": ["wait a turn"],
-      "CONTROLLER_BUTTON_X": ["hold: pause menu"],
+      "CONTROLLER_BUTTON_X": ["hold 3 s: menu"],
       "CONTROLLER_BUTTON_Y": ["hold: show controls"]
     },
     "rushhour/rushhour-GMPD3-ABXY-nav.png": {
-      "CONTROLLER_AXIS_TRIGGERLEFT": ["previous car", "hold: pause menu"],
+      "CONTROLLER_AXIS_TRIGGERLEFT": ["previous car", ["hold 3 s: menu", "(after 5 min)"]],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["next car"],
       "CONTROLLER_BUTTON_X": ["move car left"],
       "CONTROLLER_BUTTON_B": ["move car right"],
-      "CONTROLLER_BUTTON_Y": ["move car up", "hold: show controls"],
+      "CONTROLLER_BUTTON_Y": ["move car up", "hold 3 s: show controls"],
       "CONTROLLER_BUTTON_A": ["move car down"]
     },
     "rushhour/rushhour-GMPD3-stick-nav.png": {
       "CONTROLLER_AXIS_TRIGGERLEFT": ["previous car"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["next car"],
       "LEFT_STICK": ["left / right: slide", "a horizontal car", "up / down: slide", "a vertical car"],
-      "CONTROLLER_BUTTON_X": ["hold: pause menu"],
+      "CONTROLLER_BUTTON_X": [["hold 3 s: menu", "(after 5 min)"]],
       "CONTROLLER_BUTTON_Y": ["hold: show controls"]
     },
     "vizdoom/basic-GMPD3-stick-nav.png": {
       "CONTROLLER_BUTTON_X": ["move left"],
       "CONTROLLER_BUTTON_B": ["move right"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["shoot"],
-      "CONTROLLER_AXIS_TRIGGERLEFT": ["hold: pause menu"],
+      "CONTROLLER_AXIS_TRIGGERLEFT": [["hold 3 s: menu", "(after 3 min)"]],
       "CONTROLLER_BUTTON_Y": ["hold: show controls"]
     },
     "vizdoom/deadly_corridor-GMPD3-stick-nav.png": {
@@ -96,7 +96,7 @@
       "CONTROLLER_BUTTON_X": ["move left"],
       "CONTROLLER_BUTTON_B": ["move right"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["shoot"],
-      "CONTROLLER_AXIS_TRIGGERLEFT": ["hold: pause menu"],
+      "CONTROLLER_AXIS_TRIGGERLEFT": [["hold 3 s: menu", "(after 3 min)"]],
       "CONTROLLER_BUTTON_Y": ["hold: show controls"]
     },
     "vizdoom/deathmatch-GMPD3-stick-nav.png": {
@@ -104,20 +104,20 @@
       "CONTROLLER_BUTTON_X": ["move left"],
       "CONTROLLER_BUTTON_B": ["move right"],
       "CONTROLLER_BUTTON_A": ["run"],
-      "CONTROLLER_BUTTON_Y": ["hold: show controls"],
+      "CONTROLLER_BUTTON_Y": ["hold 3 s: show controls"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["shoot"],
-      "CONTROLLER_AXIS_TRIGGERLEFT": ["next weapon", "hold: pause menu"]
+      "CONTROLLER_AXIS_TRIGGERLEFT": ["next weapon", ["hold 3 s: menu", "(after 3 min)"]]
     },
     "vizdoom/defend_center-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["left / right:", "turn"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["shoot"],
-      "CONTROLLER_AXIS_TRIGGERLEFT": ["hold: pause menu"],
+      "CONTROLLER_AXIS_TRIGGERLEFT": [["hold 3 s: menu", "(after 3 min)"]],
       "CONTROLLER_BUTTON_Y": ["hold: show controls"]
     },
     "vizdoom/defend_line-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["left / right:", "turn"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["shoot"],
-      "CONTROLLER_AXIS_TRIGGERLEFT": ["hold: pause menu"],
+      "CONTROLLER_AXIS_TRIGGERLEFT": [["hold 3 s: menu", "(after 3 min)"]],
       "CONTROLLER_BUTTON_Y": ["hold: show controls"]
     },
     "vizdoom/freedoom-GMPD3-stick-nav.png": {
@@ -125,32 +125,32 @@
       "CONTROLLER_BUTTON_X": ["move left"],
       "CONTROLLER_BUTTON_B": ["move right"],
       "CONTROLLER_BUTTON_A": ["run"],
-      "CONTROLLER_BUTTON_Y": ["doors, switches", "hold: show controls"],
+      "CONTROLLER_BUTTON_Y": ["doors, switches", "hold 3 s: show controls"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["shoot"],
-      "CONTROLLER_AXIS_TRIGGERLEFT": ["next weapon", "hold: pause menu"]
+      "CONTROLLER_AXIS_TRIGGERLEFT": ["next weapon", ["hold 3 s: menu", "(after 3 min)"]]
     },
     "vizdoom/health_gathering_supreme-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["up:", "forward", "left / right:", "turn"],
-      "CONTROLLER_AXIS_TRIGGERLEFT": ["hold: pause menu"],
+      "CONTROLLER_AXIS_TRIGGERLEFT": [["hold 3 s: menu", "(after 3 min)"]],
       "CONTROLLER_BUTTON_Y": ["hold: show controls"]
     },
     "vizdoom/my_way_home-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["up:", "forward", "left / right:", "turn"],
       "CONTROLLER_BUTTON_X": ["move left"],
       "CONTROLLER_BUTTON_B": ["move right"],
-      "CONTROLLER_AXIS_TRIGGERLEFT": ["hold: pause menu"],
+      "CONTROLLER_AXIS_TRIGGERLEFT": [["hold 3 s: menu", "(after 3 min)"]],
       "CONTROLLER_BUTTON_Y": ["hold: show controls"]
     },
     "vizdoom/predict_position-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["left / right:", "turn"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["fire rocket"],
-      "CONTROLLER_AXIS_TRIGGERLEFT": ["hold: pause menu"],
+      "CONTROLLER_AXIS_TRIGGERLEFT": [["hold 3 s: menu", "(after 3 min)"]],
       "CONTROLLER_BUTTON_Y": ["hold: show controls"]
     },
     "vizdoom/take_cover-GMPD3-stick-nav.png": {
       "CONTROLLER_BUTTON_X": ["move left"],
       "CONTROLLER_BUTTON_B": ["move right"],
-      "CONTROLLER_AXIS_TRIGGERLEFT": ["hold: pause menu"],
+      "CONTROLLER_AXIS_TRIGGERLEFT": [["hold 3 s: menu", "(after 3 min)"]],
       "CONTROLLER_BUTTON_Y": ["hold: show controls"]
     },
     "stk/stk-GMPD3-stick-nav.png": {
@@ -158,7 +158,7 @@
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["fire item"],
       "CONTROLLER_AXIS_TRIGGERLEFT": ["skid"],
       "CONTROLLER_BUTTON_A": ["nitro (boost)"],
-      "CONTROLLER_BUTTON_Y": ["rescue", "hold: show controls"]
+      "CONTROLLER_BUTTON_Y": ["rescue", "hold 3 s: show controls"]
     },
     "gym/carracing-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["left / right:", "steer"],
@@ -182,7 +182,7 @@
     },
     "minihack/navigate-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["move one square"],
-      "CONTROLLER_BUTTON_X": ["hold: pause menu"],
+      "CONTROLLER_BUTTON_X": ["hold 3 s: menu"],
       "CONTROLLER_BUTTON_Y": ["hold: show controls"]
     }
   }
