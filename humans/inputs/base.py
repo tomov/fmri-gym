@@ -5,9 +5,9 @@ unique across devices: its value in
 :class:`~humans.inputs.control_names.ControlNames`. A device lists its names at
 the top of its own file, and its :meth:`InputDevice.handle` turns the pygame
 events that are its own into input events (:class:`InputEvent`); it never reads
-pygame's queue itself. As in a game engine, a control is read two ways: an input
-event the frame it happens, and held state (:meth:`InputDevice.held`) at the tick. Several
-devices together are one :class:`InputDevices`, which is itself a device.
+pygame's queue itself. As in a game engine, a control is read three ways: an input
+event the frame it happens, held state (:meth:`InputDevice.held`) at the tick, and
+its value at the tick (:meth:`InputDevice.values`). Several devices together are one :class:`InputDevices`, which is itself a device.
 """
 
 from __future__ import annotations
@@ -79,6 +79,11 @@ class InputDevice(ABC):
         """The controls down as of the last :meth:`handle`."""
         return frozenset(self._held)
 
+    def values(self) -> dict[str, float]:
+        """Each control not at rest, by its value now: 1.0 for a control held down. A control
+        at rest is left out; its value is 0.0."""
+        return dict.fromkeys(self._held, 1.0)
+
     def require_calibrated_axes_for(self, required_controls: frozenset[str]) -> None:
         """Refuse to go on when a stick direction in ``required_controls`` has no calibration.
 
@@ -149,6 +154,9 @@ class InputDevices(InputDevice):
 
     def held(self) -> frozenset[str]:
         return frozenset().union(*(d.held() for d in self.devices))
+
+    def values(self) -> dict[str, float]:
+        return {name: value for d in self.devices for name, value in d.values().items()}
 
     def require_calibrated_axes_for(self, required_controls: frozenset[str]) -> None:
         for device in self.devices:

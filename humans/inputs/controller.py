@@ -5,7 +5,8 @@ A controller's controls go by :class:`ControlNames`, whatever the controller,
 so the same name means the same place on any controller that has it. A kind of controller is a subclass that maps what SDL sends to
 these names. Each stick axis is two controls, one per side of rest, read like a
 trigger through the axis's own calibration (:mod:`humans.inputs.calibration`),
-and independent of every other axis. SDL's joystick subsystem is started here,
+and independent of every other axis; the axis itself is a third, held while
+either side is. SDL's joystick subsystem is started here,
 since only a controller needs it.
 """
 
@@ -36,6 +37,15 @@ AXIS_CONTROLS: dict[ControlNames, tuple[ControlNames, ControlNames]] = {
     ControlNames.CONTROLLER_AXIS_RIGHTY: (ControlNames.CONTROLLER_AXIS_RIGHTY_UP,
                                           ControlNames.CONTROLLER_AXIS_RIGHTY_DOWN),
 }
+
+
+def value_range(control: str) -> tuple[float, float]:
+    """The values ``control`` takes, rest at 0.0: -1..1 for a whole stick axis, 0..1 for any
+    other control (a key or button 0 or 1, a trigger or one side of a stick how far it is
+    pulled or pushed)."""
+    return (-1.0, 1.0) if control in AXIS_CONTROLS else (0.0, 1.0)
+
+
 #: The face buttons, in the order a tool asks for them: round the face under a thumb.
 FACE_BUTTONS = (ControlNames.CONTROLLER_BUTTON_A, ControlNames.CONTROLLER_BUTTON_X,
                 ControlNames.CONTROLLER_BUTTON_Y, ControlNames.CONTROLLER_BUTTON_B)
@@ -101,8 +111,6 @@ class Controller(InputDevice):
         :raises CalibrationError: when a calibration file is malformed.
         """
         super().__init__()
-        #: each axis's last raw reading, -1..1
-        self.axis_values = {name: 0.0 for name in self.AXIS_NAMES}
         #: the calibration file the axes are read through, and its contents; None: uncalibrated
         self.calibration_path: Path | None = None
         self.calibration: ControllerCalibration | None = None
@@ -143,8 +151,16 @@ class Controller(InputDevice):
 
     @abstractmethod
     def attach(self, handle: Any) -> None:
-        """Read through ``handle`` from now on: set :attr:`device_name`, remember the id
-        its events carry, and read where its axes are."""
+        """Read through ``handle`` from now on: set :attr:`device_name` and remember the id
+        its events carry."""
+
+    def axis_reading(self, axis_name: str) -> float:
+        """Where SDL last saw a stick axis, raw, -1..1; 0.0 once the controller is gone."""
+        return self._read_axis(axis_name) if self.is_open() else 0.0
+
+    @abstractmethod
+    def _read_axis(self, axis_name: str) -> float:
+        """SDL's reading of a stick axis through the open handle, raw, -1..1."""
 
     @abstractmethod
     def is_open(self) -> bool:
@@ -197,16 +213,32 @@ class Controller(InputDevice):
 
         :raises CalibrationError: naming the controller and the folder its calibration is read from.
         """
-        if self.calibration is not None or not required_controls & set(self.axis_controls()):
+        if self.calibration is not None or not required_controls & {*self.AXIS_NAMES,
+                                                                     *self.axis_controls()}:
             return
         raise CalibrationError(f"no calibration of {self.device_name!r} in {calibrations_dir()}, "
                                "and its stick controls are required")
 
-    def calibrated_value(self, axis_name: str) -> float | None:
-        """Where an axis is, as a fraction of its travel that way, -1..1; None uncalibrated."""
+    def calibrated(self, axis_name: str, axis_reading: float) -> float | None:
+        """A raw reading of an axis as a fraction of its travel that way, -1..1; None
+        uncalibrated."""
         if self.calibration is None:
             return None
-        return self.calibration.axes[axis_name].normalise(self.axis_values[axis_name])
+        return self.calibration.axes[axis_name].normalise(axis_reading)
+
+    def values(self) -> dict[str, float]:
+        """The controls not at rest: buttons and pressed controls 1.0, and each calibrated
+        stick axis by its value (-1..1) and each of its sides by how far it is pushed that
+        way (0..1)."""
+        values = super().values()
+        if self.calibration is None:
+            return values
+        for axis_name in self.AXIS_NAMES:
+            value = self.calibration.axes[axis_name].value(self.axis_reading(axis_name))
+            negative, positive = AXIS_CONTROLS[axis_name]
+            values.update({axis_name: value, negative: max(0.0, -value),
+                           positive: max(0.0, value)})
+        return {name: value for name, value in values.items() if value}
 
     def status(self) -> str:
         """One line: the controller, and the calibration its axes are read through."""
@@ -236,16 +268,19 @@ class Controller(InputDevice):
             return self._release(name)
         return []
 
-    def _move_axis(self, axis_name: str, value: float) -> list[InputEvent]:
-        """Take a raw reading of an axis, and press or release each of its sides by it.
+    def _move_axis(self, axis_name: str, axis_reading: float) -> list[InputEvent]:
+        """Press or release each side of an axis by a raw reading of it, then the axis itself,
+        held while either side is.
 
         An uncalibrated axis presses nothing.
         """
-        self.axis_values[axis_name] = value
         if self.calibration is None:
             return []
         axis: AxisCalibration = self.calibration.axes[axis_name]
-        pushed = axis.normalise(value)
+        pushed = axis.normalise(axis_reading)
         negative, positive = AXIS_CONTROLS[axis_name]
-        return (self._pull(negative, -pushed, axis.on, axis.off)
-                + self._pull(positive, pushed, axis.on, axis.off))
+        out = (self._pull(negative, -pushed, axis.on, axis.off)
+               + self._pull(positive, pushed, axis.on, axis.off))
+        if {negative, positive} & self._held:
+            return out + self._press(axis_name)
+        return out + self._release(axis_name)

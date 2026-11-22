@@ -161,6 +161,13 @@
       "CONTROLLER_BUTTON_A": ["nitro (boost)"],
       "CONTROLLER_BUTTON_Y": ["rescue", "hold 3 s: show controls"]
     },
+    "stk/stk-GMPD3-stick-analog.png": {
+      "LEFT_STICK": ["up / down:", "accelerate / brake", "(as far as pushed)", "left / right:",
+                     "steer"],
+      "CONTROLLER_AXIS_TRIGGERLEFT": ["skid"],
+      "CONTROLLER_BUTTON_A": ["nitro (boost)"],
+      "CONTROLLER_BUTTON_Y": ["hold 3 s: show controls"]
+    },
     "gym/carracing-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["left / right:", "steer"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["gas"],

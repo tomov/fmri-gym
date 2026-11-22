@@ -185,6 +185,7 @@ class _ScriptedController(Controller):
     def __init__(self, handle=None, calibrated: bool = False, frames=()) -> None:
         super().__init__(handle or _FakeHandle(), calibrated)
         self.frames = iter(frames)
+        self.axes = self.axes_at({})
 
     @classmethod
     def accepts(cls, joystick, is_controller: bool) -> bool:
@@ -196,13 +197,17 @@ class _ScriptedController(Controller):
     def is_open(self) -> bool:
         return self.joystick.get_init()
 
+    def _read_axis(self, axis_name: str) -> float:
+        return self.axes[axis_name]
+
     def handle(self, events, now: float) -> list[InputEvent]:
         """Take the next scripted frame as the controller's reading, ignoring the events."""
         frame = next(self.frames, None)
         if frame is None:
             pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
             frame = (self.axes_at({}), set())
-        axes, buttons = frame
+        self.axes, buttons = frame
+        axes = self.axes
         out = [e for b in self.BUTTON_NAMES
                for e in (self._press(b) if b in buttons else self._release(b))]
         return out + [e for name in self.AXIS_NAMES for e in self._move_axis(name, axes[name])]
@@ -315,34 +320,52 @@ def test_each_axis_reads_its_own_thresholds():
     d = _calibrated(_ScriptedController(), FILE)
     d.frames = iter([(d.axes_at({LX: 0.55, RX: 0.55}), set()),    # past LX's 0.5, not RX's 0.6
                      (d.axes_at({LX: 0.55, RX: 0.65}), set())])
-    assert d.handle([], 1.0) == [_down(ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT)]
-    assert d.handle([], 1.1) == [_down(ControlNames.CONTROLLER_AXIS_RIGHTX_RIGHT)]
+    assert d.handle([], 1.0) == [_down(ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT), _down(LX)]
+    assert d.handle([], 1.1) == [_down(ControlNames.CONTROLLER_AXIS_RIGHTX_RIGHT), _down(RX)]
     assert d.held() == {ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT,
-                        ControlNames.CONTROLLER_AXIS_RIGHTX_RIGHT}
+                        ControlNames.CONTROLLER_AXIS_RIGHTX_RIGHT, LX, RX}
 
 
 def test_a_side_is_pressed_past_on_at_once_and_released_under_off():
     d = _calibrated(_ScriptedController(), FILE)
     d.frames = iter([(d.axes_at({LY: v}), set()) for v in (-0.4, -0.9, -0.4, -0.2, 0.9)])
     assert d.handle([], 1.0) == []                                  # short of on
-    assert d.handle([], 1.01) == [_down(ControlNames.CONTROLLER_AXIS_LEFTY_UP)]
+    assert d.handle([], 1.01) == [_down(ControlNames.CONTROLLER_AXIS_LEFTY_UP), _down(LY)]
     assert d.handle([], 1.02) == []                                 # past off: still held
-    assert d.handle([], 1.03) == [_up(ControlNames.CONTROLLER_AXIS_LEFTY_UP)]
-    assert d.handle([], 1.04) == [_down(ControlNames.CONTROLLER_AXIS_LEFTY_DOWN)]
+    assert d.handle([], 1.03) == [_up(ControlNames.CONTROLLER_AXIS_LEFTY_UP), _up(LY)]
+    assert d.handle([], 1.04) == [_down(ControlNames.CONTROLLER_AXIS_LEFTY_DOWN), _down(LY)]
 
 
 def test_a_diagonal_push_presses_a_side_of_each_axis():
     d = _calibrated(_ScriptedController(), FILE)
     d.frames = iter([(d.axes_at({LX: -0.9, LY: 0.6}), set())])
-    assert d.handle([], 1.0) == [_down(ControlNames.CONTROLLER_AXIS_LEFTX_LEFT),
-                                 _down(ControlNames.CONTROLLER_AXIS_LEFTY_DOWN)]
+    assert d.handle([], 1.0) == [_down(ControlNames.CONTROLLER_AXIS_LEFTX_LEFT), _down(LX),
+                                 _down(ControlNames.CONTROLLER_AXIS_LEFTY_DOWN), _down(LY)]
+
+
+def test_a_stick_axis_has_a_value_and_each_side_how_far_it_is_pushed():
+    d = _calibrated(_ScriptedController(), FILE)
+    d.frames = iter([(d.axes_at({LX: -1.0, LY: 0.0, RX: 0.3}), {"S_A"})])
+    d.handle([], 1.0)
+    values = d.values()
+    assert values[LX] == -1.0 and values[ControlNames.CONTROLLER_AXIS_LEFTX_LEFT] == 1.0
+    assert 0.0 < values[RX] < 0.3 and values[RX] == values[ControlNames.CONTROLLER_AXIS_RIGHTX_RIGHT]
+    assert values["S_A"] == 1.0
+    assert LY not in values and ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT not in values
+
+
+def test_a_stick_within_its_drift_of_rest_reads_zero_and_its_stops_one():
+    axis = files.AxisCalibration(rest=0.1, low=-0.9, high=0.6, drift=0.05, on=0.5, off=0.3)
+    assert axis.value(0.1) == 0.0 and axis.value(0.14) == 0.0 and axis.value(0.06) == 0.0
+    assert axis.value(0.6) == 1.0 and axis.value(-0.9) == -1.0
+    assert axis.value(0.35) == pytest.approx((0.25 / 0.5 - 0.1) / 0.9)
 
 
 def test_an_uncalibrated_axis_presses_nothing():
     d = _ScriptedController()
     d.frames = iter([(d.axes_at({LX: 1.0, LY: -1.0}), set())])
-    assert d.handle([], 1.0) == [] and d.axis_values[LX] == 1.0
-    assert d.calibrated_value(LX) is None
+    assert d.handle([], 1.0) == [] and d.axis_reading(LX) == 1.0
+    assert d.calibrated(LX, 1.0) is None and d.values() == {}
 
 
 def test_a_controller_records_the_calibration_it_reads_through(config_home):
@@ -391,8 +414,9 @@ def test_the_gmpd3_names_its_buttons_as_an_xbox_pad_does_and_reads_its_stick():
               _joy(pygame.JOYAXISMOTION, axis=1, value=-0.9),
               _joy(pygame.JOYAXISMOTION, axis=3, value=-1.0)]            # pinned: no control
     assert pad.handle(events, 1.0) == [_down(ControlNames.CONTROLLER_BUTTON_A),
-                                       _down(ControlNames.CONTROLLER_AXIS_LEFTY_UP)]
-    assert pad.held() == {ControlNames.CONTROLLER_BUTTON_A, ControlNames.CONTROLLER_AXIS_LEFTY_UP}
+                                       _down(ControlNames.CONTROLLER_AXIS_LEFTY_UP), _down(LY)]
+    assert pad.held() == {ControlNames.CONTROLLER_BUTTON_A, ControlNames.CONTROLLER_AXIS_LEFTY_UP,
+                          LY}
     assert (pad.handle([_joy(pygame.JOYBUTTONUP, button=4)], 1.1)
             == [_up(ControlNames.CONTROLLER_BUTTON_A)])
     assert pad.handle([], 1.2) == []                        # the stick held still stays pressed
@@ -417,8 +441,8 @@ def test_an_xbox_controller_reads_each_stick_axis_through_its_calibration():
     pad = _calibrated(_bare(XBoxController), FILE)
     right_x = pygame.CONTROLLER_AXIS_RIGHTX
     assert pad.handle([_joy(pygame.CONTROLLERAXISMOTION, axis=right_x, value=-20000)], 1.0) == [
-        _down(ControlNames.CONTROLLER_AXIS_RIGHTX_LEFT)]
-    assert pad.calibrated_value(RX) == pytest.approx(-20000 / 32767)
+        _down(ControlNames.CONTROLLER_AXIS_RIGHTX_LEFT), _down(RX)]
+    assert pad.calibrated(RX, -20000 / 32767) == pytest.approx(-20000 / 32767)
 
 
 def test_no_two_kinds_of_device_share_a_control_name():

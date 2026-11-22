@@ -201,7 +201,7 @@ class _Task:
             if e.type == pygame.MOUSEBUTTONDOWN and self.cancel \
                     and self.cancel.collidepoint(self.to_canvas(e.pos)):
                 raise _Quit
-        ax = dict(self.controller.axis_values)
+        ax = {name: self.controller.axis_reading(name) for name in self.controller.AXIS_NAMES}
         bt = set(self.controller.held()) & set(self.buttons)
         row = {"t": round(self.now - self.t0, 4), "phase": phase, "cue": cue}
         row.update({name: round(v, 5) for name, v in ax.items()})
@@ -756,8 +756,9 @@ class _Scope:
         """The shown axis: calibrated, or raw when uncalibrated."""
         if self.axis is None:
             return 0.0
-        value = self.controller.calibrated_value(self.axis)
-        return self.controller.axis_values[self.axis] if value is None else value
+        axis_reading = self.controller.axis_reading(self.axis)
+        value = self.controller.calibrated(self.axis, axis_reading)
+        return axis_reading if value is None else value
 
     def record(self, now: float, controls: frozenset) -> None:
         """Log the presses and releases since the last frame, and add this frame to the plot."""
@@ -844,7 +845,7 @@ class _Scope:
         """The shown axis's reading, raw and calibrated, and where it rests."""
         if self.axis is None:
             return ""
-        raw = self.controller.axis_values[self.axis]
+        raw = self.controller.axis_reading(self.axis)
         if axis is None:
             return f"raw {raw:+.3f} (uncalibrated)"
         return (f"calibrated {self._shown_value():+.3f}   raw {raw:+.3f}   "

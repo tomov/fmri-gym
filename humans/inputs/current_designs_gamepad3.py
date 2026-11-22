@@ -30,6 +30,8 @@ STICK_AXES = {
     0: ControlNames.CONTROLLER_AXIS_LEFTX,
     1: ControlNames.CONTROLLER_AXIS_LEFTY
 }
+#: The stick axis -> SDL's number for it.
+_SDL_AXIS_BY_NAME = {name: axis for axis, name in STICK_AXES.items()}
 
 
 class CurrentDesignsGamepad3(Controller):
@@ -38,7 +40,8 @@ class CurrentDesignsGamepad3(Controller):
     name = "current_designs_gamepad3"
     BUTTON_NAMES = tuple(BUTTONS.values())
     AXIS_NAMES = tuple(STICK_AXES.values())
-    CONTROLS = frozenset({*BUTTON_NAMES, *(c for a in AXIS_NAMES for c in AXIS_CONTROLS[a])})
+    CONTROLS = frozenset({*BUTTON_NAMES, *AXIS_NAMES,
+                          *(c for a in AXIS_NAMES for c in AXIS_CONTROLS[a])})
     HANDLE = pygame.joystick.Joystick
 
     @classmethod
@@ -50,8 +53,9 @@ class CurrentDesignsGamepad3(Controller):
     def attach(self, handle: pygame.joystick.Joystick) -> None:
         self.joystick, self.instance_id = handle, handle.get_instance_id()
         self.device_name = handle.get_name()
-        for axis, axis_name in STICK_AXES.items():
-            self.axis_values[axis_name] = handle.get_axis(axis)
+
+    def _read_axis(self, axis_name: str) -> float:
+        return self.joystick.get_axis(_SDL_AXIS_BY_NAME[axis_name])
 
     def is_open(self) -> bool:
         return self.joystick.get_init()

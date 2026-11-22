@@ -81,6 +81,19 @@ class AxisCalibration:
             return 0.0
         return max(-1.0, min(1.0, (value - self.rest) / span))
 
+    def value(self, reading: float) -> float:
+        """A raw reading as the axis's value, -1..1: 0.0 within ``drift`` of rest, and the
+        travel past that rescaled, so each stop still reads -1.0 or +1.0.
+
+        Without the dead zone a stick let go of would still read a little off 0.
+        """
+        pushed = self.normalise(reading)
+        span = (self.high - self.rest) if reading >= self.rest else (self.rest - self.low)
+        dead_zone = self.drift / span if span > 1e-6 else 1.0
+        if abs(pushed) <= dead_zone:
+            return 0.0
+        return math.copysign((abs(pushed) - dead_zone) / (1.0 - dead_zone), pushed)
+
 
 @dataclass(frozen=True)
 class ControllerCalibration:
