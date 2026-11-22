@@ -284,7 +284,7 @@ def _describe(rig: rig_file.RigConfig, triggers: dict | None) -> str:
         f".   WARNING: {rig.fixation_warning}" if rig.fixation_warning else "")
     return "\n".join([
         f"Screen: {window} on monitor {screen.monitor}, vsync {'on' if screen.has_vsync else 'off'}",
-        f"Inputs: {', '.join(('keyboard', *rig.inputs))}{responses}",
+        f"Inputs: {', '.join(rig.inputs)}{responses}",
         f"Game sound: {'on' if rig.has_audio else 'off'}.   Data saved in: {rig.data_root}",
         fixation,
         describe_triggers(triggers) if triggers else
@@ -1084,15 +1084,16 @@ class _RigWindow(QtWidgets.QDialog):
         return page
 
     def _inputs_box(self, given: Any) -> QtWidgets.QGroupBox:
-        """One checkbox per kind of input device a rig can list besides the keyboard."""
+        """One checkbox per kind of input device a rig can list; the keyboard always ticked,
+        since every rig has it."""
         box = QtWidgets.QGroupBox("Input devices")
         column = QtWidgets.QVBoxLayout(box)
-        column.addWidget(QtWidgets.QLabel(f"{Keyboard.name}: always read"))
         given = given if isinstance(given, list) else []
         self.input_boxes: dict[str, QtWidgets.QCheckBox] = {}
         for name, cls in INPUT_DEVICE_CLASSES_BY_NAME.items():
             check = QtWidgets.QCheckBox(f"{name}: {(cls.__doc__ or '').splitlines()[0]}")
-            check.setChecked(name in given)
+            check.setChecked(name in given or name == Keyboard.name)
+            check.setEnabled(name != Keyboard.name)
             check.toggled.connect(lambda _on: self._check())
             self.input_boxes[name] = check
             column.addWidget(check)
