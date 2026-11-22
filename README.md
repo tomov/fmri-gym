@@ -99,7 +99,7 @@ Note: **Pendulum, MountainCarContinuous and BipedalWalker use continuous (`Box`)
 | `configs/curricula/<backend>/levels/<name>.json`, `configs/curricula/<backend>/<name>.json` | a **curriculum**: what one run plays -- one level (in `levels/`), or a sequence of levels (in the backend's folder) | the game; the same for every subject and site |
 | `configs/<team>/rigs/<rig>.json` | a **rig**: one setup a session runs on, made with `rig-setup` (examples: `configs/examples/rigs/`) | the team and its setup |
 | `configs/examples/sessions/<name>.sh` | an example **session**, subject and rig given when it is started | nothing: a starting point |
-| `configs/<team>/subjects/sub-<label>/ses-<NNN>/<name>.sh` | a **session**: one `fmri-play` line per run, in order | one subject's one session |
+| `configs/<team>/subjects/sub-<label>/ses-<NNN>/<name>.sh` | a **session**: its recording started first, then one `fmri-play` line per run, in order | one subject's one session |
 
 Every game that plays has a curriculum for each of its supported levels, so any one of them is a one-line command:
 
@@ -381,7 +381,7 @@ humans/
   standalone/       # the commands that are not a run; nothing outside imports them
     rig_setup/      # `rig-setup`: a rig file in a form (window.py); with --measure, the rig measured (measure.py, report.py)
     session_editor.py  # `session-editor`: sessions and their runs' curricula, without JSON
-    session_script.py  # the session's .sh script, one fmri-play line per run
+    session_script.py  # the session's .sh script, its recording, one fmri-play line per run
     gamepad_calibration.py  # `gamepad-calibration`: calibrate a controller, see what it sends
     photodiode.py   # `python -m humans.standalone.photodiode`: flash a patch to measure the flip-to-photon offset
   adapters/
@@ -448,6 +448,10 @@ set -e
 SUBJECT=sub-01
 RIG=${RIG:?run as: SUBJECT=sub-01 RIG=configs/<team>/rigs/<rig>.json sh $0 [session]}
 SES=${1:-$(uv run fmri-ses --subject "$SUBJECT" --rig "$RIG")}
+# The session's recording (session-logger): started first, stopped when the script ends.
+RECORDING=$(uv run session-logger start --subject "$SUBJECT" --ses "$SES" --rig "$RIG")
+trap 'uv run session-logger stop "$RECORDING"' EXIT
+trap 'exit 130' INT TERM HUP
 uv run fmri-play --curriculum configs/pong.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG"
 ./scripts/localizer.sh "$SES"
 # uv run fmri-play --curriculum configs/mario.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG"
@@ -457,9 +461,11 @@ uv run fmri-play --curriculum configs/pong.json --subject "$SUBJECT" --ses "$SES
 
 **The numbers come from the script, not from the disk.** The `SES=` line picks the session once, so every run lands in it: the script's own argument if it was given one (`sh ses1.sh 003` resumes session 3), else the subject's next free session. Each run states its `--run`, which is its place among the lines that play that task -- so it is the same run number however the session went, and skipping a line renumbers nothing after it. Both flags are required of `fmri-play`: it never picks a number itself.
 
+**The session records itself.** Before its first line, the script starts the session's recording ([A session's recording](#a-sessions-recording-session-logger)): the rig's input devices, read from the OS with the time the OS stamped them, which application has the focus, the machine's stalls, the clock, from before the first run to after the last, whatever each line runs. A device the rig names that cannot be read stops the script there, before anything is played. The traps stop the recording however the script ends: at its last line, at a line that fails or is quit, or on Ctrl+C. Add `uv run session-logger mark "$RECORDING" "<text>"` lines of your own to note in the recording what another program played. A run started on its own, outside a script, plays the same without a recording.
+
 A run whose folder already has data is **re-acquired, never overwritten**: it writes to `..._02` (then `_03`) beside the attempt that stopped. The suffix names the folder only, so the re-acquisition replays the same episodes as the run it replaces.
 
-`set -e` stops the script at the first run that fails or is quit with CTRL+ESCAPE (`fmri-play` then exits with status 3). A line that is not an `fmri-play` run is any command of yours, as typed; a commented line is a skipped run, which is how a stopped session is resumed. Write it by hand, or in `session-editor`, which has two tabs. **Session**: who and on which rig, then the runs in order -- add an existing or a new curriculum, an external script; repeat, reorder, skip, "Start here" -- or the script itself. **Run** (double-click a run): how it is played (run length, start again, carry on), its phases with each game's keys, or its JSON. A drop-down on each tab lists what `configs/` holds: sessions on the Session tab, curricula on the Run tab (in a session, one picked there is added after the selected run); File > Open takes a `.sh` like a `.json` from anywhere. Save writes the script and the configs you edited. Run it from the repo root: `sh configs/<team>/subjects/sub-01/ses-001/<name>.sh`.
+`set -e` stops the script at the first run that fails or is quit with CTRL+ESCAPE (`fmri-play` then exits with status 3). A line that is not an `fmri-play` run is any command of yours, as typed; a commented line is a skipped run, which is how a stopped session is resumed. Write it by hand, or in `session-editor`, which has two tabs. **Session**: who and on which rig, then the runs in order -- add an existing or a new curriculum, an external script; repeat, reorder, skip, "Start here" -- or the script itself. **Run** (double-click a run): how it is played (run length, start again, carry on), its phases with each game's keys, or its JSON. A drop-down on each tab lists what `configs/` holds: sessions on the Session tab, curricula on the Run tab (in a session, one picked there is added after the selected run); File > Open takes a `.sh` like a `.json` from anywhere. Save writes the script and the configs you edited. Run it from the repo root: `sh configs/<team>/subjects/sub-01/ses-001/<name>.sh`; on Windows, in Git Bash.
 
 **An example session to start from:** `configs/examples/sessions/pilot.sh` is six GMPD3-ABXY-nav runs -- AI GameStore games 1, 4, 7, and 8, then Rush Hour, then Baba Is You -- each played for `RUN_DURATION` seconds with `--loop --resume`. Each run waits for the experimenter's SPACE, which paces the rest between games. It fixes `sub-01`, session `1`, and `configs/examples/rigs/fmri.json` at the top; change `SUBJECT=`, `SES=`, `RUN_DURATION=`, or `RIG=` there for another run.
 
