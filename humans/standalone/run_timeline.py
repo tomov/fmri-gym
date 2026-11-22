@@ -30,7 +30,7 @@ from ..save.logging import GAME_EVENTS_FILENAME, RUN_EVENTS_FILENAME, read_lines
 from .session_logger import SESSION_EVENTS_FILENAME, recordings_folder_of_run
 from .key_codes import (
     EV_KEY, EV_SYN, EVDEV_AXES, EVDEV_BUTTONS, EVDEV_KEYS, HID_BUTTON_PAGE, HID_KEYBOARD_PAGE,
-    KEY_NAME_OF_USAGE, SYN_DROPPED,
+    KEY_NAME_OF_USAGE, SYN_DROPPED, evdev_code_of_windows_key,
 )
 
 #: The oldest log format read here: the run's own log beside its blocks'.
@@ -137,7 +137,7 @@ class RunRecord:
         if self.session_recording is None:
             return []
         return [line for line in self.session_recording.lines
-                if line["type"] in ("device_event", "device_gone")]
+                if line["type"] in ("device_event", "device_report", "device_gone")]
 
 
 @dataclass(frozen=True, slots=True)
@@ -490,13 +490,12 @@ def _device_times_of_presses(record: RunRecord) -> dict[tuple[float, str], float
 
 def _key_down_usage(line: dict[str, Any]) -> int | None:
     """The USB HID usage of the key a device line pressed; ``None`` for anything else."""
-    if line["type"] != "device_event" or line["value"] != 1:
+    if not _is_key_or_button(line) or line["value"] != 1:
         return None
-    if "event_type" in line:                                      # Linux evdev
-        if line["event_type"] != EV_KEY or line["code"] not in EVDEV_KEYS:
-            return None
-        return EVDEV_KEYS[line["code"]][0]
-    return line["usage"] if line["usage_page"] == HID_KEYBOARD_PAGE else None   # macOS IOKit
+    code = _evdev_key_code(line)
+    if code is not None:                                          # Linux, a Windows keyboard
+        return EVDEV_KEYS[code][0] if code in EVDEV_KEYS else None
+    return line["usage"] if line["usage_page"] == HID_KEYBOARD_PAGE else None   # USB HID
 
 
 def _unaccounted_device_lines(record: RunRecord, to_run_time: RunClock,
@@ -517,7 +516,7 @@ def _unaccounted_device_lines(record: RunRecord, to_run_time: RunClock,
             continue
         if not _is_key_or_button(line) or line["value"] not in (0, 1):
             continue
-        key = (line["device"], line.get("code", line.get("usage")))
+        key = (line["device"], _element_of(line))
         if line["value"] == 1 and to_run_time(line["perf_time"]) not in claimed:
             pressed.add(key)
             out.append(line)
@@ -528,10 +527,34 @@ def _unaccounted_device_lines(record: RunRecord, to_run_time: RunClock,
 
 
 def _is_key_or_button(line: dict[str, Any]) -> bool:
-    """Whether a device line is a key's or a button's."""
-    if "event_type" in line:                                      # Linux evdev
+    """Whether a device line is a key's or a button's: an evdev key (Linux), a Windows
+    keyboard's key, or a USB HID keyboard key or button (macOS, a Windows HID device)."""
+    if line["type"] != "device_event":
+        return False
+    if "event_type" in line:
         return line["event_type"] == EV_KEY
-    return line["usage_page"] in (HID_KEYBOARD_PAGE, HID_BUTTON_PAGE)   # macOS IOKit
+    if "make_code" in line:
+        return True
+    return line.get("usage_page") in (HID_KEYBOARD_PAGE, HID_BUTTON_PAGE)
+
+
+def _evdev_key_code(line: dict[str, Any]) -> int | None:
+    """The evdev code of a Linux or Windows key line; ``None`` for any other line."""
+    if "event_type" in line:
+        return line["code"]
+    if "make_code" in line:
+        return evdev_code_of_windows_key(line["make_code"], line["flags"])
+    return None
+
+
+def _element_of(line: dict[str, Any]) -> tuple[int, ...]:
+    """Which key, button or value of its device a key or button line is: its evdev code, its
+    Windows make code and prefix, or its USB HID page and usage."""
+    if "event_type" in line:
+        return (line["code"],)
+    if "make_code" in line:
+        return (line["make_code"], line["flags"] & ~1)          # but the key-up bit
+    return (line["usage_page"], line["usage"])
 
 
 def _device_detail(line: dict[str, Any]) -> str:
@@ -540,13 +563,21 @@ def _device_detail(line: dict[str, Any]) -> str:
         return f"device {line['device']} unplugged"
     if line.get("event_type") == EV_SYN:
         return f"device {line['device']}: events dropped by the kernel"
+    return f"device {line['device']}: {_element_name(line)} {'down' if line['value'] else 'up'}"
+
+
+def _element_name(line: dict[str, Any]) -> str:
+    """The name of the key or button a device line is of."""
     if "event_type" in line:
         code = line["code"]
-        name = (EVDEV_KEYS[code][1] if code in EVDEV_KEYS
+        return (EVDEV_KEYS[code][1] if code in EVDEV_KEYS
                 else EVDEV_BUTTONS.get(code, EVDEV_AXES.get(code, f"code {code}")))
-    else:
-        name = KEY_NAME_OF_USAGE.get(line["usage"], f"usage {line['usage']}")
-    return f"device {line['device']}: {name} {'down' if line['value'] else 'up'}"
+    if "make_code" in line:
+        code = _evdev_key_code(line)
+        return EVDEV_KEYS[code][1] if code is not None else f"scancode {line['make_code']:#04x}"
+    if line["usage_page"] == HID_KEYBOARD_PAGE:
+        return KEY_NAME_OF_USAGE.get(line["usage"], f"key usage {line['usage']}")
+    return f"button {line['usage']}"
 
 
 def _session_quality(record: RunRecord) -> dict[str, Any]:

@@ -972,6 +972,59 @@ def test_the_macos_front_application_is_what_launchservices_puts_in_front(monkey
     assert macos.front_application() == FrontApplication("kitty", 1324)
     assert macos.front_application() == FrontApplication("kitty", 1324)
 
+def _raw_input(kind, body: bytes) -> bytes:
+    """A Windows ``RAWINPUT`` of ``kind`` (0 mouse, 1 keyboard, 2 HID) from device handle 7."""
+    import ctypes
+
+    from humans.standalone.session_logger import windows
+    header = windows._RawInputHeader(type=kind, device=7, wparam=0)
+    header.size = ctypes.sizeof(header) + len(body)
+    return bytes(header) + body
+
+
+def test_a_windows_keys_raw_input_is_a_line_with_its_scancode_and_whether_it_went_down():
+    from humans.standalone.session_logger import windows
+
+    def key(make_code, flags):
+        return _raw_input(1, bytes(windows._RawKeyboard(make_code=make_code, flags=flags,
+                                                        vkey=0x25)))
+    keys_down = set()
+    lines = [line for data in (key(0x4B, 2), key(0x4B, 2), key(0x4B, 3), key(0x0D, 0))
+             for line in windows.lines_of_raw_input(data, 0, 5.0, None, keys_down)]
+    assert [(line["make_code"], line["flags"], line["value"]) for line in lines] == [
+        (0x4B, 2, 1), (0x4B, 2, 2), (0x4B, 3, 0), (0x0D, 0, 1)], "down, repeated, up, down"
+    assert lines[0] == {"type": "device_event", "perf_time": 5.0, "device": 0,
+                        "make_code": 0x4B, "flags": 2, "vkey": 0x25, "value": 1}
+    assert keys_down == {(0, 0x0D, 0)}
+
+
+def test_a_windows_mouse_and_hid_raw_input_are_lines_as_windows_gives_them():
+    from humans.standalone.session_logger import windows
+    mouse = _raw_input(0, bytes(windows._RawMouse(button_flags=1, last_x=-3, last_y=4)))
+    [line] = windows.lines_of_raw_input(mouse, 1, 2.0, None, set())
+    assert (line["button_flags"], line["last_x"], line["last_y"]) == (1, -3, 4)
+    reports = bytes(windows._RawHid(report_size=3, report_count=2)) + bytes([1, 2, 3, 1, 2, 4])
+    hid = _raw_input(2, reports)
+    assert [line["report"] for line in windows.lines_of_raw_input(hid, 2, 3.0, None, set())] \
+        == ["010203", "010204"], "a report no parser reads is kept whole"
+
+    class Buttons:
+        def lines(self, report, device, arrived):
+            return [{"type": "device_event", "perf_time": arrived, "device": device,
+                     "usage_page": 9, "usage": report[2], "value": 1}]
+    assert [line["usage"] for line in windows.lines_of_raw_input(hid, 2, 3.0, Buttons(), set())] \
+        == [3, 4]
+
+
+@pytest.mark.parametrize("make_code, flags, name", [
+    (0x0D, 0, "EQUAL"), (0x1E, 0, "A"), (0x4B, 2, "LEFT"), (0x4B, 0, "KP4"),
+    (0x1D, 4, "PAUSE"), (0x64, 0, "F13"), (0x60, 0, None), (0x2A, 2, None),
+])
+def test_a_windows_key_is_named_by_its_evdev_code(make_code, flags, name):
+    from humans.standalone.key_codes import EVDEV_KEYS, evdev_code_of_windows_key
+    code = evdev_code_of_windows_key(make_code, flags)
+    assert (None if code is None else EVDEV_KEYS[code][1]) == name
+
 def test_the_control_file_passes_on_each_line_once_and_whole(tmp_path):
     import json
     import queue

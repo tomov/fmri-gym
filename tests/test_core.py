@@ -830,29 +830,36 @@ def test_bids_from_logs_writes_nothing_when_it_would_have_to_choose(tmp_path, lo
 
 
 def _session_recording(data_root: Path, clock_shift: float = 0.0,
-                       has_ended: bool = True) -> Path:
+                       has_ended: bool = True, is_windows: bool = False) -> Path:
     """A session recording of sub-01's ses-001, from perf_counter 95 to 110: on the run's clock
     (:func:`_run_folder`'s) unless ``clock_shift`` moves its wall time. Its device saw the
     scanner's = and LEFT before the run read them, and an A the run never read; during the
     run, the session was marked, the focus moved and the machine stalled; without
-    ``has_ended``, it was cut short."""
+    ``has_ended``, it was cut short. ``is_windows`` writes its keys as Windows' Raw Input gives
+    them (make code and flags) instead of evdev's codes."""
     folder = data_root / "session_events" / "sub-01" / "ses-001" / "20261119T120000"
     folder.mkdir(parents=True)
     run_offset = 1.7e9 - 100.0                       # the run's start_epoch - trigger_perf
     event = {"type": "device_event", "device": 0, "event_type": 1}
+
+    def key(perf_time, evdev_code, make_code, flags):
+        if is_windows:
+            return {"type": "device_event", "perf_time": perf_time, "device": 0,
+                    "make_code": make_code, "flags": flags, "vkey": 0, "value": 1}
+        return {**event, "perf_time": perf_time, "code": evdev_code, "value": 1}
     lines = [{"type": "recording_start", "perf_time": 95.0,
               "wall_time": 95.0 + run_offset + clock_shift, "reader": "linux evdev",
               "clock": "CLOCK_MONOTONIC", "devices": [{"name": "Box"}]},
-             {**event, "perf_time": 99.9995, "code": 13, "value": 1},     # KEY_EQUAL
+             key(99.9995, 13, 0x0D, 0),                                  # =, KEY_EQUAL
              {"type": "mark", "perf_time": 100.5, "wall_time": 100.5 + run_offset,
               "text": "the participant is ready"},
              {"type": "window_focus", "perf_time": 101.0, "process": "python3",
               "pid": 4242},
              {"type": "stall", "perf_time": 101.2, "duration_ms": 35.0},
-             {**event, "perf_time": 101.615, "code": 105, "value": 1},    # KEY_LEFT
+             key(101.615, 105, 0x4B, 2),                                 # LEFT, E0-prefixed
              {"type": "device_event", "perf_time": 101.615, "device": 0, "event_type": 0,
               "code": 0, "value": 0},
-             {**event, "perf_time": 102.5, "code": 30, "value": 1}]       # KEY_A
+             key(102.5, 30, 0x1E, 0)]                                    # A
     if has_ended:
         lines.append({"type": "recording_end", "how": "stopped", "perf_time": 110.0,
                       "wall_time": 110.0 + run_offset + clock_shift, "counts": {}})
@@ -891,6 +898,16 @@ def test_a_session_recording_gives_each_press_its_devices_time(tmp_path):
     assert "session   recording 20261119T120000: 1 device(s) (linux evdev)" in text
     assert "session         1 focus change(s), 1 stall(s) (longest 35 ms)" in text
 
+
+def test_a_windows_session_recording_times_the_presses_as_a_linux_one_does(tmp_path):
+    from humans.standalone.run_timeline import RunRecord, build_timeline
+    run = _run_folder(tmp_path)
+    _session_recording(tmp_path, is_windows=True)
+    timeline = build_timeline(RunRecord.read(str(run)))
+    left = next(press for press in timeline.presses if press.control == "LEFT")
+    assert (left.onset, left.device_time) == pytest.approx((1.615, 1.615))
+    assert timeline.quality["devices"]["presses_timed"] == 2
+    assert ("device", "device 0: A down") in [(m.what, m.detail) for m in timeline.marks]
 
 def test_a_session_recording_cut_short_still_times_the_presses_it_holds(tmp_path):
     from humans.standalone.run_timeline import RunRecord, build_timeline

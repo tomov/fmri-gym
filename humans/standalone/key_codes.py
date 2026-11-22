@@ -4,7 +4,8 @@ key's USB HID usage, the number every layer agrees on.
 A keyboard key is one usage on the USB HID keyboard page (``0x07``) in macOS's IOKit values,
 and the same number is SDL's scancode, which pygame's key events carry. Linux's evdev numbers
 its keys otherwise: :data:`EVDEV_KEYS` gives each its usage and its name, as the kernel's
-``input-event-codes.h`` defines them.
+``input-event-codes.h`` defines them. Windows' Raw Input gives a key's PC scancode (set 1),
+which is its evdev code for most keys (:func:`evdev_code_of_windows_key`).
 """
 
 from __future__ import annotations
@@ -153,5 +154,35 @@ EVDEV_BUTTONS = {
 #: evdev's absolute axes, by code.
 EVDEV_AXES = {0: "ABS_X", 1: "ABS_Y", 2: "ABS_Z", 3: "ABS_RX", 4: "ABS_RY", 5: "ABS_RZ",
               9: "ABS_GAS", 10: "ABS_BRAKE", 16: "ABS_HAT0X", 17: "ABS_HAT0Y"}
+#: Windows' Raw Input key flags that mark the scancode's E0 and E1 prefixes.
+WINDOWS_KEY_E0, WINDOWS_KEY_E1 = 2, 4
+#: A Windows key whose make code another key shares, told apart by its prefix -> its evdev
+#: code.
+WINDOWS_PREFIXED_KEYS: dict[tuple[int, int], int] = {
+    (0x1C, WINDOWS_KEY_E0): 96, (0x1D, WINDOWS_KEY_E0): 97, (0x35, WINDOWS_KEY_E0): 98,
+    (0x37, WINDOWS_KEY_E0): 99, (0x38, WINDOWS_KEY_E0): 100, (0x47, WINDOWS_KEY_E0): 102,
+    (0x48, WINDOWS_KEY_E0): 103, (0x49, WINDOWS_KEY_E0): 104, (0x4B, WINDOWS_KEY_E0): 105,
+    (0x4D, WINDOWS_KEY_E0): 106, (0x4F, WINDOWS_KEY_E0): 107, (0x50, WINDOWS_KEY_E0): 108,
+    (0x51, WINDOWS_KEY_E0): 109, (0x52, WINDOWS_KEY_E0): 110, (0x53, WINDOWS_KEY_E0): 111,
+    (0x5B, WINDOWS_KEY_E0): 125, (0x5C, WINDOWS_KEY_E0): 126, (0x5D, WINDOWS_KEY_E0): 127,
+    (0x5E, WINDOWS_KEY_E0): 116, (0x1D, WINDOWS_KEY_E1): 119,
+}
+#: F13 to F24's make codes on Windows -> their evdev codes.
+WINDOWS_F13_TO_F24 = {**{0x64 + index: 183 + index for index in range(11)}, 0x76: 194}
+#: The highest make code with no prefix that is its own evdev code.
+_LAST_PLAIN_MAKE_CODE = 88
+
+
+def evdev_code_of_windows_key(make_code: int, flags: int) -> int | None:
+    """The evdev code of a key Windows' Raw Input gives by its make code and flags; ``None``
+    for a key :data:`EVDEV_KEYS` does not have."""
+    prefix = flags & (WINDOWS_KEY_E0 | WINDOWS_KEY_E1)
+    if prefix:
+        return WINDOWS_PREFIXED_KEYS.get((make_code, prefix))
+    if make_code in WINDOWS_F13_TO_F24:
+        return WINDOWS_F13_TO_F24[make_code]
+    return make_code if make_code <= _LAST_PLAIN_MAKE_CODE and make_code in EVDEV_KEYS else None
+
+
 #: USB HID keyboard usage -> the key's name.
 KEY_NAME_OF_USAGE = {usage: name for usage, name in EVDEV_KEYS.values()}

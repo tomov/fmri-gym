@@ -3,7 +3,8 @@ machine's stalls, the lines the commands ask it to add and the clock, written to
 events file as they arrive until it is told to stop.
 
 It reads each device with this OS's reader: Linux reads each device's ``/dev/input/event*``
-node (:mod:`.linux`); macOS, the IOKit HID manager (:mod:`.macos`).
+node (:mod:`.linux`); macOS, the IOKit HID manager (:mod:`.macos`); Windows, its Raw Input
+(:mod:`.windows`).
 """
 
 from __future__ import annotations
@@ -36,7 +37,8 @@ STALL_THRESHOLD_S = 0.010
 
 
 class OpenDevices(Protocol):
-    """An OS's reader of the named devices, open (:mod:`.linux`, :mod:`.macos`)."""
+    """An OS's reader of the named devices, open (:mod:`.linux`, :mod:`.macos`,
+    :mod:`.windows`)."""
 
     def record(self) -> dict[str, Any]: ...
     def read(self, timeout: float) -> list[dict[str, Any]]: ...
@@ -111,6 +113,9 @@ def open_devices(device_names: list[str]) -> OpenDevices:
     if sys.platform == "darwin":
         from .macos import MacDevices
         return MacDevices(device_names)
+    if sys.platform == "win32":
+        from .windows import WindowsDevices
+        return WindowsDevices(device_names)
     raise SessionLoggerError(f"session-logger: no device reader for {sys.platform}")
 
 
@@ -121,6 +126,8 @@ def front_application_reader() -> Callable[[], FrontApplication | None] | None:
         from .linux import front_application
     elif sys.platform == "darwin":
         from .macos import front_application
+    elif sys.platform == "win32":
+        from .windows import front_application
     else:
         return None
     return front_application if front_application() is not None else None
