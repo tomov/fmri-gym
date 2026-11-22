@@ -108,6 +108,14 @@ def test_the_eyelink_field_writes_its_section_only_when_filled_in(qt):
     assert any('"host_ip" must be an IP address' in p for p in window._measurement_problems())
 
 
+def test_the_dbp_meg_box_writes_only_what_is_filled_in(qt):
+    window, _ = _rig_window("meg")
+    assert "dbp_meg" not in window.rig
+    window.dbp_meg_form.write("center_shift_x", "-40")
+    window.dbp_meg_form.write("is_realtime", False)
+    assert window.rig["dbp_meg"] == {"is_realtime": False, "center_shift_x": -40}
+
+
 def test_a_rig_measurement_waits_for_its_triggers_to_be_chosen(qt):
     window, _ = _rig_window("minimal", need_triggers=True)
     assert window.stack.currentIndex() == 3 and not window.next.isEnabled()
