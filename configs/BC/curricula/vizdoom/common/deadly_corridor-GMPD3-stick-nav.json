@@ -1,0 +1,34 @@
+{
+  "type": "game", "backend": "vizdoom", "game": "VizdoomDeadlyCorridor-v1",
+  "instructions": {
+    "title": "Deadly Corridor", "align": "left", "controls_to_dismiss": ["CONTROLLER_BUTTON_A"],
+    "text": [
+      "Fight your way down the corridor to the green",
+      "vest at the far end. Enemies attack from alcoves",
+      "on both sides.",
+      "",
+      "![controls](BC/images/controls/vizdoom/deadly_corridor-GMPD3-stick-nav.png)",
+      "",
+      "Press A to start."
+    ]
+  },
+  "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
+  "controls": {"CONTROLLER_AXIS_LEFTY_UP": 3, "CONTROLLER_AXIS_LEFTY_DOWN": 4, "CONTROLLER_AXIS_LEFTX_LEFT": 5, "CONTROLLER_AXIS_LEFTX_RIGHT": 6, "CONTROLLER_BUTTON_X": 0, "CONTROLLER_BUTTON_B": 1, "CONTROLLER_AXIS_TRIGGERLEFT": 2},
+  "menu": {
+    "control": "CONTROLLER_AXIS_TRIGGERRIGHT", "hold": 3.0, "after": 180.0, "options": ["reset", "forfeit", "resume"], "move": ["CONTROLLER_AXIS_LEFTY_UP", "CONTROLLER_AXIS_LEFTY_DOWN"], "confirm": "CONTROLLER_BUTTON_A",
+    "text": [
+      "   stick up / down   choose",
+      "   A                 select"
+    ]
+  },
+  "hint": {
+    "control": "CONTROLLER_BUTTON_Y", "hold": 0.0, "after": 0.0,
+    "text": [
+      "![controls](BC/images/controls/vizdoom/deadly_corridor-GMPD3-stick-nav.png)",
+      "",
+      "Let go of Y to go back to the game."
+    ]
+  },
+  "hud": {"show_score": false, "show_time_remaining": false},
+  "mode": "episode", "n_episodes": 10, "duration": 300.0, "fps": 35
+}
