@@ -63,12 +63,12 @@
       "CONTROLLER_BUTTON_Y": ["move up", "hold 3 s: show controls"],
       "CONTROLLER_BUTTON_A": ["move down"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": ["wait a turn"],
-      "CONTROLLER_AXIS_TRIGGERLEFT": [["hold 3 s: menu", "(after 8 min)"]]
+      "CONTROLLER_AXIS_TRIGGERLEFT": ["hold 3 s: menu"]
     },
     "baba_auto/baba_auto-GMPD3-stick-nav.png": {
       "LEFT_STICK": ["move"],
       "CONTROLLER_BUTTON_A": ["wait a turn"],
-      "CONTROLLER_BUTTON_X": [["hold 3 s: menu", "(after 8 min)"]],
+      "CONTROLLER_BUTTON_X": ["hold 3 s: menu"],
       "CONTROLLER_BUTTON_Y": ["hold: show controls"]
     },
     "rushhour/rushhour-GMPD3-ABXY-nav.png": {
