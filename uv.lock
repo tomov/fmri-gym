@@ -924,7 +924,7 @@ requires-dist = [
     { name = "shimmy", marker = "extra == 'shimmy'" },
     { name = "sounddevice" },
     { name = "stable-retro", marker = "extra == 'retro'" },
-    { name = "supertuxkart-gym", marker = "extra == 'stk'", specifier = ">=0.1.4" },
+    { name = "supertuxkart-gym", marker = "extra == 'stk'", specifier = ">=0.1.5" },
     { name = "tile-match-gym", marker = "extra == 'tilematch'" },
     { name = "vgdl-gym", marker = "extra == 'vgdl'", editable = "gym/vgdl" },
     { name = "vizdoom", marker = "extra == 'vizdoom'" },
@@ -2598,7 +2598,7 @@ wheels = [
 
 [[package]]
 name = "supertuxkart-gym"
-version = "0.1.4"
+version = "0.1.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gymnasium" },
@@ -2606,9 +2606,9 @@ dependencies = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c1/f2/118c4ccc9fead38783ca60603fca7f34122238118a0ba6a63850c638dd71/supertuxkart_gym-0.1.4.tar.gz", hash = "sha256:ac736d29a75768e0563e7a42a627f0957d6b26251dc0e4bdb1ac9e0ec779a6d6", size = 42403, upload-time = "2026-10-21T15:26:14.407Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/14/c7/89824860f569526f4e342f53e89936e8d8a858fa652a5dc25cc47dc92c09/supertuxkart_gym-0.1.5.tar.gz", hash = "sha256:d483ba074b65570771a690504f484939e7eb472a0266911c2898c784d6630f55", size = 42605, upload-time = "2026-11-11T07:50:35.095Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1e/cb/56540c55a1080c56a825cfe8fbd640bd65136727eae2bc58784dc13069dc/supertuxkart_gym-0.1.4-py3-none-any.whl", hash = "sha256:bc79f79cb237362987b06cbdf935721477526fc5baa0c0240bf0615e29aef354", size = 36535, upload-time = "2026-10-21T15:26:13.209Z" },
+    { url = "https://files.pythonhosted.org/packages/f0/bc/7c1e6f732a72880777cbb4382f81a63287435dcbef3af4c1438bbd63ea3d/supertuxkart_gym-0.1.5-py3-none-any.whl", hash = "sha256:8fcc320c063951a4e64b1d91116d8d1aa1add7bd1cbd7a356ccf4856d402028f", size = 36532, upload-time = "2026-11-11T07:50:33.596Z" },
 ]
 
 [[package]]
