@@ -1,8 +1,10 @@
-"""Linux: each device's ``/dev/input/event*`` node, its events stamped by the kernel.
+"""Linux: each device's ``/dev/input/event*`` node, its events stamped by the kernel, and the
+application whose window the X window manager says is active.
 
 The kernel stamps each event when the device's report arrives, on ``CLOCK_MONOTONIC`` once
 asked to (``EVIOCSCLOCKID``): the clock ``perf_counter`` reads on Linux. The devices are found
-by name in sysfs, which anyone may read; reading a node takes the ``input`` group.
+by name in sysfs, which anyone may read; reading a node takes the ``input`` group. The active
+window is read with ``xprop``, so a Wayland session without X says none.
 """
 
 from __future__ import annotations
@@ -10,18 +12,24 @@ from __future__ import annotations
 import fcntl
 import glob
 import os
+import re
 import select
 import struct
+import subprocess
 import time
 from typing import Any
 
-from . import SessionLoggerError
+from . import FrontApplication, SessionLoggerError
 
 #: The kernel's ``struct input_event``: a ``timeval``, then type, code and value.
 _EVENT = struct.Struct("@llHHi")
 _CLOCK_MONOTONIC = 1
 #: ``EVIOCSCLOCKID``: ``_IOW('E', 0xa0, int)``.
 _EVIOCSCLOCKID = (1 << 30) | (struct.calcsize("i") << 16) | (ord("E") << 8) | 0xa0
+#: A window id as ``xprop`` prints it.
+_X_WINDOW = re.compile(r"window id # (0x[0-9a-fA-F]+)")
+#: The last application :func:`front_application` named, by its window's id.
+_last_front_application: tuple[str, FrontApplication | None] = ("", None)
 
 
 class LinuxDevices:
@@ -87,6 +95,41 @@ class LinuxDevices:
             os.close(fd)
         self._fds.clear()
 
+
+def front_application() -> FrontApplication | None:
+    """The application whose window the window manager says is active
+    (``_NET_ACTIVE_WINDOW``); ``None`` without an X display or ``xprop``, or when no window is.
+    """
+    global _last_front_application
+    found = _X_WINDOW.search(_xprop("-root", "_NET_ACTIVE_WINDOW"))
+    if found is None or int(found[1], 16) == 0:
+        return None
+    if found[1] == _last_front_application[0]:
+        return _last_front_application[1]
+    pid = re.search(r"= (\d+)", _xprop("-id", found[1], "_NET_WM_PID"))
+    front = None if pid is None else FrontApplication(_process_name(int(pid[1])), int(pid[1]))
+    _last_front_application = (found[1], front)
+    return front
+
+
+def _xprop(*arguments: str) -> str:
+    """What ``xprop`` prints; nothing without an X display, or when it cannot run."""
+    if not os.environ.get("DISPLAY"):
+        return ""
+    try:
+        return subprocess.run(["xprop", *arguments], capture_output=True, text=True,
+                              timeout=1).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def _process_name(pid: int) -> str:
+    """A process's name, as the kernel gives it; ``""`` once it has ended."""
+    try:
+        with open(f"/proc/{pid}/comm") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
 
 def _event_lines(data: bytes, device: int) -> list[dict[str, Any]]:
     """The kernel's ``input_event`` records in ``data`` as lines, each at the kernel's stamp.

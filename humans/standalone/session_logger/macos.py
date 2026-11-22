@@ -1,4 +1,5 @@
-"""macOS: the IOKit HID manager's input values, each with the time IOKit stamped it.
+"""macOS: the IOKit HID manager's input values, each with the time IOKit stamped it, and the
+application LaunchServices puts in front.
 
 IOKit stamps each value in mach absolute time, the clock ``perf_counter`` reads on macOS
 (checked when the reader opens). A keyboard-type device -- a trigger box that types keys
@@ -9,10 +10,12 @@ Security), given to the app the recording is started from; a gamepad needs none.
 from __future__ import annotations
 
 import ctypes
+import re
+import subprocess
 import time
 from typing import Any
 
-from . import SessionLoggerError
+from . import FrontApplication, SessionLoggerError
 
 _CF = ctypes.CDLL("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation")
 _IOKIT = ctypes.CDLL("/System/Library/Frameworks/IOKit.framework/IOKit")
@@ -22,6 +25,7 @@ _UTF8 = 0x08000100                  # kCFStringEncodingUTF8
 _SINT32 = 3                         # kCFNumberSInt32Type
 _NOT_PERMITTED = -536870174         # kIOReturnNotPermitted, 0xE00002E2, as an IOReturn
 _VALUE_CALLBACK = ctypes.CFUNCTYPE(None, _POINTER, ctypes.c_int32, _POINTER, _POINTER)
+_REMOVAL_CALLBACK = ctypes.CFUNCTYPE(None, _POINTER, ctypes.c_int32, _POINTER)
 
 
 class _Timebase(ctypes.Structure):
@@ -68,6 +72,8 @@ _IOHIDDeviceGetProperty = _function(_IOKIT, "IOHIDDeviceGetProperty", _POINTER, 
                                     _POINTER)
 _IOHIDDeviceRegisterInputValueCallback = _function(
     _IOKIT, "IOHIDDeviceRegisterInputValueCallback", None, _POINTER, _VALUE_CALLBACK, _POINTER)
+_IOHIDDeviceRegisterRemovalCallback = _function(
+    _IOKIT, "IOHIDDeviceRegisterRemovalCallback", None, _POINTER, _REMOVAL_CALLBACK, _POINTER)
 _IOHIDValueGetElement = _function(_IOKIT, "IOHIDValueGetElement", _POINTER, _POINTER)
 _IOHIDValueGetIntegerValue = _function(_IOKIT, "IOHIDValueGetIntegerValue", ctypes.c_long,
                                        _POINTER)
@@ -113,9 +119,11 @@ class MacDevices:
         self._pending: list[dict[str, Any]] = []
         # Kept alive here: IOKit holds only the pointer.
         self._callback = _VALUE_CALLBACK(self._on_value)
+        self._removal_callback = _REMOVAL_CALLBACK(self._on_removal)
         self._run_loop = _CFRunLoopGetCurrent()
         for index, handle in enumerate(handles):
             _IOHIDDeviceRegisterInputValueCallback(handle, self._callback, index + 1)
+            _IOHIDDeviceRegisterRemovalCallback(handle, self._removal_callback, index + 1)
             _IOHIDDeviceScheduleWithRunLoop(handle, self._run_loop, _DEFAULT_MODE)
 
     def record(self) -> dict[str, Any]:
@@ -149,6 +157,38 @@ class MacDevices:
             "usage": _IOHIDElementGetUsage(element),
             "value": _IOHIDValueGetIntegerValue(value)})
 
+    def _on_removal(self, context: int, result: int, sender: int) -> None:
+        """Keep a ``device_gone`` line for a device unplugged (``context`` is its index + 1),
+        stamped when IOKit said so."""
+        self._pending.append({"type": "device_gone", "perf_time": time.perf_counter(),
+                              "device": context - 1})
+
+
+#: The last application :func:`front_application` named, by its LaunchServices ASN.
+_last_front_application: tuple[str, FrontApplication | None] = ("", None)
+
+
+def front_application() -> FrontApplication | None:
+    """The application LaunchServices puts in front, as ``lsappinfo`` says; ``None`` when it
+    names none."""
+    global _last_front_application
+    asn = _lsappinfo("front").strip()
+    if asn == _last_front_application[0]:
+        return _last_front_application[1]
+    info = _lsappinfo("info", "-only", "name,pid", asn) if asn else ""
+    name, pid = re.search(r'"LSDisplayName"="(.*)"', info), re.search(r'"pid"=(\d+)', info)
+    front = FrontApplication(name[1], int(pid[1])) if name and pid else None
+    _last_front_application = (asn, front)
+    return front
+
+
+def _lsappinfo(*arguments: str) -> str:
+    """What ``lsappinfo`` prints; nothing when it cannot run."""
+    try:
+        return subprocess.run(["lsappinfo", *arguments], capture_output=True, text=True,
+                              timeout=1).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
 
 def _seconds_per_mach_tick() -> float:
     """Seconds per mach absolute time unit, checked to be ``perf_counter``'s clock.

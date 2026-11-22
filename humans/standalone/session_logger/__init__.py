@@ -1,6 +1,6 @@
 """``session-logger``: a session's own recording, beside its runs and whatever else it runs: every
-event of the rig's input devices, read from the OS with the time the OS stamped it, the
-session's marks, and the clock.
+event of the rig's input devices, read from the OS with the time the OS stamped it, which
+application has the focus, when the machine stalled, the session's marks, and the clock.
 
 ``start`` leaves a recorder (:mod:`.recorder`) running in a process and a session of its own,
 which no task imports or waits on, and prints the recording's folder once its devices are open;
@@ -21,7 +21,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from ...config.rig import RigConfig
 from ...save import bids
@@ -57,6 +57,14 @@ _DETACHED: dict[str, Any] = (
 class SessionLoggerError(RuntimeError):
     """The session cannot be recorded: a device is missing or unreadable, or the recorder
     stopped."""
+
+
+class FrontApplication(NamedTuple):
+    """The application that has the keyboard's focus, as the OS says."""
+
+    #: its process's name
+    process: str
+    pid: int
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -180,6 +188,7 @@ def stop_recording(folder: str) -> bool:
         if last is not None and last["type"] == "recording_end":
             print(f"session-logger: recording ended, {_counts_words(last['counts'])}: "
                   f"{events_path}", file=sys.stderr)
+            _warn_of_devices_gone(folder, last["devices_gone"])
             return True
         if time.monotonic() > deadline:
             break
@@ -273,6 +282,17 @@ def _wall_time_of(line: dict[str, Any], folder: str) -> float:
         return line["wall_time"]
     first = read_first_line(os.path.join(folder, SESSION_EVENTS_FILENAME))
     return line["perf_time"] + first["wall_time"] - first["perf_time"]
+
+
+def _warn_of_devices_gone(folder: str, devices_gone: list[dict[str, Any]]) -> None:
+    """Say on the console which device was unplugged during the recording, and when: the
+    recording holds none of its events after that."""
+    devices = read_first_line(os.path.join(folder, SESSION_EVENTS_FILENAME))["devices"]
+    for gone in devices_gone:
+        when = time.strftime("%H:%M:%S", time.localtime(_wall_time_of(gone, folder)))
+        print(f"session-logger: WARNING: {devices[gone['device']]['name']!r} (device "
+              f"{gone['device']}) was unplugged at {when}: the recording holds none of its "
+              "events after that", file=sys.stderr)
 
 
 def _counts_words(counts: dict[str, int]) -> str:

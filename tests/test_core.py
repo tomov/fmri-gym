@@ -833,7 +833,8 @@ def _session_recording(data_root: Path, clock_shift: float = 0.0,
                        has_ended: bool = True) -> Path:
     """A session recording of sub-01's ses-001, from perf_counter 95 to 110: on the run's clock
     (:func:`_run_folder`'s) unless ``clock_shift`` moves its wall time. Its device saw the
-    scanner's = and LEFT before the run read them, and an A the run never read; without
+    scanner's = and LEFT before the run read them, and an A the run never read; during the
+    run, the session was marked, the focus moved and the machine stalled; without
     ``has_ended``, it was cut short."""
     folder = data_root / "session_events" / "sub-01" / "ses-001" / "20261119T120000"
     folder.mkdir(parents=True)
@@ -845,6 +846,9 @@ def _session_recording(data_root: Path, clock_shift: float = 0.0,
              {**event, "perf_time": 99.9995, "code": 13, "value": 1},     # KEY_EQUAL
              {"type": "mark", "perf_time": 100.5, "wall_time": 100.5 + run_offset,
               "text": "the participant is ready"},
+             {"type": "window_focus", "perf_time": 101.0, "process": "python3",
+              "pid": 4242},
+             {"type": "stall", "perf_time": 101.2, "duration_ms": 35.0},
              {**event, "perf_time": 101.615, "code": 105, "value": 1},    # KEY_LEFT
              {"type": "device_event", "perf_time": 101.615, "device": 0, "event_type": 0,
               "code": 0, "value": 0},
@@ -876,9 +880,16 @@ def test_a_session_recording_gives_each_press_its_devices_time(tmp_path):
     assert len(record.device_lines) == 4, "the session's mark is not a device line"
     press_row = next(row for row in event_rows(timeline) if row.control == "LEFT")
     assert (press_row.onset, press_row.read_onset) == (pytest.approx(1.615), pytest.approx(1.62))
+    marks = [(mark.what, mark.detail) for mark in timeline.marks]
+    assert ("mark", "the participant is ready") in marks
+    assert ("window_focus", "python3 (pid 4242) has the focus") in marks
+    assert ("stall", "the machine ran nothing of the recorder for 35 ms") in marks
+    assert timeline.quality["session"] == {"recorded": True, "focus_changes": 1, "stalls": 1,
+                                           "longest_stall_ms": 35.0}
     text = timeline_text(record, timeline)
     assert "read 5.0 ms after its device sent it" in text
     assert "session   recording 20261119T120000: 1 device(s) (linux evdev)" in text
+    assert "session         1 focus change(s), 1 stall(s) (longest 35 ms)" in text
 
 
 def test_a_session_recording_cut_short_still_times_the_presses_it_holds(tmp_path):
@@ -897,6 +908,8 @@ def test_a_session_recording_on_another_clock_is_not_the_runs(tmp_path):
     _session_recording(tmp_path, clock_shift=3600.0)    # the machine restarted between
     record = RunRecord.read(str(run))
     assert record.session_recording is None and record.device_lines == []
-    assert all(press.device_time is None for press in build_timeline(record).presses)
+    timeline = build_timeline(record)
+    assert all(press.device_time is None for press in timeline.presses)
+    assert timeline.quality["session"] == {"recorded": False}
 
 

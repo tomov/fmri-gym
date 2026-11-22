@@ -80,6 +80,7 @@ def _checks(quality: dict[str, Any]) -> list[str]:
     out.append(f"  presses         {presses['count']}, {presses['in_episodes']} in episodes: "
                f"{presses['given_to_a_step']} given to a step, {presses['given_to_none']} "
                "to none")
+    out.append(_session_check(quality["session"]))
     if not devices["read"]:
         return out + ["  devices         not read from the OS"]
     return out + [f"  devices         {devices['events']} events, {devices['presses_timed']} "
@@ -90,6 +91,14 @@ def _checks(quality: dict[str, Any]) -> list[str]:
                   + f"; {devices['dropped']} drop(s), {devices['gone']} unplugged; recording "
                   f"{devices['ended']}"]
 
+
+def _session_check(session: dict[str, Any]) -> str:
+    """What the session's recording saw of the machine during the run, in one line."""
+    if not session["recorded"]:
+        return "  session         not recorded"
+    return (f"  session         {session['focus_changes']} focus change(s), "
+            f"{session['stalls']} stall(s)" + (
+                f" (longest {session['longest_stall_ms']:.0f} ms)" if session["stalls"] else ""))
 
 def _events(timeline: Timeline) -> list[tuple[float, int, str, str]]:
     """Every event as ``(time, order among ties, what, detail)``."""

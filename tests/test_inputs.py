@@ -821,11 +821,15 @@ def test_a_session_is_recorded_from_start_to_stop_with_its_marks(tmp_path):
         assert session_logger.stop_recording(folder)
     lines = [json.loads(line) for line in
              open(os.path.join(folder, "session_events.jsonl"), encoding="utf-8")]
-    assert [line["type"] for line in lines] == ["recording_start", "mark", "recording_end"]
-    assert lines[0]["devices"] == [] and lines[0]["subject"] == "sub-01"
-    assert lines[0]["wall_time"] > lines[0]["perf_time"]
-    assert lines[1]["text"] == "run 1: the localizer, été"
-    assert lines[2]["how"] == "stopped" and lines[2]["counts"] == {"mark": 1}
+    first, last = lines[0], lines[-1]
+    assert first["type"] == "recording_start" and last["type"] == "recording_end"
+    assert first["devices"] == [] and first["subject"] == "sub-01"
+    assert first["wall_time"] > first["perf_time"]
+    assert set(first["sources"]) == {"device_event", "window_focus", "stall", "clock", "mark"}
+    marks = [line for line in lines if line["type"] == "mark"]
+    assert [mark["text"] for mark in marks] == ["run 1: the localizer, été"]
+    assert last["how"] == "stopped" and last["counts"]["mark"] == 1
+    assert last["devices_gone"] == []
     assert not session_logger.is_recording(folder)
     assert not (tmp_path / "data" / "sub-01").exists(), "a recording takes no session number"
     assert session_logger.stop_recording(folder), "stopping a stopped recording is harmless"
@@ -871,6 +875,102 @@ def test_a_recording_writes_each_line_as_it_comes_between_a_first_and_a_last(tmp
     with pytest.raises(FileExistsError):
         record_session_events(Box(), str(path), {"type": "recording_start"}, side_lines, stop)
 
+
+def test_a_recording_lists_the_devices_unplugged_and_stop_says_so(tmp_path, capsys):
+    import json
+    import queue
+    import threading
+
+    from humans.standalone import session_logger
+    from humans.standalone.session_logger.recorder import record_session_events
+    stop = threading.Event()
+    reads = iter([[{"type": "device_gone", "perf_time": 3.0, "device": 0}]])
+
+    class Box:
+        def read(self, timeout):
+            stop.set()
+            return next(reads, [])
+
+        def close(self):
+            pass
+    first_line = {"type": "recording_start", "perf_time": 0.5, "wall_time": 1.7e9,
+                  "devices": [{"name": "Trigger Box"}], "recorder_pid": os.getpid()}
+    record_session_events(Box(), str(tmp_path / "session_events.jsonl"), first_line,
+                          queue.Queue(), stop)
+    last = json.loads((tmp_path / "session_events.jsonl").read_text().splitlines()[-1])
+    assert last["devices_gone"] == [{"device": 0, "perf_time": 3.0}]
+    assert session_logger.stop_recording(str(tmp_path))
+    assert "'Trigger Box' (device 0) was unplugged at" in capsys.readouterr().err
+
+
+def test_a_stall_is_a_sleep_that_woke_late(monkeypatch):
+    import queue
+    import threading
+    import time
+
+    from humans.standalone.session_logger import recorder
+    side_lines = queue.Queue()
+    stop = threading.Event()
+    sleeps, real_sleep = iter([0.001, 0.031]), time.sleep
+
+    def sleep(seconds):
+        time_slept = next(sleeps, None)
+        if time_slept is None:
+            stop.set()
+            return
+        real_sleep(time_slept)
+    monkeypatch.setattr(recorder.time, "sleep", sleep)
+    recorder.watch_stalls(side_lines, stop)
+    stalls = [side_lines.get_nowait() for _ in range(side_lines.qsize())]
+    assert [line["type"] for line in stalls] == ["stall"]
+    assert 25.0 < stalls[0]["duration_ms"] < 200.0
+
+
+def test_a_focus_line_is_written_each_time_another_application_has_the_focus(monkeypatch):
+    import queue
+    import threading
+
+    from humans.standalone.session_logger import FrontApplication, recorder
+    kitty, game = FrontApplication("kitty", 10), FrontApplication("python3", 20)
+    answers = iter([kitty, kitty, None, game, game])
+    side_lines = queue.Queue()
+    stop = threading.Event()
+
+    def front_application():
+        answer = next(answers, None)
+        if answer is None and not stop.is_set() and side_lines.qsize() == 2:
+            stop.set()
+        return answer
+    monkeypatch.setattr(recorder, "FOCUS_POLL_S", 0.0)
+    recorder.watch_focus(front_application, side_lines, stop)
+    lines = [side_lines.get_nowait() for _ in range(side_lines.qsize())]
+    assert [(line["process"], line["pid"]) for line in lines] == [("kitty", 10), ("python3", 20)]
+
+
+def test_the_linux_front_application_is_the_active_windows_process(monkeypatch):
+    from humans.standalone.session_logger import FrontApplication, linux
+    answers = {("-root", "_NET_ACTIVE_WINDOW"): "_NET_ACTIVE_WINDOW(WINDOW): window id # 0x4a00007",
+               ("-id", "0x4a00007", "_NET_WM_PID"): "_NET_WM_PID(CARDINAL) = 4242"}
+    monkeypatch.setattr(linux, "_xprop", lambda *arguments: answers.get(arguments, ""))
+    monkeypatch.setattr(linux, "_process_name", lambda pid: "python3")
+    monkeypatch.setattr(linux, "_last_front_application", ("", None))
+    assert linux.front_application() == FrontApplication("python3", 4242)
+    answers[("-root", "_NET_ACTIVE_WINDOW")] = "_NET_ACTIVE_WINDOW(WINDOW): window id # 0x0"
+    assert linux.front_application() is None, "no window is active"
+    monkeypatch.setattr(linux, "_xprop", lambda *arguments: "")
+    assert linux.front_application() is None, "no X display"
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="the macOS reader")
+def test_the_macos_front_application_is_what_launchservices_puts_in_front(monkeypatch):
+    from humans.standalone.session_logger import FrontApplication, macos
+    answers = {("front",): "ASN:0x0-0x77077:\n",
+               ("info", "-only", "name,pid", "ASN:0x0-0x77077:"):
+                   '"LSDisplayName"="kitty"\n"pid"=1324\n'}
+    monkeypatch.setattr(macos, "_lsappinfo", lambda *arguments: answers.get(arguments, ""))
+    monkeypatch.setattr(macos, "_last_front_application", ("", None))
+    assert macos.front_application() == FrontApplication("kitty", 1324)
+    assert macos.front_application() == FrontApplication("kitty", 1324)
 
 def test_the_control_file_passes_on_each_line_once_and_whole(tmp_path):
     import json

@@ -46,6 +46,8 @@ MAX_READ_DELAY_S = 1.0
 SAME_CLOCK_S = 1.0
 _KEY_DOWN = 768        # pygame.KEYDOWN: SDL's number, the same on every OS
 
+#: The session recording's lines the readable timeline lists as moments of their own.
+SESSION_MARK_TYPES = ("window_focus", "stall", "mark")
 #: ``perf_counter`` time to run time.
 RunClock = Callable[[float], float]
 
@@ -202,7 +204,8 @@ class Press:
 @dataclass(frozen=True, slots=True)
 class Mark:
     """A moment of the run for the readable timeline: a code sent, a printed line, a missed
-    refresh, a device event no press accounts for, the run's start and end."""
+    refresh, a device event no press accounts for, what the session's recording saw (the
+    focus moving, the machine stalling, a mark), the run's start and end."""
 
     time: float
     what: str
@@ -355,8 +358,8 @@ def _given_frames(presses: list[Press], record: RunRecord) -> list[Press]:
 
 
 def _marks(record: RunRecord, to_run_time: RunClock, presses: list[Press]) -> list[Mark]:
-    """The run's other moments: start and end, the trigger, codes sent, printed lines, and the
-    device events no press accounts for."""
+    """The run's other moments: start and end, the trigger, codes sent, printed lines, the
+    device events no press accounts for, and the session recording's other lines."""
     marks = []
     for line in record.run_lines:
         time = to_run_time(line["perf_time"])
@@ -371,8 +374,26 @@ def _marks(record: RunRecord, to_run_time: RunClock, presses: list[Press]) -> li
         elif line["type"] == "console" and line["text"].strip():
             marks.append(Mark(time, "console", line["text"]))
     claimed = {press.device_time for press in presses if press.device_time is not None}
-    return marks + [Mark(to_run_time(line["perf_time"]), "device", _device_detail(line))
-                    for line in _unaccounted_device_lines(record, to_run_time, claimed)]
+    marks += [Mark(to_run_time(line["perf_time"]), "device", _device_detail(line))
+              for line in _unaccounted_device_lines(record, to_run_time, claimed)]
+    return marks + [Mark(to_run_time(line["perf_time"]), line["type"], _session_detail(line))
+                    for line in _session_lines(record, SESSION_MARK_TYPES)]
+
+
+def _session_lines(record: RunRecord, line_types: tuple[str, ...]) -> list[dict[str, Any]]:
+    """The session recording's lines of ``line_types`` in the run's span; none without one."""
+    if record.session_recording is None:
+        return []
+    return [line for line in record.session_recording.lines if line["type"] in line_types]
+
+
+def _session_detail(line: dict[str, Any]) -> str:
+    """A session recording's line in words."""
+    if line["type"] == "window_focus":
+        return f"{line['process']} (pid {line['pid']}) has the focus"
+    if line["type"] == "stall":
+        return f"the machine ran nothing of the recorder for {line['duration_ms']:.0f} ms"
+    return line["text"]
 
 
 def _flip_gaps(record: RunRecord, to_run_time: RunClock) -> list[tuple[float, float]]:
@@ -395,11 +416,13 @@ def _flip_gaps(record: RunRecord, to_run_time: RunClock) -> list[tuple[float, fl
 
 def _quality(record: RunRecord, timeline: Timeline,
              gaps: list[tuple[float, float]]) -> dict[str, Any]:
-    """The numbers a run is checked by: its pulses, its refreshes, its presses, its devices."""
+    """The numbers a run is checked by: its pulses, its refreshes, its presses, its devices,
+    and what the session's recording saw of the machine during it."""
     return {"pulses": _pulse_quality(timeline),
             "refreshes": _refresh_quality(record, gaps),
             "presses": _press_quality(timeline),
-            "devices": _device_quality(record, timeline)}
+            "devices": _device_quality(record, timeline),
+            "session": _session_quality(record)}
 
 
 def _pulse_quality(timeline: Timeline) -> dict[str, Any]:
@@ -525,6 +548,16 @@ def _device_detail(line: dict[str, Any]) -> str:
         name = KEY_NAME_OF_USAGE.get(line["usage"], f"usage {line['usage']}")
     return f"device {line['device']}: {name} {'down' if line['value'] else 'up'}"
 
+
+def _session_quality(record: RunRecord) -> dict[str, Any]:
+    """What the session's recording saw during the run: the focus moving, the machine
+    stalling."""
+    if record.session_recording is None:
+        return {"recorded": False}
+    stalls = [line["duration_ms"] for line in _session_lines(record, ("stall",))]
+    return {"recorded": True,
+            "focus_changes": len(_session_lines(record, ("window_focus",))),
+            "stalls": len(stalls), "longest_stall_ms": max(stalls, default=0.0)}
 
 def _device_quality(record: RunRecord, timeline: Timeline) -> dict[str, Any]:
     """The device events: how many, the presses they timed and how late those were read,
