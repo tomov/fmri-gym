@@ -229,7 +229,7 @@ def test_a_game_key_the_scanner_types_is_refused_on_that_rig():
     box = RigConfig.open(write("box", triggers={"sync": {"mode": "wait", "key": "5"}}))
 
     def run_of(keys: dict) -> RunConfig:
-        game = {"type": "game", "game": "CartPole-v1", "fps": 30, "duration": 30.0, "controls": keys}
+        game = {"type": "game", "game": "CartPole-v1", "fps": 30, "controls": keys}
         curriculum = Curriculum.from_dict({"curriculum": [game]}, "cartpole.json")
         return RunConfig(curriculum=curriculum, rig=box, subject="sub-01", ses=1, run=1,
                          duration=None, resume=False, loop=False,
@@ -253,7 +253,7 @@ def test_a_control_none_of_the_rigs_inputs_has_is_refused_on_that_rig():
                          calibration_files=())
 
     def game(keys: dict, **more) -> dict:
-        return {"type": "game", "game": "CartPole-v1", "fps": 30, "duration": 30.0, "controls": keys, **more}
+        return {"type": "game", "game": "CartPole-v1", "fps": 30, "controls": keys, **more}
 
     a, x, y = (ControlNames.CONTROLLER_BUTTON_A, ControlNames.CONTROLLER_BUTTON_X,
                ControlNames.CONTROLLER_BUTTON_Y)

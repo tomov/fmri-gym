@@ -21,6 +21,6 @@
     ]
   },
   "hud": {"show_score": false, "show_time_remaining": false},
-  "mode": "endless",
+  "mode": "duration", "duration": 3600.0,
   "fps": 30, "frame_skip": 2
 }

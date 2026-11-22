@@ -30,5 +30,5 @@
     ]
   },
   "hud": {"show_score": false, "show_time_remaining": false},
-  "mode": "episode", "n_episodes": 1, "advance_on": ["terminated"], "fps": 35
+  "mode": "episode", "n_episodes": 1, "advance_on": ["terminated"], "duration": 36000.0, "fps": 35
 }

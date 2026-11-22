@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -173,8 +172,7 @@ class EnvAdapter:
         """
         # A hidden line is "" rather than dropped: a lone line sits flush left.
         settings = self.hud_settings
-        shows_time = settings.show_time_remaining and math.isfinite(time_remaining)
-        lines = [f"{max(0, int(time_remaining))} s" if shows_time else "",
+        lines = [f"{max(0, int(time_remaining))} s" if settings.show_time_remaining else "",
                  f"Score: {score:g}" if settings.show_score else ""]
         return lines if any(lines) else None
 

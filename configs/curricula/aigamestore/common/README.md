@@ -25,9 +25,9 @@ The env's action is MultiBinary over the game's keys, in `aigamestore_gym.GAME_K
 
 ## Levels
 
-An episode is one level: it ends on a win, a loss or a level clear, and `reset()` restarts the same level. Each level is one phase; drop or reorder them as the session needs. The blocks are blocking, as the games are: each is its level played until cleared (mode `episode`, `n_episodes` 1, `advance_on` `["won"]`); a loss restarts the same level, so the levels run back to back at the subject's own pace, and `duration`, where a game sets one, is the cap on a level nobody clears; game1, game7 and game8 set none, so a level ends only when cleared, forfeited from the menu, or at the end of the run. Three games differ:
+An episode is one level: it ends on a win, a loss or a level clear, and `reset()` restarts the same level. Each level is one phase; drop or reorder them as the session needs. The blocks are blocking, as the games are: each is its level played until cleared (mode `episode`, `n_episodes` 1, `advance_on` `["won"]`); a loss restarts the same level, so the levels run back to back at the subject's own pace, and `duration` is the cap on a level nobody clears (game1, game7 and game8 set it longer than a run, so a level ends only when cleared, forfeited from the menu, or at the end of the run). Three games differ:
 
-- **game4** (jetpack runner) has no levels and cannot be won: each episode is one run and ends when it is lost. The block is `endless`: runs follow one another until the run ends.
+- **game4** (jetpack runner) has no levels and cannot be won: each episode is one run and ends when it is lost. Its block is in mode `duration`, long enough that runs follow one another until the run ends.
 - **game6** (shadow platformer) is one long level with checkpoints: the block is one attempt that counts only when won, a loss restarts it, and `duration` is 300 s.
 - **game7** (top-down extract shooter) generates levels without an upper bound; the first five are listed.
 

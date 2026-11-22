@@ -76,20 +76,3 @@ def test_loop_without_duration_is_refused(tmp_path):
         env={**os.environ, "SDL_VIDEODRIVER": "dummy"})
     assert done.returncode != 0
     assert "plays the curriculum until the run's duration" in done.stderr
-
-
-def test_an_endless_block_plays_until_the_run_ends(tmp_path):
-    endless = {**CURRICULUM[1], "mode": "endless"}
-    del endless["duration"]
-    config = write_curriculum([endless, CURRICULUM[2]], tmp_path / "endless.json")
-    manifest, _, _ = _run(config, tmp_path / "data", 1)
-    block = next(p for p in manifest["phases"] if p["type"] == "game")
-    assert block["n_episodes"] > 1, "CartPole falls within seconds; the block should go on"
-    assert manifest["phases"][-1].get("end_of_run"), "the run did not end on its own clock"
-    done = subprocess.run(
-        [sys.executable, "fmri_play.py", "--curriculum", str(config), "--subject", "sub-test",
-         "--ses", "1", "--run", "2", "--rig", "configs/examples/rigs/laptop.json",
-         "--dummy-trigger"],
-        cwd=REPO, capture_output=True, text=True, timeout=60,
-        env={**os.environ, "SDL_VIDEODRIVER": "dummy"})
-    assert done.returncode != 0 and "endless game block" in done.stderr

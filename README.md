@@ -493,10 +493,9 @@ The `BC` team's sessions are in `configs/BC/subjects/`: three of about an hour f
                                 // the title (marked when a run carries the block on) over the text,
                                 // until duration runs out or one of the controls is pressed (at least
                                 // one of the two). Outside the block's clock, inside the run's
- "mode": "duration",            // "duration" = replay until time up; "episode" = play N episodes;
-                                // "endless" = replay until the run ends (needs the run's duration)
- "duration": 30.0,              // seconds the block lasts (duration mode, required) or lasts at
-                                // most, a wall-clock cap (episode mode, optional: none, no cap)
+ "mode": "duration",            // "duration" = replay until time up; "episode" = play N episodes
+ "duration": 30.0,              // seconds the block lasts (duration mode, default 30) or lasts at
+                                // most, a wall-clock cap (episode mode, default 300)
  "n_episodes": 1,               // episodes (episode mode)
  "advance_on": ["won"],         // episode mode, optional: only an episode that ends this way counts
                                 // towards n_episodes; any other replays the same instance (a level
