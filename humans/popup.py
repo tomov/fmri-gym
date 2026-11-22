@@ -92,7 +92,7 @@ class PopUp(ABC):
 
         :param display: the display to draw on.
         :param run_time: the run clock, for the log.
-        :param read_input_events: the edges since it was last called (the run's).
+        :param read_input_events: returns the input events since its last call.
         :return: ``"resume"``, another of the menu's options, or ``"quit"`` on
             window close / the quit keys.
         """
@@ -116,7 +116,7 @@ class Menu(PopUp):
 
         :param display: the display to draw on.
         :param run_time: the run clock, for the log.
-        :param read_input_events: the edges since it was last called (the run's).
+        :param read_input_events: returns the input events since its last call.
         :return: the chosen option, or ``"quit"`` on window close / the quit keys.
         """
         self.pending, self._held_since = False, None
@@ -171,7 +171,7 @@ class Hint(PopUp):
 
         :param display: the display to draw on.
         :param run_time: the run clock, for the log.
-        :param read_input_events: the edges since it was last called (the run's).
+        :param read_input_events: returns the input events since its last call.
         :return: ``"resume"``, or ``"quit"`` on window close / the quit keys.
         """
         self.pending, self._held_since = False, None

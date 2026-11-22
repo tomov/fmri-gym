@@ -447,7 +447,7 @@ def test_the_keyboard_holds_what_its_events_press_until_the_window_loses_focus()
     assert keys.held() == frozenset()
 
 
-def test_each_read_that_makes_an_edge_gives_the_triggers_every_control_held(screen):
+def test_each_read_that_makes_an_input_event_gives_the_triggers_every_control_held(screen):
     from humans.run import read_input_events
     held: list[frozenset[str]] = []
     triggers = types.SimpleNamespace(codes=types.SimpleNamespace(inputs={"LEFT": 1}),
@@ -458,7 +458,7 @@ def test_each_read_that_makes_an_edge_gives_the_triggers_every_control_held(scre
         for event in events:
             pygame.event.post(event)
         read_input_events(keys, None, triggers)
-    assert held == [{"LEFT"}, {"UP"}], "a read without an edge sends nothing"
+    assert held == [{"LEFT"}, {"UP"}], "a read without an input event sends nothing"
 
 
 def test_the_runs_inputs_take_the_queue_and_name_the_windows_close(screen):
@@ -479,7 +479,7 @@ def test_ctrl_escape_asks_to_stop_the_run_and_escape_alone_does_not(screen):
         assert read_input_events(keys, None)[0] == _down(QUIT)
 
 
-def test_the_run_logs_each_event_read_as_pygame_gave_it_then_each_edge(screen):
+def test_the_run_logs_each_event_read_as_pygame_gave_it_then_each_input_event(screen):
     from humans.run import read_input_events
     logged: list[tuple[str, float, dict]] = []
     logger = types.SimpleNamespace(log_run_event=lambda line_type, perf_time, **fields:
@@ -491,13 +491,13 @@ def test_the_run_logs_each_event_read_as_pygame_gave_it_then_each_edge(screen):
               pygame.event.Event(pygame.QUIT)]
     for event in events:
         pygame.event.post(event)
-    edges = read_input_events(InputDevices([Keyboard()]), logger)
-    assert edges == [_down(QUIT), _down("LEFT"), _up("LEFT")]
+    input_events = read_input_events(InputDevices([Keyboard()]), logger)
+    assert input_events == [_down(QUIT), _down("LEFT"), _up("LEFT")]
     assert logged == [("pygame_event", logged[0][1], {"event_name": pygame.event.event_name(e.type),
                                                       "event": {"type": e.type, **e.dict}})
                       for e in events] + [
         ("input_event", logged[0][1], {"name": name, "down": edge is Edge.DOWN})
-        for name, edge in edges]
+        for name, edge in input_events]
 
 
 def test_a_value_a_log_line_cannot_carry_is_written_as_its_repr():

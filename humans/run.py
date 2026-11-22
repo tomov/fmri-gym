@@ -98,43 +98,43 @@ def _is_quit(event: InputEvent) -> bool:
 
 def read_input_events(inputs: InputDevice, logger: Logger | None,
                       triggers: Triggers | None = None) -> list[InputEvent]:
-    """Take every event off pygame's queue and hand it to ``inputs``: the edges they make.
+    """Take every event off pygame's queue and hand it to ``inputs``: the input events they make.
 
     A queue left to fill drops new events, key presses included, so nothing is
     left there; the window's close button comes back as :data:`QUIT`.
 
-    :param inputs: the input devices that make the edges.
+    :param inputs: the input devices that make the input events.
     :param logger: the run's log, which gets each event as pygame gave it (a
-        ``pygame_event`` line), then each edge (an ``input_event`` line), at the time they
-        were read; ``None`` logs nothing.
+        ``pygame_event`` line), then each input event (an ``input_event`` line), at the time
+        they were read; ``None`` logs nothing.
     :param triggers: the trigger lines, which get the input codes of the controls held after
         the read (:meth:`Triggers.hold_input_codes`); ``None`` sends nothing.
-    :return: the edges, in order.
+    :return: the input events, in order.
     """
-    events = pygame.event.get()
+    pygame_events = pygame.event.get()
     read_time = time.perf_counter()
-    edges = inputs.handle(events, read_time)
+    input_events = inputs.handle(pygame_events, read_time)
     if logger is not None:
-        _log_read(logger, read_time, events, edges)
-    if triggers is not None and triggers.codes.inputs and edges:
+        _log_read(logger, read_time, pygame_events, input_events)
+    if triggers is not None and triggers.codes.inputs and input_events:
         triggers.hold_input_codes(inputs.held())
-    return edges
+    return input_events
 
 
-def _log_read(logger: Logger, read_time: float, events: list[pygame.event.Event],
-              edges: list[InputEvent]) -> None:
-    """Log each event read, its type and every field as pygame gave them, then each edge.
+def _log_read(logger: Logger, read_time: float, pygame_events: list[pygame.event.Event],
+              input_events: list[InputEvent]) -> None:
+    """Log each pygame event read, with every field as pygame gave it, then each input event.
 
     :param logger: the run's log.
     :param read_time: ``perf_counter`` of the read.
-    :param events: the events, as pygame gave them.
-    :param edges: the edges the inputs made of them.
+    :param pygame_events: the events, as pygame gave them.
+    :param input_events: the input events the inputs made of them.
     """
-    for event in events:
+    for pygame_event in pygame_events:
         logger.log_run_event("pygame_event", read_time,
-                             event_name=pygame.event.event_name(event.type),
-                             event={"type": event.type, **_loggable(event.dict)})
-    for name, edge in edges:
+                             event_name=pygame.event.event_name(pygame_event.type),
+                             event={"type": pygame_event.type, **_loggable(pygame_event.dict)})
+    for name, edge in input_events:
         logger.log_run_event("input_event", read_time, name=name, down=edge is Edge.DOWN)
 
 
