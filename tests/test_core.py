@@ -827,3 +827,76 @@ def test_bids_from_logs_writes_nothing_when_it_would_have_to_choose(tmp_path, lo
     with pytest.raises(SystemExit, match=problem):
         main(["--rig", _rig_of_team(tmp_path, data)])
     assert not (data / "bids").exists()
+
+
+def _session_recording(data_root: Path, clock_shift: float = 0.0,
+                       has_ended: bool = True) -> Path:
+    """A session recording of sub-01's ses-001, from perf_counter 95 to 110: on the run's clock
+    (:func:`_run_folder`'s) unless ``clock_shift`` moves its wall time. Its device saw the
+    scanner's = and LEFT before the run read them, and an A the run never read; without
+    ``has_ended``, it was cut short."""
+    folder = data_root / "session_events" / "sub-01" / "ses-001" / "20261119T120000"
+    folder.mkdir(parents=True)
+    run_offset = 1.7e9 - 100.0                       # the run's start_epoch - trigger_perf
+    event = {"type": "device_event", "device": 0, "event_type": 1}
+    lines = [{"type": "recording_start", "perf_time": 95.0,
+              "wall_time": 95.0 + run_offset + clock_shift, "reader": "linux evdev",
+              "clock": "CLOCK_MONOTONIC", "devices": [{"name": "Box"}]},
+             {**event, "perf_time": 99.9995, "code": 13, "value": 1},     # KEY_EQUAL
+             {"type": "mark", "perf_time": 100.5, "wall_time": 100.5 + run_offset,
+              "text": "the participant is ready"},
+             {**event, "perf_time": 101.615, "code": 105, "value": 1},    # KEY_LEFT
+             {"type": "device_event", "perf_time": 101.615, "device": 0, "event_type": 0,
+              "code": 0, "value": 0},
+             {**event, "perf_time": 102.5, "code": 30, "value": 1}]       # KEY_A
+    if has_ended:
+        lines.append({"type": "recording_end", "how": "stopped", "perf_time": 110.0,
+                      "wall_time": 110.0 + run_offset + clock_shift, "counts": {}})
+    (folder / "session_events.jsonl").write_text("".join(json.dumps(line) + "\n"
+                                                          for line in lines))
+    return folder
+
+
+def test_a_session_recording_gives_each_press_its_devices_time(tmp_path):
+    from humans.standalone.events_table import event_rows
+    from humans.standalone.run_timeline import RunRecord, build_timeline
+    from humans.standalone.timeline_text import timeline_text
+    run = _run_folder(tmp_path)
+    _session_recording(tmp_path)
+    record = RunRecord.read(str(run))
+    timeline = build_timeline(record)
+    left = next(press for press in timeline.presses if press.control == "LEFT")
+    assert (left.onset, left.read_time, left.device_time) == pytest.approx((1.615, 1.62, 1.615))
+    pulse = next(press for press in timeline.presses if press.is_scanner_pulse)
+    assert pulse.onset == pytest.approx(-0.0005), "a pulse is timed by its device too"
+    assert ("device", "device 0: A down") in [(m.what, m.detail) for m in timeline.marks]
+    devices = timeline.quality["devices"]
+    assert devices["presses_timed"] == 2 and devices["ended"] == "stopped"
+    assert devices["read_delay_max_ms"] == pytest.approx(5.0)
+    assert len(record.device_lines) == 4, "the session's mark is not a device line"
+    press_row = next(row for row in event_rows(timeline) if row.control == "LEFT")
+    assert (press_row.onset, press_row.read_onset) == (pytest.approx(1.615), pytest.approx(1.62))
+    text = timeline_text(record, timeline)
+    assert "read 5.0 ms after its device sent it" in text
+    assert "session   recording 20261119T120000: 1 device(s) (linux evdev)" in text
+
+
+def test_a_session_recording_cut_short_still_times_the_presses_it_holds(tmp_path):
+    from humans.standalone.run_timeline import RunRecord, build_timeline
+    run = _run_folder(tmp_path)
+    _session_recording(tmp_path, has_ended=False)
+    record = RunRecord.read(str(run))
+    assert record.session_recording is not None and record.session_recording.end is None
+    devices = build_timeline(record).quality["devices"]
+    assert devices["presses_timed"] == 2 and devices["ended"] == "cut short"
+
+
+def test_a_session_recording_on_another_clock_is_not_the_runs(tmp_path):
+    from humans.standalone.run_timeline import RunRecord, build_timeline
+    run = _run_folder(tmp_path)
+    _session_recording(tmp_path, clock_shift=3600.0)    # the machine restarted between
+    record = RunRecord.read(str(run))
+    assert record.session_recording is None and record.device_lines == []
+    assert all(press.device_time is None for press in build_timeline(record).presses)
+
+

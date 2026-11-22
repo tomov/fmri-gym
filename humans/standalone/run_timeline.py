@@ -6,13 +6,15 @@ display, the log format -- the run's ``pygame_events.jsonl`` holds what the run 
 sent and printed, and each block's ``game_events.jsonl`` what its game did. :func:`build_timeline`
 joins them once, in seconds from the trigger: screens, blocks, episodes, presses with the step
 each was given to, the scanner's pulses, the codes sent, what was printed, and the numbers a run
-is checked by.
+is checked by. When the session was recorded (:mod:`.session_logger`), the recording on the
+run's clock gives each key press the time its device sent it.
 The events table (:mod:`.events_table`) and the readable timeline (:mod:`.timeline_text`)
 are both written from it.
 """
 
 from __future__ import annotations
 
+import bisect
 import glob
 import json
 import math
@@ -23,7 +25,13 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
+from ..inputs.keyboard import NAMES
 from ..save.logging import GAME_EVENTS_FILENAME, RUN_EVENTS_FILENAME, read_lines
+from .session_logger import SESSION_EVENTS_FILENAME, recordings_folder_of_run
+from .key_codes import (
+    EV_KEY, EV_SYN, EVDEV_AXES, EVDEV_BUTTONS, EVDEV_KEYS, HID_BUTTON_PAGE, HID_KEYBOARD_PAGE,
+    KEY_NAME_OF_USAGE, SYN_DROPPED,
+)
 
 #: The oldest log format read here: the run's own log beside its blocks'.
 OLDEST_LOG_FORMAT = 2
@@ -31,6 +39,12 @@ OLDEST_LOG_FORMAT = 2
 MISSED_REFRESH = 1.5
 #: A gap between scanner pulses longer than this many of their median is a missed pulse.
 MISSED_PULSE = 1.5
+#: Seconds a device's event may precede the read of the press it made, and still be its.
+MAX_READ_DELAY_S = 1.0
+#: Seconds two wall-clock-minus-perf_counter offsets may differ and still be one clock: more,
+#: and the machine restarted (or its clock was set) between them.
+SAME_CLOCK_S = 1.0
+_KEY_DOWN = 768        # pygame.KEYDOWN: SDL's number, the same on every OS
 
 #: ``perf_counter`` time to run time.
 RunClock = Callable[[float], float]
@@ -38,6 +52,48 @@ RunClock = Callable[[float], float]
 
 class LogFormatError(ValueError):
     """A run recorded in a log format older than :data:`OLDEST_LOG_FORMAT`."""
+
+
+@dataclass(frozen=True, slots=True)
+class SessionRecording:
+    """The recording of a run's session (:mod:`.session_logger`) that covers the run."""
+
+    #: its folder's name: when it started
+    folder: str
+    #: its ``recording_start`` line: the reader, its clock, the devices
+    start: dict[str, Any]
+    #: its ``recording_end`` line; ``None`` when the recording was cut short
+    end: dict[str, Any] | None
+    #: its lines from the run's first line to its last
+    lines: list[dict[str, Any]]
+
+    @classmethod
+    def covering(cls, folder: str, manifest: dict[str, Any],
+                 run_lines: list[dict[str, Any]]) -> SessionRecording | None:
+        """The recording of the run's session that is on the run's clock and overlaps it.
+
+        :param folder: the run's folder.
+        :param manifest: the run's manifest.
+        :param run_lines: the run's log.
+        :return: the recording; ``None`` when none is.
+        """
+        if manifest.get("trigger_perf") is None or not run_lines:
+            return None
+        run_offset = manifest["start_epoch"] - manifest["trigger_perf"]
+        first, last = run_lines[0]["perf_time"], max(line["perf_time"] for line in run_lines)
+        recordings = Path(recordings_folder_of_run(folder))
+        for path in sorted(recordings.glob(f"*/{SESSION_EVENTS_FILENAME}")):
+            lines = read_lines(str(path))
+            start = lines[0]
+            end = lines[-1] if lines[-1]["type"] == "recording_end" else None
+            if abs(start["wall_time"] - start["perf_time"] - run_offset) > SAME_CLOCK_S:
+                continue
+            if start["perf_time"] > last or lines[-1]["perf_time"] < first:
+                continue
+            return cls(path.parent.name, start, end,
+                       [line for line in lines[1:]
+                        if first <= line["perf_time"] <= last and line is not end])
+        return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +107,8 @@ class RunRecord:
     run_lines: list[dict[str, Any]]
     #: each block's ``game_events.jsonl``, by its folder's name
     block_lines: dict[str, list[dict[str, Any]]]
+    #: the session's recording on the run's clock; ``None`` when none covers the run
+    session_recording: SessionRecording | None
 
     @classmethod
     def read(cls, folder: str) -> RunRecord:
@@ -67,7 +125,17 @@ class RunRecord:
                                  f"log of their own; these tools read {OLDEST_LOG_FORMAT} on")
         blocks = {Path(path).parent.name: read_lines(path) for path in
                   sorted(glob.glob(os.path.join(folder, "block-*", GAME_EVENTS_FILENAME)))}
-        return cls(folder, manifest, read_lines(os.path.join(folder, RUN_EVENTS_FILENAME)), blocks)
+        run_lines = read_lines(os.path.join(folder, RUN_EVENTS_FILENAME))
+        return cls(folder, manifest, run_lines, blocks,
+                   SessionRecording.covering(folder, manifest, run_lines))
+
+    @property
+    def device_lines(self) -> list[dict[str, Any]]:
+        """The session recording's device lines in the run's span; none without a recording."""
+        if self.session_recording is None:
+            return []
+        return [line for line in self.session_recording.lines
+                if line["type"] in ("device_event", "device_gone")]
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,8 +183,12 @@ class Press:
     """A control pressed, until it was let go."""
 
     control: str
-    #: when the run read it
+    #: the device's own time when a device recording saw it, else ``read_time``
     onset: float
+    #: when the run read it
+    read_time: float
+    #: the device's own time; ``None`` when no device recording saw it
+    device_time: float | None
     #: until it was let go, by the reads; ``None`` when it never was
     duration: float | None
     block: str | None
@@ -130,7 +202,7 @@ class Press:
 @dataclass(frozen=True, slots=True)
 class Mark:
     """A moment of the run for the readable timeline: a code sent, a printed line, a missed
-    refresh, the run's start and end."""
+    refresh, a device event no press accounts for, the run's start and end."""
 
     time: float
     what: str
@@ -167,7 +239,7 @@ def build_timeline(record: RunRecord) -> Timeline:
     blocks, episodes = _blocks(record, end), _episodes(record)
     presses = _presses(record, to_run_time, episodes)
     gaps = _flip_gaps(record, to_run_time)
-    marks = _marks(record, to_run_time) + [
+    marks = _marks(record, to_run_time, presses) + [
         Mark(time, "display", f"no flip for {1000 * gap:.1f} ms") for time, gap in gaps]
     timeline = Timeline(record.manifest["run"]["label"], end, _screens(record, to_run_time, end),
                         blocks, episodes, presses, marks)
@@ -221,9 +293,10 @@ def _episodes(record: RunRecord) -> list[Episode]:
 
 
 def _presses(record: RunRecord, to_run_time: RunClock, episodes: list[Episode]) -> list[Press]:
-    """Each press, with how long it was held, its episode and the step it was given to."""
+    """Each press, with how long it was held, its device time, its episode and its step."""
     sync = record.manifest["rig"]["triggers"]["sync"]
     scanner_key = sync["key"] if sync["mode"] == "wait" else None
+    device_time_of = _device_times_of_presses(record)
     open_presses: dict[str, int] = {}
     presses: list[Press] = []
     for line in record.run_lines:
@@ -234,10 +307,13 @@ def _presses(record: RunRecord, to_run_time: RunClock, episodes: list[Episode]) 
             if line["name"] in open_presses:
                 index = open_presses.pop(line["name"])
                 presses[index] = replace(presses[index],
-                                         duration=read_time - presses[index].onset)
+                                         duration=read_time - presses[index].read_time)
             continue
+        device_perf = device_time_of.get((line["perf_time"], line["name"]))
+        device_time = None if device_perf is None else to_run_time(device_perf)
         open_presses[line["name"]] = len(presses)
-        presses.append(Press(line["name"], read_time, None, line["block"],
+        presses.append(Press(line["name"], read_time if device_time is None else device_time,
+                             read_time, device_time, None, line["block"],
                              _episode_at(episodes, line["block"], read_time), None,
                              line["name"] == scanner_key))
     return _given_frames(presses, record)
@@ -258,7 +334,7 @@ def _given_frames(presses: list[Press], record: RunRecord) -> list[Press]:
     out = list(presses)
     for name, lines in record.block_lines.items():
         stream = sorted(
-            [(press.onset, 0, index) for index, press in enumerate(out)
+            [(press.read_time, 0, index) for index, press in enumerate(out)
              if press.block == name and not press.is_scanner_pulse]
             + [(line["run_time"] if line["type"] == "frame" else line["flip_time"], 1, line)
                for line in lines if line["type"] in ("frame", "episode_start")],
@@ -278,8 +354,9 @@ def _given_frames(presses: list[Press], record: RunRecord) -> list[Press]:
     return out
 
 
-def _marks(record: RunRecord, to_run_time: RunClock) -> list[Mark]:
-    """The run's other moments: start and end, the trigger, codes sent, printed lines."""
+def _marks(record: RunRecord, to_run_time: RunClock, presses: list[Press]) -> list[Mark]:
+    """The run's other moments: start and end, the trigger, codes sent, printed lines, and the
+    device events no press accounts for."""
     marks = []
     for line in record.run_lines:
         time = to_run_time(line["perf_time"])
@@ -293,7 +370,9 @@ def _marks(record: RunRecord, to_run_time: RunClock) -> list[Mark]:
             marks.append(Mark(time, "code", f"{line['name']} = {line['value']}"))
         elif line["type"] == "console" and line["text"].strip():
             marks.append(Mark(time, "console", line["text"]))
-    return marks
+    claimed = {press.device_time for press in presses if press.device_time is not None}
+    return marks + [Mark(to_run_time(line["perf_time"]), "device", _device_detail(line))
+                    for line in _unaccounted_device_lines(record, to_run_time, claimed)]
 
 
 def _flip_gaps(record: RunRecord, to_run_time: RunClock) -> list[tuple[float, float]]:
@@ -316,14 +395,16 @@ def _flip_gaps(record: RunRecord, to_run_time: RunClock) -> list[tuple[float, fl
 
 def _quality(record: RunRecord, timeline: Timeline,
              gaps: list[tuple[float, float]]) -> dict[str, Any]:
-    """The numbers a run is checked by: its pulses, its refreshes, its presses."""
+    """The numbers a run is checked by: its pulses, its refreshes, its presses, its devices."""
     return {"pulses": _pulse_quality(timeline),
             "refreshes": _refresh_quality(record, gaps),
-            "presses": _press_quality(timeline)}
+            "presses": _press_quality(timeline),
+            "devices": _device_quality(record, timeline)}
 
 
 def _pulse_quality(timeline: Timeline) -> dict[str, Any]:
-    """How many pulses the scanner's key gave, their intervals, and the gaps that miss one."""
+    """How many pulses the scanner's key gave, their intervals (by the device's times when a
+    device recording saw them), and the gaps that miss one."""
     times = [press.onset for press in timeline.presses if press.is_scanner_pulse]
     out: dict[str, Any] = {"count": len(times)}
     if len(times) < 2:
@@ -353,3 +434,116 @@ def _press_quality(timeline: Timeline) -> dict[str, Any]:
     return {"count": len(presses), "in_episodes": len(in_episodes),
             "given_to_a_step": sum(press.frame is not None for press in in_episodes),
             "given_to_none": sum(press.frame is None for press in in_episodes)}
+
+
+def _device_times_of_presses(record: RunRecord) -> dict[tuple[float, str], float]:
+    """The device's own time of each key press a device read saw, by the press's read time and
+    control: the press's pygame key event names the key's USB HID usage (its scancode), and the
+    earliest unclaimed device key-down of that usage, at most :data:`MAX_READ_DELAY_S` before
+    the read, is the press's.
+
+    :param record: the run.
+    :return: ``(read perf_time, control) -> device perf_time``.
+    """
+    downs: dict[int, list[float]] = {}
+    for line in record.device_lines:
+        usage = _key_down_usage(line)
+        if usage is not None:
+            downs.setdefault(usage, []).append(line["perf_time"])
+    for device_times in downs.values():
+        device_times.sort()       # several devices' lines interleave in the file's order
+    times: dict[tuple[float, str], float] = {}
+    for line in record.run_lines:
+        if line["type"] != "pygame_event" or line["event"]["type"] != _KEY_DOWN:
+            continue
+        candidates = downs.get(line["event"].get("scancode"), [])
+        first = bisect.bisect_left(candidates, line["perf_time"] - MAX_READ_DELAY_S)
+        if first < len(candidates) and candidates[first] <= line["perf_time"]:
+            control = NAMES.get(line["event"]["key"])
+            if control is not None:
+                times[(line["perf_time"], str(control))] = candidates.pop(first)
+    return times
+
+
+def _key_down_usage(line: dict[str, Any]) -> int | None:
+    """The USB HID usage of the key a device line pressed; ``None`` for anything else."""
+    if line["type"] != "device_event" or line["value"] != 1:
+        return None
+    if "event_type" in line:                                      # Linux evdev
+        if line["event_type"] != EV_KEY or line["code"] not in EVDEV_KEYS:
+            return None
+        return EVDEV_KEYS[line["code"]][0]
+    return line["usage"] if line["usage_page"] == HID_KEYBOARD_PAGE else None   # macOS IOKit
+
+
+def _unaccounted_device_lines(record: RunRecord, to_run_time: RunClock,
+                              claimed: set[float]) -> list[dict[str, Any]]:
+    """The device lines worth one of their own: a key or button press no run press claims,
+    and its release; a device gone; events the kernel dropped.
+
+    :param record: the run.
+    :param to_run_time: the run clock.
+    :param claimed: the device times of the presses that have one.
+    :return: those lines, in the file's order.
+    """
+    out, pressed = [], set()
+    for line in record.device_lines:
+        if line["type"] == "device_gone" or (line.get("event_type") == EV_SYN
+                                             and line["code"] == SYN_DROPPED):
+            out.append(line)
+            continue
+        if not _is_key_or_button(line) or line["value"] not in (0, 1):
+            continue
+        key = (line["device"], line.get("code", line.get("usage")))
+        if line["value"] == 1 and to_run_time(line["perf_time"]) not in claimed:
+            pressed.add(key)
+            out.append(line)
+        elif line["value"] == 0 and key in pressed:
+            pressed.discard(key)
+            out.append(line)
+    return out
+
+
+def _is_key_or_button(line: dict[str, Any]) -> bool:
+    """Whether a device line is a key's or a button's."""
+    if "event_type" in line:                                      # Linux evdev
+        return line["event_type"] == EV_KEY
+    return line["usage_page"] in (HID_KEYBOARD_PAGE, HID_BUTTON_PAGE)   # macOS IOKit
+
+
+def _device_detail(line: dict[str, Any]) -> str:
+    """A device line in words: the device, then the key or button and whether it went down."""
+    if line["type"] == "device_gone":
+        return f"device {line['device']} unplugged"
+    if line.get("event_type") == EV_SYN:
+        return f"device {line['device']}: events dropped by the kernel"
+    if "event_type" in line:
+        code = line["code"]
+        name = (EVDEV_KEYS[code][1] if code in EVDEV_KEYS
+                else EVDEV_BUTTONS.get(code, EVDEV_AXES.get(code, f"code {code}")))
+    else:
+        name = KEY_NAME_OF_USAGE.get(line["usage"], f"usage {line['usage']}")
+    return f"device {line['device']}: {name} {'down' if line['value'] else 'up'}"
+
+
+def _device_quality(record: RunRecord, timeline: Timeline) -> dict[str, Any]:
+    """The device events: how many, the presses they timed and how late those were read,
+    and anything lost."""
+    recording = record.session_recording
+    if recording is None or not recording.start["devices"]:
+        return {"read": False}
+    delays = sorted(press.read_time - press.device_time for press in timeline.presses
+                    if press.device_time is not None)
+    out: dict[str, Any] = {
+        "read": True, "events": len(record.device_lines),
+        "presses_timed": len(delays),
+        "dropped": sum(line.get("event_type") == EV_SYN and line["code"] == SYN_DROPPED
+                       for line in record.device_lines),
+        "gone": sum(line["type"] == "device_gone" for line in record.device_lines),
+        "recording": recording.folder,
+        "ended": "cut short" if recording.end is None else recording.end["how"]}
+    if delays:
+        out.update({"read_delay_median_ms": 1000 * statistics.median(delays),
+                    "read_delay_p95_ms": 1000 * delays[int(0.95 * (len(delays) - 1))],
+                    "read_delay_max_ms": 1000 * delays[-1]})
+    return out

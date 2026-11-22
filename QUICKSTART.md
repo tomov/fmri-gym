@@ -136,6 +136,16 @@ uv run session-editor --session configs/examples/sessions/pilot.sh   # adapt the
 sh configs/examples/sessions/pilot.sh  # play it: about an hour (edit SUBJECT=, SES=, RUN_DURATION=, and RIG= at the top for your team)
 ```
 
+## A session's recording
+
+```bash
+RECORDING=$(uv run session-logger start --rig configs/<team>/rigs/<rig>.json --subject sub-01 --ses 1)   # before anything else
+uv run session-logger mark "$RECORDING" "the localizer"   # a line of your own, stamped now
+uv run session-logger stop "$RECORDING"                   # after everything else
+```
+
+It records every event of the devices the rig names in `"device_events"`, read from the OS at the time the OS stamped it, the marks and the clock, from start to stop, beside whatever the session runs; `bids-from-logs` gives each press its device's time. On Linux it takes the `input` group; on macOS, the Input Monitoring permission for a keyboard-type device.
+
 ## After a session
 
 ```bash

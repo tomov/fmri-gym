@@ -252,8 +252,19 @@ def last_position(root: str, subject: str, curriculum_path: str) -> RunProgress 
     return RunProgress(run, last["index"], last_game, block_progress)
 
 
+def session_folder(root: str, subject: str, session: int) -> str:
+    """A subject's session folder: its runs are in its ``beh/``.
+
+    :param root: the BIDS tree's root.
+    :param subject: ``sub-<label>``.
+    :param session: the BIDS session number, from 1.
+    :return: the folder's path.
+    """
+    return os.path.join(root, subject, f"ses-{session:03d}")
+
+
 def _beh(root: str, subject: str, session: int) -> str:
-    return os.path.join(root, subject, f"ses-{session:03d}", "beh")
+    return os.path.join(session_folder(root, subject, session), "beh")
 
 
 def _next_free(folder: str, name: Callable[[int], str]) -> int:
