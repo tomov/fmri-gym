@@ -616,7 +616,7 @@ def test_a_measurement_unticked_is_not_run_and_fails_nothing(tmp_path, monkeypat
 
     # the rig's controller is not plugged in: with its test unticked, it is not looked for
     m = _measure_laptop_rig(tmp_path, monkeypatch, ("display",),
-                            inputs=["xbox_controller"])
+                            inputs=["keyboard", "xbox_controller"])
     assert m["tests"]["frames"] == {"status": "not run", "why": UNTICKED}
     assert m["tests"]["controls"] == {"status": "not run", "why": UNTICKED}
     assert m["summaries"]["frames"] == {} and m["tests"]["display"]["status"] != "not run"

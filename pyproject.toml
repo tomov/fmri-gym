@@ -64,7 +64,7 @@ rushhour = ["rushhour-gym>=0.7.0", "replay-state-gym"]
 # needs a real GL display, because the observation is the game's own rendering.
 # The pack is tied to the package version, so upgrading the pin is the whole
 # update procedure; STK_ENV_BIN overrides the binary it fetched.
-stk = ["supertuxkart-gym>=0.1.4"]
+stk = ["supertuxkart-gym>=0.1.5"]
 # `gym` backend families beyond classic_control / toy_text (which ship with gymnasium):
 # `Box2D` is the module gymnasium's box2d envs import. gymnasium[box2d] would
 # get it from box2d-py, an sdist-only 2018 release that must compile (swig +

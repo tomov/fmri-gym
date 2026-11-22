@@ -1,8 +1,8 @@
 """The input devices a participant answers with, one class per kind, and a set of them.
 
-The keyboard is always read. Each other kind goes by its name in
-:data:`INPUT_DEVICE_CLASSES_BY_NAME`, and each control by the name its device's file gives it.
-What the keyboard and a set of kinds can press is known before anything is plugged in
+Each kind goes by its name in :data:`INPUT_DEVICE_CLASSES_BY_NAME`, the keyboard
+among them, and each control by the name its device's file gives it. What a set
+of kinds can press is known before anything is plugged in
 (:func:`controls_of_input_devices`); :func:`open_input_devices` opens them.
 """
 
@@ -26,9 +26,9 @@ __all__ = ["EXPERIMENTER_KEYS", "INPUT_DEVICE_CLASSES_BY_NAME", "QUIT", "QUIT_KE
            "controls_of_input_devices", "detect_controllers", "first_controller_class_plugged_in",
            "is_control_of_any_input_device", "is_quit_request", "open_input_devices"]
 
-#: Each kind of input device read besides the keyboard, by its name.
+#: Each kind of input device, by its name.
 INPUT_DEVICE_CLASSES_BY_NAME: dict[str, type[InputDevice]] = {
-    cls.name: cls for cls in (XBoxController, CurrentDesignsGamepad3)}
+    cls.name: cls for cls in (Keyboard, XBoxController, CurrentDesignsGamepad3)}
 #: The kinds that are controllers, by the same names.
 CONTROLLER_CLASSES_BY_NAME: dict[str, type[Controller]] = {
     name: cls for name, cls in INPUT_DEVICE_CLASSES_BY_NAME.items()
@@ -36,9 +36,9 @@ CONTROLLER_CLASSES_BY_NAME: dict[str, type[Controller]] = {
 
 
 def controls_of_input_devices(input_device_names: Iterable[str]) -> frozenset[str]:
-    """Every control the keyboard and the kinds of device ``input_device_names`` have."""
-    return frozenset().union(Keyboard.CONTROLS, *(INPUT_DEVICE_CLASSES_BY_NAME[n].CONTROLS
-                                                  for n in input_device_names))
+    """Every control the kinds of device ``input_device_names`` have between them."""
+    return frozenset().union(*(INPUT_DEVICE_CLASSES_BY_NAME[n].CONTROLS
+                               for n in input_device_names))
 
 
 _CONTROLS_OF_ALL_INPUT_DEVICES = controls_of_input_devices(INPUT_DEVICE_CLASSES_BY_NAME)
@@ -74,10 +74,9 @@ def detect_controllers() -> list[dict]:
 def open_input_devices(input_device_names: Sequence[str],
                        required_controls: frozenset[str] = frozenset(),
                        calibration_files: Sequence[Path] = ()) -> InputDevices:
-    """The keyboard, then a device of each kind ``input_device_names`` lists, each controller
-    on one plugged in.
+    """A device of each kind ``input_device_names`` lists, each controller on one plugged in.
 
-    :param input_device_names: the kinds of device besides the keyboard, by name.
+    :param input_device_names: the kinds of device, by name.
     :param required_controls: controls that must be readable; a stick direction
         among them needs its controller calibrated. Empty: none needs it.
     :param calibration_files: a calibration file per controller to read it through, matched by
@@ -90,7 +89,7 @@ def open_input_devices(input_device_names: Sequence[str],
     if unknown or len(set(input_device_names)) < len(input_device_names):
         raise ValueError(f"input devices {list(input_device_names)}: expected distinct names "
                          f"from {sorted(INPUT_DEVICE_CLASSES_BY_NAME)}")
-    classes = [Keyboard, *(INPUT_DEVICE_CLASSES_BY_NAME[n] for n in input_device_names)]
+    classes = [INPUT_DEVICE_CLASSES_BY_NAME[n] for n in input_device_names]
     start_sdl_joysticks_and_wait_for(sum(issubclass(c, Controller) for c in classes))
     devices = [cls.open(calibrated=False) if issubclass(cls, Controller) else cls.open()
                for cls in classes]

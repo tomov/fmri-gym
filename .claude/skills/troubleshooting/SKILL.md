@@ -12,7 +12,7 @@ A run checks everything it can before the participant screen opens, and stops on
 - **`<path>: no such rig file`**: `--rig` names a file that is not there. Make one in the rig form, `uv run rig-setup --rig <path>`, or copy `configs/examples/rigs/minimal.json` and fill it in. A rig file lives in `configs/<team>/rigs/`.
 - **`<path>: unknown key ...`, `... must be ...`, `"site" is ..., but the file is ...`**: the rig file does not have the shape `humans/config/rig.py` describes. Fix it by hand, or open it in `uv run rig-setup --rig <path>`, which writes only valid files. `site` and `rig` must match the team folder and the file name.
 - **`"inputs": expected a list of distinct names from [...]`**: a device in the rig's `inputs` is misspelled or listed twice. The names are the ones listed in the message.
-- **`"inputs": 'keyboard' is always read; list only the other devices ...`**: every run reads the keyboard, so a rig file names only its other input devices. Remove `"keyboard"` from the rig's `inputs` (a rig with the keyboard alone has `"inputs": []`, or no `inputs`); opening and saving the rig in `rig-setup` does the same.
+- **`"inputs": every rig has the 'keyboard'`**: the rig's `inputs` leave out the keyboard, which every rig needs, since the experimenter starts and stops a run on it. Add `"keyboard"` to the rig's `inputs` (a rig with the keyboard alone has `"inputs": ["keyboard"]`, or no `inputs`); opening and saving the rig in `rig-setup`, which always ticks it, does the same.
 
 ## The curriculum against the rig
 

@@ -41,7 +41,7 @@ def test_defaults_fill_what_the_file_leaves_out():
     screen = desk.screen
     assert (screen.size, screen.is_fullscreen, screen.monitor, screen.has_vsync) == (
         (1024, 768), True, 0, True)
-    assert (desk.inputs, desk.has_audio, desk.data_root) == ((), True, "data")
+    assert (desk.inputs, desk.has_audio, desk.data_root) == (("keyboard",), True, "data")
     assert desk.record()["screen"] == {**rig.DEFAULTS["screen"], "geometry": GEOMETRY}
 
 
@@ -49,13 +49,14 @@ def test_settings_are_read():
     scan = RigConfig.open(write("scan", screen={"size": "800x600", "is_fullscreen": True,
                                                 "monitor": 1, "has_vsync": False,
                                                 "geometry": GEOMETRY},
-                                inputs=["current_designs_gamepad3"], has_audio=False,
+                                inputs=["keyboard", "current_designs_gamepad3"],
+                                has_audio=False,
                                 data_root="/data"))
     screen = scan.screen
     assert (screen.size, screen.is_fullscreen, screen.monitor, screen.has_vsync) == (
         (800, 600), True, 1, False)
-    assert (scan.inputs, scan.has_audio, scan.data_root) == (("current_designs_gamepad3",),
-                                                             False, "/data")
+    assert (scan.inputs, scan.has_audio, scan.data_root) == (
+        ("keyboard", "current_designs_gamepad3"), False, "/data")
 
 
 def test_a_missing_file_is_refused():
@@ -295,7 +296,7 @@ def test_a_game_key_the_scanner_types_is_refused_on_that_rig():
 def test_a_control_none_of_the_rigs_inputs_has_is_refused_on_that_rig():
     from humans.config.curriculum import Curriculum
     from humans.config.run import RunConfig
-    pad = RigConfig.open(write("pad", inputs=["current_designs_gamepad3"]))
+    pad = RigConfig.open(write("pad", inputs=["keyboard", "current_designs_gamepad3"]))
     keyboard = RigConfig.open(write("kb"))
 
     def run(phase: dict, on: RigConfig) -> RunConfig:
@@ -320,24 +321,24 @@ def test_a_control_none_of_the_rigs_inputs_has_is_refused_on_that_rig():
     assert f"needs {[x]}" in run(game({"": 0, "UP": 1}, menu=menu), keyboard).problems()[0]
     survey = {"type": "survey", "questions": ["ok?"], "controls": [y, a]}
     assert f"needs {[a, y]}" in run(survey, keyboard).problems()[0]
-    xbox = RigConfig.open(write("xbox", inputs=["xbox_controller"]))
+    xbox = RigConfig.open(write("xbox", inputs=["keyboard", "xbox_controller"]))
     assert run(stick, xbox).problems() == []       # the GMPD3's controls are the Xbox's too
 
 
 def test_inputs_name_the_rigs_devices():
-    both = ["current_designs_gamepad3", "xbox_controller"]
-    assert RigConfig.open(write("pad", inputs=both)).inputs == tuple(both)
-    for wrong in (["xbox_controller", "xbox_controller"], ["gmpd3"], ["joystick"], "keyboard"):
+    every = ["keyboard", "current_designs_gamepad3", "xbox_controller"]
+    assert RigConfig.open(write("pad", inputs=every)).inputs == tuple(every)
+    for wrong in (["keyboard", "keyboard"], ["gmpd3"], ["joystick"], "keyboard"):
         with pytest.raises(ValueError, match=r'"inputs": expected a list of distinct names '
-                                             r"from \['current_designs_gamepad3', "
+                                             r"from \['current_designs_gamepad3', 'keyboard', "
                                              r"'xbox_controller'\]"):
             RigConfig.open(write("pad", inputs=wrong))
 
 
-def test_a_rig_that_lists_the_keyboard_is_told_it_is_always_read():
-    for listed in (["keyboard"], ["keyboard", "xbox_controller"]):
-        with pytest.raises(ValueError, match=r"'keyboard' is always read; list only the other"):
-            RigConfig.open(write("pad", inputs=listed))
+def test_a_rig_without_the_keyboard_is_refused():
+    for without in ([], ["xbox_controller"]):
+        with pytest.raises(ValueError, match=r"\"inputs\": every rig has the 'keyboard'"):
+            RigConfig.open(write("pad", inputs=without))
 
 
 def test_every_key_is_optional_and_site_and_rig_are_the_files_place(tmp_path):
