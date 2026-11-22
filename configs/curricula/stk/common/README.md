@@ -4,11 +4,11 @@ The `stk` backend's curricula: one per race track, each including `common/stk.js
 
 ## Setup
 
-`uv sync --extra stk` (supertuxkart-gym). The wheel fetches the game and a 270 MiB asset pack from its GitHub release on first use, for Linux x86_64 and macOS (x86_64, arm64): no checkout and no build; `STK_ENV_BIN` overrides the binary it fetched. It needs a real OpenGL display: the game renders into a hidden window and every frame is read back and shown here, so it does not work under `SDL_VIDEODRIVER=dummy` or with `--render-driver=vulkan`.
+`uv sync --extra stk` installs [supertuxkart-gym](https://pypi.org/project/supertuxkart-gym/), which brings the game itself. It needs a real OpenGL display: the game renders into a hidden window and every frame is read back and shown here, so it does not work under `SDL_VIDEODRIVER=dummy` or with `--render-driver=vulkan`.
 
 ## Tracks
 
-There is one curriculum per race track the asset pack ships with geometry. Its other track directories (abyss, mines, zengarden, ... and the battle arenas and soccer fields) are metadata only, and naming one kills the game process, so a new track needs a pack that carries it, not a new config. The track is fixed for the life of a process, so a curriculum races several by using one game phase per track.
+There is one curriculum per race track the package ships. Its other track names (abyss, mines, zengarden, ... and the battle arenas and soccer fields) have no geometry, and naming one kills the game process. The track is fixed for the life of a process, so a curriculum races several by using one game phase per track.
 
 ## Keys
 

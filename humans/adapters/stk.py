@@ -2,9 +2,8 @@
 
 The backend is ``stk``; the package it drives is ``stk_gym``, the client half of
 ``supertuxkart-gym`` (don't confuse the two). That is SuperTuxKart with a
-``--gym`` server built in, stepped over a pipe. It is chosen over ``pystk2`` (the
-``supertuxkart`` backend) for the current engine, tracks and physics, and because
-the same env object is what models train against.
+``--gym`` server built in, stepped over a pipe: the current engine, tracks and
+physics, and the same env object models train against.
 
 Why this shape: with ``render_mode="rgb_array"`` the game renders into a window
 that is created hidden (never mapped, so it neither steals focus nor gets resized
@@ -36,12 +35,9 @@ Timing: the game is lock-stepped, one ``step`` per fmri-gym frame, so
 Measured on an Intel Arc laptop at 640x360 with four karts: 2.5 ms per step
 mean, 2.9 ms p95 -- well inside 16.7 ms.
 
-Needs a real OpenGL display (the frame is the game's own rendering) and the
-game itself, which ``pip install supertuxkart-gym`` brings: the wheel fetches a
-prebuilt binary and a trimmed asset pack once, for its own version.
-``STK_ENV_BIN`` overrides that binary.
-Not supported: the pystk2 backend's ``num_kart`` spelling (it is ``num_karts``
-here, the game's), and a different track per episode (one process, one track):
+Needs a real OpenGL display (the frame is the game's own rendering) and
+``pip install supertuxkart-gym``, which brings the game itself.
+Not supported: a different track per episode (one process, one track):
 a curriculum that wants several tracks uses one game phase per track. Arenas
 and soccer fields need game modes this adapter never sets.
 """
