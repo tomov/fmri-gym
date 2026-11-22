@@ -3,8 +3,9 @@
 The labels file names the underlay (a drawing of an Xbox 360 controller, whose
 controls sit where :data:`CONTROLS` says) and maps each image, by its path from
 the file, to its labels: one control name (as a curriculum writes it) to the
-lines of text beside it. The controls a game leaves unused are greyed out, as are
-the drawing's controls no controller rig has, and the names printed on it are painted over.
+lines of text beside it, a list among them being lines centered on each other. The
+controls a game leaves unused are greyed out, as are the drawing's controls no controller
+rig has, and the names printed on it are painted over.
 A key starting with ``##`` is a comment.
 
     uv run python tools/controls_images.py configs/images/controls/labels.json
@@ -29,7 +30,10 @@ PAPER, TEXT, LEADER = (255, 255, 255), (25, 25, 25), (70, 70, 70)
 #: the part of the underlay that is the controller, and its scale in the image
 CROP, SCALE = pygame.Rect(50, 50, 1180, 800), 0.75
 #: room for the labels on each side of the controller, and under it
-MARGIN, BELOW = 440, 90
+MARGIN, BELOW = 510, 90
+#: the space between two controls' labels, more than between a label's lines so each
+#: label reads as one; and the least space between a label and the image's edge
+LABEL_GAP, EDGE = 46, 10
 
 
 #: what an unused control fades to: its pixels keep this share of their contrast with
@@ -137,36 +141,97 @@ def _paint_over(pixels: np.ndarray, rect: pygame.Rect) -> None:
     region[:] = np.median(edge, axis=0).astype(np.uint8)
 
 
-def draw_label(canvas: pygame.Surface, font: pygame.font.Font, control: Control,
-               lines: list[str]) -> None:
-    """``lines`` beside ``control``, with a leader line from the control to them."""
-    anchor = _on_image(control.anchor)
-    surfaces = [font.render(line, True, TEXT) for line in lines]
-    height = sum(s.get_height() for s in surfaces)
+def _render_label(font: pygame.font.Font, lines: list[str | list[str]],
+                  side: str) -> pygame.Surface:
+    """``lines`` one under another on a transparent surface, flush toward the controller from
+    ``side``; a list among them is a group of lines centered on each other, set as one line is."""
+    groups = []
+    for line in lines:
+        texts = [line] if isinstance(line, str) else line
+        rows = [font.render(text, True, TEXT) for text in texts]
+        group = pygame.Surface((max(r.get_width() for r in rows),
+                                sum(r.get_height() for r in rows)), pygame.SRCALPHA)
+        top = 0
+        for row in rows:
+            group.blit(row, row.get_rect(midtop=(group.get_width() // 2, top)))
+            top += row.get_height()
+        groups.append(group)
+    label = pygame.Surface((max(g.get_width() for g in groups),
+                            sum(g.get_height() for g in groups)), pygame.SRCALPHA)
+    top = 0
+    for group in groups:
+        x = {"left": label.get_width() - group.get_width(), "right": 0,
+             "below": (label.get_width() - group.get_width()) // 2}[side]
+        label.blit(group, (x, top))
+        top += group.get_height()
+    return label
+
+
+def _label_tops(canvas_height: int, wanted_tops: list[int], heights: list[int]) -> list[int]:
+    """The tops of one side's labels, given top to bottom: each as near the top it wants as
+    keeps :data:`LABEL_GAP` between labels and all of them on the canvas."""
+    tops = []
+    for wanted, height in zip(wanted_tops, heights):
+        floor = tops[-1] + heights[len(tops) - 1] + LABEL_GAP if tops else EDGE
+        tops.append(max(wanted, floor))
+    ceiling = canvas_height - EDGE
+    for i in reversed(range(len(tops))):
+        tops[i] = min(tops[i], ceiling - heights[i])
+        ceiling = tops[i] - LABEL_GAP
+    return tops
+
+
+def draw_labels(canvas: pygame.Surface, font: pygame.font.Font,
+                labels: dict[str, list[str | list[str]]]) -> None:
+    """Each control's lines beside it, with a leader line from the control to them."""
+    by_side: dict[str, list[tuple[Control, pygame.Surface]]] = {}
+    for name, lines in labels.items():
+        control = CONTROLS[name]
+        label = _render_label(font, lines, control.side)
+        by_side.setdefault(control.side, []).append((control, label))
+    for side, placed in by_side.items():
+        placed.sort(key=lambda control_and_label: control_and_label[0].anchor[1])
+        anchors = [_on_image(control.anchor) for control, _ in placed]
+        heights = [label.get_height() for _, label in placed]
+        tops = [_wanted_top(control, anchor, label, font, canvas.get_height())
+                for (control, label), anchor in zip(placed, anchors)]
+        tops = _label_tops(canvas.get_height(), tops, heights)
+        for (control, label), anchor, top in zip(placed, anchors, tops):
+            _draw_label(canvas, side, anchor, label, top)
+
+
+def _wanted_top(control: Control, anchor: tuple[int, int], label: pygame.Surface,
+                font: pygame.font.Font, canvas_height: int) -> int:
+    """Where ``label``'s top goes beside ``control`` when no other label is in the way: level
+    with it, or, under the controller, at the image's bottom edge."""
     if control.side == "below":
-        top = canvas.get_height() - height - 10
-        end = (anchor[0], top - 6)
+        return canvas_height - EDGE - label.get_height()
+    if control.grows_up:
+        return anchor[1] - label.get_height() + font.get_linesize() // 2
+    return anchor[1] - label.get_height() // 2
+
+
+def _draw_label(canvas: pygame.Surface, side: str, anchor: tuple[int, int],
+                label: pygame.Surface, top: int) -> None:
+    """``label`` at ``top`` on ``side``, and the leader line from ``anchor`` to it."""
+    rect = label.get_rect()
+    if side == "below":
+        rect.midtop = (anchor[0], top)
+        end = (anchor[0], rect.top - 6)
     else:
-        top = anchor[1] - height // 2
-        if control.grows_up:
-            top = anchor[1] - height + surfaces[-1].get_height() // 2
-        x = MARGIN - 20 if control.side == "left" else canvas.get_width() - MARGIN + 20
-        end = (x + 10, anchor[1]) if control.side == "left" else (x - 10, anchor[1])
-    pygame.draw.line(canvas, LEADER, anchor, end, 3)
-    pygame.draw.circle(canvas, LEADER, anchor, 6)
-    for surface in surfaces:
-        rect = surface.get_rect()
-        if control.side == "below":
-            rect.midtop = (anchor[0], top)
-        elif control.side == "left":
+        if side == "left":
             rect.topright = (MARGIN - 20, top)
         else:
             rect.topleft = (canvas.get_width() - MARGIN + 20, top)
-        canvas.blit(surface, rect)
-        top += surface.get_height()
+        # straight across when the label is level with the control, else to its nearest line
+        end = (rect.right + 10 if side == "left" else rect.left - 10,
+               min(max(anchor[1], rect.top + 20), rect.bottom - 20))
+    pygame.draw.line(canvas, LEADER, anchor, end, 3)
+    pygame.draw.circle(canvas, LEADER, anchor, 6)
+    canvas.blit(label, rect)
 
 
-def write_controls_image(underlay: pygame.Surface, labels: dict[str, list[str]],
+def write_controls_image(underlay: pygame.Surface, labels: dict[str, list[str | list[str]]],
                          path: Path) -> None:
     """Draw ``underlay`` with ``labels`` (control name: lines) and save it as a PNG at ``path``.
 
@@ -191,8 +256,7 @@ def write_controls_image(underlay: pygame.Surface, labels: dict[str, list[str]],
     canvas.fill(controller.get_at((0, 0)))     # smoothscale leaves the white a shade darker
     canvas.blit(controller, (MARGIN, 0))
     font = pygame.font.Font(pygame.font.get_default_font(), 42)
-    for name, lines in labels.items():
-        draw_label(canvas, font, CONTROLS[name], lines)
+    draw_labels(canvas, font, labels)
     path.parent.mkdir(parents=True, exist_ok=True)
     pygame.image.save(canvas, str(path))
 
