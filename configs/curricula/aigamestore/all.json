@@ -18,7 +18,7 @@
     {"type": "fixation", "duration": 1.0},
     {
       "type": "game", "backend": "aigamestore", "game": "game3",
-      "controls": {"W": 0, "A": 1, "S": 2, "D": 3, "LEFT": 4, "RIGHT": 5, "UP": 6, "DOWN": 7, "SPACE": 8, "Z": 9, "LSHIFT": 10},
+      "controls": {"W": 0, "A": 1, "S": 2, "D": 3, "LEFT": 4, "RIGHT": 5, "UP": 6, "DOWN": 7, "SPACE": 8, "Z": 9, "X": 10},
       "mode": "duration", "duration": 15.0, "fps": 10
     },
     {"type": "message", "text": "AI GameStore 4", "duration": 2.0},
@@ -45,7 +45,7 @@
     {"type": "fixation", "duration": 1.0},
     {
       "type": "game", "backend": "aigamestore", "game": "game7",
-      "controls": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "Z": 4, "SPACE": 5, "LSHIFT": 6, "1": 7, "2": 8, "3": 9, "4": 10, "5": 11, "X": 12},
+      "controls": {"LEFT": 0, "RIGHT": 1, "UP": 2, "DOWN": 3, "Z": 4, "SPACE": 5, "C": 6, "1": 7, "2": 8, "3": 9, "4": 10, "5": 11, "X": 12},
       "mode": "duration", "duration": 15.0, "fps": 10
     },
     {"type": "message", "text": "AI GameStore 8", "duration": 2.0},

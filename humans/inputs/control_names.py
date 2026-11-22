@@ -152,3 +152,14 @@ class ControlNames(StrEnum):
     CONTROLLER_AXIS_RIGHTY = "CONTROLLER_AXIS_RIGHTY"
     CONTROLLER_AXIS_RIGHTY_UP = "CONTROLLER_AXIS_RIGHTY_UP"
     CONTROLLER_AXIS_RIGHTY_DOWN = "CONTROLLER_AXIS_RIGHTY_DOWN"
+
+
+#: The key the experimenter starts a run with.
+START_KEY = ControlNames.K_RETURN
+#: The experimenter's keys, which no curriculum may bind: the run's start and stop keys, the
+#: function keys, and the modifiers, which a button box or a scanner's trigger never types.
+EXPERIMENTER_KEYS: frozenset[ControlNames] = frozenset({
+    ControlNames.K_ESCAPE, ControlNames.K_RETURN,
+    ControlNames.K_LSHIFT, ControlNames.K_RSHIFT, ControlNames.K_LCTRL, ControlNames.K_RCTRL,
+    ControlNames.K_LALT, ControlNames.K_RALT,
+    *(ControlNames[f"K_F{n}"] for n in range(1, 13))})

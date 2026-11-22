@@ -38,8 +38,8 @@ from humans.outputs.display import quit_like_esc
 from humans.config.rig import RigConfig
 from humans.config.run import RunConfig
 
-#: Exit status when the run was quit (ESC) before its end; a session script
-#: (``set -e``) stops on it instead of starting the next run.
+#: Exit status when the run was quit (the quit keys, the window's close, Ctrl+C) before its
+#: end; a session script (``set -e``) stops on it instead of starting the next run.
 EXIT_QUIT = 3
 
 
@@ -116,7 +116,7 @@ def main() -> None:
         # Last: a terminal's Ctrl+C can come twice (to uv and to us), the second one late.
         signal.signal(signal.SIGINT, previous)
     if not completed:
-        # A session script (set -e) must not start the next run after an ESC.
+        # A session script (set -e) must not start the next run after a quit.
         sys.exit(EXIT_QUIT)
 
 

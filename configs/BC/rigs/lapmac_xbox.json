@@ -21,7 +21,7 @@
   "start_fixation": 10.0,
   "end_fixation": 10.0,
   "inputs": [
-    "keyboard",
+    
     "xbox_controller"
   ],
   "triggers": {

@@ -21,7 +21,7 @@ from typing import Any, ClassVar
 
 from ..adapters.base import HudSettings
 from ..outputs.display import image_line_problems
-from ..inputs import ControlNames, is_control_of_any_input_device
+from ..inputs import EXPERIMENTER_KEYS, ControlNames, is_control_of_any_input_device
 
 #: An episode's possible outcomes: EnvAdapter.outcome's names, and the subject's own endings.
 OUTCOMES = frozenset({"won", "lost", "terminated", "truncated", "playing", "forfeit", "reset"})
@@ -36,7 +36,7 @@ _SURVEY_CONTROLS = (ControlNames.K_1, ControlNames.K_2, ControlNames.K_3, Contro
 MENU_OPTIONS = ("reset", "forfeit", "resume")
 _MENU_DEFAULTS = {"hold": 5.0, "after": 15.0, "options": list(MENU_OPTIONS),
                   "move": [ControlNames.K_UP, ControlNames.K_DOWN],
-                  "confirm": ControlNames.K_RETURN, "text": None}
+                  "confirm": ControlNames.K_SPACE, "text": None}
 #: A game phase's ``hint``'s fields' defaults (``control`` and ``text`` have none).
 _HINT_DEFAULTS = {"hold": 3.0, "after": 0.0}
 
@@ -425,14 +425,14 @@ def _bool_problems(d: dict, keys: tuple[str, ...]) -> list[str]:
 
 
 #: Where a curriculum's control names are listed, for its messages.
-_NAMES_ARE = (f"as listed in humans/inputs/control_names.py; {ControlNames.K_ESCAPE} "
-              "quits the run")
+_NAMES_ARE = ("as listed in humans/inputs/control_names.py, but the experimenter's keys: "
+              + ", ".join(sorted(EXPERIMENTER_KEYS)))
 
 
 def _is_possible_on_any_input_device(name: Any) -> bool:
-    """Whether a curriculum may map ``name``: a control of some device, not the run's quit."""
+    """Whether a curriculum may map ``name``: a control of some device, not the experimenter's."""
     return (isinstance(name, str) and is_control_of_any_input_device(name)
-            and name != ControlNames.K_ESCAPE)
+            and name not in EXPERIMENTER_KEYS)
 
 
 def _dismiss_problems(where: str, controls: Any) -> list[str]:
@@ -458,11 +458,15 @@ def _controls_problems(d: dict) -> list[str]:
         return ['controls: missing; map each control to the env action it sends, e.g. {"": 0, '
                 '"LEFT": 3, "RIGHT": 2, "UP+SPACE": 5} ("" is nothing held; names '
                 f"{_NAMES_ARE}; there is no default map)"]
-    unknown = sorted({c for combo in controls if combo for c in combo.split("+")
-                      if not _is_possible_on_any_input_device(c)})
-    if unknown:
-        return [f"controls: {unknown} are not control names; use those {_NAMES_ARE}"]
-    return []
+    names = {c for combo in controls if combo for c in combo.split("+")}
+    out = []
+    if reserved := sorted(names & EXPERIMENTER_KEYS):
+        out.append(f"controls: {reserved} are the experimenter's keys, which no game may bind; "
+                   f"use other controls {_NAMES_ARE}")
+    if unknown := sorted(c for c in names - EXPERIMENTER_KEYS
+                         if not _is_possible_on_any_input_device(c)):
+        out.append(f"controls: {unknown} are not control names; use those {_NAMES_ARE}")
+    return out
 
 
 def _fps_problems(d: dict) -> list[str]:
@@ -564,12 +568,10 @@ def hint_problems(spec: object) -> list[str]:
 def _held_control_names_problems(field: str, names: object) -> list[str]:
     """The names in ``names`` that are no control, or the one that quits the run, as text."""
     wrong = [n for n in (names if isinstance(names, list) else []) if isinstance(n, str)
-             and (not is_control_of_any_input_device(n.upper())
-                  or n.upper() == ControlNames.K_ESCAPE)]
+             and not _is_possible_on_any_input_device(n.upper())]
     if not wrong:
         return []
-    return [f"{field}: {wrong} is no control name ({ControlNames.K_ESCAPE} quits the run): "
-            "a value in humans/inputs/control_names.py"]
+    return [f"{field}: {wrong} is no control name a curriculum may use ({_NAMES_ARE})"]
 
 
 def _hold_and_after_problems(field: str, spec: dict, defaults: dict) -> list[str]:

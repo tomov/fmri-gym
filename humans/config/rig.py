@@ -27,9 +27,9 @@ say the same thing:
   ``"geometry"`` (:class:`ScreenGeometry`) is the image's size on the screen
   and the participant's eye's distance to it, ``{"width_cm": 70.8, "height_cm": 39.8,
   "distance_cm": 120}``;
-- ``"inputs"``: the rig's input devices, the keyboard among them, by the names of
-  :data:`humans.inputs.INPUT_DEVICE_CLASSES_BY_NAME` (``["keyboard",
-  "current_designs_gamepad3"]``); each controller must be plugged in when a run starts;
+- ``"inputs"``: the rig's input devices besides the keyboard, which is always read, by the
+  names of :data:`humans.inputs.INPUT_DEVICE_CLASSES_BY_NAME`
+  (``["current_designs_gamepad3"]``); each controller must be plugged in when a run starts;
 - ``"response_keys"``: the keys a response device types by itself (a button
   box, a fORP in a key mode), each with what it stands for, ``{"1": "index
   finger", ...}``;
@@ -102,11 +102,11 @@ EXAMPLES = {
     "trigger_hardware": "fORP 932 USB, '=' at each volume",
 }
 #: How a run is played where the rig file says nothing: fullscreen, as a session needs
-#: (a window only when asked for), the keyboard alone, the audio on, no fixation at
-#: either end.
+#: (a window only when asked for), no input device but the keyboard, the audio on, no
+#: fixation at either end.
 DEFAULTS: dict[str, Any] = {
     "screen": {"size": "1024x768", "is_fullscreen": True, "monitor": 0, "has_vsync": True},
-    "inputs": ["keyboard"], "has_audio": True, "data_root": "data", "start_fixation": None,
+    "inputs": [], "has_audio": True, "data_root": "data", "start_fixation": None,
     "end_fixation": None, "triggers": {}, "response_keys": {}, "photodiode_patch": None,
     "eyelink": None,
     "rig_measurement": {},
@@ -302,7 +302,7 @@ class RigConfig:
     fields: dict[str, str]
     #: the window.
     screen: ScreenConfig
-    #: the input devices, the keyboard among them, by
+    #: the input devices besides the keyboard, which is always read, by
     #: :data:`humans.inputs.INPUT_DEVICE_CLASSES_BY_NAME` name.
     inputs: tuple[str, ...]
     #: the keys a response device types itself -> what each stands for
@@ -582,9 +582,12 @@ def _setting_problems(rig: dict) -> list[str]:
 
 
 def _input_device_problems(rig: dict) -> list[str]:
-    """``inputs``: distinct names of the kinds of input device the rig has."""
+    """``inputs``: distinct names of the kinds of input device the rig has besides the keyboard."""
     names = rig.get("inputs", DEFAULTS["inputs"])
     known = INPUT_DEVICE_CLASSES_BY_NAME
+    if isinstance(names, list) and Keyboard.name in names:
+        return [f'"inputs": {Keyboard.name!r} is always read; list only the other devices '
+                f"(from {sorted(known)}), or none"]
     if (isinstance(names, list) and all(isinstance(n, str) and n in known for n in names)
             and len(set(names)) == len(names)):
         return []

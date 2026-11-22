@@ -128,7 +128,7 @@ def use_rig(data_root: str, has_audio: bool, end_fixation: float) -> str:
               "screen": {"size": "640x480", "is_fullscreen": False, "monitor": 0,
                          "has_vsync": False,
                          "geometry": {"width_cm": 28.6, "height_cm": 17.9, "distance_cm": 50.0}},
-              "inputs": ["keyboard"], "has_audio": has_audio, "data_root": data_root,
+              "inputs": [], "has_audio": has_audio, "data_root": data_root,
               "end_fixation": end_fixation}, path)
     return path
 

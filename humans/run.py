@@ -47,7 +47,8 @@ from .config.curriculum import Curriculum, game_changes
 from .config.phases import BlockMode, Fixation, GamePhase, Message, Phase, Survey
 from .config.run import RunConfig
 from .outputs.display import Display, check_monitor
-from .inputs import QUIT, ControlNames, Edge, InputDevice, InputEvent, open_input_devices
+from .inputs import (QUIT, QUIT_KEYS, START_KEY, Edge, InputDevice, InputEvent,
+                     open_input_devices)
 from .popup import Hint, Menu, PopUp
 from .save.logging import Logger
 from .sync.clock import Clock
@@ -56,7 +57,6 @@ from .sync.triggers import Triggers
 if TYPE_CHECKING:
     from .adapters.base import EnvAdapter
 
-EXPERIMENTER_KEY = ControlNames.K_SPACE
 #: How far ``fps`` may sit from the engine's own rate and still count as real
 #: speed: what the audio output absorbs by resampling.
 _SAME_SPEED = 2e-3
@@ -75,7 +75,7 @@ class EpisodeResult:
     #: one of the adapter's names (:meth:`~.adapters.base.EnvAdapter.outcome`:
     #: ``"won"``, ``"lost"``, ``"terminated"``, ``"truncated"``, or
     #: ``"playing"`` when the block's clock cut it off), or the subject's own:
-    #: ``"quit"`` for ESC / window close, ``"reset"`` / ``"forfeit"`` for the
+    #: ``"quit"`` for the quit keys / window close, ``"reset"`` / ``"forfeit"`` for the
     #: choice in the menu
     outcome: str
     #: the last step's flags
@@ -92,8 +92,8 @@ class EpisodeResult:
 
 
 def _is_quit(event: InputEvent) -> bool:
-    """Whether ``event`` asks to stop the run: the window closing, or ESC."""
-    return event.edge is Edge.DOWN and event.name in (QUIT, ControlNames.K_ESCAPE)
+    """Whether ``event`` asks to stop the run: the window closing, or the quit keys."""
+    return event.edge is Edge.DOWN and event.name == QUIT
 
 
 def read_input_events(inputs: InputDevice) -> list[InputEvent]:
@@ -108,7 +108,7 @@ def read_input_events(inputs: InputDevice) -> list[InputEvent]:
 def _check_quit(inputs: InputDevice) -> bool:
     """Read the presses waiting and report whether the user requested quit.
 
-    :return: ``True`` if the window was closed or ESC was pressed.
+    :return: ``True`` if the window was closed or the quit keys pressed.
     """
     return any(_is_quit(event) for event in read_input_events(inputs))
 
@@ -145,7 +145,7 @@ def _poll_keys_until(
         wait long enough that the screen would otherwise go stale. It
         redraws; it must not step, log or trigger.
     :return: ``(pressed, user_quit)``: the controls pressed, in order, and
-        whether the window was closed or ESC pressed.
+        whether the window was closed or the quit keys pressed.
     """
     pressed: list[str] = []
     next_redraw = time.perf_counter() + HUD_REDRAW_S
@@ -154,7 +154,7 @@ def _poll_keys_until(
             return pressed, False
         for name, edge in read_input_events(inputs):
             down = edge is Edge.DOWN
-            if name in (QUIT, ControlNames.K_ESCAPE):
+            if name == QUIT:
                 if down:
                     return pressed, True
                 continue
@@ -184,7 +184,7 @@ def _wait_for_control(
         accept every control (a self-paced "press any key" screen).
     :param dummy_trigger: if ``True``, sleep briefly and return without waiting.
     :param until: ``perf_counter`` at which to stop waiting regardless.
-    :raises KeyboardInterrupt: on window close or ESC.
+    :raises KeyboardInterrupt: on window close or the quit keys.
     """
     if dummy_trigger:
         time.sleep(0.05)
@@ -206,7 +206,7 @@ def _wait_for_duration(inputs: InputDevice, display: Display, duration: float,
     :param display: the display, idled between polls (see :meth:`Display.idle`).
     :param duration: seconds to wait.
     :param until: ``perf_counter`` at which to stop waiting regardless.
-    :raises KeyboardInterrupt: on window close or ESC.
+    :raises KeyboardInterrupt: on window close or the quit keys.
     """
     end = min(time.perf_counter() + duration, until)
     while time.perf_counter() < end:
@@ -224,7 +224,7 @@ def _wait_for_controls(inputs: InputDevice, display: Display, names: list[str],
     :param names: control names (:mod:`humans.inputs`) that end the wait.
     :param deadline: ``perf_counter`` at which to stop waiting.
     :return: the control that ended the wait, or ``None`` at the deadline.
-    :raises KeyboardInterrupt: on window close or ESC.
+    :raises KeyboardInterrupt: on window close or the quit keys.
     """
     while time.perf_counter() < deadline:
         for event in read_input_events(inputs):
@@ -436,11 +436,11 @@ class Run:
         ``task_start``.
         """
         self.display.draw_text("Please keep your head as still as possible.")
-        print(f"\n>>> READY: press {EXPERIMENTER_KEY} to start the run\n"
+        print(f"\n>>> READY: press {START_KEY} to start the run ({QUIT_KEYS} stops it)\n"
               f"    triggers: {self.triggers.status()}\n"
               f"    audio:    {self.audio.status()}", file=sys.stderr)
         self.display.take_focus()
-        _wait_for_control(self.inputs, self.display, EXPERIMENTER_KEY,
+        _wait_for_control(self.inputs, self.display, START_KEY,
                       dummy_trigger=self.config.dummy_trigger)
         if self.sync.mode == "wait":
             print(f">>> WAITING for the scanner's trigger key {self.sync.key!r}",
@@ -479,7 +479,7 @@ class Run:
         """Draw a message and wait until a key press or its duration (see :class:`Message`).
 
         :return: the ``text`` shown, its ``onset`` and ``offset``.
-        :raises KeyboardInterrupt: on window close or ESC.
+        :raises KeyboardInterrupt: on window close or the quit keys.
         """
         duration = message.duration
         text = message.text
@@ -501,7 +501,7 @@ class Run:
         """Run a Likert-style survey and log each confirmed response.
 
         :param index: phase index in the curriculum (for the manifest).
-        :raises KeyboardInterrupt: on window close or ESC.
+        :raises KeyboardInterrupt: on window close or the quit keys.
         """
         onset = self.clock.run_time()
         responses: list[dict] = []
@@ -515,7 +515,7 @@ class Run:
     def _ask(self, phase: Survey, responses: list[dict]) -> None:
         """Append each Likert answer to ``responses``: one press of a point's control.
 
-        :raises KeyboardInterrupt: on window close or ESC.
+        :raises KeyboardInterrupt: on window close or the quit keys.
         """
         controls = list(phase.controls)
         width = max(len(str(len(controls))), *map(len, controls))
@@ -715,7 +715,7 @@ class Run:
         :param resumed: whether the block carries on from an earlier run.
         :return: for the game's manifest entry, the ``text`` shown with its
             ``onset`` and ``offset``; ``None`` without instructions.
-        :raises KeyboardInterrupt: on window close or ESC.
+        :raises KeyboardInterrupt: on window close or the quit keys.
         """
         if phase.instructions is None:
             return None
@@ -825,7 +825,7 @@ class Run:
             self.audio.stop()
             # An episode the subject restarted from the menu was not played; nor,
             # in a blocking block, one whose outcome does not advance; nor one
-            # a clock or ESC stopped, which a later run may carry on; nor a
+            # a clock or the quit keys stopped, which a later run may carry on; nor a
             # death that is rewound.
             advances = game_phase.advance_on is None or outcome in game_phase.advance_on
             num_completed_episodes += (outcome not in ("reset", "playing", "quit")
@@ -835,7 +835,7 @@ class Run:
                 break
         user_quit = (outcome == "quit")
         # Stopped before the block's own end (its clock, its episodes, a
-        # forfeit) -- by the run's clock or ESC -- so a later run can carry it on.
+        # forfeit) -- by the run's clock or the quit keys -- so a later run can carry it on.
         block_did_not_finish = user_quit or (
             self._time_up() and time.perf_counter() < own_end and outcome != "forfeit"
             and not (game_phase.mode is BlockMode.EPISODE

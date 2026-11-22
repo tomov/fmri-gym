@@ -64,7 +64,8 @@ _PHASES, _JSON = 0, 1
 
 _GAME_CONTROLS_HINT = (
     "Controls: which control does what in this game. Write control names, joined with + "
-    "for a combo: the keyboard's (UP, DOWN, LEFT, RIGHT, SPACE, RETURN, A-Z, 0-9, ...) or an "
+    "for a combo: the keyboard's (UP, DOWN, LEFT, RIGHT, SPACE, A-Z, 0-9, ...; not the "
+    "experimenter's keys) or an "
     "input device's (humans/inputs/<device>.py); a rig plays the curriculum only if its "
     "inputs (set in rig-setup) have every control named, and a button box types its keys "
     "itself (its response keys). There is no default map. The action is what the game takes: "

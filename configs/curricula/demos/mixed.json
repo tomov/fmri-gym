@@ -5,7 +5,7 @@
     {"type": "game", "backend": "ale", "game": "ALE/Pong-v5", "mode": "duration", "duration": 15.0, "fps": 30, "controls": {"": 0, "SPACE": 1, "RIGHT": 2, "LEFT": 3, "RIGHT+SPACE": 4, "LEFT+SPACE": 5, "UP": 2, "DOWN": 3}},
     {"type": "message", "text": "Airstriker (Genesis)", "duration": 2.0},
     {"type": "fixation", "duration": 2.0},
-    {"type": "game", "backend": "retro", "game": "Airstriker-Genesis-v0", "controls": {"Z": 1, "X": 0, "C": 8, "A": 10, "S": 9, "D": 11, "UP": 4, "DOWN": 5, "LEFT": 6, "RIGHT": 7, "RETURN": 3, "TAB": 2}, "mode": "duration", "duration": 15.0, "fps": 59.92274340431231},
+    {"type": "game", "backend": "retro", "game": "Airstriker-Genesis-v0", "controls": {"Z": 1, "X": 0, "C": 8, "A": 10, "S": 9, "D": 11, "UP": 4, "DOWN": 5, "LEFT": 6, "RIGHT": 7, "Q": 3, "TAB": 2}, "mode": "duration", "duration": 15.0, "fps": 59.92274340431231},
     {"type": "message", "text": "Crafter", "duration": 2.0},
     {"type": "fixation", "duration": 2.0},
     {"type": "game", "backend": "crafter", "game": "Crafter-v0", "controls": {"": 0, "LEFT": 1, "RIGHT": 2, "UP": 3, "DOWN": 4, "SPACE": 5, "S": 6}, "mode": "episode", "n_episodes": 1, "duration": 15.0, "fps": 15, "seed": 0},

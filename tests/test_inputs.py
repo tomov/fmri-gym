@@ -455,6 +455,16 @@ def test_the_runs_inputs_take_the_queue_and_name_the_windows_close(screen):
     assert pygame.event.peek() is False
 
 
+def test_ctrl_escape_asks_to_stop_the_run_and_escape_alone_does_not(screen):
+    from humans.run import read_input_events
+    keys = InputDevices([Keyboard()])
+    pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, mod=0))
+    assert QUIT not in [name for name, _ in read_input_events(keys)]
+    for ctrl in (pygame.KMOD_LCTRL, pygame.KMOD_RCTRL):
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE, mod=ctrl))
+        assert read_input_events(keys)[0] == _down(QUIT)
+
+
 @pytest.fixture
 def sdl(monkeypatch):
     """SDL's joystick list, faked: ``sdl.names`` is what it sees; no SDL touched."""
@@ -541,7 +551,8 @@ def test_a_tap_inside_one_frame_counts_for_that_frame(screen):
 
 
 @pytest.mark.parametrize("names, says", [
-    (["keyboard", "keyboard"], "expected distinct names"),
+    (["keyboard"], "expected distinct names"),
+    (["xbox_controller", "xbox_controller"], "expected distinct names"),
     (["gmpd3"], "expected distinct names"),
     (["xbox_controller"], 'no "xbox_controller" is plugged in'),
 ])
@@ -551,7 +562,7 @@ def test_a_rigs_inputs_that_cannot_be_opened_stop_the_run(sdl, config_home, name
 
 
 def test_a_rigs_inputs_open_its_devices_and_say_which_joysticks_they_ignore(sdl, config_home):
-    opened = inputs.open_input_devices(["keyboard", "current_designs_gamepad3"],
+    opened = inputs.open_input_devices(["current_designs_gamepad3"],
                                        frozenset({ControlNames.CONTROLLER_BUTTON_A, "SPACE"}))
     assert [d.name for d in opened.devices] == ["keyboard", "current_designs_gamepad3"]
     assert "IGNORED \"Joystick Of Nobody's\"" in opened.status()
@@ -559,15 +570,15 @@ def test_a_rigs_inputs_open_its_devices_and_say_which_joysticks_they_ignore(sdl,
     with pytest.raises(CalibrationError, match="no calibration of 'Scripted'"):
         inputs.open_input_devices(["current_designs_gamepad3"],
                                   frozenset({ControlNames.CONTROLLER_AXIS_LEFTX_LEFT}))
-    assert [d.name for d in inputs.open_input_devices(["current_designs_gamepad3"]).devices] == [
-        "current_designs_gamepad3"]                   # no keyboard unless the rig lists one
+    assert [d.name for d in inputs.open_input_devices([]).devices] == [
+        "keyboard"], "every rig reads the keyboard"
 
 
 def test_a_rigs_controller_is_read_through_the_calibration_file_given(sdl, config_home):
     given = _write(config_home, "Scripted_a.json", GMPD3_FILE, 1000)
     _write(config_home, "Scripted_b.json", {"device": "Scripted", "sticks": {}}, 2000)
     opened = inputs.open_input_devices(["current_designs_gamepad3"], frozenset(), [given])
-    assert opened.devices[0].calibration_path == given
+    assert opened.devices[1].calibration_path == given
     other = _write(config_home, "Other_a.json", {**GMPD3_FILE, "device": "Other"}, 1000)
     with pytest.raises(CalibrationError, match=re.escape(f"{other}: a calibration of 'Other'")):
         inputs.open_input_devices(["current_designs_gamepad3"], frozenset(), [given, other])
