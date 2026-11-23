@@ -139,17 +139,21 @@ class _FakeHandle:
     at rest.
 
     A joystick's and a game controller's handles spell these differently; this one spells both.
+    Like SDL's, ``id`` is the index it was opened at, not the instance id its events carry.
     """
 
-    def __init__(self, index: int = 0, name: str = "Scripted") -> None:
-        self.name, self.id = name, 7
+    def __init__(self, index: int = 0, name: str = "Scripted", instance_id: int = 7) -> None:
+        self.name, self.id, self.instance_id = name, index, instance_id
         self.open = True
 
     def get_name(self) -> str:
         return self.name
 
     def get_instance_id(self) -> int:
-        return self.id
+        return self.instance_id
+
+    def as_joystick(self) -> _FakeHandle:
+        return self
 
     def get_axis(self, axis: int) -> float:
         return 0.0
@@ -192,10 +196,11 @@ class _ScriptedController(Controller):
         return True
 
     def attach(self, handle) -> None:
-        self.joystick, self.instance_id, self.device_name = handle, handle.id, handle.name
+        self.device_handle, self.device_name = handle, handle.name
+        self.instance_id = handle.get_instance_id()
 
     def is_open(self) -> bool:
-        return self.joystick.get_init()
+        return self.device_handle.get_init()
 
     def _read_axis(self, axis_name: str) -> float:
         return self.axes[axis_name]
@@ -556,14 +561,25 @@ def sdl(monkeypatch):
     return seen
 
 
-def test_a_controller_whose_handle_a_game_closed_is_given_a_new_one(sdl, capsys):
-    pad = _bare(CurrentDesignsGamepad3)
-    old = pad.joystick
+@pytest.mark.parametrize("cls, button_down", [
+    (CurrentDesignsGamepad3, lambda instance_id: pygame.event.Event(
+        pygame.JOYBUTTONDOWN, instance_id=instance_id, button=4)),
+    (XBoxController, lambda instance_id: pygame.event.Event(
+        pygame.CONTROLLERBUTTONDOWN, instance_id=instance_id, button=pygame.CONTROLLER_BUTTON_A)),
+])
+def test_a_controller_whose_handle_a_game_closed_is_given_a_new_one(
+        sdl, capsys, monkeypatch, cls, button_down):
+    monkeypatch.setattr(cls, "accepts", classmethod(lambda c, j, i: j.get_name() == "Scripted"))
+    monkeypatch.setattr(cls, "HANDLE", staticmethod(          # reopened: a new instance id
+        lambda index: _FakeHandle(index, sdl.names[index], instance_id=8)))
+    pad = _bare(cls)
+    old = pad.device_handle
     old.quit()                                              # what pygame.quit() does to it
-    pad.handle([], 1.0)
-    assert pad.joystick is not old and pad.is_open()
+    assert pad.handle([button_down(7)], 1.0) == []          # the closed handle's id
+    assert pad.device_handle is not old and pad.is_open()
+    assert pad.handle([button_down(8)], 1.05) == [_down(ControlNames.CONTROLLER_BUTTON_A)]
     sdl.names.clear()
-    pad.joystick.quit()
+    pad.device_handle.quit()
     pad.handle([], 1.1)
     pad.handle([], 1.2)
     assert capsys.readouterr().err.count("is gone") == 1

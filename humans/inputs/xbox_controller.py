@@ -73,10 +73,12 @@ class XBoxController(Controller):
         return is_controller
 
     def attach(self, handle: sdl_controller.Controller) -> None:
-        self.controller, self.instance_id, self.device_name = handle, handle.id, handle.name
+        self.device_handle, self.device_name = handle, handle.name
+        # handle.id is SDL's device index; the events carry the joystick's instance id.
+        self.instance_id = handle.as_joystick().get_instance_id()
 
     def _read_axis(self, axis_name: str) -> float:
-        return _scaled(self.controller.get_axis(_SDL_AXIS_BY_NAME[axis_name]))
+        return _scaled(self.device_handle.get_axis(_SDL_AXIS_BY_NAME[axis_name]))
 
     def values(self) -> dict[str, float]:
         """The sticks' values (:meth:`Controller.values`), and each trigger by how far it is
@@ -88,12 +90,12 @@ class XBoxController(Controller):
         if not self.is_open():
             return values
         for axis, trigger in TRIGGERS.items():
-            if pulled := max(0.0, _scaled(self.controller.get_axis(axis))):
+            if pulled := max(0.0, _scaled(self.device_handle.get_axis(axis))):
                 values[trigger] = pulled
         return values
 
     def is_open(self) -> bool:
-        return self.controller.get_init()
+        return self.device_handle.get_init()
 
     def handle(self, events: list[pygame.event.Event], now: float) -> list[InputEvent]:
         self._reopen_if_closed()
@@ -113,5 +115,5 @@ class XBoxController(Controller):
         return out
 
     def close(self) -> None:
-        if self.controller.get_init():
-            self.controller.quit()
+        if self.device_handle.get_init():
+            self.device_handle.quit()

@@ -51,14 +51,14 @@ class CurrentDesignsGamepad3(Controller):
                 and joystick.get_numaxes() >= len(STICK_AXES))
 
     def attach(self, handle: pygame.joystick.Joystick) -> None:
-        self.joystick, self.instance_id = handle, handle.get_instance_id()
+        self.device_handle, self.instance_id = handle, handle.get_instance_id()
         self.device_name = handle.get_name()
 
     def _read_axis(self, axis_name: str) -> float:
-        return self.joystick.get_axis(_SDL_AXIS_BY_NAME[axis_name])
+        return self.device_handle.get_axis(_SDL_AXIS_BY_NAME[axis_name])
 
     def is_open(self) -> bool:
-        return self.joystick.get_init()
+        return self.device_handle.get_init()
 
     def handle(self, events: list[pygame.event.Event], now: float) -> list[InputEvent]:
         self._reopen_if_closed()
@@ -75,5 +75,5 @@ class CurrentDesignsGamepad3(Controller):
         return out
 
     def close(self) -> None:
-        if self.joystick.get_init():
-            self.joystick.quit()
+        if self.device_handle.get_init():
+            self.device_handle.quit()
