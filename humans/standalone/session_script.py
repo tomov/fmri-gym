@@ -34,7 +34,7 @@ LOGGER = "uv run session-logger"
 #: on one it leaves untrapped, runs it too.
 RECORDING_LINES = [
     "# The session's recording (session-logger): started first, stopped when the script ends.",
-    f"RECORDING=$({LOGGER} start --subject {SUBJECT_VAR} --ses {SES_VAR} --rig {RIG_VAR})",
+    f"RECORDING=$({LOGGER} start --subject {SUBJECT_VAR} --ses {SES_VAR} --rig {RIG_VAR} --session-pid $$)",
     f"trap '{LOGGER} stop \"$RECORDING\"' EXIT",
     "trap 'exit 130' INT TERM HUP"]
 #: How a script that leaves a variable to its launch says how to start it.
@@ -75,7 +75,7 @@ def write_session(session: Session) -> str:
         RIG=${RIG:?run as: SUBJECT=sub-01 RIG=configs/<team>/rigs/<rig>.json sh $0 [session]}
         SES=${1:-$(uv run fmri-ses --subject "$SUBJECT" --rig "$RIG")}
         # The session's recording (session-logger): started first, stopped when the script ends.
-        RECORDING=$(uv run session-logger start --subject "$SUBJECT" --ses "$SES" --rig "$RIG")
+        RECORDING=$(uv run session-logger start --subject "$SUBJECT" --ses "$SES" --rig "$RIG" --session-pid $$)
         trap 'uv run session-logger stop "$RECORDING"' EXIT
         trap 'exit 130' INT TERM HUP
         uv run fmri-play --curriculum configs/pong.json --subject "$SUBJECT" --ses "$SES" --run 1 --rig "$RIG"
