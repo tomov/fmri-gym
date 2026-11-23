@@ -126,6 +126,8 @@ uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/mi
 uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/minimal.json --curriculum configs/curricula/stk/levels/hacienda.json
 ```
 
+The `*-GMPD3-stick-nav-analog` curricula need a supertuxkart-gym that is not released yet; `configs/curricula/stk/common/README.md` ("Setup") says how to install it from its branch.
+
 ## Before a real session
 
 ```bash
