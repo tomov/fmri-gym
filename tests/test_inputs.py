@@ -142,8 +142,10 @@ class _FakeHandle:
     Like SDL's, ``id`` is the index it was opened at, not the instance id its events carry.
     """
 
-    def __init__(self, index: int = 0, name: str = "Scripted", instance_id: int = 7) -> None:
+    def __init__(self, index: int = 0, name: str = "Scripted", instance_id: int = 7,
+                 axes: dict[int, float] | None = None) -> None:
         self.name, self.id, self.instance_id = name, index, instance_id
+        self.axes = axes or {}
         self.open = True
 
     def get_name(self) -> str:
@@ -156,7 +158,7 @@ class _FakeHandle:
         return self
 
     def get_axis(self, axis: int) -> float:
-        return 0.0
+        return self.axes.get(axis, 0.0)
 
     def get_init(self) -> bool:
         return self.open
@@ -187,9 +189,9 @@ class _ScriptedController(Controller):
     HANDLE = _FakeHandle
 
     def __init__(self, handle=None, calibrated: bool = False, frames=()) -> None:
-        super().__init__(handle or _FakeHandle(), calibrated)
         self.frames = iter(frames)
         self.axes = self.axes_at({})
+        super().__init__(handle or _FakeHandle(), calibrated)
 
     @classmethod
     def accepts(cls, joystick, is_controller: bool) -> bool:
@@ -198,9 +200,6 @@ class _ScriptedController(Controller):
     def attach(self, handle) -> None:
         self.device_handle, self.device_name = handle, handle.name
         self.instance_id = handle.get_instance_id()
-
-    def is_open(self) -> bool:
-        return self.device_handle.get_init()
 
     def _read_axis(self, axis_name: str) -> float:
         return self.axes[axis_name]
@@ -438,8 +437,10 @@ def test_an_xbox_controller_reads_its_mapping_and_not_the_joystick_twin():
     assert pad.handle(pull, 1.1) == [_down(ControlNames.CONTROLLER_AXIS_TRIGGERLEFT)]
     ease = [_joy(pygame.CONTROLLERAXISMOTION, axis=trigger, value=12000)]   # still past off
     assert pad.handle(ease, 1.2) == []
+    assert pad.values() == {ControlNames.CONTROLLER_AXIS_TRIGGERLEFT: 12000 / 32767}
     let_go = [_joy(pygame.CONTROLLERAXISMOTION, axis=trigger, value=0)]
     assert pad.handle(let_go, 1.3) == [_up(ControlNames.CONTROLLER_AXIS_TRIGGERLEFT)]
+    assert pad.values() == {}
 
 
 def test_an_xbox_controller_reads_each_stick_axis_through_its_calibration():
@@ -583,6 +584,21 @@ def test_a_controller_whose_handle_a_game_closed_is_given_a_new_one(
     pad.handle([], 1.1)
     pad.handle([], 1.2)
     assert capsys.readouterr().err.count("is gone") == 1
+
+
+def test_a_reopened_controller_forgets_its_values_and_reads_where_its_stick_is(sdl, monkeypatch):
+    pad = _calibrated(_bare(CurrentDesignsGamepad3), GMPD3_FILE)
+    pad.handle([_joy(pygame.JOYAXISMOTION, axis=0, value=0.9)], 1.0)
+    assert set(pad.values()) == {LX, ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT}
+    monkeypatch.setattr(CurrentDesignsGamepad3, "HANDLE", staticmethod(   # pushed up, no event
+        lambda index: _FakeHandle(index, sdl.names[index], axes={1: -0.9})))
+    pad.device_handle.quit()                                # what pygame.quit() does to it
+    assert pad.handle([], 1.1) == [_up(ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT), _up(LX),
+                                   _down(ControlNames.CONTROLLER_AXIS_LEFTY_UP), _down(LY)]
+    assert set(pad.values()) == {LY, ControlNames.CONTROLLER_AXIS_LEFTY_UP}
+    assert pad.values()[LY] < 0 and pad.axis_reading(LY) == -0.9
+    pad.close()
+    assert pad.values() == {} and pad.axis_reading(LY) == 0.0
 
 
 class _SdlControllerHandle(_FakeHandle):

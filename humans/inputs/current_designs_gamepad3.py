@@ -57,12 +57,8 @@ class CurrentDesignsGamepad3(Controller):
     def _read_axis(self, axis_name: str) -> float:
         return self.device_handle.get_axis(_SDL_AXIS_BY_NAME[axis_name])
 
-    def is_open(self) -> bool:
-        return self.device_handle.get_init()
-
     def handle(self, events: list[pygame.event.Event], now: float) -> list[InputEvent]:
-        self._reopen_if_closed()
-        out: list[InputEvent] = []
+        out = self._reopen_if_closed()
         for event in events:
             if getattr(event, "instance_id", None) != self.instance_id:
                 continue
@@ -73,7 +69,3 @@ class CurrentDesignsGamepad3(Controller):
             elif event.type == pygame.JOYAXISMOTION and event.axis in STICK_AXES:
                 out += self._move_axis(STICK_AXES[event.axis], event.value)
         return out
-
-    def close(self) -> None:
-        if self.device_handle.get_init():
-            self.device_handle.quit()

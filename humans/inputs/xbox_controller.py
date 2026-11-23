@@ -80,26 +80,20 @@ class XBoxController(Controller):
     def _read_axis(self, axis_name: str) -> float:
         return _scaled(self.device_handle.get_axis(_SDL_AXIS_BY_NAME[axis_name]))
 
-    def values(self) -> dict[str, float]:
-        """The sticks' values (:meth:`Controller.values`), and each trigger by how far it is
-        pulled (0..1).
+    def _take_axis_readings(self) -> list[InputEvent]:
+        """The sticks' readings (:meth:`Controller._take_axis_readings`), then the triggers'."""
+        return super()._take_axis_readings() + [
+            e for axis, trigger in TRIGGERS.items()
+            for e in self._move_trigger(trigger, _scaled(self.device_handle.get_axis(axis)))]
 
-        :return: the value of each of them not at rest.
-        """
-        values = super().values()
-        if not self.is_open():
-            return values
-        for axis, trigger in TRIGGERS.items():
-            if pulled := max(0.0, _scaled(self.device_handle.get_axis(axis))):
-                values[trigger] = pulled
-        return values
-
-    def is_open(self) -> bool:
-        return self.device_handle.get_init()
+    def _move_trigger(self, trigger: str, axis_reading: float) -> list[InputEvent]:
+        """Set a trigger's value, how far it is pulled (0..1), and press or release it."""
+        pulled = max(0.0, axis_reading)
+        self._set(trigger, pulled)
+        return self._pull(trigger, pulled, _TRIGGER_ON, _TRIGGER_OFF)
 
     def handle(self, events: list[pygame.event.Event], now: float) -> list[InputEvent]:
-        self._reopen_if_closed()
-        out: list[InputEvent] = []
+        out = self._reopen_if_closed()
         for event in events:
             if getattr(event, "instance_id", None) != self.instance_id:
                 continue
@@ -108,12 +102,7 @@ class XBoxController(Controller):
             elif event.type == pygame.CONTROLLERBUTTONUP and event.button in BUTTONS:
                 out += self._release(BUTTONS[event.button])
             elif event.type == pygame.CONTROLLERAXISMOTION and event.axis in TRIGGERS:
-                out += self._pull(TRIGGERS[event.axis], _scaled(event.value),
-                                  _TRIGGER_ON, _TRIGGER_OFF)
+                out += self._move_trigger(TRIGGERS[event.axis], _scaled(event.value))
             elif event.type == pygame.CONTROLLERAXISMOTION and event.axis in STICK_AXES:
                 out += self._move_axis(STICK_AXES[event.axis], _scaled(event.value))
         return out
-
-    def close(self) -> None:
-        if self.device_handle.get_init():
-            self.device_handle.quit()

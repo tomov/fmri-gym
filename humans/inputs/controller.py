@@ -97,6 +97,8 @@ class Controller(InputDevice):
     the handle SDL gives it (:attr:`HANDLE`) and reads its events in its
     :meth:`handle`, pressing buttons with :meth:`_press`, triggers with
     :meth:`_pull` and moving stick axes with :meth:`_move_axis`.
+
+    Its :attr:`device_handle` is the handle it reads through, set by :meth:`attach`.
     """
 
     #: its buttons, in the order a tool asks for them
@@ -119,9 +121,12 @@ class Controller(InputDevice):
         self.calibration: ControllerCalibration | None = None
         self._said_gone = False
         self.device_name = ""
+        #: each stick axis's raw reading, -1..1, as of the last event that moved it
+        self._axis_readings: dict[str, float] = {}
         self.attach(handle)
         if calibrated:
             self.load_calibration()
+        self._take_axis_readings()
 
     # -- SDL: which joystick it is -----------------------------------------------------
     @classmethod
@@ -154,19 +159,19 @@ class Controller(InputDevice):
 
     @abstractmethod
     def attach(self, handle: Any) -> None:
-        """Read through ``handle`` from now on: set :attr:`device_name` and remember the id
-        its events carry.
+        """Read through ``handle`` from now on: set :attr:`device_handle` and
+        :attr:`device_name`, and remember the id its events carry.
 
         :param handle: what SDL opened the controller as (:attr:`HANDLE`).
         """
 
     def axis_reading(self, axis_name: str) -> float:
-        """Where SDL last saw a stick axis.
+        """A stick axis's raw reading as of the last :meth:`handle`.
 
         :param axis_name: one of :attr:`AXIS_NAMES`.
-        :return: the raw reading, -1..1; 0.0 once the controller is gone.
+        :return: the raw reading, -1..1; 0.0 while the controller is closed.
         """
-        return self._read_axis(axis_name) if self.is_open() else 0.0
+        return self._axis_readings.get(axis_name, 0.0)
 
     @abstractmethod
     def _read_axis(self, axis_name: str) -> float:
@@ -176,23 +181,43 @@ class Controller(InputDevice):
         :return: the raw reading, -1..1.
         """
 
-    @abstractmethod
+    def _take_axis_readings(self) -> list[InputEvent]:
+        """Move each stick axis to where the open handle reads it: no event says where a
+        stick already pushed is."""
+        return [e for axis_name in self.AXIS_NAMES
+                for e in self._move_axis(axis_name, self._read_axis(axis_name))]
+
     def is_open(self) -> bool:
         """Whether the handle it reads through is still open."""
+        return self.device_handle.get_init()
 
-    def _reopen_if_closed(self) -> None:
-        """A game that quits pygame closes every joystick handle: take a new one, or say
-        once that the controller is gone."""
+    def _reopen_if_closed(self) -> list[InputEvent]:
+        """A game that quits pygame closes every joystick handle: forget the values read
+        through it, then take a new one and read its axes, or say once that the controller is
+        gone.
+
+        :return: the input events the new handle's axes make.
+        """
         if self.is_open():
-            return
+            return []
+        self._values.clear()
+        self._axis_readings.clear()
         for index in self.plugged_in_indices():
             if pygame.joystick.Joystick(index).get_name() == self.device_name:
                 self.attach(self.HANDLE(index))
-                return
+                return self._take_axis_readings()
         if not self._said_gone:
             self._said_gone = True
             print(f"{self.name}: {self.device_name!r} is gone; its controls press nothing",
                   file=sys.stderr)
+        return []
+
+    def close(self) -> None:
+        """Forget the values read, and let go of the handle."""
+        self._values.clear()
+        self._axis_readings.clear()
+        if self.is_open():
+            self.device_handle.quit()
 
     # -- the axes and their calibration ------------------------------------------------
     def axis_controls(self) -> tuple[str, ...]:
@@ -244,22 +269,6 @@ class Controller(InputDevice):
             return None
         return self.calibration.axes[axis_name].normalise(axis_reading)
 
-    def values(self) -> dict[str, float]:
-        """Each stick axis by where it is (-1..1), and each of its sides by how far it is
-        pushed that way (0..1), read through the calibration.
-
-        :return: the value of each of them not at rest; none when uncalibrated.
-        """
-        if self.calibration is None:
-            return {}
-        values: dict[str, float] = {}
-        for axis_name in self.AXIS_NAMES:
-            value = self.calibration.axes[axis_name].value(self.axis_reading(axis_name))
-            negative, positive = AXIS_CONTROLS[axis_name]
-            values.update({axis_name: value, negative: max(0.0, -value),
-                           positive: max(0.0, value)})
-        return {name: value for name, value in values.items() if value}
-
     def status(self) -> str:
         """One line: the controller, and the calibration its axes are read through."""
         if not self.AXIS_NAMES:
@@ -289,16 +298,21 @@ class Controller(InputDevice):
         return []
 
     def _move_axis(self, axis_name: str, axis_reading: float) -> list[InputEvent]:
-        """Press or release each side of an axis by a raw reading of it, then the axis itself,
+        """Take a raw reading of an axis: set the axis's value (-1..1) and each side's (how
+        far it is pushed that way, 0..1), press or release each side, then the axis itself,
         held while either side is.
 
-        An uncalibrated axis presses nothing.
+        An uncalibrated axis keeps only its reading: no value, nothing pressed.
         """
+        self._axis_readings[axis_name] = axis_reading
         if self.calibration is None:
             return []
         axis: AxisCalibration = self.calibration.axes[axis_name]
-        pushed = axis.normalise(axis_reading)
+        pushed, value = axis.normalise(axis_reading), axis.value(axis_reading)
         negative, positive = AXIS_CONTROLS[axis_name]
+        self._set(axis_name, value)
+        self._set(negative, max(0.0, -value))
+        self._set(positive, max(0.0, value))
         out = (self._pull(negative, -pushed, axis.on, axis.off)
                + self._pull(positive, pushed, axis.on, axis.off))
         if {negative, positive} & self._held:
