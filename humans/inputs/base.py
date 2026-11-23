@@ -24,6 +24,10 @@ QUIT = "QUIT"
 #: The keys that stop a run, held together, as the experimenter is told them: ESCAPE with
 #: CTRL held, so that no single stray press stops it.
 QUIT_KEYS = "CTRL+ESCAPE"
+#: The keys that end a run early and let the session go on, held together, as the experimenter
+#: is told them: RETURN with CTRL held. The run stops as for :data:`QUIT_KEYS`, its data kept
+#: alike; only how it ended differs (:attr:`InputDevices.has_end_run_request`).
+END_RUN_KEYS = "CTRL+RETURN"
 
 
 class Edge(Enum):
@@ -117,7 +121,7 @@ class InputDevices(InputDevice):
     """Several input devices read as one: a run's keyboard and controllers together.
 
     Its input events are each device's, in the devices' order, after the window's
-    close button and each press of :data:`QUIT_KEYS` as :data:`QUIT`.
+    close button and each press of :data:`QUIT_KEYS` or :data:`END_RUN_KEYS` as :data:`QUIT`.
     """
 
     name = "inputs"
@@ -132,6 +136,8 @@ class InputDevices(InputDevice):
         super().__init__()
         self.devices = tuple(devices)
         self.ignored_joysticks = tuple(ignored_joysticks)
+        #: whether :data:`END_RUN_KEYS` were pressed: the stop asked for ends this run alone
+        self.has_end_run_request = False
 
     @classmethod
     def open(cls) -> InputDevices:
@@ -139,7 +145,12 @@ class InputDevices(InputDevice):
         return cls([])
 
     def handle(self, events: list[pygame.event.Event], now: float) -> list[InputEvent]:
-        out = [InputEvent(QUIT, Edge.DOWN) for e in events if is_quit_request(e)]
+        out = []
+        for event in events:
+            if is_end_run_request(event):
+                self.has_end_run_request = True
+            if is_quit_request(event) or is_end_run_request(event):
+                out.append(InputEvent(QUIT, Edge.DOWN))
         for device in self.devices:
             out += device.handle(events, now)
         return out
@@ -169,6 +180,12 @@ class InputDevices(InputDevice):
     def close(self) -> None:
         for device in self.devices:
             device.close()
+
+
+def is_end_run_request(event: pygame.event.Event) -> bool:
+    """Whether ``event`` is RETURN pressed with CTRL held."""
+    return (event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN
+            and bool(getattr(event, "mod", 0) & pygame.KMOD_CTRL))
 
 
 def is_quit_request(event: pygame.event.Event) -> bool:

@@ -24,7 +24,7 @@ uv run rig-setup --rig configs/examples/rigs/minimal.json --measure   # measure 
 uv run bids-from-logs --rig configs/examples/rigs/minimal.json        # the runs played: a behavioural BIDS dataset and each run's timeline, in data/bids
 ```
 
-Press **RETURN**, then **=** (the scanner trigger; on a laptop you press it). **CTRL+ESCAPE** (hold CTRL, press ESCAPE) quits; the data is saved under `data/`. Any other level: swap in another file from `configs/curricula/<backend>/levels/`.
+Press **RETURN**, then **=** (the scanner trigger; on a laptop you press it). **CTRL+ESCAPE** (hold CTRL, press ESCAPE) quits; **CTRL+RETURN** ends the run but lets a session script go on to its next run; either way the data is saved under `data/`. Any other level: swap in another file from `configs/curricula/<backend>/levels/`.
 
 ## 3. Every game
 

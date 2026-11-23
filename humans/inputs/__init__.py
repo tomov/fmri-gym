@@ -11,8 +11,8 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 
-from .base import (QUIT, QUIT_KEYS, Edge, InputDevice, InputDevices, InputEvent,
-                   is_quit_request)
+from .base import (END_RUN_KEYS, QUIT, QUIT_KEYS, Edge, InputDevice, InputDevices, InputEvent,
+                   is_end_run_request, is_quit_request)
 from .calibration import CalibrationError, ControllerCalibration, newest, read
 from .control_names import EXPERIMENTER_KEYS, START_KEY, ControlNames
 from .controller import Controller, sdl_joystick_names, start_sdl_joysticks_and_wait_for
@@ -20,11 +20,13 @@ from .current_designs_gamepad3 import CurrentDesignsGamepad3
 from .keyboard import Keyboard
 from .xbox_controller import XBoxController
 
-__all__ = ["EXPERIMENTER_KEYS", "INPUT_DEVICE_CLASSES_BY_NAME", "QUIT", "QUIT_KEYS", "START_KEY",
+__all__ = ["END_RUN_KEYS", "EXPERIMENTER_KEYS", "INPUT_DEVICE_CLASSES_BY_NAME", "QUIT", "QUIT_KEYS",
+           "START_KEY",
            "CalibrationError", "ControlNames", "Controller", "CurrentDesignsGamepad3", "Edge",
            "InputDevice", "InputDevices", "InputEvent", "Keyboard", "XBoxController",
            "controls_of_input_devices", "detect_controllers", "first_controller_class_plugged_in",
-           "is_control_of_any_input_device", "is_quit_request", "open_input_devices"]
+           "is_control_of_any_input_device", "is_end_run_request", "is_quit_request",
+           "open_input_devices"]
 
 #: Each kind of input device, by its name.
 INPUT_DEVICE_CLASSES_BY_NAME: dict[str, type[InputDevice]] = {

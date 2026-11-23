@@ -480,6 +480,18 @@ def test_ctrl_escape_asks_to_stop_the_run_and_escape_alone_does_not(screen):
         assert read_input_events(keys, None)[0] == _down(QUIT)
 
 
+def test_ctrl_return_asks_to_end_the_run_and_says_so_and_return_alone_does_not(screen):
+    from humans.run import read_input_events
+    keys = InputDevices([Keyboard()])
+    pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN, mod=0))
+    assert QUIT not in [name for name, _ in read_input_events(keys, None)]
+    assert not keys.has_end_run_request
+    pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN,
+                                         mod=pygame.KMOD_LCTRL))
+    assert read_input_events(keys, None)[0] == _down(QUIT)
+    assert keys.has_end_run_request, "the stop it asks for ends this run alone"
+
+
 def test_the_run_logs_each_event_read_as_pygame_gave_it_then_each_input_event(screen):
     from humans.run import read_input_events
     logged: list[tuple[str, float, dict]] = []
