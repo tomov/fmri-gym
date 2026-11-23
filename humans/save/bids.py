@@ -138,8 +138,8 @@ def next_session(root: str, subject: str) -> int:
 
 
 def has_session(root: str, subject: str, session: int) -> bool:
-    """Whether the subject's session already has a run filed under ``root``."""
-    return os.path.isdir(_beh(root, subject, session))
+    """Whether the subject's session already has a run or a recording filed under ``root``."""
+    return os.path.isdir(beh_folder(root, subject, session))
 
 
 def run_label(subject: str, session: int, task: str, run: int) -> str:
@@ -168,7 +168,7 @@ def run_output(root: str, subject: str, task: str, session: int, run: int) -> Ru
         if number < 1:
             raise ValueError(f"--{flag} counts from 1, got {number}")
     label = run_label(subject, session, task, run)
-    base = os.path.join(_beh(root, subject, session), label)
+    base = os.path.join(beh_folder(root, subject, session), label)
     folder, attempt = base, 1
     while os.path.exists(folder):
         attempt += 1
@@ -263,7 +263,14 @@ def session_folder(root: str, subject: str, session: int) -> str:
     return os.path.join(root, subject, f"ses-{session:03d}")
 
 
-def _beh(root: str, subject: str, session: int) -> str:
+def beh_folder(root: str, subject: str, session: int) -> str:
+    """A subject's session's ``beh/``: the folder that holds its runs.
+
+    :param root: the BIDS tree's root.
+    :param subject: ``sub-<label>``.
+    :param session: the BIDS session number, from 1.
+    :return: the folder's path.
+    """
     return os.path.join(session_folder(root, subject, session), "beh")
 
 

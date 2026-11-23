@@ -813,8 +813,9 @@ def test_a_session_is_recorded_from_start_to_stop_with_its_marks(tmp_path):
     from humans.standalone import session_logger
     folder = session_logger.start_recording(_rig_with_devices(tmp_path, None), "sub-01", 2)
     try:
-        assert folder.endswith(os.path.join("data", "session_events", "sub-01", "ses-002",
+        assert folder.endswith(os.path.join("data", "sub-01", "ses-002", "beh",
                                             os.path.basename(folder)))
+        assert os.path.basename(folder).startswith("sub-01_ses-002_session-events_")
         assert session_logger.is_recording(folder)
         session_logger.mark_recording(folder, "run 1: the localizer, été")
     finally:
@@ -831,7 +832,10 @@ def test_a_session_is_recorded_from_start_to_stop_with_its_marks(tmp_path):
     assert last["how"] == "stopped" and last["counts"]["mark"] == 1
     assert last["devices_gone"] == []
     assert not session_logger.is_recording(folder)
-    assert not (tmp_path / "data" / "sub-01").exists(), "a recording takes no session number"
+    from humans.save import bids
+    assert bids.next_session(str(tmp_path / "data"), "sub-01") == 1
+    os.makedirs(tmp_path / "data" / "sub-01" / "ses-001")
+    assert bids.next_session(str(tmp_path / "data"), "sub-01") == 3, "a recording takes its session"
     assert session_logger.stop_recording(folder), "stopping a stopped recording is harmless"
 
 

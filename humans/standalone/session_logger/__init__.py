@@ -4,8 +4,8 @@ application has the focus, when the machine stalled, the session's marks, and th
 
 ``start`` leaves a recorder (:mod:`.recorder`) running in a process and a session of its own,
 which no task imports or waits on, and prints the recording's folder once its devices are open;
-``mark`` adds a line to it; ``stop`` ends it. A recording is a folder under the rig's data root,
-beside the subjects' (:func:`recordings_folder`), and its events file is written as the lines
+``mark`` adds a line to it; ``stop`` ends it. A recording is a folder in the session's ``beh/``,
+beside its runs (:func:`recordings_folder`), and its events file is written as the lines
 arrive, flushed to disk every second: first ``recording_start`` (what is read, with what, and a
 ``perf_counter`` time with its wall time), then one line per event, each with its ``type`` and
 ``perf_time`` (on the clock every process on the machine shares until it restarts), and last
@@ -20,21 +20,20 @@ import os
 import subprocess
 import sys
 import time
-from pathlib import Path
 from typing import Any, NamedTuple
 
 from ...config.rig import RigConfig
 from ...save import bids
 
-#: The folder, under a data root, that holds every subject's session recordings.
-SESSION_EVENTS_FOLDER = "session_events"
 #: A recording's events, in its folder.
 SESSION_EVENTS_FILENAME = "session_events.jsonl"
 #: What the commands ask of a running recording, one line each, in its folder.
 CONTROL_FILENAME = "control.jsonl"
 #: The recorder's own messages, in the recording's folder.
 LOG_FILENAME = "session_logger.log"
-#: How a recording's folder is named: when it started.
+#: How a recording's folder is named, beside the session's runs: its subject, session and start.
+FOLDER_NAME = "{subject}_ses-{session:03d}_session-events_{start}"
+#: How a recording's start is written in its folder's name.
 FOLDER_TIME_FORMAT = "%Y%m%dT%H%M%S"
 #: Seconds a device read waits for events before the recorder looks for anything else to write.
 READ_TIMEOUT_S = 0.25
@@ -98,26 +97,23 @@ def main(argv: list[str] | None = None) -> None:
 
 
 def recordings_folder(data_root: str, subject: str, session: int) -> str:
-    """Where a session's recordings go: beside the subjects' folders, so that a session that
-    has played no run yet is not taken.
+    """Where a session's recordings go: the session's ``beh/``, beside its runs.
 
     :param data_root: the rig's data root.
     :param subject: ``sub-<label>``.
     :param session: the session number, from 1.
     :return: the folder, one recording per subfolder.
     """
-    return bids.session_folder(os.path.join(data_root, SESSION_EVENTS_FOLDER), subject, session)
+    return bids.beh_folder(data_root, subject, session)
 
 
 def recordings_folder_of_run(run_folder: str) -> str:
-    """Where the recordings of a run's session are, from the run's folder:
-    ``<data root>/<subject>/<session>/beh/<run>``.
+    """Where the recordings of a run's session are: beside the run's folder, in its ``beh/``.
 
     :param run_folder: the run's folder.
     :return: the folder :func:`recordings_folder` gives its session.
     """
-    data_root, (subject, session) = Path(run_folder).parents[3], Path(run_folder).parts[-4:-2]
-    return os.path.join(data_root, SESSION_EVENTS_FOLDER, subject, session)
+    return os.path.dirname(os.path.abspath(run_folder))
 
 
 def start_recording(rig_path: str, subject: str, session: int) -> str:
@@ -132,9 +128,11 @@ def start_recording(rig_path: str, subject: str, session: int) -> str:
         :data:`START_TIMEOUT_S`.
     """
     rig = RigConfig.open(rig_path)
+    subject_label = bids.subject_label(subject)
     folder = os.path.abspath(os.path.join(
-        recordings_folder(rig.data_root, bids.subject_label(subject), session),
-        time.strftime(FOLDER_TIME_FORMAT)))
+        recordings_folder(rig.data_root, subject_label, session),
+        FOLDER_NAME.format(subject=subject_label, session=session,
+                           start=time.strftime(FOLDER_TIME_FORMAT))))
     os.makedirs(folder)
     with open(os.path.join(folder, LOG_FILENAME), "w") as log:
         recorder = subprocess.Popen(
