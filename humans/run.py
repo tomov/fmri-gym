@@ -47,8 +47,8 @@ from .config.curriculum import Curriculum, game_changes
 from .config.phases import BlockMode, Fixation, GamePhase, Message, Phase, Survey
 from .config.run import RunConfig
 from .outputs.display import Display, check_monitor
-from .inputs import (QUIT, QUIT_KEYS, START_KEY, Edge, InputDevice, InputEvent,
-                     open_input_devices)
+from .inputs import (END_RUN_KEYS, QUIT, QUIT_KEYS, START_KEY, Edge, InputDevice, InputDevices,
+                     InputEvent, open_input_devices)
 from .popup import Hint, Menu, PopUp
 from .save.logging import AudioBlockLog, Logger
 from .sync.clock import Clock
@@ -398,7 +398,7 @@ class Run:
         logger: Logger,
         audio: Audio,
         triggers: Triggers,
-        inputs: InputDevice,
+        inputs: InputDevices,
         resume_from: RunProgress | None = None,
     ) -> None:
         """Set up the run's clock and phase dispatch for one subject, on its open log.
@@ -534,7 +534,8 @@ class Run:
         ``task_start``.
         """
         self.display.draw_text("Please keep your head as still as possible.")
-        print(f"\n>>> READY: press {START_KEY} to start the run ({QUIT_KEYS} stops it)\n"
+        print(f"\n>>> READY: press {START_KEY} to start the run ({END_RUN_KEYS} ends it and the "
+              f"session goes on; {QUIT_KEYS} stops it and the session)\n"
               f"    triggers: {self.triggers.status()}\n"
               f"    audio:    {self.audio.status()}", file=sys.stderr)
         self.display.take_focus()
@@ -1026,8 +1027,8 @@ class Run:
         interrupt (partial data).
 
         :return: ``True`` if the run played to its end -- the curriculum's or
-            its duration's -- and ``False`` if it was quit, so a caller can
-            report a run that stopped early.
+            its duration's -- or was ended with :data:`END_RUN_KEYS`, and ``False`` if it was
+            quit, so a caller can stop the runs that would follow.
         """
         user_quit = False
         how_the_run_ended = "quit"
@@ -1066,8 +1067,12 @@ class Run:
                 time.sleep(2.0)
             how_the_run_ended = "finished" if reached_end else "time_up"
         except KeyboardInterrupt:
-            user_quit = True
-            print("Interrupted -- saving partial data.", file=sys.stderr)
+            if self.inputs.has_end_run_request:
+                how_the_run_ended = "ended"
+                print(f"Ended with {END_RUN_KEYS} -- saving partial data.", file=sys.stderr)
+            else:
+                user_quit = True
+                print("Interrupted -- saving partial data.", file=sys.stderr)
         except Exception as error:
             how_the_run_ended = f"error: {type(error).__name__}: {error}"
             raise
