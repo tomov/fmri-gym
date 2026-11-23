@@ -87,8 +87,8 @@ class InputDevice(ABC):
         """Each control with a range of values (a stick, a trigger), by its value as of the
         last :meth:`handle`.
 
-        :return: the value of each such control not at rest; a control left out is at rest,
-            or has no range (a key or button, whose value is whether it is held).
+        :return: the value of each such control read, 0.0 at rest; a control left out has
+            not been read, or has no range (a key or button, whose value is whether it is held).
         """
         return dict(self._values)
 
@@ -127,10 +127,7 @@ class InputDevice(ABC):
 
     def _set(self, name: str, value: float) -> None:
         """Set the value of ``name``, a control with a range; 0.0 is at rest."""
-        if value:
-            self._values[name] = value
-        else:
-            self._values.pop(name, None)
+        self._values[name] = value
 
 
 class InputDevices(InputDevice):

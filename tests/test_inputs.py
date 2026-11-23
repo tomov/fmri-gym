@@ -355,7 +355,7 @@ def test_a_stick_axis_has_a_value_and_each_side_how_far_it_is_pushed():
     assert values[LX] == -1.0 and values[ControlNames.CONTROLLER_AXIS_LEFTX_LEFT] == 1.0
     assert 0.0 < values[RX] < 0.3 and values[RX] == values[ControlNames.CONTROLLER_AXIS_RIGHTX_RIGHT]
     assert "S_A" not in values                                  # a button's value is held()
-    assert LY not in values and ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT not in values
+    assert values[LY] == 0.0 and values[ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT] == 0.0
 
 
 def test_a_stick_within_its_drift_of_rest_reads_zero_and_its_stops_one():
@@ -437,10 +437,10 @@ def test_an_xbox_controller_reads_its_mapping_and_not_the_joystick_twin():
     assert pad.handle(pull, 1.1) == [_down(ControlNames.CONTROLLER_AXIS_TRIGGERLEFT)]
     ease = [_joy(pygame.CONTROLLERAXISMOTION, axis=trigger, value=12000)]   # still past off
     assert pad.handle(ease, 1.2) == []
-    assert pad.values() == {ControlNames.CONTROLLER_AXIS_TRIGGERLEFT: 12000 / 32767}
+    assert pad.values()[ControlNames.CONTROLLER_AXIS_TRIGGERLEFT] == 12000 / 32767
     let_go = [_joy(pygame.CONTROLLERAXISMOTION, axis=trigger, value=0)]
     assert pad.handle(let_go, 1.3) == [_up(ControlNames.CONTROLLER_AXIS_TRIGGERLEFT)]
-    assert pad.values() == {}
+    assert pad.values()[ControlNames.CONTROLLER_AXIS_TRIGGERLEFT] == 0.0
 
 
 def test_an_xbox_controller_reads_each_stick_axis_through_its_calibration():
@@ -589,13 +589,15 @@ def test_a_controller_whose_handle_a_game_closed_is_given_a_new_one(
 def test_a_reopened_controller_forgets_its_values_and_reads_where_its_stick_is(sdl, monkeypatch):
     pad = _calibrated(_bare(CurrentDesignsGamepad3), GMPD3_FILE)
     pad.handle([_joy(pygame.JOYAXISMOTION, axis=0, value=0.9)], 1.0)
-    assert set(pad.values()) == {LX, ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT}
+    assert {name for name, value in pad.values().items() if value} == {
+        LX, ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT}
     monkeypatch.setattr(CurrentDesignsGamepad3, "HANDLE", staticmethod(   # pushed up, no event
         lambda index: _FakeHandle(index, sdl.names[index], axes={1: -0.9})))
     pad.device_handle.quit()                                # what pygame.quit() does to it
     assert pad.handle([], 1.1) == [_up(ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT), _up(LX),
                                    _down(ControlNames.CONTROLLER_AXIS_LEFTY_UP), _down(LY)]
-    assert set(pad.values()) == {LY, ControlNames.CONTROLLER_AXIS_LEFTY_UP}
+    assert {name for name, value in pad.values().items() if value} == {
+        LY, ControlNames.CONTROLLER_AXIS_LEFTY_UP}
     assert pad.values()[LY] < 0 and pad.axis_reading(LY) == -0.9
     pad.close()
     assert pad.values() == {} and pad.axis_reading(LY) == 0.0

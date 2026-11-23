@@ -55,8 +55,8 @@ class Keymap(ABC):
 
         :param held: the NAMES of the controls held at the tick and of those pressed
             during the frame, so a tap shorter than a frame counts for one.
-        :param values: each control with a range by its value at the tick, a control at rest
-            left out (:meth:`~humans.inputs.InputDevice.values`).
+        :param values: each control with a range by its value, 0.0 at rest
+            (:meth:`~humans.inputs.InputDevice.values`).
         :return: the action to send to the env this frame.
         """
 
