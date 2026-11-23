@@ -16,9 +16,9 @@ key does what differs from site to site, so the file states all of it.
   with no control gets. No action of these spaces means "do nothing" everywhere (0
   is FrozenLake's LEFT, MiniHack's "move N"), so a real-time phase has to write
   it; an ``is_turn_based`` phase steps only on presses and needs none.
-- :class:`ContinuousBoxKeymap`, for a ``Box`` phase whose values are dimensions, not
-  lists: each control's value sets one dimension of ``""``'s action
-  (:class:`DimensionBinding`).
+- :class:`ContinuousBoxKeymap`, for a ``Box`` phase where a control's value is a
+  dimension, not a list: that control's value sets the dimension over the action the
+  held combos give (:class:`DimensionBinding`).
 """
 
 from __future__ import annotations
@@ -50,11 +50,13 @@ class Keymap(ABC):
         """The action ``value`` stands for in ``space``; raises if it is not one."""
 
     @abstractmethod
-    def resolve(self, held: frozenset[str]) -> Any:
-        """The action for the controls of this frame.
+    def resolve(self, held: frozenset[str], values: dict[str, float]) -> Any:
+        """The action for the controls of this frame; a keymap reads either argument or both.
 
         :param held: the NAMES of the controls held at the tick and of those pressed
             during the frame, so a tap shorter than a frame counts for one.
+        :param values: each control with a range by its value at the tick, a control at rest
+            left out (:meth:`~humans.inputs.InputDevice.values`).
         :return: the action to send to the env this frame.
         """
 
@@ -64,7 +66,8 @@ class Keymap(ABC):
 
     def turn_actions(self) -> dict[str, Any]:
         """``{control: action}`` for the single-control entries: turn-based play steps on one press."""
-        return {next(iter(combo)): self.resolve(combo) for combo in self.combos if len(combo) == 1}
+        return {next(iter(combo)): self.resolve(combo, {})
+                for combo in self.combos if len(combo) == 1}
 
 
 class MultiBinaryKeymap(Keymap):
@@ -85,7 +88,7 @@ class MultiBinaryKeymap(Keymap):
                              f"(0..{self.n - 1}) of the button that control holds down")
         return value
 
-    def resolve(self, held: frozenset[str]) -> list[int]:
+    def resolve(self, held: frozenset[str], _: dict[str, float]) -> list[int]:
         vec = [0] * self.n
         for combo in self._matched(held):
             vec[self.combos[combo]] = 1
@@ -101,7 +104,7 @@ class DiscreteKeymap(Keymap):
                              f"{space}")
         return value
 
-    def resolve(self, held: frozenset[str]) -> Any:
+    def resolve(self, held: frozenset[str], _: dict[str, float]) -> Any:
         return self.combos[max(self._matched(held), key=len)]
 
 
@@ -141,7 +144,7 @@ class DimensionBinding(NamedTuple):
             two numbers.
         """
         where = f"controls: {control!r}: {value!r}"
-        if "+" in control:
+        if "+" in control or control == "":
             raise ValueError(f"{where}: a dimension of the action is set by one control")
         if isinstance(value, dict) and set(value) != {"dimension", "range"}:
             raise ValueError(f'{where}: expected {{"dimension": <index>, "range": [<at the '
@@ -174,8 +177,9 @@ class DimensionBinding(NamedTuple):
 
 
 class ContinuousBoxKeymap(Keymap):
-    """``Box``, a dimension per control: ``""`` is the action, and each other control sets
-    one dimension of it from its value (:class:`DimensionBinding`), clipped to the space.
+    """``Box`` with dimensions: the most specific held combo's list (``""`` with none) is the
+    action, and each control bound to a dimension sets it from its value
+    (:class:`DimensionBinding`), clipped to the space.
 
     :raises ValueError: ``""`` missing, a binding it cannot read, or two controls on one
         dimension.
@@ -196,29 +200,33 @@ class ContinuousBoxKeymap(Keymap):
             controls_by_dimension[binding.dimension] = control
 
     def _action(self, space: spaces.Box, combo: str, value: Any) -> Any:
-        if combo != "":
+        if not isinstance(value, list):
             return DimensionBinding.from_dict(combo, value, space)
         action = np.asarray(value, dtype=space.dtype)
         if not space.contains(action):
-            raise ValueError(f'controls: "": {value!r} is not an action of the env\'s {space}')
+            raise ValueError(f"controls: {combo!r}: {value!r} is not an action of the env's "
+                             f"{space}")
         return action
 
     def _dimension_bindings(self) -> list[tuple[str, DimensionBinding]]:
-        """Each control and the dimension it sets."""
-        return [(next(iter(combo)), binding) for combo, binding in self.combos.items() if combo]
+        """Each control bound to a dimension, and its binding."""
+        return [(next(iter(combo)), binding) for combo, binding in self.combos.items()
+                if isinstance(binding, DimensionBinding)]
 
-    def resolve(self, held: frozenset[str],
-                values: dict[str, float] | None = None) -> np.ndarray:
-        """The action: ``""``'s, each bound dimension set by its control's value.
+    def _matched(self, held: frozenset[str]) -> list[frozenset[str]]:
+        """The held combos whose value is a whole action (``""`` always is)."""
+        return [combo for combo in super()._matched(held)
+                if not isinstance(self.combos[combo], DimensionBinding)]
+
+    def resolve(self, held: frozenset[str], values: dict[str, float]) -> np.ndarray:
+        """The most specific held combo's action, each bound dimension set by its control.
 
         :param held: as :meth:`Keymap.resolve`.
-        :param values: each control's value, a control at rest left out
-            (:meth:`~humans.inputs.InputDevice.values`). A control not in it reads 1.0 when
-            held and 0.0 when not, as a key or button does. None: every control reads so.
+        :param values: as :meth:`Keymap.resolve`. A control not in it (a key or button) reads
+            1.0 when held and 0.0 when not.
         :return: the action to send to the env this frame.
         """
-        values = {} if values is None else values
-        action = self.combos[frozenset()].copy()
+        action = self.combos[max(self._matched(held), key=len)].copy()
         for control, binding in self._dimension_bindings():
             value = values.get(control, float(control in held))
             action[binding.dimension] = binding.dimension_value(control, value)
@@ -253,5 +261,5 @@ def make_keymap(spec: dict, space: gym.Space) -> Keymap:
 
 
 def _binds_dimensions(controls: dict[str, Any]) -> bool:
-    """Whether a control other than ``""`` maps to a dimension rather than a whole action."""
+    """Whether a control maps to a dimension rather than a whole action."""
     return any(not isinstance(value, list) for combo, value in controls.items() if combo)

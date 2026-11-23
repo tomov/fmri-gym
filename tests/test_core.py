@@ -200,22 +200,22 @@ def test_each_code_a_line_sends_is_logged_and_none_from_a_line_that_sends_nothin
 
 def test_discrete_keymap_longest_combo_wins():
     km = make_keymap({"controls": {"": 0, "LEFT": 1, "LEFT+SPACE": 2}}, spaces.Discrete(3))
-    assert km.resolve(frozenset()) == 0
-    assert km.resolve(frozenset({"LEFT"})) == 1
-    assert km.resolve(frozenset({"LEFT", "SPACE"})) == 2
-    assert km.resolve(frozenset({"X"})) == 0
+    assert km.resolve(frozenset(), {}) == 0
+    assert km.resolve(frozenset({"LEFT"}), {}) == 1
+    assert km.resolve(frozenset({"LEFT", "SPACE"}), {}) == 2
+    assert km.resolve(frozenset({"X"}), {}) == 0
     assert km.turn_actions() == {"LEFT": 1}          # the no-key entry is not a press
 
 
 def test_multibinary_keymap_combines_held_keys():
     km = make_keymap({"controls": {"LEFT": 0, "RIGHT": 1, "SPACE": 2}}, spaces.MultiBinary(3))
-    assert list(km.resolve(frozenset({"LEFT", "SPACE"}))) == [1, 0, 1]
-    assert list(km.resolve(frozenset())) == [0, 0, 0]
+    assert list(km.resolve(frozenset({"LEFT", "SPACE"}), {})) == [1, 0, 1]
+    assert list(km.resolve(frozenset(), {})) == [0, 0, 0]
 
 
 def test_box_keymap_takes_lists():
     km = make_keymap({"controls": {"": [0.0], "RIGHT": [1.0]}}, spaces.Box(-1.0, 1.0, (1,)))
-    assert np.array_equal(km.resolve(frozenset({"RIGHT"})), np.array([1.0], dtype=np.float32))
+    assert np.array_equal(km.resolve(frozenset({"RIGHT"}), {}), np.array([1.0], dtype=np.float32))
 
 
 #: STK's continuous_full: steer, accel, brake, nitro, skid.
@@ -243,7 +243,7 @@ def test_a_value_comes_before_held():
                      _STEER_ACCEL_BRAKE)
     trigger = "CONTROLLER_AXIS_TRIGGERRIGHT"
     assert km.resolve(frozenset({trigger}), {trigger: 0.6}).tolist()[1] == pytest.approx(0.6)
-    assert km.resolve(frozenset({trigger})).tolist()[1] == 1.0     # no values: held is 1
+    assert km.resolve(frozenset({trigger}), {}).tolist()[1] == 1.0     # no value: held is 1
 
 
 def test_a_range_maps_a_control_value_onto_a_dimension_and_can_flip_it():
@@ -261,6 +261,14 @@ def test_a_dimension_value_outside_the_space_is_clipped():
     assert km.resolve(frozenset(), {"CONTROLLER_AXIS_LEFTX": -0.7}).tolist()[1] == 0.0
 
 
+def test_a_dimension_is_set_over_the_held_combo_s_whole_action():
+    km = make_keymap({"controls": {"": [0, 0, 0, 0, 0], "SPACE": [0, 0, 0, 1, 1],
+                                   "CONTROLLER_AXIS_LEFTX": 0}}, _STEER_ACCEL_BRAKE)
+    action = km.resolve(frozenset({"SPACE"}), {"CONTROLLER_AXIS_LEFTX": 1.0})
+    assert action.tolist() == [1, 0, 0, 1, 1]
+    assert km.resolve(frozenset(), {}).tolist() == [0, 0, 0, 0, 0]
+
+
 def test_a_box_phase_of_whole_actions_stays_discrete():
     km = make_keymap({"controls": {"": [0, 0, 0, 0, 0], "SPACE": [0, 0, 0, 1, 1]}},
                      _STEER_ACCEL_BRAKE)
@@ -271,7 +279,6 @@ def test_a_box_phase_of_whole_actions_stays_discrete():
     ({"": [0] * 5, "LEFT": 0, "RIGHT": 0}, "both set dimension 0"),
     ({"": [0] * 5, "LEFT+UP": 0}, "set by one control"),
     ({"": [0] * 5, "LEFT": 5}, "expected a dimension"),
-    ({"": [0] * 5, "LEFT": 0, "RIGHT": [1, 0, 0, 0, 0]}, "expected a dimension"),
     ({"": [0] * 5, "LEFT": {"dimension": 0}}, "expected"),
     ({"": [0] * 5, "LEFT": {"dimension": 0, "range": [0]}}, "two numbers"),
     ({"LEFT": 0}, '"" missing'),
