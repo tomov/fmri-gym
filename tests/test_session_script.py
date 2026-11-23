@@ -109,10 +109,11 @@ def test_a_session_is_recorded_from_before_its_first_line_until_it_ends(tmp_path
     script.write_text(write_session(Session(
         [{"command": f"echo played >> {tmp_path / 'uv.log'}; {last_line}", "skip": False}],
         "sub-01", RIG, 4)))
-    ran = subprocess.run(["sh", script], env=_uv_that_logs(tmp_path))
-    assert ran.returncode == status
+    session = subprocess.Popen(["sh", script], env=_uv_that_logs(tmp_path))
+    assert session.wait() == status
     assert _asked_of_uv(tmp_path) == [
-        f"run session-logger start --subject sub-01 --ses 004 --rig {RIG}", "played",
+        f"run session-logger start --subject sub-01 --ses 004 --rig {RIG} "
+        f"--session-pid {session.pid}", "played",
         "run session-logger stop /recordings/1"]
 
 

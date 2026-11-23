@@ -5,7 +5,9 @@ session's marks, and the clock.
 
 ``start`` leaves a recorder (:mod:`.recorder`) running in a process and a session of its own,
 which no task imports or waits on, and prints the recording's events file once its devices are
-open; ``mark`` adds a line to it; ``stop`` ends it. A recording is a file in the session's
+open; ``mark`` adds a line to it; ``stop`` ends it. The recorder also ends it when the session's
+own process (the script that started it) ends, however it ends: killed, crashed, its terminal
+closed. A recording is a file in the session's
 ``beh/``, beside its runs, never written over, with two others while it runs
 (:class:`RecordingFiles`); its events file is written as the lines arrive, flushed to disk every second: first ``recording_start`` (what is read, with what, and a
 ``perf_counter`` time with its wall time), then one line per event, each with its ``type`` and
@@ -119,6 +121,9 @@ def main(argv: list[str] | None = None) -> None:
     start.add_argument("--rig", required=True, help="the rig file: its data root")
     start.add_argument("--subject", required=True, help="sub-<label>")
     start.add_argument("--ses", type=int, required=True, help="the session number, from 1")
+    start.add_argument("--session-pid", type=int, required=True,
+                       help="the session's own process, a script's $$: the recording ends "
+                       "when it ends")
     mark = commands.add_parser("mark", help="add a line to the recording, stamped now")
     mark.add_argument("recording", help="the recording's events file, as start printed it")
     mark.add_argument("text", help="what the line says")
@@ -126,7 +131,7 @@ def main(argv: list[str] | None = None) -> None:
     stop.add_argument("recording", help="the recording's events file, as start printed it")
     args = parser.parse_args(argv)
     if args.command == "start":
-        print(start_recording(args.rig, args.subject, args.ses))
+        print(start_recording(args.rig, args.subject, args.ses, args.session_pid))
     elif args.command == "mark":
         mark_recording(args.recording, args.text)
     elif not stop_recording(args.recording):
@@ -144,17 +149,23 @@ def recordings_of_run(run_folder: str) -> list[RecordingFiles]:
     return [RecordingFiles.of_events_file(path) for path in sorted(glob.glob(pattern))]
 
 
-def start_recording(rig_path: str, subject: str, session: int) -> str:
-    """Leave a recorder writing a new recording of the session, every input device open.
+def start_recording(rig_path: str, subject: str, session: int, session_pid: int) -> str:
+    """Leave a recorder writing a new recording of the session, every input device open, until
+    it is stopped or the process ``session_pid`` ends.
 
     :param rig_path: the rig file: its data root.
     :param subject: ``sub-<label>``.
     :param session: the session number, from 1.
+    :param session_pid: the session's own process.
     :return: the recording's events file, absolute, once its first line is on disk.
-    :raises SessionLoggerError: if a recording of that name is already there, if the recorder
+    :raises SessionLoggerError: if the process ``session_pid`` is not running, if a recording of
+        that name is already there, if the recorder
         stops before its first line (a device the OS will not let it read: its message says
         which) or does not write it in :data:`START_TIMEOUT_S`.
     """
+    if not is_process_running(session_pid):
+        raise SessionLoggerError(f"session-logger: the session's process {session_pid} is not "
+                                 "running, so its recording would end at once")
     rig = RigConfig.open(rig_path)
     subject_label = bids.subject_label(subject)
     folder = os.path.abspath(bids.beh_folder(rig.data_root, subject_label, session))
@@ -167,7 +178,8 @@ def start_recording(rig_path: str, subject: str, session: int) -> str:
     with open(files.errors, "x") as errors:
         recorder = subprocess.Popen(
             [sys.executable, "-m", f"{__name__}.recorder", "--events", files.events,
-             "--rig", rig.path, "--subject", subject, "--ses", str(session)],
+             "--rig", rig.path, "--subject", subject, "--ses", str(session),
+             "--session-pid", str(session_pid)],
             stdin=subprocess.DEVNULL, stdout=errors, stderr=errors, **_DETACHED)
     deadline = time.monotonic() + START_TIMEOUT_S
     while read_first_line(files.events) is None:
@@ -240,7 +252,7 @@ def is_recording(recording: str) -> bool:
     first = read_first_line(recording)
     if first is None or read_last_line(recording)["type"] == "recording_end":
         return False
-    return _is_process_running(first["recorder_pid"])
+    return is_process_running(first["recorder_pid"])
 
 
 def append_line(path: str, line: dict[str, Any]) -> None:
@@ -274,7 +286,7 @@ def read_last_line(path: str) -> dict[str, Any] | None:
     return json.loads(complete[-1]) if complete else None
 
 
-def _is_process_running(pid: int) -> bool:
+def is_process_running(pid: int) -> bool:
     """Whether the process ``pid`` is running."""
     if sys.platform == "win32":
         import ctypes
@@ -307,7 +319,7 @@ def _remove_control_and_empty_errors(files: RecordingFiles, deadline: float) -> 
     """Once the recorder has exited (waited for until ``deadline``), remove the control file
     and an empty errors file; the console is told of any it could not remove."""
     pid = read_first_line(files.events)["recorder_pid"]
-    while _is_process_running(pid) and time.monotonic() < deadline:
+    while is_process_running(pid) and time.monotonic() < deadline:
         time.sleep(0.05)
     removable = [files.control] + ([files.errors] if os.path.exists(files.errors)
                                    and os.path.getsize(files.errors) == 0 else [])

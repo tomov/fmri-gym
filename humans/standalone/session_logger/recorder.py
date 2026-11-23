@@ -1,6 +1,7 @@
 """The recorder of one session: every input device, the ones plugged in during it too, which
 application has the focus, the machine's stalls, the lines the commands ask it to add and the
-clock, written to the recording's events file as they arrive until it is told to stop.
+clock, written to the recording's events file as they arrive until it is told to stop or the
+session's own process ends.
 
 It reads the devices with this OS's reader: Linux reads each ``/dev/input/event*`` node
 (:mod:`.linux`); macOS, the IOKit HID manager (:mod:`.macos`); Windows, its Raw Input
@@ -23,10 +24,12 @@ from typing import IO, Any, Protocol
 from ...config.rig import RigConfig
 from ...save.provenance import platform_info, versions
 from . import (CLOCK_INTERVAL_S, FLUSH_INTERVAL_S, READ_TIMEOUT_S, FrontApplication,
-               RecordingFiles, SessionLoggerError)
+               RecordingFiles, SessionLoggerError, is_process_running)
 
 #: Seconds between two looks at the control file for a line the commands added.
 CONTROL_POLL_S = 0.05
+#: Seconds between two looks at whether the session's own process is still running.
+SESSION_POLL_S = 0.5
 #: Seconds between two looks at which application has the focus.
 FOCUS_POLL_S = 0.5
 #: The heartbeat's sleep, in seconds: how often the recorder looks whether it was run.
@@ -46,7 +49,8 @@ class OpenDevices(Protocol):
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Record into ``--events`` until the recording's control file says to stop.
+    """Record into ``--events`` until the recording's control file says to stop, or the process
+    ``--session-pid`` ends.
 
     :param argv: the command line; ``None`` reads the process's.
     :raises SystemExit: with the reason alone, when a device cannot be read.
@@ -57,6 +61,8 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--rig", required=True, help="the rig file, recorded in the first line")
     parser.add_argument("--subject", required=True, help="sub-<label>")
     parser.add_argument("--ses", type=int, required=True, help="the session number, from 1")
+    parser.add_argument("--session-pid", type=int, required=True,
+                        help="the session's own process: the recording ends when it ends")
     args = parser.parse_args(argv)
     files = RecordingFiles.of_events_file(args.events)
     rig = RigConfig.open(args.rig)
@@ -69,6 +75,7 @@ def main(argv: list[str] | None = None) -> None:
     stop = threading.Event()
     sources: list[tuple[Callable[..., None], tuple[Any, ...]]] = [
         (follow_control_file, (files.control, side_lines, stop)),
+        (watch_session_process, (args.session_pid, side_lines, stop)),
         (sample_clock, (side_lines, stop)), (watch_stalls, (side_lines, stop))]
     if front_application is not None:
         sources.append((watch_focus, (front_application, side_lines, stop)))
@@ -77,7 +84,8 @@ def main(argv: list[str] | None = None) -> None:
     first_line = {"type": "recording_start", "perf_time": time.perf_counter(),
                   "wall_time": time.time(), "subject": args.subject, "session": args.ses,
                   **devices.record(), "sources": _sources(devices, front_application),
-                  "rig": rig.record(), "recorder_pid": os.getpid(), "versions": versions(),
+                  "rig": rig.record(), "recorder_pid": os.getpid(),
+                  "session_pid": args.session_pid, "versions": versions(),
                   "platform": platform_info()}
     record_session_events(devices, files.events, first_line, side_lines, stop)
 
@@ -120,7 +128,9 @@ def record_session_events(devices: OpenDevices, path: str, first_line: dict[str,
                           stop: threading.Event) -> None:
     """Write ``first_line``, then every line ``devices`` read or ``side_lines`` holds, as they
     come, flushed to disk every :data:`FLUSH_INTERVAL_S`, until ``stop``; then the last ones and
-    a ``recording_end`` line that counts them and lists the devices plugged in and unplugged.
+    a ``recording_end`` line that says how it ended (``session_ended`` when a ``session_ended``
+    line was written, else ``stopped``), counts the lines and lists the devices plugged in and
+    unplugged.
 
     :param devices: the open devices; closed at the end.
     :param path: the events file, made here: a recording never writes over another.
@@ -143,7 +153,8 @@ def record_session_events(devices: OpenDevices, path: str, first_line: dict[str,
         _write_lines(out, devices.read(0.0) + _drain(side_lines), counts, devices_changed)
         devices.close()
         del counts["recording_start"]
-        out.write(json.dumps({"type": "recording_end", "how": "stopped",
+        how = "session_ended" if counts["session_ended"] else "stopped"
+        out.write(json.dumps({"type": "recording_end", "how": how,
                               "perf_time": time.perf_counter(), "wall_time": time.time(),
                               "counts": dict(counts),
                               "devices_added": devices_changed["device_added"],
@@ -172,6 +183,24 @@ def follow_control_file(path: str, side_lines: queue.Queue[dict[str, Any]],
                 stop.set()
                 return
             side_lines.put(asked)
+
+
+def watch_session_process(session_pid: int, side_lines: queue.Queue[dict[str, Any]],
+                          stop: threading.Event) -> None:
+    """A ``session_ended`` line, then ``stop``, once the process ``session_pid`` is not running:
+    looked at every :data:`SESSION_POLL_S`, stamped when seen.
+
+    :param session_pid: the session's own process.
+    :param side_lines: where the line goes.
+    :param stop: set when it has ended, or by another to end this.
+    """
+    while not stop.wait(SESSION_POLL_S):
+        if is_process_running(session_pid):
+            continue
+        side_lines.put({"type": "session_ended", "perf_time": time.perf_counter(),
+                        "wall_time": time.time(), "pid": session_pid})
+        stop.set()
+        return
 
 
 def sample_clock(side_lines: queue.Queue[dict[str, Any]], stop: threading.Event) -> None:
@@ -227,7 +256,9 @@ def _sources(devices: OpenDevices,
         "stall": f"a {1000 * HEARTBEAT_S:g} ms sleep woken over "
                  f"{1000 * STALL_THRESHOLD_S:g} ms late",
         "clock": f"every {CLOCK_INTERVAL_S:g} s",
-        "mark": "session-logger mark, stamped when it ran"}
+        "mark": "session-logger mark, stamped when it ran",
+        "session_ended": f"the session's own process seen gone, looked at every "
+                         f"{SESSION_POLL_S:g} s"}
 
 
 def _write_lines(out: IO[str], lines: list[dict[str, Any]], counts: Counter[str],

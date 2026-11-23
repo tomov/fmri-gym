@@ -888,7 +888,7 @@ def test_a_session_is_recorded_from_start_to_stop_with_its_marks(tmp_path, fake_
 
     from humans.standalone import session_logger
     fake_devices.setenv("FAKE_DEVICES", json.dumps([{"name": "Pad"}, {"name": "Keyboard"}]))
-    recording = session_logger.start_recording(_rig(tmp_path), "sub-01", 2)
+    recording = session_logger.start_recording(_rig(tmp_path), "sub-01", 2, os.getpid())
     beh = tmp_path / "data" / "sub-01" / "ses-002" / "beh"
     try:
         assert os.path.dirname(recording) == str(beh), "straight into the session's beh/"
@@ -905,7 +905,8 @@ def test_a_session_is_recorded_from_start_to_stop_with_its_marks(tmp_path, fake_
     assert first["devices"] == [{"name": "Pad"}, {"name": "Keyboard"}]
     assert first["subject"] == "sub-01" and first["wall_time"] > first["perf_time"]
     assert set(first["sources"]) == {"device_event", "device_added", "window_focus", "stall",
-                                     "clock", "mark"}
+                                     "clock", "mark", "session_ended"}
+    assert first["session_pid"] == os.getpid()
     marks = [line for line in lines if line["type"] == "mark"]
     assert [mark["text"] for mark in marks] == ["run 1: the localizer, été"]
     assert last["how"] == "stopped" and last["counts"]["mark"] == 1
@@ -921,11 +922,42 @@ def test_a_session_is_recorded_from_start_to_stop_with_its_marks(tmp_path, fake_
     assert os.listdir(beh) == [os.path.basename(recording)], "a late mark writes nothing"
 
 
+def test_a_recording_ends_itself_when_its_session_ends_without_stopping_it(tmp_path,
+                                                                           fake_devices):
+    import subprocess
+    import time
+
+    from humans.standalone import session_logger
+    session = subprocess.Popen(["sleep", "60"])
+    recording = session_logger.start_recording(_rig(tmp_path), "sub-01", 1, session.pid)
+    session.kill()                              # killed: no stop will come
+    session.wait()
+    deadline = time.monotonic() + 10
+    while session_logger.is_recording(recording) and time.monotonic() < deadline:
+        time.sleep(0.1)
+    lines = [json.loads(line) for line in open(recording)]
+    assert lines[-2]["type"] == "session_ended" and lines[-2]["pid"] == session.pid
+    assert lines[-1]["type"] == "recording_end" and lines[-1]["how"] == "session_ended"
+    assert not session_logger.is_recording(recording), "its recorder has exited"
+    assert session_logger.stop_recording(recording), "a stop after it is harmless"
+
+
+def test_a_recording_does_not_start_for_a_session_that_is_not_running(tmp_path, fake_devices):
+    import subprocess
+
+    from humans.standalone import session_logger
+    session = subprocess.Popen(["true"])
+    session.wait()
+    with pytest.raises(session_logger.SessionLoggerError, match="is not running"):
+        session_logger.start_recording(_rig(tmp_path), "sub-01", 1, session.pid)
+    assert not (tmp_path / "data").exists(), "nothing is written"
+
+
 def test_a_recording_is_never_written_over(tmp_path, fake_devices):
     from humans.standalone import session_logger
     fake_devices.setattr(session_logger.time, "strftime", lambda _: "20261119T120000")
     rig = _rig(tmp_path)
-    recording = session_logger.start_recording(rig, "sub-01", 1)
+    recording = session_logger.start_recording(rig, "sub-01", 1, os.getpid())
     assert session_logger.stop_recording(recording)
     beh = os.path.dirname(recording)
 
@@ -933,7 +965,7 @@ def test_a_recording_is_never_written_over(tmp_path, fake_devices):
         return {name: open(os.path.join(beh, name), "rb").read() for name in os.listdir(beh)}
     before = files_in_beh()
     with pytest.raises(session_logger.SessionLoggerError, match="never written over"):
-        session_logger.start_recording(rig, "sub-01", 1)
+        session_logger.start_recording(rig, "sub-01", 1, os.getpid())
     assert files_in_beh() == before
     with pytest.raises(session_logger.SessionLoggerError, match="not a recording's events"):
         session_logger.stop_recording(beh)
@@ -943,7 +975,7 @@ def test_a_recording_does_not_start_when_a_device_cannot_be_read(tmp_path, fake_
     from humans.standalone import session_logger
     fake_devices.setenv("FAKE_DEVICES_ERROR", "session-logger: the Pad cannot be read")
     with pytest.raises(session_logger.SessionLoggerError, match="the Pad cannot be read"):
-        session_logger.start_recording(_rig(tmp_path), "sub-01", 1)
+        session_logger.start_recording(_rig(tmp_path), "sub-01", 1, os.getpid())
     beh = tmp_path / "data" / "sub-01" / "ses-001" / "beh"
     errors = [name for name in os.listdir(beh) if name.endswith("_errors.log")]
     assert errors and "the Pad cannot be read" in (beh / errors[0]).read_text(), \
