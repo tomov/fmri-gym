@@ -25,6 +25,9 @@ _POINTER = ctypes.c_void_p
 _UTF8 = 0x08000100                  # kCFStringEncodingUTF8
 _SINT32 = 3                         # kCFNumberSInt32Type
 _NOT_PERMITTED = -536870174         # kIOReturnNotPermitted, 0xE00002E2, as an IOReturn
+#: The bytes of a value IOKit's integer holds whole: a longer one (a vendor's whole report, as
+#: Apple's Xbox controller driver gives it) is cut to its first ones.
+_INTEGER_BYTES = 4
 _VALUE_CALLBACK = ctypes.CFUNCTYPE(None, _POINTER, ctypes.c_int32, _POINTER, _POINTER)
 _REMOVAL_CALLBACK = ctypes.CFUNCTYPE(None, _POINTER, ctypes.c_int32, _POINTER)
 _MATCHING_CALLBACK = ctypes.CFUNCTYPE(None, _POINTER, ctypes.c_int32, _POINTER, _POINTER)
@@ -87,6 +90,8 @@ _IOHIDValueGetIntegerValue = _function(_IOKIT, "IOHIDValueGetIntegerValue", ctyp
                                        _POINTER)
 _IOHIDValueGetTimeStamp = _function(_IOKIT, "IOHIDValueGetTimeStamp", ctypes.c_uint64,
                                     _POINTER)
+_IOHIDValueGetLength = _function(_IOKIT, "IOHIDValueGetLength", ctypes.c_long, _POINTER)
+_IOHIDValueGetBytePtr = _function(_IOKIT, "IOHIDValueGetBytePtr", _POINTER, _POINTER)
 _IOHIDElementGetUsagePage = _function(_IOKIT, "IOHIDElementGetUsagePage", ctypes.c_uint32,
                                       _POINTER)
 _IOHIDElementGetUsage = _function(_IOKIT, "IOHIDElementGetUsage", ctypes.c_uint32, _POINTER)
@@ -171,14 +176,19 @@ class MacDevices:
         return index
 
     def _on_value(self, context: int, result: int, sender: int, value: int) -> None:
-        """Keep one input value: its device (``context`` is its index + 1), element and stamp."""
+        """Keep one input value: its device (``context`` is its index + 1), element and stamp;
+        a value longer than :data:`_INTEGER_BYTES` keeps its ``bytes`` too, which its integer
+        cuts short."""
         element = _IOHIDValueGetElement(value)
-        self._pending.append({
-            "type": "device_event",
-            "perf_time": _IOHIDValueGetTimeStamp(value) * self._seconds_per_tick,
-            "device": context - 1, "usage_page": _IOHIDElementGetUsagePage(element),
-            "usage": _IOHIDElementGetUsage(element),
-            "value": _IOHIDValueGetIntegerValue(value)})
+        line = {"type": "device_event",
+                "perf_time": _IOHIDValueGetTimeStamp(value) * self._seconds_per_tick,
+                "device": context - 1, "usage_page": _IOHIDElementGetUsagePage(element),
+                "usage": _IOHIDElementGetUsage(element),
+                "value": _IOHIDValueGetIntegerValue(value)}
+        length = _IOHIDValueGetLength(value)
+        if length > _INTEGER_BYTES:
+            line["bytes"] = ctypes.string_at(_IOHIDValueGetBytePtr(value), length).hex()
+        self._pending.append(line)
 
     def _on_removal(self, context: int, result: int, sender: int) -> None:
         """Keep a ``device_gone`` line for a device unplugged (``context`` is its index + 1),
