@@ -1,0 +1,5 @@
+{
+  "curriculum": [
+    {"__include": "../common/my_way_home-GMPD3-stick-nav.json"}
+  ]
+}

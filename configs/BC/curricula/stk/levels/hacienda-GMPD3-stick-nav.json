@@ -1,0 +1,9 @@
+{
+  "curriculum": [
+    {
+      "__include": "../common/stk-GMPD3-stick-nav.json",
+      "track": "hacienda",
+      "instructions": {"title": "SuperTuxKart: Hacienda"}
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "curriculum": [
+    {"__include": "../common/health_gathering_supreme-GMPD3-stick-nav.json"}
+  ]
+}

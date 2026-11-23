@@ -1,0 +1,47 @@
+{
+  "pi": "MT",
+  "modality": "fmri",
+  "monitor": "Sony Projector",
+  "photodiode": "None",
+  "audio_path": "MR-safe insert earphones",
+  "trigger_hardware": "932 USB",
+  "notes": "3T MRI at MIT (compatible with Hippocampus and Athena), 2x2 response boxes through the 932: buttons send the keys 1, 2, 3, 4; distance_cm set to 106 (measured: 122) so the CogTasks stimulus arrays fit the screen",
+  "screen": {
+    "size": "1024x768",
+    "is_fullscreen": true,
+    "monitor": 1,
+    "has_vsync": true,
+    "geometry": {
+      "width_cm": 44.5,
+      "height_cm": 25.0,
+      "distance_cm": 106.0
+    }
+  },
+  "has_audio": true,
+  "data_root": "data",
+  "start_fixation": 10.0,
+  "end_fixation": 10.0,
+  "inputs": [
+    "keyboard"
+  ],
+  "triggers": {
+    "sync": {
+      "mode": "wait",
+      "key": "KP_PLUS"
+    },
+    "backend": "null",
+    "hid_device": "mcc-1208fs",
+    "lsl_stream_name": "fmri_gym",
+    "pulse_ms": 10.0,
+    "on_frame": true,
+    "frame_every": 1,
+    "on_episode_start": true,
+    "codes": {
+      "frame_bits": 3,
+      "task_start": 8,
+      "task_stop": 16,
+      "episode_start": 32,
+      "scanner_start": 64
+    }
+  }
+}

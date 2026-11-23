@@ -6,9 +6,10 @@ The backend is ``stk``; the package it drives is ``stk_gym``, the client half of
 physics, and the same env object models train against.
 
 Why this shape: with ``render_mode="rgb_array"`` the game renders into a window
-that is created hidden (never mapped, so it neither steals focus nor gets resized
-by the window manager) and every ``step`` brings the frame back, HUD included, at
-the requested ``screensize``; ``display.py`` scales it to the screen. With
+that is created hidden (never mapped, so the window manager never resizes it), in
+an engine launched as a background app (so it never takes the keyboard and the
+controllers from the display's window), and every ``step`` brings the frame back,
+HUD included, at the requested ``screensize``; ``display.py`` scales it to the screen. With
 ``action_mode="keys"`` the env's action *is* the set of keys held -- a
 ``MultiBinary(8)`` over left, right, up, down, nitro, skid, fire, rescue, the
 indices a phase's ``keys`` name -- and the game's own player controller turns
@@ -44,11 +45,34 @@ and soccer fields need game modes this adapter never sets.
 
 from __future__ import annotations
 
+import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 import gymnasium as gym
 
 from .base import EnvAdapter, FrameState
+
+#: SDL's hint, read by an SDL program as it starts: no activation, no Dock icon (macOS only).
+_SDL_MAC_BACKGROUND_APP = "SDL_MAC_BACKGROUND_APP"
+
+
+@contextmanager
+def _engine_launched_as_background_app() -> Iterator[None]:
+    """An engine launched in this block starts as a background app: on macOS its SDL would
+    otherwise activate it, hidden window or not, and take the keyboard and the controllers
+    from the display's window. Set for the launch only; this process's own SDL must not read it.
+    """
+    previous = os.environ.get(_SDL_MAC_BACKGROUND_APP)
+    os.environ[_SDL_MAC_BACKGROUND_APP] = "1"
+    try:
+        yield
+    finally:
+        if previous is None:
+            del os.environ[_SDL_MAC_BACKGROUND_APP]
+        else:
+            os.environ[_SDL_MAC_BACKGROUND_APP] = previous
 
 
 class STKAdapter(EnvAdapter):
@@ -58,19 +82,20 @@ class STKAdapter(EnvAdapter):
     def _make(self, spec: dict) -> gym.Env:
         import stk_gym
 
-        env = stk_gym.StkEnv(
-            track=spec.get("track", "hacienda"),
-            laps=spec.get("laps"),
-            num_karts=spec.get("num_karts"),
-            difficulty=spec.get("difficulty"),
-            obs_mode="vector",
-            action_mode="keys",
-            render_mode="rgb_array",
-            frame_skip=int(spec.get("frame_skip", 2)),
-            screensize=spec.get("screensize", "640x360"),
-            seed=spec.get("seed"),
-            binary=spec.get("binary"),
-        )
+        with _engine_launched_as_background_app():
+            env = stk_gym.StkEnv(
+                track=spec.get("track", "hacienda"),
+                laps=spec.get("laps"),
+                num_karts=spec.get("num_karts"),
+                difficulty=spec.get("difficulty"),
+                obs_mode="vector",
+                action_mode="keys",
+                render_mode="rgb_array",
+                frame_skip=int(spec.get("frame_skip", 2)),
+                screensize=spec.get("screensize", "640x360"),
+                seed=spec.get("seed"),
+                binary=spec.get("binary"),
+            )
         # Steps come at fps; the game advances frame_skip ticks
         # per step. If the two disagree the race runs in slow or fast motion
         # relative to the scanner clock, silently.

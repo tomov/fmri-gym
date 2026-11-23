@@ -1,0 +1,5 @@
+{
+  "curriculum": [
+    {"__include": "../common/defend_center-GMPD3-stick-nav.json"}
+  ]
+}

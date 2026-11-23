@@ -1,0 +1,5 @@
+{
+  "curriculum": [
+    {"__include": "../common/deathmatch-GMPD3-stick-nav.json"}
+  ]
+}

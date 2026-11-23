@@ -5,7 +5,7 @@
   "photodiode": "None",
   "audio_path": "MR-safe insert earphones",
   "trigger_hardware": "932 USB",
-  "notes": "3T MRI at MIT (compatible with Hippocampus and Athena)",
+  "notes": "3T MRI at MIT (compatible with Hippocampus and Athena); distance_cm set to 106 (measured: 122) so the CogTasks stimulus arrays fit the screen",
   "screen": {
     "size": "1024x768",
     "is_fullscreen": true,
@@ -14,7 +14,7 @@
     "geometry": {
       "width_cm": 44.5,
       "height_cm": 25.0,
-      "distance_cm": 122.0
+      "distance_cm": 106.0
     }
   },
   "has_audio": true,
