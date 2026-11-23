@@ -1,0 +1,30 @@
+{
+  "__include": "rushhour.json",
+  "instructions": {
+    "text": [
+      "On each puzzle, get the RED car out through the opening",
+      "on the right wall.",
+      "",
+      "Vehicles only slide along their own axis, and cannot pass",
+      "through each other.",
+      "",
+      "One car is outlined in white; the arrows on it show which ways",
+      "it can still move.",
+      "",
+      "Cars that cannot move at all are skipped: choosing only ever",
+      "lands on a car with at least one arrow.",
+      "",
+      "   A / S  or  3 / 4          choose the previous / next car",
+      "   LEFT / RIGHT              slide a horizontal car left / right",
+      "   UP / DOWN                 slide a vertical car up / down",
+      "   1 or Z   /   2 or X       slide it left or up / right or down",
+      "   hold M 3 s                pause menu (restart / give up / resume), after 3 min",
+      "",
+      "There are 392 puzzles. They get harder as you go:",
+      "a few at each difficulty, easiest first.",
+      "Each puzzle lasts up to 8 minutes.",
+      "",
+      "(press SPACE to begin)"
+    ]
+  }
+}
