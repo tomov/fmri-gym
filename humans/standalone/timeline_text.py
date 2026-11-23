@@ -88,7 +88,8 @@ def _checks(quality: dict[str, Any]) -> list[str]:
                       f", read {devices['read_delay_median_ms']:.1f} ms later (median; 95%: "
                       f"{devices['read_delay_p95_ms']:.1f}, max "
                       f"{devices['read_delay_max_ms']:.1f})" if devices["presses_timed"] else "")
-                  + f"; {devices['dropped']} drop(s), {devices['gone']} unplugged; recording "
+                  + f"; {devices['dropped']} drop(s), {devices['added']} plugged in, "
+                  f"{devices['gone']} unplugged; recording "
                   f"{devices['ended']}"]
 
 

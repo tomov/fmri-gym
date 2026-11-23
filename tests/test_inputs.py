@@ -739,8 +739,10 @@ def test_the_linux_reader_writes_each_kernel_record_at_the_kernels_time():
     from humans.standalone.session_logger import linux
     read_end, write_end = os.pipe()
     devices = object.__new__(linux.LinuxDevices)
-    devices._devices = [{"name": "Trigger Box"}]
+    devices._devices = [{"name": "Trigger Box", "path": "/dev/input/event7"}]
     devices._fds = {read_end: 0}
+    devices._fd_of_node = {"/dev/input/event7": read_end}
+    devices._next_look = float("inf")
     os.write(write_end, linux._EVENT.pack(12345, 678901, 1, 13, 1)     # EV_KEY KEY_EQUAL down
              + linux._EVENT.pack(12345, 678901, 0, 0, 0))              # EV_SYN SYN_REPORT
     try:
@@ -754,22 +756,18 @@ def test_the_linux_reader_writes_each_kernel_record_at_the_kernels_time():
 
 
 @linux_only
-def test_the_linux_reader_names_the_devices_it_cannot_find_or_read(monkeypatch):
+def test_the_linux_reader_opens_every_node_and_stops_at_one_it_cannot_read(monkeypatch):
     from humans.standalone.session_logger import SessionLoggerError, linux
     present = [{"name": "Trigger Box", "path": "/dev/input/event7"},
                {"name": "Keyboard", "path": "/dev/input/event2"}]
-    monkeypatch.setattr(linux.glob, "glob", lambda pattern: ["a", "b"])
-    monkeypatch.setattr(linux, "_sysfs_device", lambda node: present[node == "b"])
-    with pytest.raises(SessionLoggerError, match="no input device is named 'Pad'; these are: "
-                                                "'Keyboard', 'Trigger Box'"):
-        linux.LinuxDevices(["Pad"])
+    monkeypatch.setattr(linux, "_present_devices", lambda: present)
 
     def refuse(path, flags):
         raise PermissionError(path)
     monkeypatch.setattr(linux.os, "open", refuse)
     with pytest.raises(SessionLoggerError, match=re.escape(
             "/dev/input/event7 (Trigger Box) cannot be read by this user")):
-        linux.LinuxDevices(["Trigger Box"])
+        linux.LinuxDevices()
 
 
 @linux_only
@@ -778,73 +776,155 @@ def test_the_linux_reader_stops_when_perf_counter_is_not_the_kernels_clock(monke
     monkeypatch.setattr(linux.time, "get_clock_info",
                         lambda name: types.SimpleNamespace(implementation="something else"))
     with pytest.raises(SessionLoggerError, match="perf_counter reads something else"):
-        linux.LinuxDevices(["Trigger Box"])
+        linux.LinuxDevices()
 
 
-@pytest.mark.parametrize("device_events, says", [
-    (["Trigger Box"], None),
-    (None, None),
-    ([], "expected the devices' names"),
-    ("Trigger Box", "expected the devices' names"),
-    ([""], "expected the devices' names"),
-])
-def test_a_rigs_device_events_are_the_devices_names(device_events, says):
+@pytest.mark.skipif(sys.platform == "win32", reason="the Linux reader's nodes are POSIX files")
+def test_the_linux_reader_adds_a_device_plugged_in_and_one_it_cannot_read(monkeypatch, capsys):
+    from humans.standalone.session_logger import linux
+    present: list[dict] = []
+    readable: set[str] = set()
+    pipes: list[int] = []
+    clock = [100.0]
+    monkeypatch.setattr(linux, "_present_devices", lambda: list(present))
+    monkeypatch.setattr(linux.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(linux.fcntl, "ioctl", lambda fd, request, argument: 0)
+    monkeypatch.setattr(linux.time, "get_clock_info", lambda name: types.SimpleNamespace(
+        implementation="clock_gettime(CLOCK_MONOTONIC)"))
+
+    def open_node(path, flags):
+        if path not in readable:
+            raise PermissionError(path)
+        read_end, write_end = os.pipe()
+        pipes.extend([read_end, write_end])
+        return read_end
+    monkeypatch.setattr(linux.os, "open", open_node)
+    devices = linux.LinuxDevices()
+    try:
+        assert devices.record()["devices"] == []
+        present.append({"name": "Pad", "path": "/dev/input/event9"})
+        readable.add("/dev/input/event9")
+        present.append({"name": "Box", "path": "/dev/input/event10"})
+        clock[0] += linux.DEVICE_LOOK_S
+        added = [line for line in devices.read(0.0) if line["type"] == "device_added"]
+        assert [(line["device"], line["name"]) for line in added] == [(0, "Pad")]
+        clock[0] += linux.DEVICE_LOOK_S
+        assert devices.read(0.0) == [], "a node not readable yet is given time"
+        clock[0] += linux.NEW_NODE_GRACE_S
+        added = [line for line in devices.read(0.0) if line["type"] == "device_added"]
+        assert [(line["device"], line["name"]) for line in added] == [(1, "Box")]
+        assert "cannot be read by this user" in added[0]["error"]
+        assert "as device 1" in capsys.readouterr().err
+        clock[0] += linux.DEVICE_LOOK_S
+        assert devices.read(0.0) == [], "a node refused once is not looked at again"
+    finally:
+        devices.close()
+        for fd in pipes[1::2]:
+            os.close(fd)
+
+
+def test_a_rig_naming_device_events_is_refused():
     from humans.config import rig as rig_file
-    found = [problem for problem in rig_file.problems({"device_events": device_events})
-             if "device_events" in problem]
-    assert found == ([] if says is None else [found[0]]) and (says is None or says in found[0])
+    assert any("unknown key 'device_events'" in problem
+               for problem in rig_file.problems({"device_events": ["Trigger Box"]}))
 
 
-def _rig_with_devices(tmp_path, device_events) -> str:
+#: Replaces each OS's reader in the recorder's process: devices from ``FAKE_DEVICES`` (JSON),
+#: or the error ``FAKE_DEVICES_ERROR`` when it is set.
+_FAKE_READERS = """
+import importlib, json, os, sys, time
+from humans.standalone.session_logger import SessionLoggerError
+
+class FakeDevices:
+    def __init__(self):
+        if os.environ.get("FAKE_DEVICES_ERROR"):
+            raise SessionLoggerError(os.environ["FAKE_DEVICES_ERROR"])
+
+    def record(self):
+        return {"reader": "fake", "clock": "perf_counter",
+                "devices": json.loads(os.environ.get("FAKE_DEVICES", "[]"))}
+
+    def read(self, timeout):
+        time.sleep(timeout)
+        return []
+
+    def close(self):
+        pass
+
+# This OS's reader alone: another OS's cannot be imported here.
+module, reader = {"darwin": ("macos", "MacDevices"), "win32": ("windows", "WindowsDevices")}.get(
+    sys.platform, ("linux", "LinuxDevices"))
+setattr(importlib.import_module("humans.standalone.session_logger." + module), reader,
+        FakeDevices)
+"""
+
+
+@pytest.fixture
+def fake_devices(tmp_path, monkeypatch):
+    """The recorder's process reads fake devices, whatever this machine has plugged in."""
+    folder = tmp_path / "fake_readers"
+    folder.mkdir()
+    (folder / "sitecustomize.py").write_text(_FAKE_READERS)
+    monkeypatch.setenv("PYTHONPATH", os.pathsep.join(
+        [str(folder), *filter(None, [os.environ.get("PYTHONPATH")])]))
+    return monkeypatch
+
+
+def _rig(tmp_path) -> str:
     """A rig file of team ``lab`` whose data root is ``tmp_path/data``."""
     from humans.config import rig as rig_file
     path = tmp_path / "configs" / "lab" / "rigs" / "desk.json"
     rig_file.save({**{k: "x" for k in rig_file.FIELDS}, "site": "lab", "rig": "desk",
                    "pi": "MT", "modality": "meg", "notes": "",
-                   "data_root": str(tmp_path / "data"), "device_events": device_events,
+                   "data_root": str(tmp_path / "data"),
                    "screen": {"geometry": {"width_cm": 30.0, "height_cm": 20.0,
                                            "distance_cm": 60.0}}}, str(path))
     return str(path)
 
 
-def test_a_session_is_recorded_from_start_to_stop_with_its_marks(tmp_path):
+def test_a_session_is_recorded_from_start_to_stop_with_its_marks(tmp_path, fake_devices,
+                                                                  capsys):
     import json
 
     from humans.standalone import session_logger
-    recording = session_logger.start_recording(_rig_with_devices(tmp_path, None), "sub-01", 2)
+    fake_devices.setenv("FAKE_DEVICES", json.dumps([{"name": "Pad"}, {"name": "Keyboard"}]))
+    recording = session_logger.start_recording(_rig(tmp_path), "sub-01", 2)
     beh = tmp_path / "data" / "sub-01" / "ses-002" / "beh"
     try:
         assert os.path.dirname(recording) == str(beh), "straight into the session's beh/"
         assert os.path.basename(recording).startswith("sub-01_ses-002_session-")
+        assert "every input device (2)" in capsys.readouterr().err
         assert session_logger.is_recording(recording)
         session_logger.mark_recording(recording, "run 1: the localizer, été")
     finally:
         assert session_logger.stop_recording(recording)
-    stem = recording.removesuffix("_events.jsonl")
-    assert sorted(os.listdir(beh)) == sorted(os.path.basename(stem) + suffix for suffix in
-                                             ("_events.jsonl", "_control.jsonl", "_logger.log"))
+    assert os.listdir(beh) == [os.path.basename(recording)], "the events file alone is left"
     lines = [json.loads(line) for line in open(recording, encoding="utf-8")]
     first, last = lines[0], lines[-1]
     assert first["type"] == "recording_start" and last["type"] == "recording_end"
-    assert first["devices"] == [] and first["subject"] == "sub-01"
-    assert first["wall_time"] > first["perf_time"]
-    assert set(first["sources"]) == {"device_event", "window_focus", "stall", "clock", "mark"}
+    assert first["devices"] == [{"name": "Pad"}, {"name": "Keyboard"}]
+    assert first["subject"] == "sub-01" and first["wall_time"] > first["perf_time"]
+    assert set(first["sources"]) == {"device_event", "device_added", "window_focus", "stall",
+                                     "clock", "mark"}
     marks = [line for line in lines if line["type"] == "mark"]
     assert [mark["text"] for mark in marks] == ["run 1: the localizer, été"]
     assert last["how"] == "stopped" and last["counts"]["mark"] == 1
-    assert last["devices_gone"] == []
+    assert last["devices_added"] == [] and last["devices_gone"] == []
     assert not session_logger.is_recording(recording)
     from humans.save import bids
     assert bids.next_session(str(tmp_path / "data"), "sub-01") == 1
     os.makedirs(tmp_path / "data" / "sub-01" / "ses-001")
     assert bids.next_session(str(tmp_path / "data"), "sub-01") == 3, "a recording takes its session"
     assert session_logger.stop_recording(recording), "stopping a stopped recording is harmless"
+    session_logger.mark_recording(recording, "too late")
+    assert "has stopped, so this mark is not in it" in capsys.readouterr().err
+    assert os.listdir(beh) == [os.path.basename(recording)], "a late mark writes nothing"
 
 
-def test_a_recording_is_never_written_over(tmp_path, monkeypatch):
+def test_a_recording_is_never_written_over(tmp_path, fake_devices):
     from humans.standalone import session_logger
-    monkeypatch.setattr(session_logger.time, "strftime", lambda _: "20261119T120000")
-    rig = _rig_with_devices(tmp_path, None)
+    fake_devices.setattr(session_logger.time, "strftime", lambda _: "20261119T120000")
+    rig = _rig(tmp_path)
     recording = session_logger.start_recording(rig, "sub-01", 1)
     assert session_logger.stop_recording(recording)
     beh = os.path.dirname(recording)
@@ -859,10 +939,15 @@ def test_a_recording_is_never_written_over(tmp_path, monkeypatch):
         session_logger.stop_recording(beh)
 
 
-def test_a_recording_does_not_start_when_a_device_the_rig_names_is_missing(tmp_path):
+def test_a_recording_does_not_start_when_a_device_cannot_be_read(tmp_path, fake_devices):
     from humans.standalone import session_logger
-    with pytest.raises(session_logger.SessionLoggerError, match="No Such Pad|no device reader"):
-        session_logger.start_recording(_rig_with_devices(tmp_path, ["No Such Pad"]), "sub-01", 1)
+    fake_devices.setenv("FAKE_DEVICES_ERROR", "session-logger: the Pad cannot be read")
+    with pytest.raises(session_logger.SessionLoggerError, match="the Pad cannot be read"):
+        session_logger.start_recording(_rig(tmp_path), "sub-01", 1)
+    beh = tmp_path / "data" / "sub-01" / "ses-001" / "beh"
+    errors = [name for name in os.listdir(beh) if name.endswith("_errors.log")]
+    assert errors and "the Pad cannot be read" in (beh / errors[0]).read_text(), \
+        "what went wrong is kept"
 
 
 def test_a_recording_writes_each_line_as_it_comes_between_a_first_and_a_last(tmp_path):
@@ -900,7 +985,7 @@ def test_a_recording_writes_each_line_as_it_comes_between_a_first_and_a_last(tmp
         record_session_events(Box(), str(path), {"type": "recording_start"}, side_lines, stop)
 
 
-def test_a_recording_lists_the_devices_unplugged_and_stop_says_so(tmp_path, capsys):
+def test_a_recording_lists_the_devices_plugged_in_and_unplugged_and_stop_says_so(tmp_path, capsys):
     import json
     import queue
     import threading
@@ -908,7 +993,8 @@ def test_a_recording_lists_the_devices_unplugged_and_stop_says_so(tmp_path, caps
     from humans.standalone import session_logger
     from humans.standalone.session_logger.recorder import record_session_events
     stop = threading.Event()
-    reads = iter([[{"type": "device_gone", "perf_time": 3.0, "device": 0}]])
+    reads = iter([[{"type": "device_added", "perf_time": 2.0, "device": 1, "name": "Pad"},
+                   {"type": "device_gone", "perf_time": 3.0, "device": 1}]])
 
     class Box:
         def read(self, timeout):
@@ -922,9 +1008,10 @@ def test_a_recording_lists_the_devices_unplugged_and_stop_says_so(tmp_path, caps
     recording = tmp_path / "sub-01_ses-001_session-x_events.jsonl"
     record_session_events(Box(), str(recording), first_line, queue.Queue(), stop)
     last = json.loads(recording.read_text().splitlines()[-1])
-    assert last["devices_gone"] == [{"device": 0, "perf_time": 3.0}]
+    assert last["devices_added"] == [{"perf_time": 2.0, "device": 1, "name": "Pad"}]
+    assert last["devices_gone"] == [{"device": 1, "perf_time": 3.0}]
     assert session_logger.stop_recording(str(recording))
-    assert "'Trigger Box' (device 0) was unplugged at" in capsys.readouterr().err
+    assert "'Pad' (device 1) was unplugged at" in capsys.readouterr().err
 
 
 def test_a_stall_is_a_sleep_that_woke_late(monkeypatch):

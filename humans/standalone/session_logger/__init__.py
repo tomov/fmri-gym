@@ -1,12 +1,13 @@
 """``session-logger``: a session's own recording, beside its runs and whatever else it runs: every
-event of the rig's input devices, read from the OS with the time the OS stamped it, which
-application has the focus, when the machine stalled, the session's marks, and the clock.
+event of every input device, the ones plugged in during the session too, read from the OS with
+the time the OS stamped it, which application has the focus, when the machine stalled, the
+session's marks, and the clock.
 
 ``start`` leaves a recorder (:mod:`.recorder`) running in a process and a session of its own,
 which no task imports or waits on, and prints the recording's events file once its devices are
-open; ``mark`` adds a line to it; ``stop`` ends it. A recording is three files in the session's
-``beh/``, beside its runs (:class:`RecordingFiles`), never written over, and its events file is
-written as the lines arrive, flushed to disk every second: first ``recording_start`` (what is read, with what, and a
+open; ``mark`` adds a line to it; ``stop`` ends it. A recording is a file in the session's
+``beh/``, beside its runs, never written over, with two others while it runs
+(:class:`RecordingFiles`); its events file is written as the lines arrive, flushed to disk every second: first ``recording_start`` (what is read, with what, and a
 ``perf_counter`` time with its wall time), then one line per event, each with its ``type`` and
 ``perf_time`` (on the clock every process on the machine shares until it restarts), and last
 ``recording_end``, which a recording cut short lacks.
@@ -34,8 +35,8 @@ RECORDING_TIME_FORMAT = "%Y%m%dT%H%M%S"
 SESSION_EVENTS_SUFFIX = "_events.jsonl"
 #: What the commands ask of a running recording, one line each: its name, then this.
 CONTROL_SUFFIX = "_control.jsonl"
-#: The recorder's own messages: its name, then this.
-LOG_SUFFIX = "_logger.log"
+#: What went wrong, as the recorder said it: its name, then this.
+ERRORS_SUFFIX = "_errors.log"
 #: Seconds a device read waits for events before the recorder looks for anything else to write.
 READ_TIMEOUT_S = 0.25
 #: Seconds between the events file's flushes to disk.
@@ -60,20 +61,22 @@ class SessionLoggerError(RuntimeError):
 
 
 class RecordingFiles(NamedTuple):
-    """A recording's files, side by side in its session's ``beh/``."""
+    """A recording's files, side by side in its session's ``beh/``: its events, and while it
+    runs, the commands' and the recorder's errors, which a recording that ended leaves only
+    when the recorder wrote one."""
 
     #: its lines, as :mod:`.recorder` writes them; the path that names the recording
     events: str
-    #: what the commands ask of it
+    #: what the commands ask of it, which its events hold once they are done
     control: str
-    #: the recorder's own messages
-    log: str
+    #: what went wrong, as the recorder said it
+    errors: str
 
     @classmethod
     def named(cls, folder: str, name: str) -> RecordingFiles:
         """The files of the recording ``name`` in ``folder``."""
         stem = os.path.join(folder, name)
-        return cls(stem + SESSION_EVENTS_SUFFIX, stem + CONTROL_SUFFIX, stem + LOG_SUFFIX)
+        return cls(stem + SESSION_EVENTS_SUFFIX, stem + CONTROL_SUFFIX, stem + ERRORS_SUFFIX)
 
     @classmethod
     def of_events_file(cls, events_path: str) -> RecordingFiles:
@@ -108,13 +111,12 @@ def main(argv: list[str] | None = None) -> None:
     :raises SessionLoggerError: when ``start`` cannot record.
     """
     parser = argparse.ArgumentParser(
-        prog="session-logger", description="Record a session: the rig's input devices, read "
+        prog="session-logger", description="Record a session: every input device, read "
         "from the OS with the OS's own time, the session's marks and the clock.")
     commands = parser.add_subparsers(dest="command", required=True)
-    start = commands.add_parser("start", help="open the rig's devices and record until stopped; "
+    start = commands.add_parser("start", help="open every input device and record until stopped; "
                                 "prints the recording's events file")
-    start.add_argument("--rig", required=True, help="the rig file: its device_events and data "
-                       "root")
+    start.add_argument("--rig", required=True, help="the rig file: its data root")
     start.add_argument("--subject", required=True, help="sub-<label>")
     start.add_argument("--ses", type=int, required=True, help="the session number, from 1")
     mark = commands.add_parser("mark", help="add a line to the recording, stamped now")
@@ -143,15 +145,15 @@ def recordings_of_run(run_folder: str) -> list[RecordingFiles]:
 
 
 def start_recording(rig_path: str, subject: str, session: int) -> str:
-    """Leave a recorder writing a new recording of the session, its devices open.
+    """Leave a recorder writing a new recording of the session, every input device open.
 
-    :param rig_path: the rig file: the devices it names in ``device_events``, its data root.
+    :param rig_path: the rig file: its data root.
     :param subject: ``sub-<label>``.
     :param session: the session number, from 1.
     :return: the recording's events file, absolute, once its first line is on disk.
     :raises SessionLoggerError: if a recording of that name is already there, if the recorder
-        stops before its first line (a device missing, or one the OS will not let it read: its
-        message says which) or does not write it in :data:`START_TIMEOUT_S`.
+        stops before its first line (a device the OS will not let it read: its message says
+        which) or does not write it in :data:`START_TIMEOUT_S`.
     """
     rig = RigConfig.open(rig_path)
     subject_label = bids.subject_label(subject)
@@ -162,59 +164,67 @@ def start_recording(rig_path: str, subject: str, session: int) -> str:
     if any(os.path.exists(path) for path in files):
         raise SessionLoggerError(f"session-logger: a recording named {files.name} is already in "
                                  f"{folder}, and a recording is never written over")
-    with open(files.log, "x") as log:
+    with open(files.errors, "x") as errors:
         recorder = subprocess.Popen(
             [sys.executable, "-m", f"{__name__}.recorder", "--events", files.events,
              "--rig", rig.path, "--subject", subject, "--ses", str(session)],
-            stdin=subprocess.DEVNULL, stdout=log, stderr=log, **_DETACHED)
+            stdin=subprocess.DEVNULL, stdout=errors, stderr=errors, **_DETACHED)
     deadline = time.monotonic() + START_TIMEOUT_S
     while read_first_line(files.events) is None:
         if recorder.poll() is not None:
-            raise SessionLoggerError(_recorder_log(files) or "session-logger: the recorder "
+            raise SessionLoggerError(_recorder_errors(files) or "session-logger: the recorder "
                                      f"stopped before recording (exit {recorder.returncode})")
         if time.monotonic() > deadline:
             recorder.kill()
             raise SessionLoggerError(f"session-logger: the recorder wrote nothing in "
-                                     f"{START_TIMEOUT_S:g} s; its log: {_recorder_log(files)}")
+                                     f"{START_TIMEOUT_S:g} s; its errors: "
+                                     f"{_recorder_errors(files)}")
         time.sleep(0.05)
-    print(f"session-logger: recording {_devices_words(rig)} into {files.events}", file=sys.stderr)
+    devices = read_first_line(files.events)["devices"]
+    print(f"session-logger: recording every input device ({len(devices)}) into {files.events}",
+          file=sys.stderr)
     return files.events
 
 
 def mark_recording(recording: str, text: str) -> None:
-    """Add a ``mark`` line to a recording, stamped now; say on the console when its recorder
-    is not running, since the mark then reaches no recording.
+    """Add a ``mark`` line to a recording, stamped now; when its recorder is not running, the
+    mark would reach no recording: the console is told, and nothing is written.
 
     :param recording: the recording's events file.
     :param text: what the line says.
     """
     files = RecordingFiles.of_events_file(recording)
+    if not is_recording(recording):
+        print(f"session-logger: WARNING: the recording {files.events} has stopped, so this mark "
+              f"is not in it: {_cut_short_words(files)}", file=sys.stderr)
+        return
     append_line(files.control,
                 {"type": "mark", "perf_time": time.perf_counter(), "wall_time": time.time(),
                  "text": text})
-    if not is_recording(recording):
-        print(f"session-logger: WARNING: the recording {files.events} has stopped: "
-              f"{_cut_short_words(files)}", file=sys.stderr)
 
 
 def stop_recording(recording: str) -> bool:
-    """End a recording, and wait until its last line is on disk.
+    """End a recording, wait until its last line is on disk and its recorder has exited, then
+    remove its control file, which its events hold, and its errors file when it is empty.
 
     :param recording: the recording's events file.
-    :return: whether it ended when told to: ``False`` when its recorder had already stopped or
-        did not end in :data:`STOP_TIMEOUT_S`, which the console is told.
+    :return: whether it ended when told to, or had already: ``False`` when its recorder had
+        stopped before its last line or did not end in :data:`STOP_TIMEOUT_S`, which the console
+        is told, and its files are all kept.
     """
     files = RecordingFiles.of_events_file(recording)
     was_recording = is_recording(recording)
-    append_line(files.control,
-                {"type": "stop", "perf_time": time.perf_counter(), "wall_time": time.time()})
+    if was_recording:
+        append_line(files.control,
+                    {"type": "stop", "perf_time": time.perf_counter(), "wall_time": time.time()})
     deadline = time.monotonic() + (STOP_TIMEOUT_S if was_recording else 0.0)
     while True:
         last = read_last_line(files.events)
         if last is not None and last["type"] == "recording_end":
             print(f"session-logger: recording ended, {_counts_words(last['counts'])}: "
                   f"{files.events}", file=sys.stderr)
-            _warn_of_devices_gone(files, last["devices_gone"])
+            _warn_of_devices_gone(files, last)
+            _remove_control_and_empty_errors(files, deadline)
             return True
         if time.monotonic() > deadline:
             break
@@ -286,10 +296,29 @@ def _is_process_running(pid: int) -> bool:
     return True
 
 
-def _recorder_log(files: RecordingFiles) -> str:
-    """What the recorder wrote to its log, for a message that must say why it stopped."""
-    with open(files.log) as f:
+def _recorder_errors(files: RecordingFiles) -> str:
+    """What the recorder wrote to its errors file, for a message that must say why it
+    stopped."""
+    with open(files.errors) as f:
         return f.read().strip()
+
+
+def _remove_control_and_empty_errors(files: RecordingFiles, deadline: float) -> None:
+    """Once the recorder has exited (waited for until ``deadline``), remove the control file
+    and an empty errors file; the console is told of any it could not remove."""
+    pid = read_first_line(files.events)["recorder_pid"]
+    while _is_process_running(pid) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    removable = [files.control] + ([files.errors] if os.path.exists(files.errors)
+                                   and os.path.getsize(files.errors) == 0 else [])
+    for path in removable:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+        except OSError as error:
+            print(f"session-logger: WARNING: {path} could not be removed: {error}",
+                  file=sys.stderr)
 
 
 def _cut_short_words(files: RecordingFiles) -> str:
@@ -297,7 +326,8 @@ def _cut_short_words(files: RecordingFiles) -> str:
     last = read_last_line(files.events)
     when = ("it wrote nothing" if last is None else "its last line is from "
             + time.strftime("%H:%M:%S", time.localtime(_wall_time_of(last, files))))
-    return f"{when}, and the session's events after it are not recorded (its log: {files.log})"
+    return (f"{when}, and the session's events after it are not recorded (its errors: "
+            f"{files.errors})")
 
 
 def _wall_time_of(line: dict[str, Any], files: RecordingFiles) -> float:
@@ -308,11 +338,15 @@ def _wall_time_of(line: dict[str, Any], files: RecordingFiles) -> float:
     return line["perf_time"] + first["wall_time"] - first["perf_time"]
 
 
-def _warn_of_devices_gone(files: RecordingFiles, devices_gone: list[dict[str, Any]]) -> None:
+def _warn_of_devices_gone(files: RecordingFiles, last_line: dict[str, Any]) -> None:
     """Say on the console which device was unplugged during the recording, and when: the
-    recording holds none of its events after that."""
-    devices = read_first_line(files.events)["devices"]
-    for gone in devices_gone:
+    recording holds none of its events after that.
+
+    :param files: the recording's files.
+    :param last_line: its ``recording_end`` line, which lists the devices added and gone.
+    """
+    devices = read_first_line(files.events)["devices"] + last_line["devices_added"]
+    for gone in last_line["devices_gone"]:
         when = time.strftime("%H:%M:%S", time.localtime(_wall_time_of(gone, files)))
         print(f"session-logger: WARNING: {devices[gone['device']]['name']!r} (device "
               f"{gone['device']}) was unplugged at {when}: the recording holds none of its "
@@ -323,10 +357,3 @@ def _counts_words(counts: dict[str, int]) -> str:
     """A recording's line counts in words, by type."""
     return ", ".join(f"{count} {line_type}" for line_type, count in sorted(counts.items())) or \
         "no line"
-
-
-def _devices_words(rig: RigConfig) -> str:
-    """The devices a rig has recorded, or that it names none."""
-    if rig.device_events is None:
-        return f"no device ({rig.path} names no device_events)"
-    return ", ".join(rig.device_events)

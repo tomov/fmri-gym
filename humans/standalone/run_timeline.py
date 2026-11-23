@@ -136,7 +136,8 @@ class RunRecord:
         if self.session_recording is None:
             return []
         return [line for line in self.session_recording.lines
-                if line["type"] in ("device_event", "device_report", "device_gone")]
+                if line["type"] in ("device_event", "device_report", "device_added",
+                                    "device_gone")]
 
 
 @dataclass(frozen=True, slots=True)
@@ -500,7 +501,7 @@ def _key_down_usage(line: dict[str, Any]) -> int | None:
 def _unaccounted_device_lines(record: RunRecord, to_run_time: RunClock,
                               claimed: set[float]) -> list[dict[str, Any]]:
     """The device lines worth one of their own: a key or button press no run press claims,
-    and its release; a device gone; events the kernel dropped.
+    and its release; a device plugged in or gone; events the kernel dropped.
 
     :param record: the run.
     :param to_run_time: the run clock.
@@ -509,8 +510,8 @@ def _unaccounted_device_lines(record: RunRecord, to_run_time: RunClock,
     """
     out, pressed = [], set()
     for line in record.device_lines:
-        if line["type"] == "device_gone" or (line.get("event_type") == EV_SYN
-                                             and line["code"] == SYN_DROPPED):
+        if line["type"] in ("device_added", "device_gone") or (
+                line.get("event_type") == EV_SYN and line["code"] == SYN_DROPPED):
             out.append(line)
             continue
         if not _is_key_or_button(line) or line["value"] not in (0, 1):
@@ -560,6 +561,8 @@ def _device_detail(line: dict[str, Any]) -> str:
     """A device line in words: the device, then the key or button and whether it went down."""
     if line["type"] == "device_gone":
         return f"device {line['device']} unplugged"
+    if line["type"] == "device_added":
+        return f"device {line['device']} plugged in: {line['name']!r}"
     if line.get("event_type") == EV_SYN:
         return f"device {line['device']}: events dropped by the kernel"
     return f"device {line['device']}: {_element_name(line)} {'down' if line['value'] else 'up'}"
@@ -602,6 +605,7 @@ def _device_quality(record: RunRecord, timeline: Timeline) -> dict[str, Any]:
         "presses_timed": len(delays),
         "dropped": sum(line.get("event_type") == EV_SYN and line["code"] == SYN_DROPPED
                        for line in record.device_lines),
+        "added": sum(line["type"] == "device_added" for line in record.device_lines),
         "gone": sum(line["type"] == "device_gone" for line in record.device_lines),
         "recording": recording.name,
         "ended": "cut short" if recording.end is None else recording.end["how"]}

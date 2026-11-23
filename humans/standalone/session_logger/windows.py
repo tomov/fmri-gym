@@ -1,14 +1,14 @@
-"""Windows: each named device's Raw Input, stamped by ``perf_counter`` (QueryPerformanceCounter)
-as it arrives, and the application of the foreground window.
+"""Windows: every device's Raw Input, the ones plugged in later too, stamped by ``perf_counter``
+(QueryPerformanceCounter) as it arrives, and the application of the foreground window.
 
 Windows gives raw input no time of its own, so a thread that does nothing else, at the highest
 priority a thread may have without administrator rights, stamps each report as it receives it:
 the stamp is late by the time Windows took to hand it over, and by any stall the recording
-shows. Raw input is asked for by kind of device (keyboards, mice, a HID usage), so every device
-of a kind sends its reports here; those of a device the rig does not name are dropped unread.
-A device is named by its USB product string. A HID device's report is read into buttons and
-values by the HID parser Windows keeps for the device, and each one that changed is a line, as
-IOKit gives them on macOS; a report that parser refuses is kept whole.
+shows. Raw input is asked for by kind of device (a HID page and usage): the kinds of the devices
+present and :data:`_KINDS_ALWAYS_ASKED`, so a device plugged in later is read when it is of one
+of them. A HID device's report is read into buttons and values by the HID parser Windows keeps
+for the device, and each one that changed is a line, as IOKit gives them on macOS; a report that
+parser refuses is kept whole.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ _RID_INPUT = 0x10000003
 _RIDI_PREPARSEDDATA, _RIDI_DEVICENAME, _RIDI_DEVICEINFO = 0x20000005, 0x20000007, 0x2000000B
 _RIDEV_INPUTSINK, _RIDEV_DEVNOTIFY, _RIDEV_REMOVE = 0x00000100, 0x00002000, 0x00000001
 _WM_INPUT_DEVICE_CHANGE, _WM_INPUT, _WM_QUIT = 0x00FE, 0x00FF, 0x0012
-_GIDC_REMOVAL = 2
+_GIDC_ARRIVAL, _GIDC_REMOVAL = 1, 2
 _RI_KEY_BREAK = 1
 _HWND_MESSAGE = -3
 _THREAD_PRIORITY_TIME_CRITICAL = 15
@@ -43,6 +43,9 @@ _FILE_SHARE_READ_WRITE, _OPEN_EXISTING = 3, 3
 _INVALID_HANDLE = ctypes.c_void_p(-1).value
 #: The kind of device each usage of the generic desktop page (1) is asked for as.
 _KIND_OF_TYPE = {_RIM_TYPEMOUSE: (1, 2), _RIM_TYPEKEYBOARD: (1, 6)}
+#: Kinds of device asked for even when none is plugged in at the start: mice, joysticks,
+#: gamepads, keyboards, multi-axis controllers (generic desktop page) and consumer controls.
+_KINDS_ALWAYS_ASKED = {(1, 2), (1, 4), (1, 5), (1, 6), (1, 8), (0x0C, 1)}
 _VENDOR_PRODUCT = re.compile(r"VID_([0-9A-Fa-f]{4})&PID_([0-9A-Fa-f]{4})")
 
 
@@ -139,40 +142,32 @@ class _WindowClass(ctypes.Structure):
 
 
 class WindowsDevices:
-    """The named devices' raw input, received by a thread of its own; their reports as it
-    stamped them."""
+    """Every device's raw input, the ones plugged in later too, received by a thread of its own;
+    their reports as it stamped them."""
 
-    def __init__(self, device_names: list[str]) -> None:
-        """Find every raw input device whose product string is one of ``device_names``, and
-        start receiving their input.
+    def __init__(self) -> None:
+        """Find every raw input device, and start receiving their input.
 
-        :param device_names: USB product strings.
-        :raises SessionLoggerError: if a name matches no device, or Windows will not send this
-            process their input.
+        :raises SessionLoggerError: if Windows will not send this process their input.
         """
         win32 = _win32()
         present = _raw_input_devices(win32)
-        named = [device for device in present if device["name"] in device_names]
-        missing = sorted(set(device_names) - {device["name"] for device in named})
-        if missing:
-            nameless = sum(not device["name"] for device in present)
-            raise SessionLoggerError(
-                f"session-logger: no raw input device is named {', '.join(map(repr, missing))}; "
-                f"these are: {', '.join(sorted({repr(d['name']) for d in present if d['name']}))}"
-                + (f", and {nameless} with no product string" if nameless else ""))
-        self._devices = [{key: value for key, value in device.items() if key != "handle"}
-                         for device in named]
-        self._index_of_handle = {device["handle"]: index for index, device in enumerate(named)}
-        self._hid_reports = {device["handle"]: HidReports(win32, device["handle"])
-                             for device in named if device["kind"] == "hid"}
+        #: each device's identity, by its index
+        self._devices: list[dict[str, Any]] = []
+        #: each device plugged in -> its index
+        self._index_of_handle: dict[int, int] = {}
+        self._hid_reports: dict[int, HidReports] = {}
+        for device in present:
+            self._add(win32, device)
         #: (device, make code, flags but the break bit) of each key held down
         self._keys_down: set[tuple[int, int, int]] = set()
         self._lines: queue.Queue[dict[str, Any]] = queue.Queue()
         self._receiver_started = threading.Event()
         self._receiver_failure: str | None = None
         self._receiver_thread_id = 0
-        usages = sorted({(device["usage_page"], device["usage"]) for device in named})
-        self._receiver = threading.Thread(target=self._receive, args=(win32, usages),
+        kinds = sorted({(device["usage_page"], device["usage"]) for device in present}
+                       | _KINDS_ALWAYS_ASKED)
+        self._receiver = threading.Thread(target=self._receive, args=(win32, kinds),
                                           daemon=True)
         self._receiver.start()
         self._receiver_started.wait()
@@ -180,16 +175,17 @@ class WindowsDevices:
             raise SessionLoggerError(self._receiver_failure)
 
     def record(self) -> dict[str, Any]:
-        """The reader, the clock of its stamps, and each device by its index."""
+        """The reader, the clock of its stamps, and each device plugged in now by its index."""
         return {"reader": "windows raw input", "clock": "QueryPerformanceCounter, at arrival",
-                "devices": self._devices}
+                "devices": list(self._devices)}
 
     def read(self, timeout: float) -> list[dict[str, Any]]:
         """The lines received, waiting up to ``timeout`` seconds for the first.
 
         :param timeout: seconds to wait when none is there yet.
         :return: one line per key, button, value or mouse report (:func:`lines_of_raw_input`),
-            and a ``device_gone`` line for a device unplugged.
+            a ``device_added`` line for a device plugged in and a ``device_gone`` line for one
+            unplugged.
         """
         lines = []
         try:
@@ -208,18 +204,37 @@ class WindowsDevices:
         _win32().user32.PostThreadMessageW(self._receiver_thread_id, _WM_QUIT, 0, 0)
         self._receiver.join(timeout=2.0)
 
-    def _receive(self, win32: SimpleNamespace, usages: list[tuple[int, int]]) -> None:
-        """The receiving thread: a message-only window that asks for ``usages``' raw input, and
+    def _add(self, win32: SimpleNamespace, device: dict[str, Any]) -> int:
+        """Give a device the next index, and its HID parser to a HID device."""
+        index = len(self._devices)
+        self._devices.append({key: value for key, value in device.items() if key != "handle"})
+        self._index_of_handle[device["handle"]] = index
+        if device["kind"] == "hid":
+            self._hid_reports[device["handle"]] = HidReports(win32, device["handle"])
+        return index
+
+    def _index_of(self, win32: SimpleNamespace, handle: int, arrived: float) -> int:
+        """A device's index; a device not seen yet is added, with a ``device_added`` line."""
+        index = self._index_of_handle.get(handle)
+        if index is not None:
+            return index
+        index = self._add(win32, _raw_input_device(win32, handle))
+        self._lines.put({"type": "device_added", "perf_time": arrived, "device": index,
+                         **self._devices[index]})
+        return index
+
+    def _receive(self, win32: SimpleNamespace, kinds: list[tuple[int, int]]) -> None:
+        """The receiving thread: a message-only window that asks for ``kinds``' raw input, and
         its message loop, until a quit message."""
         self._receiver_thread_id = win32.kernel32.GetCurrentThreadId()
         win32.kernel32.SetThreadPriority(win32.kernel32.GetCurrentThread(),
                                          _THREAD_PRIORITY_TIME_CRITICAL)
         window = _message_window(win32)
-        requests = (_RawInputDevice * len(usages))(*[
+        requests = (_RawInputDevice * len(kinds))(*[
             _RawInputDevice(page, usage, _RIDEV_INPUTSINK | _RIDEV_DEVNOTIFY, window)
-            for page, usage in usages])
+            for page, usage in kinds])
         if not window or not win32.user32.RegisterRawInputDevices(
-                requests, len(usages), ctypes.sizeof(_RawInputDevice)):
+                requests, len(kinds), ctypes.sizeof(_RawInputDevice)):
             self._receiver_failure = (f"session-logger: Windows would not send this process the "
                                       f"devices' raw input (error {ctypes.get_last_error()})")
             self._receiver_started.set()
@@ -230,20 +245,28 @@ class WindowsDevices:
             arrived = time.perf_counter()
             if message.message == _WM_INPUT:
                 self._keep_raw_input(win32, message.lparam, arrived)
-            elif message.message == _WM_INPUT_DEVICE_CHANGE and message.wparam == _GIDC_REMOVAL:
-                index = self._index_of_handle.get(message.lparam)
-                if index is not None:
-                    self._lines.put({"type": "device_gone", "perf_time": arrived,
-                                     "device": index})
+            elif message.message == _WM_INPUT_DEVICE_CHANGE:
+                self._keep_device_change(win32, message.wparam, message.lparam, arrived)
             win32.user32.DispatchMessageW(ctypes.byref(message))
         for request in requests:
             request.flags, request.window = _RIDEV_REMOVE, None
-        win32.user32.RegisterRawInputDevices(requests, len(usages),
+        win32.user32.RegisterRawInputDevices(requests, len(kinds),
                                              ctypes.sizeof(_RawInputDevice))
         win32.user32.DestroyWindow(window)
 
+    def _keep_device_change(self, win32: SimpleNamespace, change: int, handle: int,
+                            arrived: float) -> None:
+        """A device plugged in (Windows names the ones already there too, which are known) or
+        unplugged: a ``device_added`` or ``device_gone`` line."""
+        if change == _GIDC_ARRIVAL:
+            self._index_of(win32, handle, arrived)
+        elif change == _GIDC_REMOVAL and handle in self._index_of_handle:
+            self._lines.put({"type": "device_gone", "perf_time": arrived,
+                             "device": self._index_of_handle.pop(handle)})
+            self._hid_reports.pop(handle, None)
+
     def _keep_raw_input(self, win32: SimpleNamespace, raw_input: int, arrived: float) -> None:
-        """Keep the lines of one raw input message, if it is from a named device."""
+        """Keep the lines of one raw input message."""
         size = _UINT(0)
         header_size = ctypes.sizeof(_RawInputHeader)
         win32.user32.GetRawInputData(raw_input, _RID_INPUT, None, ctypes.byref(size),
@@ -253,9 +276,7 @@ class WindowsDevices:
                                         header_size) != size.value:
             return
         handle = _RawInputHeader.from_buffer(data).device
-        index = self._index_of_handle.get(handle)
-        if index is None:                      # a device the rig does not name
-            return
+        index = self._index_of(win32, handle, arrived)
         for line in lines_of_raw_input(data.raw, index, arrived, self._hid_reports.get(handle),
                                        self._keys_down):
             self._lines.put(line)
@@ -413,31 +434,32 @@ def _caps(get_caps: Any, caps_type: type, count: int, parser: Any) -> list[Any]:
 
 
 def _raw_input_devices(win32: SimpleNamespace) -> list[dict[str, Any]]:
-    """Every raw input device: its handle, kind, product string, path, vendor and product ids,
-    and the HID page and usage it is asked for by."""
+    """Every raw input device (:func:`_raw_input_device`)."""
     count = _UINT(0)
     size = ctypes.sizeof(_RawInputDeviceList)
     win32.user32.GetRawInputDeviceList(None, ctypes.byref(count), size)
     listed = (_RawInputDeviceList * count.value)()
     found = win32.user32.GetRawInputDeviceList(listed, ctypes.byref(count), size)
-    devices = []
-    for entry in listed[:found if found != 0xFFFFFFFF else 0]:
-        info = _DeviceInfo(size=ctypes.sizeof(_DeviceInfo))
-        info_size = _UINT(ctypes.sizeof(_DeviceInfo))
-        win32.user32.GetRawInputDeviceInfoW(entry.device, _RIDI_DEVICEINFO, ctypes.byref(info),
-                                            ctypes.byref(info_size))
-        path = _device_path(win32, entry.device)
-        ids = _VENDOR_PRODUCT.search(path)
-        usage_page, usage = (_KIND_OF_TYPE[entry.type] if entry.type in _KIND_OF_TYPE else
-                             (info.of_type.hid.usage_page, info.of_type.hid.usage))
-        devices.append({
-            "handle": entry.device, "name": _product_string(win32, path),
-            "kind": {_RIM_TYPEMOUSE: "mouse", _RIM_TYPEKEYBOARD: "keyboard"}.get(entry.type,
-                                                                                  "hid"),
+    return [_raw_input_device(win32, entry.device)
+            for entry in listed[:found if found != 0xFFFFFFFF else 0]]
+
+
+def _raw_input_device(win32: SimpleNamespace, handle: int) -> dict[str, Any]:
+    """A raw input device: its handle, kind, product string, path, vendor and product ids,
+    and the HID page and usage it is asked for by."""
+    info = _DeviceInfo(size=ctypes.sizeof(_DeviceInfo))
+    info_size = _UINT(ctypes.sizeof(_DeviceInfo))
+    win32.user32.GetRawInputDeviceInfoW(handle, _RIDI_DEVICEINFO, ctypes.byref(info),
+                                        ctypes.byref(info_size))
+    path = _device_path(win32, handle)
+    ids = _VENDOR_PRODUCT.search(path)
+    usage_page, usage = (_KIND_OF_TYPE[info.type] if info.type in _KIND_OF_TYPE else
+                         (info.of_type.hid.usage_page, info.of_type.hid.usage))
+    return {"handle": handle, "name": _product_string(win32, path),
+            "kind": {_RIM_TYPEMOUSE: "mouse", _RIM_TYPEKEYBOARD: "keyboard"}.get(info.type, "hid"),
             "vendor": int(ids[1], 16) if ids else None,
             "product": int(ids[2], 16) if ids else None,
-            "usage_page": usage_page, "usage": usage, "path": path})
-    return devices
+            "usage_page": usage_page, "usage": usage, "path": path}
 
 
 def _device_path(win32: SimpleNamespace, handle: int) -> str:

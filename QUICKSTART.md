@@ -146,7 +146,7 @@ uv run session-logger mark "$RECORDING" "the localizer"   # a line of your own, 
 uv run session-logger stop "$RECORDING"                   # after everything else
 ```
 
-It records every event of the devices the rig names in `"device_events"`, read from the OS at the time the OS stamped it, which application has the focus, the machine's stalls, the marks and the clock, from start to stop, beside whatever the session runs; `bids-from-logs` gives each press its device's time. On Linux it takes the `input` group; on macOS, the Input Monitoring permission for a keyboard-type device; on Windows, nothing, and the session script runs in Git Bash.
+It records every event of every input device, the ones plugged in during the session too, read from the OS at the time the OS stamped it, which application has the focus, the machine's stalls, the marks and the clock, from start to stop, beside whatever the session runs; `bids-from-logs` gives each press its device's time. On Linux it takes the `input` group; on macOS, the Input Monitoring permission; on Windows, nothing, and the session script runs in Git Bash.
 
 ## After a session
 

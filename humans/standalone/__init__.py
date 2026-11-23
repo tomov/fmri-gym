@@ -8,7 +8,7 @@ outside this package imports from it.
   it sends.
 - :mod:`.photodiode`: the flip-to-photon offset of a rig.
 - ``session-logger`` (:mod:`.session_logger`): a session's own recording, beside whatever it
-  runs: the rig's input devices read from the OS with the OS's own time, marks, the clock.
+  runs: every input device read from the OS with the OS's own time, marks, the clock.
 
 The windows import PySide6 at the top, so the commands import them only when they open one,
 and say how to install it when it is missing (:func:`needs_pyside6`).

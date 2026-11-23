@@ -44,16 +44,16 @@ A run checks everything it can before the participant screen opens, and stops on
 
 ## A session's recording (`session-logger`)
 
-- **`session-logger: no input device is named '<name>'; these are: ...`** (Linux), **`... no HID device is named ...`** (macOS) or **`... no raw input device is named ...`** (Windows): the rig names a device in `"device_events"` that is not plugged in, or not by that name. Copy the name from the list in the message into the rig file. On Windows a device is named by its USB product string, so one without (a laptop's built-in keyboard) cannot be named; the message counts them.
-- **`session-logger: /dev/input/eventN (<name>) cannot be read by this user`** (Linux): reading a device's node takes the `input` group. `sudo usermod -aG input $USER`, then log in again (or start it with `sg input -c "..."` until then).
-- **`session-logger: this app lacks the Input Monitoring permission, ...`** (macOS): a keyboard-type device (a trigger box that types keys among them) is read only with it. System Settings > Privacy & Security > Input Monitoring: add the app it is started from (the terminal), then restart that app.
+- **`session-logger: /dev/input/eventN (<name>) cannot be read by this user`** (Linux): reading a device's node takes the `input` group, and every node is read. `sudo usermod -aG input $USER`, then log in again (or start it with `sg input -c "..."` until then).
+- **`session-logger: this app lacks the Input Monitoring permission, ...`** (macOS): a keyboard-type device (the Mac's own keyboard, a trigger box that types keys) is read only with it, and every device is read. System Settings > Privacy & Security > Input Monitoring: add the app it is started from (the terminal), then restart that app.
 - **`session-logger: perf_counter reads ...`** or **`... perf_counter is ... off mach absolute time ...`**: this Python's `perf_counter` is not on the clock the OS stamps its events with, so they could not be matched to the runs. Use the Python the project pins (`uv run`).
 - **`session-logger: Windows would not send this process the devices' raw input (error N)`** (Windows): registering for the devices' raw input failed; the error is Windows' (`GetLastError`). Start the session from a desktop session of the user at the rig, not over a remote service.
-- **`session-logger: no device reader for <platform>`**: there is no device reader for this OS. A rig without `"device_events"` is still recorded: its marks and the clock.
+- **`session-logger: no device reader for <platform>`**: there is no device reader for this OS, so a session cannot be recorded on it.
 - **`session-logger: a recording named <name> is already in <folder>, and a recording is never written over`**: two recordings of the same session started within the same second. Start it again.
-- **`session-logger: the recorder wrote nothing in ... s`**: the recorder started but did not open the devices in time; its log, in the message, says where it stopped.
+- **`session-logger: the recorder wrote nothing in ... s`**: the recorder started but did not open the devices in time; its errors, in the message, say where it stopped.
+- **`session-logger: ... (plugged in during the recording, as device N)`** (in `_errors.log`): a device plugged in during the session could not be read (a reason above); the recording has its `device_added` line, with the error, and none of its events.
 - **`session-logger: WARNING: '<name>' (device N) was unplugged at HH:MM:SS: ...`** (`stop`): the device left the machine during the session, and the recording holds none of its events after that time; the runs still have their own times for its presses (when they read them). Check its cable before the next session.
-- **`session-logger: WARNING: the recording <events file> has stopped: ...`** (`mark`) or **`... did not end when told to: ...`** (`stop`): the recorder stopped before the session ended. The message says when its last line was written, and names its log, which says why; the recording keeps every line until then.
+- **`session-logger: WARNING: the recording <events file> has stopped, so this mark is not in it: ...`** (`mark`) or **`... did not end when told to: ...`** (`stop`): the recorder stopped before the session ended. The message says when its last line was written, and names its `_errors.log`, which says why; the recording keeps every line until then, and both of its other files are kept.
 
 ## Audio
 
