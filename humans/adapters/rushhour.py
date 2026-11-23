@@ -17,12 +17,12 @@ direction across it moves nothing and is logged as ``event`` ``wrong_axis``.
 ``rushhour_gym.human.DEFAULT_KEYS`` is the program's own keyboard layout, to
 copy from.
 
-One game block is one puzzle: the phase's ``puzzle`` (``"p07"``; the library
-is numbered easiest first) or ``puzzle_indices`` / ``min_moves_range`` picks
-it, and the block ends when it is solved (``mode: "episode"``,
-``n_episodes: 1``). The program's trial flow -- a self-paced ready screen, a
-blank interval, a "PUZZLE SOLVED!" hold -- is not the env's business here:
-each is a ``message`` phase around the game phase.
+One game block is one puzzle: the phase's ``puzzle`` (``"p07"``; each block
+of the library, ``p`` then ``e``, is numbered easiest first) or
+``puzzle_indices`` / ``min_moves_range`` picks it, and the block ends when it
+is solved (``mode: "episode"``, ``n_episodes: 1``). The program's trial flow
+-- a self-paced ready screen, a blank interval, a "PUZZLE SOLVED!" hold -- is
+not the env's business here: each is a ``message`` phase around the game phase.
 
 Env constructor options live in ``env_kwargs``: ``puzzle`` (``"p07"``),
 ``puzzle_indices``, ``min_moves_range``, ``movable_only`` (default true), and

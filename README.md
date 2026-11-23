@@ -125,7 +125,7 @@ A curriculum's path after `curricula/`, in camelCase (BIDS labels are letters an
 | `minihack/` | 22 | `levels/`: room5x5/15x15, mazewalk9x9, river, corridor, eat: the `-Allocentric-v0` twin from `minihack_levels` (view fixed on the map), each with an `_egocentric` sibling on MiniHack's own id (view centred on the agent); and the designed levels room_*, mazewalk_*, river_*; and `all`, the six standard tasks (allocentric) in a row |
 | `nethack/` | 1 | `levels/`: score (base NetHack; TTY rendered to a pixel frame) |
 | `retro/` | 1 | `levels/`: airstriker (ships with stable-retro; sound) |
-| `rushhour/` | 2 | `levels/`: easy (5 min of random easy puzzles); complete (Rush-Hour's own program, then the rest of the library: all 49 puzzles, one game phase each, with ready screens and solved feedback as message phases) |
+| `rushhour/` | 2 | `levels/`: easy (5 min of random easy puzzles); complete (Rush-Hour's own program, then the rest of the library's first block: its 49 puzzles, one game phase each, with ready screens and solved feedback as message phases) |
 | `stk/` | 10 | `levels/`: hacienda, cornfield_crossing, lighthouse, scotland, snowmountain (the race tracks the package ships; needs a real GL display), each also in a `*-GMPD3-stick-nav` controller version |
 | `vgdl/` | 11 | `levels/`: aliens, avoidGeorge, beesAndBirds, jaws, missile_command, plaqueAttack, portals, preconditions, pushBoulders, relational (needs the VGDL checkout), and `all` |
 | `vizdoom/` | 155 | `levels/`: basic, deadly_corridor, defend_center, defend_line, health_gathering_supreme, my_way_home, predict_position, take_cover, deathmatch, freedoom1_e1m1 … freedoom1_e4m9 and freedoom2_map01 … freedoom2_map32 (every map of [Freedoom](https://freedoom.github.io/) Phase 1 and Phase 2, whose WADs ship with `vizdoom`; `VizdoomDoom*` plays the original WADs, given them); each also in a `*-GMPD3-stick-nav` controller version; and `all-GMPD3-stick-nav`, those controller versions in a row, the stock scenarios from the simplest, then Freedoom Phase 1 and Phase 2 |
@@ -305,7 +305,7 @@ Phase fields: `game` (`"game1"`…`"game10"`, plus `/level<N>` to name the level
 
 ```bash
 uv run fmri-play --subject sub-01 --dummy-trigger --ses 1 --run 1 --rig configs/examples/rigs/laptop.json --curriculum configs/curricula/rushhour/levels/easy.json      # 5 min of random easy puzzles
-uv run fmri-play --subject sub-01 --dummy-trigger --ses 1 --run 1 --rig configs/examples/rigs/laptop.json --curriculum configs/curricula/rushhour/all.json   # the program's session then the rest of the library: 49 puzzles, one block each
+uv run fmri-play --subject sub-01 --dummy-trigger --ses 1 --run 1 --rig configs/examples/rigs/laptop.json --curriculum configs/curricula/rushhour/all.json   # the program's session then the rest of the library's first block: 49 puzzles, one block each
 ```
 
 Controls, phase fields and the logged columns are documented in `configs/curricula/rushhour/common/README.md` and in the package's README ("A person at the board").
