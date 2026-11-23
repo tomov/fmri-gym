@@ -87,7 +87,7 @@ def select(paths: list[str]) -> Selection:
 
 def _adapter(stem: str, selection: Selection) -> None:
     """An adapter module is its backend's; the shared ones are the core's."""
-    if stem in ("base", "keymap", "__init__"):
+    if stem in ("base", "__init__"):
         selection.core = True
     elif stem == "default":
         selection.direct.add("gym")

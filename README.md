@@ -367,6 +367,7 @@ humans/
     run.py          # RunConfig: one run's command line and the rig it is played on
   popup.py          # the hold-a-key pop-ups: pause menu (reset / forfeit / resume) and hint, opt-in per game phase
   inputs/           # the input devices: one named control per key, button, stick direction
+  keymaps/          # the phase's controls -> actions: base.py (Keymap), one file per action space's Keymap
   outputs/
     display.py      # pygame: fixed window, aspect-fit frame, fixation, text; vsync-locked flip + call_on_flip
     audio.py        # streaming PCM to the speakers, each chunk timed to its frame's flip
@@ -386,7 +387,6 @@ humans/
     photodiode.py   # `python -m humans.standalone.photodiode`: flash a patch to measure the flip-to-photon offset
   adapters/
     base.py         # EnvAdapter + FrameState (the seam)
-    keymap.py       # the phase's keys -> actions, one Keymap per action space
     ale.py          # clone_state, getRAM, lossless indexed pixels
     retro.py        # em.get_state, get_ram, decoded info vars, console-button keymap
     default.py      # ANY gym env: rgb frames, seed+replay, obs-as-state
@@ -565,7 +565,7 @@ Includes are resolved when the file is read, so everything after that sees each 
 Every game phase states its whole map of controls. **There is no default**: the file says which key or button does what, and a phase without `controls` is refused before the window opens. These are the names of controls of the rig's input devices (see *Rigs*); a curriculum plays on the rigs whose inputs have them. `controls` is a dict of `"<control(s)>": <action>`:
 
 - The control is a value from `humans/inputs/control_names.py` (the keyboard's `UP`, `DOWN`, `LEFT`, `RIGHT`, `SPACE`, `A`–`Z`, `0`–`9`, `KP0`–`KP9`, …; a controller's `CONTROLLER_BUTTON_A`, `CONTROLLER_AXIS_LEFTY_UP`, …); a name no device has is refused, since it could never be pressed, and so is an experimenter's key (see "The experimenter's keys"). Join controls with `+` for a combo (`"UP+SPACE"`).
-- The action is what the env's `step` takes, as JSON, and the rule is the env's action space (`humans/adapters/keymap.py`, one class per space):
+- The action is what the env's `step` takes, as JSON, and the rule is the env's action space (`humans/keymaps/`, one class per space):
   - **`MultiBinary`** (retro, vizdoom, stk, aigamestore): the value is the **index of the button** the key holds down; every held control sets its bit, so controls combine as on a controller, and nothing held is every button up. An index outside the space is refused when the env is built, and so is a `""` entry (nothing held already means no button).
   - **`Discrete`** (ale, coom, vgdl, crafter, minihack, baba, rushhour, gym) or **`Box`** (gym, stk): the value is the action itself, an index or a list (`"LEFT": [-1.0, 0.0]`). The most specific combo whose controls are all held wins (`"UP+SPACE"` over `"UP"`), and the **`""`** entry is what a frame with nothing held sends. `""` is required unless the phase is `is_turn_based`, where nothing is sent between presses: these spaces have no action that means "do nothing" everywhere (FrozenLake's 0 is LEFT, MiniHack's is "move N"). A value outside the space is refused when the env is built.
   - **`Box`, one dimension per control**: instead of a list, a control's value may be one **dimension** of the action, which the control's value (the table below) sets every frame, over the list its held combos give: `"CONTROLLER_AXIS_LEFTX": 0` puts the stick's -1..1 in dimension 0 as it is, and `"CONTROLLER_AXIS_LEFTY_DOWN": {"dimension": 2, "range": [0.5, 1]}` maps the control's range onto the one given, its least value to the first number and its greatest to the second (`[1, -1]` flips a stick axis; `[0, -1]` makes a key or a stick side push a dimension negative). A dimension is set by one control (not a combo), and by no other; `""` is required, and gives the dimensions no control sets. The action is clipped to the space, so a control and a dimension whose ranges differ are allowed: a stick axis on a 0..1 dimension does nothing on its negative side.

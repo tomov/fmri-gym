@@ -1719,7 +1719,7 @@ def _engine_rate(phase: dict) -> float | None:
     """Build the phase's adapter (which checks its keys against the env) and read its own rate.
 
     :return: the native fps; ``None`` for an engine with no clock of its own.
-    :raises Exception: whatever the engine or the :mod:`~humans.adapters.keymap` refuses.
+    :raises Exception: whatever the engine or the :mod:`~humans.keymaps` refuses.
     """
     from ..adapters import get_adapter
 

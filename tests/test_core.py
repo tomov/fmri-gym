@@ -17,7 +17,7 @@ from gymnasium import spaces
 from humans.outputs.sound import Sound
 from humans.save.bids import task_label
 from humans.adapters.base import EnvAdapter, HudSettings
-from humans.adapters.keymap import ContinuousBoxKeymap, DiscreteBoxKeymap, make_keymap
+from humans.keymaps import ContinuousBoxKeymap, DiscreteBoxKeymap, make_keymap
 from humans.config.curriculum import (
     check_shape, game_changes, is_common_file, load_curriculum, save_curriculum,
     shared_overrides, validate_curriculum,
