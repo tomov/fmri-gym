@@ -14,7 +14,7 @@ There is one curriculum per race track the package ships. Its other track names 
 
 Every phase states its `action_mode`, which the adapter hands to the env; `stk.json` and `stk-GMPD3-stick-nav.json` play `"keys"`. With it, the env's action is MultiBinary(8) over SuperTuxKart's keys: 0=left, 1=right, 2=up (accelerate), 3=down (brake / reverse), 4=nitro, 5=skid, 6=fire, 7=rescue. Held keys combine, and the game's own player controller turns them into controls. `stk.json` maps them to the rig's ten keys (arrows, X nitro, C skid, SPACE fire, Z rescue), and `stk-GMPD3-stick-nav.json` to a controller's stick (up accelerates, down brakes), RT fire, LT skid, A nitro and B rescue; in both controller versions, Y shows the controls image for as long as it is held; keep each shared phase's Controls text in sync by hand.
 
-`stk-GMPD3-stick-nav-analog.json` sets `"action_mode": "continuous_full"`: the action is Box(5) of the kart's controls, 0=steer (-1 left .. 1 right), 1=accelerate (0..1), 2=brake, 3=nitro, 4=skid (each on above 0.5), which the env sets directly, past the game's player controller (no steering ramp). The stick's x axis is the steering, its up side the throttle and its down side the brake (past half its travel), LT skid and A nitro. The env has no fire or rescue in this mode, so this version has neither.
+`stk-GMPD3-stick-nav-analog.json` sets `"action_mode": "continuous_full"`: the action is Box(7) of the kart's controls, 0=steer (-1 left .. 1 right), 1=accelerate (0..1), 2=brake, 3=nitro, 4=skid, 5=fire, 6=rescue (each on above 0.5), which the env sets directly, past the game's player controller (no steering ramp). The stick's x axis is the steering, its up side the throttle and its down side the brake (past half its travel), LT skid, A nitro, RT fire and B rescue.
 
 ## Timing
 
@@ -22,7 +22,7 @@ The game is lock-stepped: one step per frame, `frame_skip` physics ticks (120 Hz
 
 ## Logging
 
-Per frame: the action (the 8-vector; the 5 controls in `*-GMPD3-stick-nav-analog`), the reward (progress, in metres), and every `SAMPLE_FIELDS` column of stk_gym: tick/time/phase, speed, x/y/z, heading, distance_down_track, distance_to_center, on_road/on_ground/wrong_way, rank, finished_laps, powerup, nitro_energy, progress_m, and ctrl_* (the controls the kart applied). Frames are shown, not stored. A block replays from `episode_seeds` + actions with the same track, karts, seed and supertuxkart-gym version: step a fresh `stk_gym.StkEnv` through the logged actions.
+Per frame: the action (the 8-vector; the 7 controls in `*-GMPD3-stick-nav-analog`), the reward (progress, in metres), and every `SAMPLE_FIELDS` column of stk_gym: tick/time/phase, speed, x/y/z, heading, distance_down_track, distance_to_center, on_road/on_ground/wrong_way, rank, finished_laps, powerup, nitro_energy, progress_m, and ctrl_* (the controls the kart applied). Frames are shown, not stored. A block replays from `episode_seeds` + actions with the same track, karts, seed and supertuxkart-gym version: step a fresh `stk_gym.StkEnv` through the logged actions.
 
 ## Curricula
 
