@@ -79,12 +79,15 @@ class XBoxController(Controller):
         return _scaled(self.controller.get_axis(_SDL_AXIS_BY_NAME[axis_name]))
 
     def values(self) -> dict[str, float]:
-        """The controller's values, each trigger's by how far it is pulled (0..1)."""
+        """The sticks' values (:meth:`Controller.values`), and each trigger by how far it is
+        pulled (0..1).
+
+        :return: the value of each of them not at rest.
+        """
         values = super().values()
         if not self.is_open():
             return values
         for axis, trigger in TRIGGERS.items():
-            values.pop(trigger, None)
             if pulled := max(0.0, _scaled(self.controller.get_axis(axis))):
                 values[trigger] = pulled
         return values

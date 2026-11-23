@@ -10,13 +10,15 @@ key does what differs from site to site, so the file states all of it.
 - :class:`MultiBinaryKeymap`: a value is the index of the button that key holds
   down, and every held control sets its button, so they combine as on a controller.
   Nothing held is every button up, so ``""`` is refused.
-- :class:`DiscreteKeymap`, :class:`BoxKeymap`: a value is an action of the space
-  (an index, a list). The most specific combo whose controls are all held wins, and
-  ``""`` -- the empty combo, held whenever nothing else is -- is what a frame
-  with no control gets. In a ``Box`` phase a control's value may instead be one
-  dimension of the action, which the control's value sets (:class:`DimensionBinding`). No action of these spaces means "do nothing" everywhere (0
+- :class:`DiscreteKeymap`, :class:`DiscreteBoxKeymap`: a value is an action of the
+  space (an index, a list). The most specific combo whose controls are all held wins,
+  and ``""`` -- the empty combo, held whenever nothing else is -- is what a frame
+  with no control gets. No action of these spaces means "do nothing" everywhere (0
   is FrozenLake's LEFT, MiniHack's "move N"), so a real-time phase has to write
   it; an ``is_turn_based`` phase steps only on presses and needs none.
+- :class:`ContinuousBoxKeymap`, for a ``Box`` phase whose values are dimensions, not
+  lists: each control's value sets one dimension of ``""``'s action
+  (:class:`DimensionBinding`).
 """
 
 from __future__ import annotations
@@ -29,51 +31,6 @@ import numpy as np
 from gymnasium import spaces
 
 from ..inputs import value_range
-
-
-class DimensionBinding(NamedTuple):
-    """One dimension of a ``Box`` action that one control's value sets: written as the
-    dimension's index, which takes the value as it is, or as ``{"dimension": d, "range": [a,
-    b]}``, which maps the control's range (:func:`~humans.inputs.value_range`) onto ``a..b``
-    (``[1, -1]`` flips it)."""
-
-    dimension: int
-    #: what the dimension takes at the control's least and greatest value; None: the value
-    value_range: tuple[float, float] | None
-
-    @classmethod
-    def from_dict(cls, control: str, value: Any, space: spaces.Box) -> DimensionBinding:
-        """The binding ``value`` writes for ``control``.
-
-        :raises ValueError: a combo, a dimension the space has not, or a range that is not
-            two numbers.
-        """
-        where = f"controls: {control!r}: {value!r}"
-        if "+" in control or control == "":
-            raise ValueError(f"{where}: a dimension of the action is set by one control")
-        dimension = value.get("dimension") if isinstance(value, dict) else value
-        if isinstance(value, dict) and set(value) != {"dimension", "range"}:
-            raise ValueError(f'{where}: expected {{"dimension": <index>, "range": [<at the '
-                             'least value>, <at the greatest>]}')
-        if (isinstance(dimension, bool) or not isinstance(dimension, int) or len(space.shape) != 1
-                or not 0 <= dimension < space.shape[0]):
-            raise ValueError(f"{where}: expected a dimension (0..{space.shape[0] - 1}) of the "
-                             f"env's {space}")
-        if not isinstance(value, dict):
-            return cls(dimension, None)
-        ends = value["range"]
-        if not (isinstance(ends, list) and len(ends) == 2 and all(
-                isinstance(end, (int, float)) and not isinstance(end, bool) for end in ends)):
-            raise ValueError(f"{where}: range: expected two numbers, got {ends!r}")
-        return cls(dimension, (float(ends[0]), float(ends[1])))
-
-    def dimension_value(self, control: str, value: float) -> float:
-        """What the dimension takes when ``control``'s value is ``value``."""
-        if self.value_range is None:
-            return value
-        least, greatest = value_range(control)
-        at_least, at_greatest = self.value_range
-        return at_least + (value - least) / (greatest - least) * (at_greatest - at_least)
 
 
 class Keymap(ABC):
@@ -93,13 +50,11 @@ class Keymap(ABC):
         """The action ``value`` stands for in ``space``; raises if it is not one."""
 
     @abstractmethod
-    def resolve(self, held: frozenset[str], values: dict[str, float]) -> Any:
+    def resolve(self, held: frozenset[str]) -> Any:
         """The action for the controls of this frame.
 
         :param held: the NAMES of the controls held at the tick and of those pressed
             during the frame, so a tap shorter than a frame counts for one.
-        :param values: each control's value at the tick, a control at rest left out
-            (:meth:`~humans.inputs.InputDevice.values`).
         :return: the action to send to the env this frame.
         """
 
@@ -109,8 +64,7 @@ class Keymap(ABC):
 
     def turn_actions(self) -> dict[str, Any]:
         """``{control: action}`` for the single-control entries: turn-based play steps on one press."""
-        return {next(iter(combo)): self.resolve(combo, dict.fromkeys(combo, 1.0))
-                for combo in self.combos if len(combo) == 1}
+        return {next(iter(combo)): self.resolve(combo) for combo in self.combos if len(combo) == 1}
 
 
 class MultiBinaryKeymap(Keymap):
@@ -131,7 +85,7 @@ class MultiBinaryKeymap(Keymap):
                              f"(0..{self.n - 1}) of the button that control holds down")
         return value
 
-    def resolve(self, held: frozenset[str], values: dict[str, float]) -> list[int]:
+    def resolve(self, held: frozenset[str]) -> list[int]:
         vec = [0] * self.n
         for combo in self._matched(held):
             vec[self.combos[combo]] = 1
@@ -147,45 +101,13 @@ class DiscreteKeymap(Keymap):
                              f"{space}")
         return value
 
-    def resolve(self, held: frozenset[str], values: dict[str, float]) -> Any:
+    def resolve(self, held: frozenset[str]) -> Any:
         return self.combos[max(self._matched(held), key=len)]
 
 
-class BoxKeymap(DiscreteKeymap):
-    """``Box``: a list is the whole action, sent as an array of the space's dtype; anything
-    else binds one dimension (:class:`DimensionBinding`), which the control's value sets over
-    the whole action, clipped to the space."""
-
-    def __init__(self, controls: dict[str, Any], space: spaces.Box) -> None:
-        self.low, self.high = space.low, space.high
-        self.dimensions = {control: DimensionBinding.from_dict(control, value, space)
-                           for control, value in controls.items() if not isinstance(value, list)}
-        controls_by_dimension: dict[int, str] = {}
-        for control, binding in self.dimensions.items():
-            if binding.dimension in controls_by_dimension:
-                raise ValueError(f"controls: {control!r} and "
-                                 f"{controls_by_dimension[binding.dimension]!r} both set "
-                                 f"dimension {binding.dimension}; one control sets a dimension")
-            controls_by_dimension[binding.dimension] = control
-        if self.dimensions and "" not in controls:
-            raise ValueError('controls: "" missing: it is the action whose dimensions no '
-                             "control sets")
-        super().__init__({combo: value for combo, value in controls.items()
-                          if isinstance(value, list)}, space)
-
-    def resolve(self, held: frozenset[str], values: dict[str, float]) -> np.ndarray:
-        action = super().resolve(held, values)
-        if not self.dimensions:
-            return action
-        action = action.copy()
-        for control, binding in self.dimensions.items():
-            action[binding.dimension] = binding.dimension_value(control, values.get(control, 0.0))
-        return np.clip(action, self.low, self.high).astype(action.dtype)
-
-    def turn_actions(self) -> dict[str, Any]:
-        return {**super().turn_actions(),
-                **{control: self.resolve(frozenset({control}), {control: 1.0})
-                   for control in self.dimensions}}
+class DiscreteBoxKeymap(DiscreteKeymap):
+    """``Box``, a whole action per combo: a value is a list, sent as an array of the space's
+    dtype."""
 
     def _action(self, space: spaces.Box, combo: str, value: Any) -> np.ndarray:
         action = np.asarray(value, dtype=space.dtype)
@@ -193,6 +115,114 @@ class BoxKeymap(DiscreteKeymap):
             raise ValueError(f"controls: {combo!r}: {value!r} is not an action of the env's "
                              f"{space}")
         return action
+
+
+class DimensionBinding(NamedTuple):
+    """One dimension of a ``Box`` action, set by one control's value.
+
+    Written as the dimension's index, which takes the value as it is, or as
+    ``{"dimension": d, "range": [a, b]}``, which maps the control's range
+    (:func:`~humans.inputs.value_range`) onto ``a..b`` (``[1, -1]`` flips it).
+    """
+
+    dimension: int
+    #: what the dimension takes at the control's least and greatest value; None: the value
+    value_range: tuple[float, float] | None
+
+    @classmethod
+    def from_dict(cls, control: str, value: Any, space: spaces.Box) -> DimensionBinding:
+        """The binding ``value`` writes for ``control``.
+
+        :param control: the control's name, as ``controls`` writes it.
+        :param value: what ``controls`` maps it to: an index, or a dimension and a range.
+        :param space: the env's action space.
+        :return: the binding.
+        :raises ValueError: a combo, a dimension the space has not, or a range that is not
+            two numbers.
+        """
+        where = f"controls: {control!r}: {value!r}"
+        if "+" in control:
+            raise ValueError(f"{where}: a dimension of the action is set by one control")
+        if isinstance(value, dict) and set(value) != {"dimension", "range"}:
+            raise ValueError(f'{where}: expected {{"dimension": <index>, "range": [<at the '
+                             'least value>, <at the greatest>]}')
+        dimension = value["dimension"] if isinstance(value, dict) else value
+        if (isinstance(dimension, bool) or not isinstance(dimension, int)
+                or len(space.shape) != 1 or not 0 <= dimension < space.shape[0]):
+            raise ValueError(f"{where}: expected a dimension (0..{space.shape[0] - 1}) of the "
+                             f"env's {space}")
+        if not isinstance(value, dict):
+            return cls(dimension, None)
+        ends = value["range"]
+        if not (isinstance(ends, list) and len(ends) == 2 and all(
+                isinstance(end, (int, float)) and not isinstance(end, bool) for end in ends)):
+            raise ValueError(f"{where}: range: expected two numbers, got {ends!r}")
+        return cls(dimension, (float(ends[0]), float(ends[1])))
+
+    def dimension_value(self, control: str, value: float) -> float:
+        """What the dimension takes when ``control``'s value is ``value``.
+
+        :param control: the control bound.
+        :param value: its value, within :func:`~humans.inputs.value_range`.
+        :return: the value as it is, or mapped onto :attr:`value_range`.
+        """
+        if self.value_range is None:
+            return value
+        least, greatest = value_range(control)
+        at_least, at_greatest = self.value_range
+        return at_least + (value - least) / (greatest - least) * (at_greatest - at_least)
+
+
+class ContinuousBoxKeymap(Keymap):
+    """``Box``, a dimension per control: ``""`` is the action, and each other control sets
+    one dimension of it from its value (:class:`DimensionBinding`), clipped to the space.
+
+    :raises ValueError: ``""`` missing, a binding it cannot read, or two controls on one
+        dimension.
+    """
+
+    def __init__(self, controls: dict[str, Any], space: spaces.Box) -> None:
+        if "" not in controls:
+            raise ValueError('controls: "" missing: it is the action whose dimensions no '
+                             "control sets")
+        self.low, self.high = space.low, space.high
+        super().__init__(controls, space)
+        controls_by_dimension: dict[int, str] = {}
+        for control, binding in self._dimension_bindings():
+            if binding.dimension in controls_by_dimension:
+                raise ValueError(f"controls: {control!r} and "
+                                 f"{controls_by_dimension[binding.dimension]!r} both set "
+                                 f"dimension {binding.dimension}; one control sets a dimension")
+            controls_by_dimension[binding.dimension] = control
+
+    def _action(self, space: spaces.Box, combo: str, value: Any) -> Any:
+        if combo != "":
+            return DimensionBinding.from_dict(combo, value, space)
+        action = np.asarray(value, dtype=space.dtype)
+        if not space.contains(action):
+            raise ValueError(f'controls: "": {value!r} is not an action of the env\'s {space}')
+        return action
+
+    def _dimension_bindings(self) -> list[tuple[str, DimensionBinding]]:
+        """Each control and the dimension it sets."""
+        return [(next(iter(combo)), binding) for combo, binding in self.combos.items() if combo]
+
+    def resolve(self, held: frozenset[str],
+                values: dict[str, float] | None = None) -> np.ndarray:
+        """The action: ``""``'s, each bound dimension set by its control's value.
+
+        :param held: as :meth:`Keymap.resolve`.
+        :param values: each control's value, a control at rest left out
+            (:meth:`~humans.inputs.InputDevice.values`). A control not in it reads 1.0 when
+            held and 0.0 when not, as a key or button does. None: every control reads so.
+        :return: the action to send to the env this frame.
+        """
+        values = {} if values is None else values
+        action = self.combos[frozenset()].copy()
+        for control, binding in self._dimension_bindings():
+            value = values.get(control, float(control in held))
+            action[binding.dimension] = binding.dimension_value(control, value)
+        return np.clip(action, self.low, self.high).astype(action.dtype)
 
 
 def make_keymap(spec: dict, space: gym.Space) -> Keymap:
@@ -208,8 +238,10 @@ def make_keymap(spec: dict, space: gym.Space) -> Keymap:
         return MultiBinaryKeymap(controls, space)
     if isinstance(space, spaces.Discrete):
         cls: type[Keymap] = DiscreteKeymap
+    elif isinstance(space, spaces.Box) and _binds_dimensions(controls):
+        cls = ContinuousBoxKeymap
     elif isinstance(space, spaces.Box):
-        cls = BoxKeymap
+        cls = DiscreteBoxKeymap
     else:
         raise TypeError(f"controls: the env's action space is {space}; a keymap drives "
                         "MultiBinary, Discrete or Box only")
@@ -218,3 +250,8 @@ def make_keymap(spec: dict, space: gym.Space) -> Keymap:
                          "phase that is not turn-based needs the action sent on a frame with "
                          "no control held")
     return cls(controls, space)
+
+
+def _binds_dimensions(controls: dict[str, Any]) -> bool:
+    """Whether a control other than ``""`` maps to a dimension rather than a whole action."""
+    return any(not isinstance(value, list) for combo, value in controls.items() if combo)

@@ -71,10 +71,13 @@ class AxisCalibration:
                 "on": round(self.on, 3), "off": round(self.off, 3)}
 
     def normalise(self, value: float) -> float:
-        """A raw reading as a fraction of the travel on its side of rest, -1..1.
+        """A raw reading as a fraction of the travel on its side of rest.
 
         Each side is scaled by its own span, so an axis reaching -0.5 one way and
         +1.0 the other still reports -1.0 and +1.0 at its stops.
+
+        :param value: the raw reading.
+        :return: the fraction, -1..1.
         """
         span = (self.high - self.rest) if value >= self.rest else (self.rest - self.low)
         if span <= 1e-6:
@@ -82,10 +85,13 @@ class AxisCalibration:
         return max(-1.0, min(1.0, (value - self.rest) / span))
 
     def value(self, reading: float) -> float:
-        """A raw reading as the axis's value, -1..1: 0.0 within ``drift`` of rest, and the
-        travel past that rescaled, so each stop still reads -1.0 or +1.0.
+        """A raw reading as the axis's value: 0.0 within ``drift`` of rest, and the travel
+        past that rescaled, so each stop still reads -1.0 or +1.0.
 
         Without the dead zone a stick let go of would still read a little off 0.
+
+        :param reading: the raw reading.
+        :return: the value, -1..1.
         """
         pushed = self.normalise(reading)
         span = (self.high - self.rest) if reading >= self.rest else (self.rest - self.low)

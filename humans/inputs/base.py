@@ -12,7 +12,9 @@ its value at the tick (:meth:`InputDevice.values`). Several devices together are
 
 from __future__ import annotations
 
+import operator
 from abc import ABC, abstractmethod
+from functools import reduce
 from enum import Enum
 from typing import Any, ClassVar, NamedTuple
 
@@ -80,9 +82,12 @@ class InputDevice(ABC):
         return frozenset(self._held)
 
     def values(self) -> dict[str, float]:
-        """Each control not at rest, by its value now: 1.0 for a control held down. A control
-        at rest is left out; its value is 0.0."""
-        return dict.fromkeys(self._held, 1.0)
+        """Each control with a range of values (a stick, a trigger), by its value now.
+
+        :return: the value of each such control not at rest; a control left out is at rest,
+            or has no range (a key or button, whose value is whether it is held).
+        """
+        return {}
 
     def require_calibrated_axes_for(self, required_controls: frozenset[str]) -> None:
         """Refuse to go on when a stick direction in ``required_controls`` has no calibration.
@@ -156,7 +161,7 @@ class InputDevices(InputDevice):
         return frozenset().union(*(d.held() for d in self.devices))
 
     def values(self) -> dict[str, float]:
-        return {name: value for d in self.devices for name, value in d.values().items()}
+        return reduce(operator.or_, (d.values() for d in self.devices), {})
 
     def require_calibrated_axes_for(self, required_controls: frozenset[str]) -> None:
         for device in self.devices:

@@ -1,9 +1,5 @@
 {
   "curriculum": [
-    {
-      "__include": "../common/stk-GMPD3-stick-analog.json",
-      "track": "cornfield_crossing",
-      "instructions": {"title": "SuperTuxKart: Cornfield Crossing"}
-    }
+    {"__include": "../common/stk-GMPD3-stick-analog.json", "track": "cornfield_crossing", "instructions": {"title": "SuperTuxKart: Cornfield Crossing"}}
   ]
 }

@@ -40,6 +40,7 @@ import pygame
 
 from .save import bids
 from .adapters import get_adapter
+from .adapters.keymap import ContinuousBoxKeymap
 from .outputs.audio import Audio
 from .save.bids import BlockProgress, RunOutput, RunProgress
 from .save.provenance import platform_info, versions
@@ -743,8 +744,10 @@ class Run:
                 # As a game engine reads its keys: what is held at the tick, and
                 # what was pressed during the frame, so a tap shorter than a
                 # frame still counts for one.
-                action = adapter.keymap.resolve(self.inputs.held() | frozenset(pressed),
-                                                self.inputs.values())
+                held = self.inputs.held() | frozenset(pressed)
+                action = (adapter.keymap.resolve(held, self.inputs.values())
+                          if isinstance(adapter.keymap, ContinuousBoxKeymap)
+                          else adapter.keymap.resolve(held))
 
             observation, reward, terminated, truncated, info = adapter.step(action)
             auto = adapter.autoplay(info) if game_phase.is_turn_based else None

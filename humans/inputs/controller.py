@@ -40,9 +40,12 @@ AXIS_CONTROLS: dict[ControlNames, tuple[ControlNames, ControlNames]] = {
 
 
 def value_range(control: str) -> tuple[float, float]:
-    """The values ``control`` takes, rest at 0.0: -1..1 for a whole stick axis, 0..1 for any
-    other control (a key or button 0 or 1, a trigger or one side of a stick how far it is
-    pulled or pushed)."""
+    """The values a control takes, rest at 0.0.
+
+    :param control: a control's name.
+    :return: -1..1 for a whole stick axis; 0..1 for any other control (a key or button 0 or
+        1, a trigger or one side of a stick how far it is pulled or pushed).
+    """
     return (-1.0, 1.0) if control in AXIS_CONTROLS else (0.0, 1.0)
 
 
@@ -152,15 +155,26 @@ class Controller(InputDevice):
     @abstractmethod
     def attach(self, handle: Any) -> None:
         """Read through ``handle`` from now on: set :attr:`device_name` and remember the id
-        its events carry."""
+        its events carry.
+
+        :param handle: what SDL opened the controller as (:attr:`HANDLE`).
+        """
 
     def axis_reading(self, axis_name: str) -> float:
-        """Where SDL last saw a stick axis, raw, -1..1; 0.0 once the controller is gone."""
+        """Where SDL last saw a stick axis.
+
+        :param axis_name: one of :attr:`AXIS_NAMES`.
+        :return: the raw reading, -1..1; 0.0 once the controller is gone.
+        """
         return self._read_axis(axis_name) if self.is_open() else 0.0
 
     @abstractmethod
     def _read_axis(self, axis_name: str) -> float:
-        """SDL's reading of a stick axis through the open handle, raw, -1..1."""
+        """SDL's reading of a stick axis through the open handle.
+
+        :param axis_name: one of :attr:`AXIS_NAMES`.
+        :return: the raw reading, -1..1.
+        """
 
     @abstractmethod
     def is_open(self) -> bool:
@@ -220,19 +234,25 @@ class Controller(InputDevice):
                                "and its stick controls are required")
 
     def calibrated(self, axis_name: str, axis_reading: float) -> float | None:
-        """A raw reading of an axis as a fraction of its travel that way, -1..1; None
-        uncalibrated."""
+        """A raw reading of an axis as a fraction of its travel that way.
+
+        :param axis_name: one of :attr:`AXIS_NAMES`.
+        :param axis_reading: a raw reading of it (:meth:`axis_reading`).
+        :return: the fraction, -1..1; None uncalibrated.
+        """
         if self.calibration is None:
             return None
         return self.calibration.axes[axis_name].normalise(axis_reading)
 
     def values(self) -> dict[str, float]:
-        """The controls not at rest: buttons and pressed controls 1.0, and each calibrated
-        stick axis by its value (-1..1) and each of its sides by how far it is pushed that
-        way (0..1)."""
-        values = super().values()
+        """Each stick axis by where it is (-1..1), and each of its sides by how far it is
+        pushed that way (0..1), read through the calibration.
+
+        :return: the value of each of them not at rest; none when uncalibrated.
+        """
         if self.calibration is None:
-            return values
+            return {}
+        values: dict[str, float] = {}
         for axis_name in self.AXIS_NAMES:
             value = self.calibration.axes[axis_name].value(self.axis_reading(axis_name))
             negative, positive = AXIS_CONTROLS[axis_name]

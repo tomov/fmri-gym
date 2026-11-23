@@ -350,7 +350,7 @@ def test_a_stick_axis_has_a_value_and_each_side_how_far_it_is_pushed():
     values = d.values()
     assert values[LX] == -1.0 and values[ControlNames.CONTROLLER_AXIS_LEFTX_LEFT] == 1.0
     assert 0.0 < values[RX] < 0.3 and values[RX] == values[ControlNames.CONTROLLER_AXIS_RIGHTX_RIGHT]
-    assert values["S_A"] == 1.0
+    assert "S_A" not in values                                  # a button's value is held()
     assert LY not in values and ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT not in values
 
 

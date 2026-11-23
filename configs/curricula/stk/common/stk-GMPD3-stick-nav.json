@@ -12,6 +12,7 @@
       "Press A to start."
     ]
   },
+  "action_mode": "keys",
   "controls": {"CONTROLLER_AXIS_LEFTX_LEFT": 0, "CONTROLLER_AXIS_LEFTX_RIGHT": 1, "CONTROLLER_AXIS_LEFTY_UP": 2, "CONTROLLER_AXIS_LEFTY_DOWN": 3, "CONTROLLER_BUTTON_A": 4, "CONTROLLER_AXIS_TRIGGERLEFT": 5, "CONTROLLER_AXIS_TRIGGERRIGHT": 6, "CONTROLLER_BUTTON_Y": 7},
   "hint": {
     "control": "CONTROLLER_BUTTON_Y", "hold": 3.0, "after": 0.0,
