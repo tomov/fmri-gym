@@ -1,5 +1,0 @@
-{
-  "curriculum": [
-    {"__include": "../common/stk-GMPD3-stick-analog.json", "track": "snowmountain", "instructions": {"title": "SuperTuxKart: Northern Resort"}}
-  ]
-}
