@@ -49,7 +49,7 @@ def _head(record: RunRecord, timeline: Timeline) -> list[str]:
         f"logs      format {manifest['log_format']['format']} {manifest['log_format']['version']}"
         f": the run's log and {len(record.block_lines)} block log(s)",
         "session   " + (
-            f"recording {record.session_recording.folder}: "
+            f"recording {record.session_recording.name}: "
             f"{len(record.session_recording.start['devices'])} device(s) "
             f"({record.session_recording.start['reader']}), {len(record.device_lines)} device "
             "events in the run" if record.session_recording else

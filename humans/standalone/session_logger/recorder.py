@@ -22,8 +22,8 @@ from typing import IO, Any, Protocol
 
 from ...config.rig import RigConfig
 from ...save.provenance import platform_info, versions
-from . import (CLOCK_INTERVAL_S, CONTROL_FILENAME, FLUSH_INTERVAL_S, READ_TIMEOUT_S,
-               SESSION_EVENTS_FILENAME, FrontApplication, SessionLoggerError)
+from . import (CLOCK_INTERVAL_S, FLUSH_INTERVAL_S, READ_TIMEOUT_S, FrontApplication,
+               RecordingFiles, SessionLoggerError)
 
 #: Seconds between two looks at the control file for a line the commands added.
 CONTROL_POLL_S = 0.05
@@ -62,18 +62,19 @@ class NoDevices:
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Record into ``--folder`` until its control file says to stop.
+    """Record into ``--events`` until the recording's control file says to stop.
 
     :param argv: the command line; ``None`` reads the process's.
     :raises SystemExit: with the reason alone, when a device the rig names cannot be read.
     """
-    parser = argparse.ArgumentParser(description="Record a session into a recording's folder "
-                                     "until its control file says to stop.")
-    parser.add_argument("--folder", required=True, help="the recording's folder")
+    parser = argparse.ArgumentParser(description="Record a session into a recording's events "
+                                     "file until its control file says to stop.")
+    parser.add_argument("--events", required=True, help="the recording's events file, made here")
     parser.add_argument("--rig", required=True, help="the rig file: its device_events")
     parser.add_argument("--subject", required=True, help="sub-<label>")
     parser.add_argument("--ses", type=int, required=True, help="the session number, from 1")
     args = parser.parse_args(argv)
+    files = RecordingFiles.of_events_file(args.events)
     rig = RigConfig.open(args.rig)
     try:
         devices = (NoDevices() if rig.device_events is None
@@ -84,7 +85,7 @@ def main(argv: list[str] | None = None) -> None:
     side_lines: queue.Queue[dict[str, Any]] = queue.Queue()
     stop = threading.Event()
     sources: list[tuple[Callable[..., None], tuple[Any, ...]]] = [
-        (follow_control_file, (os.path.join(args.folder, CONTROL_FILENAME), side_lines, stop)),
+        (follow_control_file, (files.control, side_lines, stop)),
         (sample_clock, (side_lines, stop)), (watch_stalls, (side_lines, stop))]
     if front_application is not None:
         sources.append((watch_focus, (front_application, side_lines, stop)))
@@ -95,8 +96,7 @@ def main(argv: list[str] | None = None) -> None:
                   **devices.record(), "sources": _sources(devices, front_application),
                   "rig": rig.record(), "recorder_pid": os.getpid(), "versions": versions(),
                   "platform": platform_info()}
-    record_session_events(devices, os.path.join(args.folder, SESSION_EVENTS_FILENAME),
-                          first_line, side_lines, stop)
+    record_session_events(devices, files.events, first_line, side_lines, stop)
 
 
 def open_devices(device_names: list[str]) -> OpenDevices:

@@ -811,17 +811,19 @@ def test_a_session_is_recorded_from_start_to_stop_with_its_marks(tmp_path):
     import json
 
     from humans.standalone import session_logger
-    folder = session_logger.start_recording(_rig_with_devices(tmp_path, None), "sub-01", 2)
+    recording = session_logger.start_recording(_rig_with_devices(tmp_path, None), "sub-01", 2)
+    beh = tmp_path / "data" / "sub-01" / "ses-002" / "beh"
     try:
-        assert folder.endswith(os.path.join("data", "sub-01", "ses-002", "beh",
-                                            os.path.basename(folder)))
-        assert os.path.basename(folder).startswith("sub-01_ses-002_session-events_")
-        assert session_logger.is_recording(folder)
-        session_logger.mark_recording(folder, "run 1: the localizer, été")
+        assert os.path.dirname(recording) == str(beh), "straight into the session's beh/"
+        assert os.path.basename(recording).startswith("sub-01_ses-002_session-")
+        assert session_logger.is_recording(recording)
+        session_logger.mark_recording(recording, "run 1: the localizer, été")
     finally:
-        assert session_logger.stop_recording(folder)
-    lines = [json.loads(line) for line in
-             open(os.path.join(folder, "session_events.jsonl"), encoding="utf-8")]
+        assert session_logger.stop_recording(recording)
+    stem = recording.removesuffix("_events.jsonl")
+    assert sorted(os.listdir(beh)) == sorted(os.path.basename(stem) + suffix for suffix in
+                                             ("_events.jsonl", "_control.jsonl", "_logger.log"))
+    lines = [json.loads(line) for line in open(recording, encoding="utf-8")]
     first, last = lines[0], lines[-1]
     assert first["type"] == "recording_start" and last["type"] == "recording_end"
     assert first["devices"] == [] and first["subject"] == "sub-01"
@@ -831,12 +833,30 @@ def test_a_session_is_recorded_from_start_to_stop_with_its_marks(tmp_path):
     assert [mark["text"] for mark in marks] == ["run 1: the localizer, été"]
     assert last["how"] == "stopped" and last["counts"]["mark"] == 1
     assert last["devices_gone"] == []
-    assert not session_logger.is_recording(folder)
+    assert not session_logger.is_recording(recording)
     from humans.save import bids
     assert bids.next_session(str(tmp_path / "data"), "sub-01") == 1
     os.makedirs(tmp_path / "data" / "sub-01" / "ses-001")
     assert bids.next_session(str(tmp_path / "data"), "sub-01") == 3, "a recording takes its session"
-    assert session_logger.stop_recording(folder), "stopping a stopped recording is harmless"
+    assert session_logger.stop_recording(recording), "stopping a stopped recording is harmless"
+
+
+def test_a_recording_is_never_written_over(tmp_path, monkeypatch):
+    from humans.standalone import session_logger
+    monkeypatch.setattr(session_logger.time, "strftime", lambda _: "20261119T120000")
+    rig = _rig_with_devices(tmp_path, None)
+    recording = session_logger.start_recording(rig, "sub-01", 1)
+    assert session_logger.stop_recording(recording)
+    beh = os.path.dirname(recording)
+
+    def files_in_beh():
+        return {name: open(os.path.join(beh, name), "rb").read() for name in os.listdir(beh)}
+    before = files_in_beh()
+    with pytest.raises(session_logger.SessionLoggerError, match="never written over"):
+        session_logger.start_recording(rig, "sub-01", 1)
+    assert files_in_beh() == before
+    with pytest.raises(session_logger.SessionLoggerError, match="not a recording's events"):
+        session_logger.stop_recording(beh)
 
 
 def test_a_recording_does_not_start_when_a_device_the_rig_names_is_missing(tmp_path):
@@ -899,11 +919,11 @@ def test_a_recording_lists_the_devices_unplugged_and_stop_says_so(tmp_path, caps
             pass
     first_line = {"type": "recording_start", "perf_time": 0.5, "wall_time": 1.7e9,
                   "devices": [{"name": "Trigger Box"}], "recorder_pid": os.getpid()}
-    record_session_events(Box(), str(tmp_path / "session_events.jsonl"), first_line,
-                          queue.Queue(), stop)
-    last = json.loads((tmp_path / "session_events.jsonl").read_text().splitlines()[-1])
+    recording = tmp_path / "sub-01_ses-001_session-x_events.jsonl"
+    record_session_events(Box(), str(recording), first_line, queue.Queue(), stop)
+    last = json.loads(recording.read_text().splitlines()[-1])
     assert last["devices_gone"] == [{"device": 0, "perf_time": 3.0}]
-    assert session_logger.stop_recording(str(tmp_path))
+    assert session_logger.stop_recording(str(recording))
     assert "'Trigger Box' (device 0) was unplugged at" in capsys.readouterr().err
 
 

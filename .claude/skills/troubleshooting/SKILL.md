@@ -50,9 +50,10 @@ A run checks everything it can before the participant screen opens, and stops on
 - **`session-logger: perf_counter reads ...`** or **`... perf_counter is ... off mach absolute time ...`**: this Python's `perf_counter` is not on the clock the OS stamps its events with, so they could not be matched to the runs. Use the Python the project pins (`uv run`).
 - **`session-logger: Windows would not send this process the devices' raw input (error N)`** (Windows): registering for the devices' raw input failed; the error is Windows' (`GetLastError`). Start the session from a desktop session of the user at the rig, not over a remote service.
 - **`session-logger: no device reader for <platform>`**: there is no device reader for this OS. A rig without `"device_events"` is still recorded: its marks and the clock.
+- **`session-logger: a recording named <name> is already in <folder>, and a recording is never written over`**: two recordings of the same session started within the same second. Start it again.
 - **`session-logger: the recorder wrote nothing in ... s`**: the recorder started but did not open the devices in time; its log, in the message, says where it stopped.
 - **`session-logger: WARNING: '<name>' (device N) was unplugged at HH:MM:SS: ...`** (`stop`): the device left the machine during the session, and the recording holds none of its events after that time; the runs still have their own times for its presses (when they read them). Check its cable before the next session.
-- **`session-logger: WARNING: the recording in <folder> has stopped: ...`** (`mark`) or **`... did not end when told to: ...`** (`stop`): the recorder stopped before the session ended. The message says when its last line was written, and names its log, which says why; the recording keeps every line until then.
+- **`session-logger: WARNING: the recording <events file> has stopped: ...`** (`mark`) or **`... did not end when told to: ...`** (`stop`): the recorder stopped before the session ended. The message says when its last line was written, and names its log, which says why; the recording keeps every line until then.
 
 ## Audio
 

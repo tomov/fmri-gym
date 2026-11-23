@@ -27,7 +27,7 @@ from typing import Any
 
 from ..inputs.keyboard import NAMES
 from ..save.logging import GAME_EVENTS_FILENAME, RUN_EVENTS_FILENAME, read_lines
-from .session_logger import SESSION_EVENTS_FILENAME, recordings_folder_of_run
+from .session_logger import recordings_of_run
 from .key_codes import (
     EV_KEY, EV_SYN, EVDEV_AXES, EVDEV_BUTTONS, EVDEV_KEYS, HID_BUTTON_PAGE, HID_KEYBOARD_PAGE,
     KEY_NAME_OF_USAGE, SYN_DROPPED, evdev_code_of_windows_key,
@@ -60,8 +60,8 @@ class LogFormatError(ValueError):
 class SessionRecording:
     """The recording of a run's session (:mod:`.session_logger`) that covers the run."""
 
-    #: its folder's name: when it started
-    folder: str
+    #: its name: its subject, session and start
+    name: str
     #: its ``recording_start`` line: the reader, its clock, the devices
     start: dict[str, Any]
     #: its ``recording_end`` line; ``None`` when the recording was cut short
@@ -83,16 +83,15 @@ class SessionRecording:
             return None
         run_offset = manifest["start_epoch"] - manifest["trigger_perf"]
         first, last = run_lines[0]["perf_time"], max(line["perf_time"] for line in run_lines)
-        recordings = Path(recordings_folder_of_run(folder))
-        for path in sorted(recordings.glob(f"*/{SESSION_EVENTS_FILENAME}")):
-            lines = read_lines(str(path))
+        for recording in recordings_of_run(folder):
+            lines = read_lines(recording.events)
             start = lines[0]
             end = lines[-1] if lines[-1]["type"] == "recording_end" else None
             if abs(start["wall_time"] - start["perf_time"] - run_offset) > SAME_CLOCK_S:
                 continue
             if start["perf_time"] > last or lines[-1]["perf_time"] < first:
                 continue
-            return cls(path.parent.name, start, end,
+            return cls(recording.name, start, end,
                        [line for line in lines[1:]
                         if first <= line["perf_time"] <= last and line is not end])
         return None
@@ -604,7 +603,7 @@ def _device_quality(record: RunRecord, timeline: Timeline) -> dict[str, Any]:
         "dropped": sum(line.get("event_type") == EV_SYN and line["code"] == SYN_DROPPED
                        for line in record.device_lines),
         "gone": sum(line["type"] == "device_gone" for line in record.device_lines),
-        "recording": recording.folder,
+        "recording": recording.name,
         "ended": "cut short" if recording.end is None else recording.end["how"]}
     if delays:
         out.update({"read_delay_median_ms": 1000 * statistics.median(delays),

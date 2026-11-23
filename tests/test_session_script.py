@@ -73,7 +73,7 @@ def test_a_run_is_numbered_by_its_place_among_its_task():
 
 def _uv_that_logs(tmp_path) -> dict[str, str]:
     """An environment whose ``uv`` only writes what it is asked into ``uv.log``, and answers
-    ``session-logger start`` with a recording's folder."""
+    ``session-logger start`` with a recording's events file."""
     (tmp_path / "bin").mkdir()
     uv = tmp_path / "bin" / "uv"
     uv.write_text(f'#!/bin/sh\necho "$*" >> "{tmp_path / "uv.log"}"\n'
