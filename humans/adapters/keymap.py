@@ -30,7 +30,7 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-from ..inputs import value_range
+from ..inputs import STICK_AXIS_NAMES, value_range
 
 
 class Keymap(ABC):
@@ -38,12 +38,18 @@ class Keymap(ABC):
 
     :param controls: the phase's ``controls``, whose names are real controls.
     :param space: the env's action space, which the values are checked against.
-    :raises ValueError: a value that is not an action of the space.
+    :raises ValueError: a value that is not an action of the space, or a whole stick axis
+        bound to anything but a dimension: it is never held.
     """
 
     def __init__(self, controls: dict[str, Any], space: gym.Space) -> None:
         self.combos = {frozenset(combo.split("+") if combo else ()):
                        self._action(space, combo, value) for combo, value in controls.items()}
+        for combo, action in self.combos.items():
+            if combo & STICK_AXIS_NAMES and not isinstance(action, DimensionBinding):
+                raise ValueError(f"controls: {'+'.join(sorted(combo))!r}: a whole stick axis is "
+                                 "never held, so it only sets a dimension of a Box action; bind "
+                                 "its sides to press")
 
     @abstractmethod
     def _action(self, space: gym.Space, combo: str, value: Any) -> Any:

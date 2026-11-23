@@ -15,13 +15,14 @@ from .base import (QUIT, QUIT_KEYS, Edge, InputDevice, InputDevices, InputEvent,
                    is_quit_request)
 from .calibration import CalibrationError, ControllerCalibration, newest, read
 from .control_names import EXPERIMENTER_KEYS, START_KEY, ControlNames
-from .controller import (Controller, sdl_joystick_names, start_sdl_joysticks_and_wait_for,
-                         value_range)
+from .controller import (STICK_AXIS_NAMES, Controller, sdl_joystick_names,
+                         start_sdl_joysticks_and_wait_for, value_range)
 from .current_designs_gamepad3 import CurrentDesignsGamepad3
 from .keyboard import Keyboard
 from .xbox_controller import XBoxController
 
 __all__ = ["EXPERIMENTER_KEYS", "INPUT_DEVICE_CLASSES_BY_NAME", "QUIT", "QUIT_KEYS", "START_KEY",
+           "STICK_AXIS_NAMES",
            "CalibrationError", "ControlNames", "Controller", "CurrentDesignsGamepad3", "Edge",
            "InputDevice", "InputDevices", "InputEvent", "Keyboard", "XBoxController",
            "controls_of_input_devices", "detect_controllers", "first_controller_class_plugged_in",

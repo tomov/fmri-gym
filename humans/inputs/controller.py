@@ -5,8 +5,8 @@ A controller's controls go by :class:`ControlNames`, whatever the controller,
 so the same name means the same place on any controller that has it. A kind of controller is a subclass that maps what SDL sends to
 these names. Each stick axis is two controls, one per side of rest, read like a
 trigger through the axis's own calibration (:mod:`humans.inputs.calibration`),
-and independent of every other axis; the axis itself is a third, held while
-either side is. SDL's joystick subsystem is started here,
+and independent of every other axis; the axis itself is a third, which has a value (where
+the stick is) and is never held. SDL's joystick subsystem is started here,
 since only a controller needs it.
 """
 
@@ -37,6 +37,8 @@ AXIS_CONTROLS: dict[ControlNames, tuple[ControlNames, ControlNames]] = {
     ControlNames.CONTROLLER_AXIS_RIGHTY: (ControlNames.CONTROLLER_AXIS_RIGHTY_UP,
                                           ControlNames.CONTROLLER_AXIS_RIGHTY_DOWN),
 }
+#: Every whole stick axis: a control with a value that is never held; its sides are.
+STICK_AXIS_NAMES = frozenset(AXIS_CONTROLS)
 
 
 def value_range(control: str) -> tuple[float, float]:
@@ -46,7 +48,7 @@ def value_range(control: str) -> tuple[float, float]:
     :return: -1..1 for a whole stick axis; 0..1 for any other control (a key or button 0 or
         1, a trigger or one side of a stick how far it is pulled or pushed).
     """
-    return (-1.0, 1.0) if control in AXIS_CONTROLS else (0.0, 1.0)
+    return (-1.0, 1.0) if control in STICK_AXIS_NAMES else (0.0, 1.0)
 
 
 #: The face buttons, in the order a tool asks for them: round the face under a thumb.
@@ -299,8 +301,7 @@ class Controller(InputDevice):
 
     def _move_axis(self, axis_name: str, axis_reading: float) -> list[InputEvent]:
         """Take a raw reading of an axis: set the axis's value (-1..1) and each side's (how
-        far it is pushed that way, 0..1), press or release each side, then the axis itself,
-        held while either side is.
+        far it is pushed that way, 0..1), and press or release each side.
 
         An uncalibrated axis keeps only its reading: no value, nothing pressed.
         """
@@ -313,8 +314,5 @@ class Controller(InputDevice):
         self._set(axis_name, value)
         self._set(negative, max(0.0, -value))
         self._set(positive, max(0.0, value))
-        out = (self._pull(negative, -pushed, axis.on, axis.off)
-               + self._pull(positive, pushed, axis.on, axis.off))
-        if {negative, positive} & self._held:
-            return out + self._press(axis_name)
-        return out + self._release(axis_name)
+        return (self._pull(negative, -pushed, axis.on, axis.off)
+                + self._pull(positive, pushed, axis.on, axis.off))

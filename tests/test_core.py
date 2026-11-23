@@ -288,6 +288,17 @@ def test_a_box_phase_of_dimensions_refuses_a_binding_it_cannot_read(controls, me
         make_keymap({"controls": controls, "is_turn_based": True}, _STEER_ACCEL_BRAKE)
 
 
+@pytest.mark.parametrize("controls, space", [
+    ({"": 0, "CONTROLLER_AXIS_LEFTX": 1}, spaces.Discrete(3)),
+    ({"": 0, "CONTROLLER_AXIS_LEFTX+CONTROLLER_BUTTON_A": 1}, spaces.Discrete(3)),
+    ({"": [0] * 5, "CONTROLLER_AXIS_LEFTX": [1] * 5}, _STEER_ACCEL_BRAKE),
+    ({"CONTROLLER_AXIS_LEFTX": 0}, spaces.MultiBinary(3)),
+])
+def test_a_whole_stick_axis_only_sets_a_dimension(controls, space):
+    with pytest.raises(ValueError, match="never held"):
+        make_keymap({"controls": controls}, space)
+
+
 def test_keymap_refuses_an_action_outside_the_space():
     with pytest.raises(ValueError):
         make_keymap({"controls": {"": 0, "LEFT": 5}}, spaces.Discrete(3))
@@ -309,6 +320,9 @@ def test_keymap_refuses_an_action_outside_the_space():
     ({**PHASE, "hint": {"text": "hi"}}, "hint.control"),
     ({**PHASE, "hint": {"control": "X", "text": "hi", "hold": -1}}, "hint.hold"),
     ({**PHASE, "hint": {"control": "X", "text": "hi", "colour": "red"}}, "colour"),
+    ({**PHASE, "hint": {"control": "CONTROLLER_AXIS_LEFTX", "text": "hi"}}, "never pressed"),
+    ({"type": "message", "text": "hi", "controls_to_dismiss": ["CONTROLLER_AXIS_LEFTY"]},
+     "never pressed"),
 ])
 def test_validate_config_refuses(phase, problem):
     problems = validate_curriculum({"curriculum": [phase]})
