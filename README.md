@@ -12,7 +12,7 @@ A proof-of-concept framework that turns games into neuroimaging tasks — fixed 
 | `vgdl`        | VGDL games (`aliens`, `beesAndBirds`, …), from a pinned checkout in `external/vgdl` | vgdl-gym (`gym/vgdl/`) over the language_and_experience fork |
 | `crafter`     | Crafter (open-world survival) | crafter-gym (`gym/crafter/`) over crafter |
 | `minihack`    | MiniHack tasks (pixel obs) | minihack / NLE |
-| `nethack_gamepad` | Full NetHack 3.6.0; native menus and tiles | nethack-gamepad-gym pip package; [installation and play](configs/curricula/nethack_gamepad/common/README.md) |
+| `nethack_gym` | Full NetHack 3.6.0; native menus and tiles | nethack-gym pip package; [installation and play](configs/curricula/nethack_gym/common/README.md) |
 | `nethack`     | NetHack (`NetHack*-v0`; TTY rendered to pixels) | nle |
 | `aigamestore` | AI GameStore browser games (`game1`…`game10`), lock-stepped | aigamestore-gym (`gym/aigamestore/`) |
 | `vizdoom`     | Doom action-shooter scenarios (COOM's engine) | ViZDoom |

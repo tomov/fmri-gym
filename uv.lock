@@ -773,7 +773,7 @@ all = [
     { name = "hidapi" },
     { name = "minihack" },
     { name = "minihack-levels" },
-    { name = "nethack-gamepad-gym" },
+    { name = "nethack-gym" },
     { name = "nle" },
     { name = "pylsl" },
     { name = "pyparallel" },
@@ -843,8 +843,8 @@ nethack = [
     { name = "nle" },
     { name = "replay-state-gym" },
 ]
-nethack-gamepad = [
-    { name = "nethack-gamepad-gym" },
+nethack-gym = [
+    { name = "nethack-gym" },
 ]
 retro = [
     { name = "stable-retro" },
@@ -896,7 +896,7 @@ requires-dist = [
     { name = "box2d", marker = "extra == 'box2d'", specifier = ">=2.3.10" },
     { name = "coom-gym", marker = "extra == 'coom'", editable = "gym/coom" },
     { name = "crafter-gym", marker = "extra == 'crafter'", editable = "gym/crafter" },
-    { name = "fmri-gym", extras = ["dbp", "ale", "retro", "nethack", "nethack-gamepad", "vgdl", "arc3", "box2d", "mujoco", "shimmy", "tilematch", "triggers", "gui"], marker = "extra == 'all'" },
+    { name = "fmri-gym", extras = ["dbp", "ale", "retro", "nethack", "nethack-gym", "vgdl", "arc3", "box2d", "mujoco", "shimmy", "tilematch", "triggers", "gui"], marker = "extra == 'all'" },
     { name = "fmri-gym", extras = ["vizdoom", "coom", "aigamestore", "crafter", "rushhour", "baba-auto", "minihack", "stk"], marker = "extra == 'dbp'" },
     { name = "gymnasium" },
     { name = "gymnasium", extras = ["mujoco"], marker = "extra == 'mujoco'" },
@@ -905,7 +905,7 @@ requires-dist = [
     { name = "minihack", marker = "extra == 'minihack'" },
     { name = "minihack-levels", marker = "extra == 'minihack'", editable = "gym/minihack" },
     { name = "minihack-levels", marker = "extra == 'nethack'", editable = "gym/minihack" },
-    { name = "nethack-gamepad-gym", marker = "extra == 'nethack-gamepad'", specifier = "==0.1.0" },
+    { name = "nethack-gym", marker = "extra == 'nethack-gym'", specifier = "==0.1.0" },
     { name = "nle", marker = "extra == 'minihack'", specifier = ">=1.3" },
     { name = "nle", marker = "extra == 'nethack'", specifier = ">=1.3" },
     { name = "numpy" },
@@ -936,7 +936,7 @@ requires-dist = [
     { name = "vizdoom-gym", marker = "extra == 'coom'", editable = "gym/vizdoom" },
     { name = "vizdoom-gym", marker = "extra == 'vizdoom'", editable = "gym/vizdoom" },
 ]
-provides-extras = ["ale", "retro", "crafter", "baba", "baba-auto", "vgdl", "minihack", "nethack-gamepad", "nethack", "aigamestore", "arc3", "vizdoom", "coom", "rushhour", "stk", "box2d", "mujoco", "shimmy", "tilematch", "triggers", "gui", "dbp", "all"]
+provides-extras = ["ale", "retro", "crafter", "baba", "baba-auto", "vgdl", "minihack", "nethack-gym", "nethack", "aigamestore", "arc3", "vizdoom", "coom", "rushhour", "stk", "box2d", "mujoco", "shimmy", "tilematch", "triggers", "gui", "dbp", "all"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1805,7 +1805,7 @@ wheels = [
 ]
 
 [[package]]
-name = "nethack-gamepad-gym"
+name = "nethack-gym"
 version = "0.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
@@ -1816,9 +1816,9 @@ dependencies = [
     { name = "pillow" },
     { name = "pygame-ce" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/be/96/577d2ff8f34ba562e4f5e6b146c9f9e4fca21aa848b4c64aadef70dabbf6/nethack_gamepad_gym-0.1.0.tar.gz", hash = "sha256:4742a9604afd3f05fae36229790e0af4f70940025771c78d474358aeb8c94554", size = 4677256, upload-time = "2026-11-17T19:58:18.082Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/74/52/c1bb14e148dd5b436b17f8f505c00a25a1ddc3809b8aab279815edde7f67/nethack_gym-0.1.0.tar.gz", hash = "sha256:26425f959701a1915f08fc2d4121bee39ef4bb7d1b98a9df9749c18cdb7a14c6", size = 4669964, upload-time = "2026-11-23T22:58:07.222Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cc/3a/ad4c2d2a689ea901a787e78fc99967a4a9576e61311c02f4d66d596e19e2/nethack_gamepad_gym-0.1.0-py3-none-any.whl", hash = "sha256:6f51ec5169719717a454e4f1d1f8aac1a430ce8f0e41b5c069ee2907fbe9279d", size = 5106558, upload-time = "2026-11-17T19:58:16.279Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/78/3115ad10f76a07ce586a13a97cbe59ed5447cb86a9526ffff1d6827cac89/nethack_gym-0.1.0-py3-none-any.whl", hash = "sha256:44f69cc621fe6d75f95852526f3e8b69ba12e3e5fe042388f056e6eaef33c7c3", size = 5092926, upload-time = "2026-11-23T22:58:05.548Z" },
 ]
 
 [[package]]

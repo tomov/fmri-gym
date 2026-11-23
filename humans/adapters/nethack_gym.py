@@ -20,8 +20,8 @@ import numpy as np
 from .base import EnvAdapter, FrameState
 
 
-class NetHackGamepadAdapter(EnvAdapter):
-    name = "nethack_gamepad"
+class NetHackGymAdapter(EnvAdapter):
+    name = "nethack_gym"
 
     def _make(self, spec: dict) -> gym.Env:
         kwargs = spec.get("env_kwargs", {})
