@@ -15,7 +15,7 @@
   "action_mode": "continuous_full",
   "controls": {"": [0, 0, 0, 0, 0], "CONTROLLER_AXIS_LEFTX": 0, "CONTROLLER_AXIS_LEFTY_UP": 1, "CONTROLLER_AXIS_LEFTY_DOWN": 2, "CONTROLLER_BUTTON_A": 3, "CONTROLLER_AXIS_TRIGGERLEFT": 4},
   "hint": {
-    "control": "CONTROLLER_BUTTON_Y", "hold": 3.0, "after": 0.0,
+    "control": "CONTROLLER_BUTTON_Y", "hold": 0.0, "after": 0.0,
     "text": [
       "![controls](images/controls/stk/stk-GMPD3-stick-nav-analog.png)",
       "",
