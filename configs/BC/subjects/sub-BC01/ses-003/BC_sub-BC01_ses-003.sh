@@ -16,7 +16,7 @@ MTB=$HOME/GitHub/DBP/dev/DBP_MTB             # branch rig-structured-fields + th
 BEH=$PWD/data/$SUBJECT/ses-$(printf %03d "$SES")/beh   # CogTasks and MTB data, in the games' folder
 
 # The session's recording (session-logger): started first, stopped when the script ends.
-RECORDING=$(uv run session-logger start --subject "$SUBJECT" --ses "$SES" --rig "$RIG")
+RECORDING=$(uv run session-logger start --subject "$SUBJECT" --ses "$SES" --rig "$RIG" --session-pid $$)
 trap 'uv run session-logger stop "$RECORDING"' EXIT
 trap 'exit 130' INT TERM HUP
 
