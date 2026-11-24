@@ -48,3 +48,4 @@ Per frame: the action (the 8-vector; the 7 controls in `*-GMPD3-stick-nav-analog
 | `snowmountain.json` | Northern Resort | 1147 m |
 | `<track>-GMPD3-stick-nav.json` | the same track, on a controller | |
 | `<track>-GMPD3-stick-nav-analog.json` | the same track, on a controller's analog stick | |
+| `all-GMPD3-stick-nav-analog.json` | every track's analog version in a row, from the shortest lap to the longest | |
