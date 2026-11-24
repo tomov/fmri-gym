@@ -41,14 +41,14 @@ def no_key_action(adapter) -> tuple:
     A real-time phase must map ``""`` (see :mod:`humans.adapters.keymap`), so
     standing still is an action like any other. A turn-based phase has no such
     entry, on purpose: nothing happens until a key is pressed, and
-    ``resolve(frozenset())`` raises rather than invent a step. A policy in that
+    ``resolve(frozenset(), {})`` raises rather than invent a step. A policy in that
     mode is allowed to press nothing too, which costs it the frame.
 
     :param adapter: the block's adapter.
     :return: ``(action, True)``, or ``(None, False)`` in a turn-based phase.
     """
     try:
-        return adapter.keymap.resolve(frozenset()), True
+        return adapter.keymap.resolve(frozenset(), {}), True
     except ValueError:
         return None, False
 

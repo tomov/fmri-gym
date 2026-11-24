@@ -6,7 +6,7 @@ checkout since it describes this machine's controller, found by the name SDL
 gives the device, in its file name (:func:`newest`), and never rewritten (:func:`write`).
 Only a device's newest file is read, so its older ones never stop a run. Each file states the
 :data:`FORMAT` it is written in. Nothing here knows which axes a controller has; each axis is
-read on its own (:meth:`AxisCalibration.normalise`).
+read on its own (:meth:`AxisCalibration.normalize`).
 """
 
 from __future__ import annotations
@@ -32,8 +32,8 @@ class CalibrationError(ValueError):
 
 @dataclass(frozen=True)
 class AxisCalibration:
-    """One stick axis: where it rests, its two stops and how far its centre moves, raw; and
-    the fraction of its travel past which a side is pressed (``on``) and under which it is
+    """One stick axis: where it rests, its two stops and how far its centre moves, as raw
+    values; and the value past which a side is pressed (``on``) and under which it is
     released (``off``)."""
 
     rest: float
@@ -59,10 +59,9 @@ class AxisCalibration:
         on = _number(d, "on", where, lambda v: 0 < v < 1, "a number in (0, 1)")
         off = _number(d, "off", where, lambda v: 0 < v <= on, f"a number in (0, on={on:g}]")
         for side, span in (("low", rest - low), ("high", high - rest)):
-            if drift >= off * span:     # back at rest after a push, it would still be pressed
-                raise CalibrationError(
-                    f"{where}: its centre drifts {drift:g}, past its release point on its "
-                    f"{side} side ({off:g} of {span:g})")
+            if drift >= span:           # its value would be 0 all the way to the stop
+                raise CalibrationError(f"{where}: its centre drifts {drift:g}, as far as its "
+                                       f"stop on its {side} side ({span:g})")
         return cls(rest, low, high, drift, on, off)
 
     def record(self) -> dict[str, float]:
@@ -70,16 +69,36 @@ class AxisCalibration:
         return {"rest": self.rest, "low": self.low, "high": self.high, "drift": self.drift,
                 "on": round(self.on, 3), "off": round(self.off, 3)}
 
-    def normalise(self, value: float) -> float:
-        """A raw reading as a fraction of the travel on its side of rest, -1..1.
+    def normalize(self, raw_value: float) -> float:
+        """A raw value as the normalized value: the fraction of the travel on its side of rest.
 
         Each side is scaled by its own span, so an axis reaching -0.5 one way and
         +1.0 the other still reports -1.0 and +1.0 at its stops.
+
+        :param raw_value: what SDL reports.
+        :return: the normalized value, -1..1.
         """
-        span = (self.high - self.rest) if value >= self.rest else (self.rest - self.low)
+        span = (self.high - self.rest) if raw_value >= self.rest else (self.rest - self.low)
         if span <= 1e-6:
             return 0.0
-        return max(-1.0, min(1.0, (value - self.rest) / span))
+        return max(-1.0, min(1.0, (raw_value - self.rest) / span))
+
+    def value(self, raw_value: float) -> float:
+        """A raw value as the axis's value: the normalized value, 0.0 within ``drift`` of rest
+        and rescaled past that, so each stop still reads -1.0 or +1.0.
+
+        Without the dead zone a stick let go of would still read a little off 0.
+
+        :param raw_value: what SDL reports.
+        :return: the value, -1..1.
+        """
+        normalized_value = self.normalize(raw_value)
+        span = (self.high - self.rest) if raw_value >= self.rest else (self.rest - self.low)
+        dead_zone = self.drift / span if span > 1e-6 else 1.0
+        if abs(normalized_value) <= dead_zone:
+            return 0.0
+        return math.copysign((abs(normalized_value) - dead_zone) / (1.0 - dead_zone),
+                             normalized_value)
 
 
 @dataclass(frozen=True)

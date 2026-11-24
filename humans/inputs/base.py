@@ -5,14 +5,17 @@ unique across devices: its value in
 :class:`~humans.inputs.control_names.ControlNames`. A device lists its names at
 the top of its own file, and its :meth:`InputDevice.handle` turns the pygame
 events that are its own into input events (:class:`InputEvent`); it never reads
-pygame's queue itself. As in a game engine, a control is read two ways: an input
-event the frame it happens, and held state (:meth:`InputDevice.held`) at the tick. Several
-devices together are one :class:`InputDevices`, which is itself a device.
+pygame's queue itself. As in a game engine, a control is read three ways, all as of the
+last :meth:`InputDevice.handle`: an input event the frame it happens, held state
+(:meth:`InputDevice.held`), and its value (:meth:`InputDevice.values`). Several devices
+together are one :class:`InputDevices`, which is itself a device.
 """
 
 from __future__ import annotations
 
+import operator
 from abc import ABC, abstractmethod
+from functools import reduce
 from enum import Enum
 from typing import Any, ClassVar, NamedTuple
 
@@ -44,8 +47,8 @@ class InputDevice(ABC):
     """One input device: its controls, and which of them it holds.
 
     A subclass names itself (:attr:`name`), lists its controls (:attr:`CONTROLS`)
-    and presses and releases them with :meth:`_press` and :meth:`_release` from its
-    :meth:`handle`.
+    and presses and releases them with :meth:`_press` and :meth:`_release`, and sets the
+    value of a control with a range with :meth:`_set`, from its :meth:`handle`.
     """
 
     #: the name the kind of device goes by
@@ -55,6 +58,7 @@ class InputDevice(ABC):
 
     def __init__(self) -> None:
         self._held: set[str] = set()
+        self._values: dict[str, float] = {}
 
     @classmethod
     @abstractmethod
@@ -78,6 +82,15 @@ class InputDevice(ABC):
     def held(self) -> frozenset[str]:
         """The controls down as of the last :meth:`handle`."""
         return frozenset(self._held)
+
+    def values(self) -> dict[str, float]:
+        """Each control with a range of values (a stick, a trigger), by its value as of the
+        last :meth:`handle`.
+
+        :return: the value of each such control read, 0.0 at rest; a control left out has
+            not been read, or has no range (a key or button, whose value is whether it is held).
+        """
+        return dict(self._values)
 
     def require_calibrated_axes_for(self, required_controls: frozenset[str]) -> None:
         """Refuse to go on when a stick direction in ``required_controls`` has no calibration.
@@ -111,6 +124,10 @@ class InputDevice(ABC):
             return []
         self._held.discard(name)
         return [InputEvent(name, Edge.UP)]
+
+    def _set(self, name: str, value: float) -> None:
+        """Set the value of ``name``, a control with a range; 0.0 is at rest."""
+        self._values[name] = value
 
 
 class InputDevices(InputDevice):
@@ -149,6 +166,9 @@ class InputDevices(InputDevice):
 
     def held(self) -> frozenset[str]:
         return frozenset().union(*(d.held() for d in self.devices))
+
+    def values(self) -> dict[str, float]:
+        return reduce(operator.or_, (d.values() for d in self.devices), {})
 
     def require_calibrated_axes_for(self, required_controls: frozenset[str]) -> None:
         for device in self.devices:

@@ -1,0 +1,5 @@
+{
+  "curriculum": [
+    {"__include": "../common/stk-GMPD3-stick-nav-analog.json", "track": "scotland", "instructions": {"title": "SuperTuxKart: Nessie's Pond"}}
+  ]
+}

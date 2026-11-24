@@ -1,9 +1,5 @@
 {
   "curriculum": [
-    {
-      "__include": "../common/stk-GMPD3-stick-nav.json",
-      "track": "lighthouse",
-      "instructions": {"title": "SuperTuxKart: Around the Lighthouse"}
-    }
+    {"__include": "../common/stk-GMPD3-stick-nav.json", "track": "lighthouse", "instructions": {"title": "SuperTuxKart: Around the Lighthouse"}}
   ]
 }

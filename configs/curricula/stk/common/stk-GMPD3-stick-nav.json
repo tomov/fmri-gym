@@ -12,9 +12,10 @@
       "Press A to start."
     ]
   },
-  "controls": {"CONTROLLER_AXIS_LEFTX_LEFT": 0, "CONTROLLER_AXIS_LEFTX_RIGHT": 1, "CONTROLLER_AXIS_LEFTY_UP": 2, "CONTROLLER_AXIS_LEFTY_DOWN": 3, "CONTROLLER_BUTTON_A": 4, "CONTROLLER_AXIS_TRIGGERLEFT": 5, "CONTROLLER_AXIS_TRIGGERRIGHT": 6, "CONTROLLER_BUTTON_Y": 7},
+  "action_mode": "keys",
+  "controls": {"CONTROLLER_AXIS_LEFTX_LEFT": 0, "CONTROLLER_AXIS_LEFTX_RIGHT": 1, "CONTROLLER_AXIS_LEFTY_UP": 2, "CONTROLLER_AXIS_LEFTY_DOWN": 3, "CONTROLLER_BUTTON_A": 4, "CONTROLLER_AXIS_TRIGGERLEFT": 5, "CONTROLLER_AXIS_TRIGGERRIGHT": 6, "CONTROLLER_BUTTON_B": 7},
   "hint": {
-    "control": "CONTROLLER_BUTTON_Y", "hold": 3.0, "after": 0.0,
+    "control": "CONTROLLER_BUTTON_Y", "hold": 0.0, "after": 0.0,
     "text": [
       "![controls](images/controls/stk/stk-GMPD3-stick-nav.png)",
       "",
