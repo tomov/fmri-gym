@@ -13,10 +13,10 @@ the requested ``screensize``; ``display.py`` scales it to the screen. The phase'
 the set of keys held -- a ``MultiBinary(8)`` over left, right, up, down, nitro,
 skid, fire, rescue, the indices a phase's ``controls`` name -- and the game's own
 player controller turns it into controls, so steering ramps and skids latch
-exactly as they do for a keyboard. With ``"continuous_full"`` it is a ``Box(5)``
+exactly as they do for a keyboard. With ``"continuous_full"`` it is a ``Box(7)``
 of the controls themselves: 0 steer (-1 left .. 1 right), 1 accelerate (0..1),
-then brake, nitro and skid, each on above 0.5; the env, not the game's player
-controller, sets them, and it has no fire or rescue. The participant and a model
+then brake, nitro, skid, fire and rescue, each on above 0.5; the env, not the
+game's player controller, sets them. The participant and a model
 are therefore in front of the same env.
 
 Replay: a run reproduces bit for bit from a fresh launch, but a restart of the
