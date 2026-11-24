@@ -223,9 +223,11 @@ def _step_and_compare(adapter: Any, lines: list[dict], pixels: dict,
     :param audio: the block's logged chunks by number, to compare each frame's
         ``sound()`` against its ``audio_chunk``; ``None`` skips the sound.
     """
+    from humans.save.replay import action_as_sent
     mismatches = 0
     for line in lines:
-        obs, reward, terminated, truncated, info = adapter.step(_action(line["action"]))
+        action = action_as_sent(line["action"], adapter.env.action_space)
+        obs, reward, terminated, truncated, info = adapter.step(action)
         fs = adapter.capture(obs, info, want_blob=False)
         problems = []
         if not np.array_equal(np.asarray(adapter.render()), pixels[line["frame"]]):
@@ -251,11 +253,6 @@ def _compare_sound(sound: Any, chunk: int, audio: dict[int, np.ndarray], tally: 
     if sound is None or not np.array_equal(np.asarray(sound.pcm), audio[chunk]):
         return ["audio"]
     return []
-
-
-def _action(logged: Any) -> Any:
-    """The logged action as the env takes it: a JSON list is an array again."""
-    return np.asarray(logged) if isinstance(logged, list) else logged
 
 
 def _jsonable(variables: dict) -> Any:
