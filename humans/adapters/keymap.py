@@ -135,8 +135,8 @@ class DimensionBinding(NamedTuple):
     """
 
     dimension: int
-    #: what the dimension takes at the control's least and greatest value; None: the value
-    dimension_range: tuple[float, float] | None
+    #: what the action's dimension takes at the control's least and greatest value; None: the value
+    action_range: tuple[float, float] | None
 
     @classmethod
     def from_dict(cls, control: str, value: Any, space: spaces.Box) -> DimensionBinding:
@@ -173,12 +173,12 @@ class DimensionBinding(NamedTuple):
 
         :param control: the control bound.
         :param value: its value, within :func:`~humans.inputs.value_range`.
-        :return: the value as it is, or mapped onto :attr:`dimension_range`.
+        :return: the value as it is, or mapped onto :attr:`action_range`.
         """
-        if self.dimension_range is None:
+        if self.action_range is None:
             return value
         least, greatest = value_range(control)
-        at_least, at_greatest = self.dimension_range
+        at_least, at_greatest = self.action_range
         return at_least + (value - least) / (greatest - least) * (at_greatest - at_least)
 
 
