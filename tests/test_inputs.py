@@ -91,7 +91,7 @@ def test_a_calibration_round_trips_through_its_file():
     ("stick", "LEFT_STICK", "stick: unknown key"),
     ("format", ..., "format: expected 1, got None"),
     ("format", 0, "format: expected 1, got 0"),
-    (f"axes.{LX}.drift", 0.3, f"axes.{LX}: its centre drifts 0.3, past its release point"),
+    (f"axes.{LX}.drift", 1.0, f"axes.{LX}: its centre drifts 1, as far as its stop"),
 ])
 def test_each_wrong_field_is_refused_by_its_file_and_name(tmp_path, field, value, says):
     path = tmp_path / "Scripted_20261021-141500.json"
@@ -201,7 +201,7 @@ class _ScriptedController(Controller):
         self.device_handle, self.device_name = handle, handle.name
         self.instance_id = handle.get_instance_id()
 
-    def _read_axis(self, axis_name: str) -> float:
+    def _read_raw_value(self, axis_name: str) -> float:
         return self.axes[axis_name]
 
     def handle(self, events, now: float) -> list[InputEvent]:
@@ -368,8 +368,8 @@ def test_a_stick_within_its_drift_of_rest_reads_zero_and_its_stops_one():
 def test_an_uncalibrated_axis_presses_nothing():
     d = _ScriptedController()
     d.frames = iter([(d.axes_at({LX: 1.0, LY: -1.0}), set())])
-    assert d.handle([], 1.0) == [] and d.axis_reading(LX) == 1.0
-    assert d.calibrated(LX, 1.0) is None and d.values() == {}
+    assert d.handle([], 1.0) == [] and d.raw_value(LX) == 1.0
+    assert d.values() == {}
 
 
 def test_a_controller_records_the_calibration_it_reads_through(config_home):
@@ -447,7 +447,8 @@ def test_an_xbox_controller_reads_each_stick_axis_through_its_calibration():
     right_x = pygame.CONTROLLER_AXIS_RIGHTX
     assert pad.handle([_joy(pygame.CONTROLLERAXISMOTION, axis=right_x, value=-20000)], 1.0) == [
         _down(ControlNames.CONTROLLER_AXIS_RIGHTX_LEFT)]
-    assert pad.calibrated(RX, -20000 / 32767) == pytest.approx(-20000 / 32767)
+    assert pad.raw_value(RX) == pytest.approx(-20000 / 32767)
+    assert pad.values()[RX] == pytest.approx((20000 / 32767 - 0.01) / 0.99 * -1)
 
 
 def test_no_two_kinds_of_device_share_a_control_name():
@@ -597,9 +598,9 @@ def test_a_reopened_controller_forgets_its_values_and_reads_where_its_stick_is(s
                                    _down(ControlNames.CONTROLLER_AXIS_LEFTY_UP)]
     assert {name for name, value in pad.values().items() if value} == {
         LY, ControlNames.CONTROLLER_AXIS_LEFTY_UP}
-    assert pad.values()[LY] < 0 and pad.axis_reading(LY) == -0.9
+    assert pad.values()[LY] < 0 and pad.raw_value(LY) == -0.9
     pad.close()
-    assert pad.values() == {} and pad.axis_reading(LY) == 0.0
+    assert pad.values() == {} and pad.raw_value(LY) == 0.0
 
 
 class _SdlControllerHandle(_FakeHandle):

@@ -182,9 +182,9 @@ class _Task:
         self.t0 = self.now = self.clock.tick()
 
     def frame(self, phase: str, cue: str) -> tuple[dict[str, float], set[str]]:
-        """Wait for the next frame, hand the controller its events and record its reading.
+        """Wait for the next frame, hand the controller its events and record its raw values.
 
-        :return: each axis's raw reading, by its name; and the buttons down.
+        :return: each axis's raw value, by its name; and the buttons down.
         :raises _Quit: on ESC, a click on Cancel, or the window closing (which is
             left on the queue for the window's owner, when it has a Cancel).
         """
@@ -201,13 +201,14 @@ class _Task:
             if e.type == pygame.MOUSEBUTTONDOWN and self.cancel \
                     and self.cancel.collidepoint(self.to_canvas(e.pos)):
                 raise _Quit
-        ax = {name: self.controller.axis_reading(name) for name in self.controller.AXIS_NAMES}
+        raw_values = {name: self.controller.raw_value(name)
+                      for name in self.controller.AXIS_NAMES}
         bt = set(self.controller.held()) & set(self.buttons)
         row = {"t": round(self.now - self.t0, 4), "phase": phase, "cue": cue}
-        row.update({name: round(v, 5) for name, v in ax.items()})
+        row.update({name: round(v, 5) for name, v in raw_values.items()})
         row.update({f"b_{c}": int(c in bt) for c in self.buttons})
         self.samples.append(row)
-        return ax, bt
+        return raw_values, bt
 
     def draw(self, lines: list[str], colour=INK, sub: str = "",
              arrows: tuple[tuple[str, Any], ...] = (),
@@ -263,15 +264,15 @@ def _hold_still(task: _Task, phase: str, words: list[str]) -> dict[str, float]:
     window: deque = deque()
     while True:
         task.draw(words, INK2)
-        ax, _ = task.frame(phase, "")
-        window.append((task.now, ax))
+        raw_values, _ = task.frame(phase, "")
+        window.append((task.now, raw_values))
         while task.now - window[0][0] > STILL_S:
             window.popleft()
         if task.now - window[0][0] < 0.95 * STILL_S:
             continue
-        spans = [max(a[c] for _, a in window) - min(a[c] for _, a in window) for c in ax]
+        spans = [max(a[c] for _, a in window) - min(a[c] for _, a in window) for c in raw_values]
         if max(spans, default=0.0) <= STILL_RANGE:
-            return {c: statistics.median(a[c] for _, a in window) for c in ax}
+            return {c: statistics.median(a[c] for _, a in window) for c in raw_values}
 
 
 def _push_to_stops(task: _Task, axis_name: str, rest: float) -> tuple[float, float]:
@@ -287,15 +288,15 @@ def _push_to_stops(task: _Task, axis_name: str, rest: float) -> tuple[float, flo
         arrows = tuple((arrow_of(c), LIVE if c in reached else GRID) for c in (negative, positive))
         task.draw(words, sub="push it to its stop each way, until both arrows are lit",
                   arrows=arrows)
-        ax, _ = task.frame("stops", axis_name)
-        value = ax[axis_name]
-        if value < lo - 0.01 or value > hi + 0.01:
+        raw_values, _ = task.frame("stops", axis_name)
+        raw_value = raw_values[axis_name]
+        if raw_value < lo - 0.01 or raw_value > hi + 0.01:
             reached.clear()                     # further than before: to each stop again
-        lo, hi = min(lo, value), max(hi, value)
-        pushed = _fraction(value, rest, lo, hi)
-        if pushed <= -STOP_REACH:
+        lo, hi = min(lo, raw_value), max(hi, raw_value)
+        normalized_value = _normalized_value(raw_value, rest, lo, hi)
+        if normalized_value <= -STOP_REACH:
             reached.add(negative)
-        if pushed >= STOP_REACH:
+        if normalized_value >= STOP_REACH:
             reached.add(positive)
         if len(reached) == 2 and min(hi - rest, rest - lo) >= STOP_MIN:
             return lo, hi
@@ -311,31 +312,32 @@ def _roll(task: _Task, x: str, y: str, rest: dict[str, float]) -> dict[str, tupl
     while True:
         task.draw(words, sub="push it to its stop, all the way round, until every dot is lit",
                   ring=(ROLL_BINS, lit))
-        ax, _ = task.frame("stops", _stick_of(x))
+        raw_values, _ = task.frame("stops", _stick_of(x))
         for c in (x, y):
-            if ax[c] < lo[c] - 0.01 or ax[c] > hi[c] + 0.01:
+            if raw_values[c] < lo[c] - 0.01 or raw_values[c] > hi[c] + 0.01:
                 lit.clear()                     # further than before: round again at it
-            lo[c], hi[c] = min(lo[c], ax[c]), max(hi[c], ax[c])
-        n = [_fraction(ax[c], rest[c], lo[c], hi[c]) for c in (x, y)]
-        if math.hypot(*n) >= STOP_REACH:
-            turn = (math.atan2(n[1], n[0]) + math.pi) / (2 * math.pi)
+            lo[c], hi[c] = min(lo[c], raw_values[c]), max(hi[c], raw_values[c])
+        normalized = [_normalized_value(raw_values[c], rest[c], lo[c], hi[c]) for c in (x, y)]
+        if math.hypot(*normalized) >= STOP_REACH:
+            turn = (math.atan2(normalized[1], normalized[0]) + math.pi) / (2 * math.pi)
             lit.add(int(turn * ROLL_BINS) % ROLL_BINS)
         if len(lit) == ROLL_BINS and all(min(hi[c] - rest[c], rest[c] - lo[c]) >= STOP_MIN
                                          for c in (x, y)):
             return {c: (lo[c], hi[c]) for c in (x, y)}
 
 
-def _fraction(value: float, rest: float, lo: float, hi: float) -> float:
-    """A reading as a fraction of the travel seen on its side of rest, -1..1."""
-    span = (hi - rest) if value >= rest else (rest - lo)
-    return 0.0 if span <= 1e-6 else max(-1.0, min(1.0, (value - rest) / span))
+def _normalized_value(raw_value: float, rest: float, lo: float, hi: float) -> float:
+    """A raw value as a fraction of the travel seen on its side of rest, -1..1."""
+    span = (hi - rest) if raw_value >= rest else (rest - lo)
+    return 0.0 if span <= 1e-6 else max(-1.0, min(1.0, (raw_value - rest) / span))
 
 
 def _ask(task: _Task, cue: str, words: str, colour, arrow: str | None, answer, idle) -> int:
     """Ask for ``cue`` until it comes :data:`TWICE` in a row. Returns the wrong answers.
 
-    :param answer: the reading -> the control it answers, or None.
-    :param idle: the reading -> whether the pad is let go of, which a next answer waits for.
+    :param answer: the raw values and buttons down -> the control they answer, or None.
+    :param idle: the raw values and buttons down -> whether the pad is let go of, which a next
+        answer waits for.
     """
     wrong, row, said = 0, 0, ""
     arrows = ((arrow, colour),) if arrow else ()
@@ -361,19 +363,19 @@ def _ask_axis_controls(task: _Task, rest: dict[str, float],
     The answer is the side pushed furthest of every axis, so a push that moves the
     wrong axis further than the one asked for is named.
     """
-    def pushes(ax: dict[str, float]) -> dict[str, float]:
+    def pushes(raw_values: dict[str, float]) -> dict[str, float]:
         out = {}
         for name, (negative, positive) in ((n, AXIS_CONTROLS[n]) for n in rest):
-            pushed = _fraction(ax[name], rest[name], *travel[name])
-            out[negative], out[positive] = -pushed, pushed
+            normalized_value = _normalized_value(raw_values[name], rest[name], *travel[name])
+            out[negative], out[positive] = -normalized_value, normalized_value
         return out
 
-    def answer(ax: dict[str, float], _bt: set[str]) -> str | None:
-        best = max(pushes(ax).items(), key=lambda kv: kv[1])
+    def answer(raw_values: dict[str, float], _bt: set[str]) -> str | None:
+        best = max(pushes(raw_values).items(), key=lambda kv: kv[1])
         return best[0] if best[1] >= PUSH else None
 
-    def idle(ax: dict[str, float], _bt: set[str]) -> bool:
-        return all(abs(v) < RELEASE for v in pushes(ax).values())
+    def idle(raw_values: dict[str, float], _bt: set[str]) -> bool:
+        return all(abs(v) < RELEASE for v in pushes(raw_values).values())
 
     return sum(_ask(task, control, f"push {_stick_words(task.controller, name)}", INK,
                     arrow_of(control), answer, idle)
@@ -447,7 +449,7 @@ def fit(rows: list[dict], axis_names: tuple[str, ...], device_name: str,
     An axis presses at :data:`CAL_ON` of its travel and releases under :data:`CAL_OFF`,
     raised to ten times its dither at rest for an axis that dithers.
 
-    :param rows: the frames of a calibration (raw readings), as :func:`calibrate` records them.
+    :param rows: the frames of a calibration (raw values), as :func:`calibrate` records them.
     :param made: when the measurement was made.
     """
     axes = {}
@@ -753,12 +755,11 @@ class _Scope:
         return None if cal is None or self.axis is None else cal.axes[self.axis]
 
     def _shown_value(self) -> float:
-        """The shown axis: calibrated, or raw when uncalibrated."""
+        """The shown axis: its value, which its thresholds press on; its raw value when
+        uncalibrated."""
         if self.axis is None:
             return 0.0
-        axis_reading = self.controller.axis_reading(self.axis)
-        value = self.controller.calibrated(self.axis, axis_reading)
-        return axis_reading if value is None else value
+        return self.controller.values().get(self.axis, self.controller.raw_value(self.axis))
 
     def record(self, now: float, controls: frozenset) -> None:
         """Log the presses and releases since the last frame, and add this frame to the plot."""
@@ -842,13 +843,13 @@ class _Scope:
         screen.blit(self.f_sm.render(self._numbers(axis), True, INK3), (px + 160, py + 8))
 
     def _numbers(self, axis: AxisCalibration | None) -> str:
-        """The shown axis's reading, raw and calibrated, and where it rests."""
+        """The shown axis's value and raw value, and where it rests."""
         if self.axis is None:
             return ""
-        raw = self.controller.axis_reading(self.axis)
+        raw_value = self.controller.raw_value(self.axis)
         if axis is None:
-            return f"raw {raw:+.3f} (uncalibrated)"
-        return (f"calibrated {self._shown_value():+.3f}   raw {raw:+.3f}   "
+            return f"raw {raw_value:+.3f} (uncalibrated)"
+        return (f"value {self._shown_value():+.3f}   raw {raw_value:+.3f}   "
                 f"rest {axis.rest:+.3f}")
 
     def draw_lanes(self, screen: pygame.Surface, controls: frozenset, now: float) -> int:

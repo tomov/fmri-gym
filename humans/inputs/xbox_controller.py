@@ -53,7 +53,7 @@ _TRIGGER_ON, _TRIGGER_OFF = 0.5, 0.3
 
 
 def _scaled(value: float) -> float:
-    """A game-controller axis's reading, -32768..32767, as -1..1."""
+    """What SDL reports for a game-controller axis, -32768..32767, as its raw value, -1..1."""
     return max(-1.0, min(1.0, value / 32767))
 
 
@@ -77,20 +77,23 @@ class XBoxController(Controller):
         # handle.id is SDL's device index; the events carry the joystick's instance id.
         self.instance_id = handle.as_joystick().get_instance_id()
 
-    def _read_axis(self, axis_name: str) -> float:
+    def _read_raw_value(self, axis_name: str) -> float:
         return _scaled(self.device_handle.get_axis(_SDL_AXIS_BY_NAME[axis_name]))
 
-    def _take_axis_readings(self) -> list[InputEvent]:
-        """The sticks' readings (:meth:`Controller._take_axis_readings`), then the triggers'."""
-        return super()._take_axis_readings() + [
+    def _take_raw_values(self) -> list[InputEvent]:
+        """The sticks' raw values (:meth:`Controller._take_raw_values`), then the triggers'."""
+        return super()._take_raw_values() + [
             e for axis, trigger in TRIGGERS.items()
             for e in self._move_trigger(trigger, _scaled(self.device_handle.get_axis(axis)))]
 
-    def _move_trigger(self, trigger: str, axis_reading: float) -> list[InputEvent]:
-        """Set a trigger's value, how far it is pulled (0..1), and press or release it."""
-        pulled = max(0.0, axis_reading)
-        self._set(trigger, pulled)
-        return self._pull(trigger, pulled, _TRIGGER_ON, _TRIGGER_OFF)
+    def _move_trigger(self, trigger: str, raw_value: float) -> list[InputEvent]:
+        """Set a trigger's value, how far it is pulled (0..1), and press or release it by it.
+
+        A trigger has no calibration: its raw value at rest is 0, so its value is the raw value.
+        """
+        value = max(0.0, raw_value)
+        self._set(trigger, value)
+        return self._pull(trigger, value, _TRIGGER_ON, _TRIGGER_OFF)
 
     def handle(self, events: list[pygame.event.Event], now: float) -> list[InputEvent]:
         out = self._reopen_if_closed()

@@ -54,7 +54,7 @@ class CurrentDesignsGamepad3(Controller):
         self.device_handle, self.instance_id = handle, handle.get_instance_id()
         self.device_name = handle.get_name()
 
-    def _read_axis(self, axis_name: str) -> float:
+    def _read_raw_value(self, axis_name: str) -> float:
         return self.device_handle.get_axis(_SDL_AXIS_BY_NAME[axis_name])
 
     def handle(self, events: list[pygame.event.Event], now: float) -> list[InputEvent]:
