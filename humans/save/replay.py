@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any, NamedTuple
 
 import numpy as np
+from gymnasium import spaces
 
 from .logging import read_events, read_state
 
@@ -71,9 +72,25 @@ def reconstruct_episode(
         adapter.restore(plan.initial_state)
     actions = plan.actions if n_actions is None else plan.actions[:n_actions]
     for action in actions:
-        obs, _, _, _, info = adapter.step(action)
+        obs, _, _, _, info = adapter.step(action_as_sent(action, adapter.env.action_space))
         adapter.capture(obs, info, want_blob=False)
     return adapter, plan
+
+
+def action_as_sent(logged_action: Any, action_space: Any) -> Any:
+    """A frame's logged ``action`` as the env was sent it.
+
+    A ``Box`` action is sent as an array of the space's dtype and logged as a JSON list;
+    stepped back as Python floats instead, an env that computes in the action's dtype (a
+    float32 physics step) drifts from the first frame.
+
+    :param logged_action: the frame line's ``action``.
+    :param action_space: the env's action space.
+    :return: an array of the space's dtype for a ``Box``; otherwise the action as logged.
+    """
+    if isinstance(action_space, spaces.Box) and isinstance(logged_action, list):
+        return np.asarray(logged_action, dtype=action_space.dtype)
+    return logged_action
 
 
 def frame_arrays(block: str) -> dict[str, np.ndarray]:
