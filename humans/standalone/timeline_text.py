@@ -49,7 +49,7 @@ def _head(record: RunRecord, timeline: Timeline) -> list[str]:
         f"logs      format {manifest['log_format']['format']} {manifest['log_format']['version']}"
         f": the run's log and {len(record.block_lines)} block log(s)",
         "session   " + (
-            f"recording {record.session_recording.folder}: "
+            f"recording {record.session_recording.name}: "
             f"{len(record.session_recording.start['devices'])} device(s) "
             f"({record.session_recording.start['reader']}), {len(record.device_lines)} device "
             "events in the run" if record.session_recording else
@@ -88,7 +88,8 @@ def _checks(quality: dict[str, Any]) -> list[str]:
                       f", read {devices['read_delay_median_ms']:.1f} ms later (median; 95%: "
                       f"{devices['read_delay_p95_ms']:.1f}, max "
                       f"{devices['read_delay_max_ms']:.1f})" if devices["presses_timed"] else "")
-                  + f"; {devices['dropped']} drop(s), {devices['gone']} unplugged; recording "
+                  + f"; {devices['dropped']} drop(s), {devices['added']} plugged in, "
+                  f"{devices['gone']} unplugged; recording "
                   f"{devices['ended']}"]
 
 

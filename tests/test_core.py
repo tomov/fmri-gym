@@ -921,8 +921,8 @@ def _session_recording(data_root: Path, clock_shift: float = 0.0,
     run, the session was marked, the focus moved and the machine stalled; without
     ``has_ended``, it was cut short. ``is_windows`` writes its keys as Windows' Raw Input gives
     them (make code and flags) instead of evdev's codes."""
-    folder = data_root / "session_events" / "sub-01" / "ses-001" / "20261119T120000"
-    folder.mkdir(parents=True)
+    folder = data_root / "sub-01" / "ses-001" / "beh"
+    folder.mkdir(parents=True, exist_ok=True)
     run_offset = 1.7e9 - 100.0                       # the run's start_epoch - trigger_perf
     event = {"type": "device_event", "device": 0, "event_type": 1}
 
@@ -947,7 +947,7 @@ def _session_recording(data_root: Path, clock_shift: float = 0.0,
     if has_ended:
         lines.append({"type": "recording_end", "how": "stopped", "perf_time": 110.0,
                       "wall_time": 110.0 + run_offset + clock_shift, "counts": {}})
-    (folder / "session_events.jsonl").write_text("".join(json.dumps(line) + "\n"
+    (folder / "sub-01_ses-001_session-20261119T120000_events.jsonl").write_text("".join(json.dumps(line) + "\n"
                                                           for line in lines))
     return folder
 
@@ -979,7 +979,8 @@ def test_a_session_recording_gives_each_press_its_devices_time(tmp_path):
                                            "longest_stall_ms": 35.0}
     text = timeline_text(record, timeline)
     assert "read 5.0 ms after its device sent it" in text
-    assert "session   recording 20261119T120000: 1 device(s) (linux evdev)" in text
+    assert ("session   recording sub-01_ses-001_session-20261119T120000: 1 device(s) "
+            "(linux evdev)") in text
     assert "session         1 focus change(s), 1 stall(s) (longest 35 ms)" in text
 
 

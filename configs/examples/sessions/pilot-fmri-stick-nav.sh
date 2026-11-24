@@ -10,7 +10,7 @@ SES=1
 RUN_DURATION=600
 
 # The session's recording (session-logger): started first, stopped when the script ends.
-RECORDING=$(uv run session-logger start --subject "$SUBJECT" --ses "$SES" --rig "$RIG")
+RECORDING=$(uv run session-logger start --subject "$SUBJECT" --ses "$SES" --rig "$RIG" --session-pid $$)
 trap 'uv run session-logger stop "$RECORDING"' EXIT
 trap 'exit 130' INT TERM HUP
 

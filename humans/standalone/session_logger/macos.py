@@ -1,10 +1,10 @@
-"""macOS: the IOKit HID manager's input values, each with the time IOKit stamped it, and the
+"""macOS: every HID device's input values, each with the time IOKit stamped it, and the
 application LaunchServices puts in front.
 
 IOKit stamps each value in mach absolute time, the clock ``perf_counter`` reads on macOS
-(checked when the reader opens). A keyboard-type device -- a trigger box that types keys
-included -- is read only with the Input Monitoring permission (System Settings, Privacy &
-Security), given to the app the recording is started from; a gamepad needs none.
+(checked when the reader opens). A keyboard-type device -- the Mac's own keyboard, a trigger box
+that types keys -- is read only with the Input Monitoring permission (System Settings, Privacy &
+Security), given to the app the recording is started from.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ from __future__ import annotations
 import ctypes
 import re
 import subprocess
+import sys
 import time
 from typing import Any
 
@@ -24,8 +25,12 @@ _POINTER = ctypes.c_void_p
 _UTF8 = 0x08000100                  # kCFStringEncodingUTF8
 _SINT32 = 3                         # kCFNumberSInt32Type
 _NOT_PERMITTED = -536870174         # kIOReturnNotPermitted, 0xE00002E2, as an IOReturn
+#: The bytes of a value IOKit's integer holds whole: a longer one (a vendor's whole report, as
+#: Apple's Xbox controller driver gives it) is cut to its first ones.
+_INTEGER_BYTES = 4
 _VALUE_CALLBACK = ctypes.CFUNCTYPE(None, _POINTER, ctypes.c_int32, _POINTER, _POINTER)
 _REMOVAL_CALLBACK = ctypes.CFUNCTYPE(None, _POINTER, ctypes.c_int32, _POINTER)
+_MATCHING_CALLBACK = ctypes.CFUNCTYPE(None, _POINTER, ctypes.c_int32, _POINTER, _POINTER)
 
 
 class _Timebase(ctypes.Structure):
@@ -50,6 +55,7 @@ _CFGetTypeID = _function(_CF, "CFGetTypeID", ctypes.c_ulong, _POINTER)
 _CFStringGetTypeID = _function(_CF, "CFStringGetTypeID", ctypes.c_ulong)
 _CFSetGetCount = _function(_CF, "CFSetGetCount", ctypes.c_long, _POINTER)
 _CFSetGetValues = _function(_CF, "CFSetGetValues", None, _POINTER, ctypes.POINTER(_POINTER))
+_CFRetain = _function(_CF, "CFRetain", _POINTER, _POINTER)
 _CFRunLoopGetCurrent = _function(_CF, "CFRunLoopGetCurrent", _POINTER)
 _CFRunLoopRunInMode = _function(_CF, "CFRunLoopRunInMode", ctypes.c_int32, _POINTER,
                                 ctypes.c_double, ctypes.c_bool)
@@ -60,6 +66,11 @@ _IOHIDManagerCreate = _function(_IOKIT, "IOHIDManagerCreate", _POINTER, _POINTER
 _IOHIDManagerSetDeviceMatching = _function(_IOKIT, "IOHIDManagerSetDeviceMatching", None,
                                            _POINTER, _POINTER)
 _IOHIDManagerCopyDevices = _function(_IOKIT, "IOHIDManagerCopyDevices", _POINTER, _POINTER)
+_IOHIDManagerRegisterDeviceMatchingCallback = _function(
+    _IOKIT, "IOHIDManagerRegisterDeviceMatchingCallback", None, _POINTER, _MATCHING_CALLBACK,
+    _POINTER)
+_IOHIDManagerScheduleWithRunLoop = _function(_IOKIT, "IOHIDManagerScheduleWithRunLoop", None,
+                                             _POINTER, _POINTER, _POINTER)
 _IOHIDDeviceOpen = _function(_IOKIT, "IOHIDDeviceOpen", ctypes.c_int32, _POINTER,
                              ctypes.c_uint32)
 _IOHIDDeviceClose = _function(_IOKIT, "IOHIDDeviceClose", ctypes.c_int32, _POINTER,
@@ -79,6 +90,8 @@ _IOHIDValueGetIntegerValue = _function(_IOKIT, "IOHIDValueGetIntegerValue", ctyp
                                        _POINTER)
 _IOHIDValueGetTimeStamp = _function(_IOKIT, "IOHIDValueGetTimeStamp", ctypes.c_uint64,
                                     _POINTER)
+_IOHIDValueGetLength = _function(_IOKIT, "IOHIDValueGetLength", ctypes.c_long, _POINTER)
+_IOHIDValueGetBytePtr = _function(_IOKIT, "IOHIDValueGetBytePtr", _POINTER, _POINTER)
 _IOHIDElementGetUsagePage = _function(_IOKIT, "IOHIDElementGetUsagePage", ctypes.c_uint32,
                                       _POINTER)
 _IOHIDElementGetUsage = _function(_IOKIT, "IOHIDElementGetUsage", ctypes.c_uint32, _POINTER)
@@ -88,80 +101,123 @@ _mach_timebase_info = _function(_SYSTEM, "mach_timebase_info", ctypes.c_int,
 
 
 class MacDevices:
-    """The named HID devices, each open on this thread's run loop;
+    """Every HID device, the ones plugged in later too, each open on this thread's run loop;
     their input values as IOKit stamped them."""
 
-    def __init__(self, device_names: list[str]) -> None:
-        """Open every HID device whose product name is one of ``device_names``.
+    def __init__(self) -> None:
+        """Open every HID device, and watch for more.
 
-        :param device_names: product names as IOKit gives them.
-        :raises SessionLoggerError: if ``perf_counter`` is not on mach absolute time, a name
-            matches no device, or IOKit will not open them (a keyboard-type device without the
-            Input Monitoring permission).
+        :raises SessionLoggerError: if ``perf_counter`` is not on mach absolute time, or IOKit
+            will not open a device (a keyboard-type device without the Input Monitoring
+            permission).
         """
         self._seconds_per_tick = _seconds_per_mach_tick()
-        # Every device, kept by name here: IOKit ignores a product name in a matching dictionary.
         self._manager = _IOHIDManagerCreate(None, 0)
-        _IOHIDManagerSetDeviceMatching(self._manager, None)
-        all_handles = _devices(self._manager)
-        handles = [handle for handle in all_handles
-                   if _string_property(handle, "Product") in device_names]
-        self._devices = [_identity(handle) for handle in handles]
-        missing = sorted(set(device_names) - {device["name"] for device in self._devices})
-        if missing:
-            raise SessionLoggerError(
-                f"session-logger: no HID device is named {', '.join(map(repr, missing))}; "
-                f"these are: {', '.join(sorted(map(repr, _product_names(all_handles))))}")
-        for handle in handles:
-            _open_device(handle)
-        self._handles = handles
-        #: the lines of the values IOKit delivered since the last :meth:`read`
+        _IOHIDManagerSetDeviceMatching(self._manager, None)        # every device
+        self._run_loop = _CFRunLoopGetCurrent()
+        #: each device's identity, by its index
+        self._devices: list[dict[str, Any]] = []
+        #: each device ever opened -> its index; kept retained, so no new device takes its address
+        self._index_of_handle: dict[int, int] = {}
+        #: the devices still plugged in, by index
+        self._open_handles: dict[int, int] = {}
+        #: the lines of what IOKit delivered since the last :meth:`read`
         self._pending: list[dict[str, Any]] = []
-        # Kept alive here: IOKit holds only the pointer.
+        # Kept alive here: IOKit holds only the pointers.
         self._callback = _VALUE_CALLBACK(self._on_value)
         self._removal_callback = _REMOVAL_CALLBACK(self._on_removal)
-        self._run_loop = _CFRunLoopGetCurrent()
-        for index, handle in enumerate(handles):
-            _IOHIDDeviceRegisterInputValueCallback(handle, self._callback, index + 1)
-            _IOHIDDeviceRegisterRemovalCallback(handle, self._removal_callback, index + 1)
-            _IOHIDDeviceScheduleWithRunLoop(handle, self._run_loop, _DEFAULT_MODE)
+        self._matching_callback = _MATCHING_CALLBACK(self._on_matching)
+        try:
+            for handle in _devices(self._manager):
+                self._open(handle)
+        except SessionLoggerError:
+            self.close()
+            raise
+        _IOHIDManagerRegisterDeviceMatchingCallback(self._manager, self._matching_callback, None)
+        _IOHIDManagerScheduleWithRunLoop(self._manager, self._run_loop, _DEFAULT_MODE)
 
     def record(self) -> dict[str, Any]:
-        """The reader, the clock of its stamps, and each device by its index."""
+        """The reader, the clock of its stamps, and each device open now by its index."""
         return {"reader": "macos iokit", "clock": "mach_absolute_time",
-                "devices": self._devices}
+                "devices": list(self._devices)}
 
     def read(self, timeout: float) -> list[dict[str, Any]]:
-        """The values IOKit delivers while this thread's run loop runs for ``timeout`` seconds.
+        """What IOKit delivers while this thread's run loop runs for ``timeout`` seconds.
 
         :param timeout: seconds to run the run loop.
-        :return: one line per value (``usage_page``, ``usage``, ``value``).
+        :return: one line per value (``usage_page``, ``usage``, ``value``), a ``device_added``
+            line for a device plugged in and a ``device_gone`` line for one unplugged.
         """
         _CFRunLoopRunInMode(_DEFAULT_MODE, timeout, False)
         lines, self._pending = self._pending, []
         return lines
 
     def close(self) -> None:
-        """Take the devices off the run loop and close them."""
-        for handle in self._handles:
+        """Take the devices still plugged in off the run loop and close them."""
+        for handle in self._open_handles.values():
             _IOHIDDeviceUnscheduleFromRunLoop(handle, self._run_loop, _DEFAULT_MODE)
             _IOHIDDeviceClose(handle, 0)
+        self._open_handles.clear()
+
+    def _open(self, handle: int) -> int:
+        """Open a device, read its values from now on, and give it the next index.
+
+        :raises SessionLoggerError: if IOKit will not open it.
+        """
+        _open_device(handle)
+        index = len(self._devices)
+        _CFRetain(handle)
+        self._devices.append(_identity(handle))
+        self._index_of_handle[handle] = index
+        self._open_handles[index] = handle
+        _IOHIDDeviceRegisterInputValueCallback(handle, self._callback, index + 1)
+        _IOHIDDeviceRegisterRemovalCallback(handle, self._removal_callback, index + 1)
+        _IOHIDDeviceScheduleWithRunLoop(handle, self._run_loop, _DEFAULT_MODE)
+        return index
 
     def _on_value(self, context: int, result: int, sender: int, value: int) -> None:
-        """Keep one input value: its device (``context`` is its index + 1), element and stamp."""
+        """Keep one input value: its device (``context`` is its index + 1), element and stamp;
+        a value longer than :data:`_INTEGER_BYTES` keeps its ``bytes`` too, which its integer
+        cuts short."""
         element = _IOHIDValueGetElement(value)
-        self._pending.append({
-            "type": "device_event",
-            "perf_time": _IOHIDValueGetTimeStamp(value) * self._seconds_per_tick,
-            "device": context - 1, "usage_page": _IOHIDElementGetUsagePage(element),
-            "usage": _IOHIDElementGetUsage(element),
-            "value": _IOHIDValueGetIntegerValue(value)})
+        line = {"type": "device_event",
+                "perf_time": _IOHIDValueGetTimeStamp(value) * self._seconds_per_tick,
+                "device": context - 1, "usage_page": _IOHIDElementGetUsagePage(element),
+                "usage": _IOHIDElementGetUsage(element),
+                "value": _IOHIDValueGetIntegerValue(value)}
+        length = _IOHIDValueGetLength(value)
+        if length > _INTEGER_BYTES:
+            line["bytes"] = ctypes.string_at(_IOHIDValueGetBytePtr(value), length).hex()
+        self._pending.append(line)
 
     def _on_removal(self, context: int, result: int, sender: int) -> None:
         """Keep a ``device_gone`` line for a device unplugged (``context`` is its index + 1),
-        stamped when IOKit said so."""
+        stamped when IOKit said so, and close it."""
+        handle = self._open_handles.pop(context - 1, None)
+        if handle is not None:
+            _IOHIDDeviceUnscheduleFromRunLoop(handle, self._run_loop, _DEFAULT_MODE)
+            _IOHIDDeviceClose(handle, 0)
         self._pending.append({"type": "device_gone", "perf_time": time.perf_counter(),
                               "device": context - 1})
+
+    def _on_matching(self, context: int, result: int, sender: int, device: int) -> None:
+        """Open a device IOKit has just found, unless it is one already open, and keep a
+        ``device_added`` line with its identity, stamped when IOKit said so; one IOKit will not
+        open is a line too, with why, and the console is told."""
+        if device in self._index_of_handle:
+            return
+        found = time.perf_counter()
+        try:
+            index = self._open(device)
+        except SessionLoggerError as error:
+            index = len(self._devices)
+            _CFRetain(device)
+            self._devices.append({**_identity(device), "error": str(error)})
+            self._index_of_handle[device] = index
+            print(f"{error} (plugged in during the recording, as device {index})",
+                  file=sys.stderr, flush=True)
+        self._pending.append({"type": "device_added", "perf_time": found, "device": index,
+                              **self._devices[index]})
 
 
 #: The last application :func:`front_application` named, by its LaunchServices ASN.
@@ -236,18 +292,15 @@ def _devices(manager: int) -> list[int]:
     return list(handles)
 
 
-def _product_names(devices: list[int]) -> list[str]:
-    """The devices' product names, for an error that has to name them."""
-    return sorted({name for name in map(lambda device: _string_property(device, "Product"),
-                                        devices) if name})
-
-
 def _identity(device: int) -> dict[str, Any]:
-    """A device's product name, vendor and product ids and USB location."""
+    """A device's product name, vendor and product ids, USB location, and the HID page and
+    usage of what it is (one physical device can be several, each a device here)."""
     return {"name": _string_property(device, "Product"),
             "vendor": _number_property(device, "VendorID"),
             "product": _number_property(device, "ProductID"),
-            "location": _number_property(device, "LocationID")}
+            "location": _number_property(device, "LocationID"),
+            "usage_page": _number_property(device, "PrimaryUsagePage"),
+            "usage": _number_property(device, "PrimaryUsage")}
 
 
 def _string_property(device: int, key: str) -> str:

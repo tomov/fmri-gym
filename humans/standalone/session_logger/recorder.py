@@ -1,9 +1,10 @@
-"""The recorder of one session: the rig's input devices, which application has the focus, the
-machine's stalls, the lines the commands ask it to add and the clock, written to the recording's
-events file as they arrive until it is told to stop.
+"""The recorder of one session: every input device, the ones plugged in during it too, which
+application has the focus, the machine's stalls, the lines the commands ask it to add and the
+clock, written to the recording's events file as they arrive until it is told to stop or the
+session's own process ends.
 
-It reads each device with this OS's reader: Linux reads each device's ``/dev/input/event*``
-node (:mod:`.linux`); macOS, the IOKit HID manager (:mod:`.macos`); Windows, its Raw Input
+It reads the devices with this OS's reader: Linux reads each ``/dev/input/event*`` node
+(:mod:`.linux`); macOS, the IOKit HID manager (:mod:`.macos`); Windows, its Raw Input
 (:mod:`.windows`).
 """
 
@@ -22,11 +23,13 @@ from typing import IO, Any, Protocol
 
 from ...config.rig import RigConfig
 from ...save.provenance import platform_info, versions
-from . import (CLOCK_INTERVAL_S, CONTROL_FILENAME, FLUSH_INTERVAL_S, READ_TIMEOUT_S,
-               SESSION_EVENTS_FILENAME, FrontApplication, SessionLoggerError)
+from . import (CLOCK_INTERVAL_S, FLUSH_INTERVAL_S, READ_TIMEOUT_S, FrontApplication,
+               RecordingFiles, SessionLoggerError, is_process_running)
 
 #: Seconds between two looks at the control file for a line the commands added.
 CONTROL_POLL_S = 0.05
+#: Seconds between two looks at whether the session's own process is still running.
+SESSION_POLL_S = 0.5
 #: Seconds between two looks at which application has the focus.
 FOCUS_POLL_S = 0.5
 #: The heartbeat's sleep, in seconds: how often the recorder looks whether it was run.
@@ -37,7 +40,7 @@ STALL_THRESHOLD_S = 0.010
 
 
 class OpenDevices(Protocol):
-    """An OS's reader of the named devices, open (:mod:`.linux`, :mod:`.macos`,
+    """An OS's reader of every input device, open (:mod:`.linux`, :mod:`.macos`,
     :mod:`.windows`)."""
 
     def record(self) -> dict[str, Any]: ...
@@ -45,46 +48,34 @@ class OpenDevices(Protocol):
     def close(self) -> None: ...
 
 
-class NoDevices:
-    """The reader of a rig that names no device: nothing is read while the time passes."""
-
-    def record(self) -> dict[str, Any]:
-        """No reader, no clock of its own, no device."""
-        return {"reader": None, "clock": None, "devices": []}
-
-    def read(self, timeout: float) -> list[dict[str, Any]]:
-        """Nothing, after ``timeout`` seconds."""
-        time.sleep(timeout)
-        return []
-
-    def close(self) -> None:
-        """Nothing to close."""
-
-
 def main(argv: list[str] | None = None) -> None:
-    """Record into ``--folder`` until its control file says to stop.
+    """Record into ``--events`` until the recording's control file says to stop, or the process
+    ``--session-pid`` ends.
 
     :param argv: the command line; ``None`` reads the process's.
-    :raises SystemExit: with the reason alone, when a device the rig names cannot be read.
+    :raises SystemExit: with the reason alone, when a device cannot be read.
     """
-    parser = argparse.ArgumentParser(description="Record a session into a recording's folder "
-                                     "until its control file says to stop.")
-    parser.add_argument("--folder", required=True, help="the recording's folder")
-    parser.add_argument("--rig", required=True, help="the rig file: its device_events")
+    parser = argparse.ArgumentParser(description="Record a session into a recording's events "
+                                     "file until its control file says to stop.")
+    parser.add_argument("--events", required=True, help="the recording's events file, made here")
+    parser.add_argument("--rig", required=True, help="the rig file, recorded in the first line")
     parser.add_argument("--subject", required=True, help="sub-<label>")
     parser.add_argument("--ses", type=int, required=True, help="the session number, from 1")
+    parser.add_argument("--session-pid", type=int, required=True,
+                        help="the session's own process: the recording ends when it ends")
     args = parser.parse_args(argv)
+    files = RecordingFiles.of_events_file(args.events)
     rig = RigConfig.open(args.rig)
     try:
-        devices = (NoDevices() if rig.device_events is None
-                   else open_devices(list(rig.device_events)))
+        devices = open_devices()
     except SessionLoggerError as error:
         sys.exit(str(error))            # the message alone: the command that started it raises
     front_application = front_application_reader()
     side_lines: queue.Queue[dict[str, Any]] = queue.Queue()
     stop = threading.Event()
     sources: list[tuple[Callable[..., None], tuple[Any, ...]]] = [
-        (follow_control_file, (os.path.join(args.folder, CONTROL_FILENAME), side_lines, stop)),
+        (follow_control_file, (files.control, side_lines, stop)),
+        (watch_session_process, (args.session_pid, side_lines, stop)),
         (sample_clock, (side_lines, stop)), (watch_stalls, (side_lines, stop))]
     if front_application is not None:
         sources.append((watch_focus, (front_application, side_lines, stop)))
@@ -93,29 +84,28 @@ def main(argv: list[str] | None = None) -> None:
     first_line = {"type": "recording_start", "perf_time": time.perf_counter(),
                   "wall_time": time.time(), "subject": args.subject, "session": args.ses,
                   **devices.record(), "sources": _sources(devices, front_application),
-                  "rig": rig.record(), "recorder_pid": os.getpid(), "versions": versions(),
+                  "rig": rig.record(), "recorder_pid": os.getpid(),
+                  "session_pid": args.session_pid, "versions": versions(),
                   "platform": platform_info()}
-    record_session_events(devices, os.path.join(args.folder, SESSION_EVENTS_FILENAME),
-                          first_line, side_lines, stop)
+    record_session_events(devices, files.events, first_line, side_lines, stop)
 
 
-def open_devices(device_names: list[str]) -> OpenDevices:
-    """This OS's reader of ``device_names``, its devices open.
+def open_devices() -> OpenDevices:
+    """This OS's reader of every input device, its devices open.
 
-    :param device_names: the devices, by the names the OS gives them.
     :return: the reader.
-    :raises SessionLoggerError: on an OS with no reader, a name no device has, or a device the
-        OS will not let this process read.
+    :raises SessionLoggerError: on an OS with no reader, or a device the OS will not let this
+        process read.
     """
     if sys.platform.startswith("linux"):
         from .linux import LinuxDevices
-        return LinuxDevices(device_names)
+        return LinuxDevices()
     if sys.platform == "darwin":
         from .macos import MacDevices
-        return MacDevices(device_names)
+        return MacDevices()
     if sys.platform == "win32":
         from .windows import WindowsDevices
-        return WindowsDevices(device_names)
+        return WindowsDevices()
     raise SessionLoggerError(f"session-logger: no device reader for {sys.platform}")
 
 
@@ -138,7 +128,9 @@ def record_session_events(devices: OpenDevices, path: str, first_line: dict[str,
                           stop: threading.Event) -> None:
     """Write ``first_line``, then every line ``devices`` read or ``side_lines`` holds, as they
     come, flushed to disk every :data:`FLUSH_INTERVAL_S`, until ``stop``; then the last ones and
-    a ``recording_end`` line that counts them and lists the devices unplugged.
+    a ``recording_end`` line that says how it ended (``session_ended`` when a ``session_ended``
+    line was written, else ``stopped``), counts the lines and lists the devices plugged in and
+    unplugged.
 
     :param devices: the open devices; closed at the end.
     :param path: the events file, made here: a recording never writes over another.
@@ -147,23 +139,26 @@ def record_session_events(devices: OpenDevices, path: str, first_line: dict[str,
     :param stop: set to end the recording.
     """
     counts: Counter[str] = Counter()
-    devices_gone: list[dict[str, Any]] = []
+    devices_changed: dict[str, list[dict[str, Any]]] = {"device_added": [], "device_gone": []}
     with open(path, "x") as out:
-        _write_lines(out, [first_line], counts, devices_gone)
+        _write_lines(out, [first_line], counts, devices_changed)
         _sync(out)
         last_sync = time.monotonic()
         while not stop.is_set():
             _write_lines(out, devices.read(READ_TIMEOUT_S) + _drain(side_lines), counts,
-                         devices_gone)
+                         devices_changed)
             if time.monotonic() - last_sync >= FLUSH_INTERVAL_S:
                 _sync(out)
                 last_sync = time.monotonic()
-        _write_lines(out, devices.read(0.0) + _drain(side_lines), counts, devices_gone)
+        _write_lines(out, devices.read(0.0) + _drain(side_lines), counts, devices_changed)
         devices.close()
         del counts["recording_start"]
-        out.write(json.dumps({"type": "recording_end", "how": "stopped",
+        how = "session_ended" if counts["session_ended"] else "stopped"
+        out.write(json.dumps({"type": "recording_end", "how": how,
                               "perf_time": time.perf_counter(), "wall_time": time.time(),
-                              "counts": dict(counts), "devices_gone": devices_gone}) + "\n")
+                              "counts": dict(counts),
+                              "devices_added": devices_changed["device_added"],
+                              "devices_gone": devices_changed["device_gone"]}) + "\n")
         _sync(out)
 
 
@@ -188,6 +183,24 @@ def follow_control_file(path: str, side_lines: queue.Queue[dict[str, Any]],
                 stop.set()
                 return
             side_lines.put(asked)
+
+
+def watch_session_process(session_pid: int, side_lines: queue.Queue[dict[str, Any]],
+                          stop: threading.Event) -> None:
+    """A ``session_ended`` line, then ``stop``, once the process ``session_pid`` is not running:
+    looked at every :data:`SESSION_POLL_S`, stamped when seen.
+
+    :param session_pid: the session's own process.
+    :param side_lines: where the line goes.
+    :param stop: set when it has ended, or by another to end this.
+    """
+    while not stop.wait(SESSION_POLL_S):
+        if is_process_running(session_pid):
+            continue
+        side_lines.put({"type": "session_ended", "perf_time": time.perf_counter(),
+                        "wall_time": time.time(), "pid": session_pid})
+        stop.set()
+        return
 
 
 def sample_clock(side_lines: queue.Queue[dict[str, Any]], stop: threading.Event) -> None:
@@ -235,24 +248,30 @@ def _sources(devices: OpenDevices,
     """What makes each type of line, and when it is stamped."""
     record = devices.record()
     return {
-        "device_event": (f"{record['reader']}, each event at its stamp ({record['clock']})"
-                         if record["devices"] else "none: the rig names no device"),
+        "device_event": f"{record['reader']}, each event at its stamp ({record['clock']})",
+        "device_added": f"{record['reader']}, when it said a device was plugged in",
         "window_focus": (f"looked at every {FOCUS_POLL_S:g} s, stamped when seen"
                          if front_application is not None else
                          "none: this OS does not say here which application has the focus"),
         "stall": f"a {1000 * HEARTBEAT_S:g} ms sleep woken over "
                  f"{1000 * STALL_THRESHOLD_S:g} ms late",
         "clock": f"every {CLOCK_INTERVAL_S:g} s",
-        "mark": "session-logger mark, stamped when it ran"}
+        "mark": "session-logger mark, stamped when it ran",
+        "session_ended": f"the session's own process seen gone, looked at every "
+                         f"{SESSION_POLL_S:g} s"}
 
 
 def _write_lines(out: IO[str], lines: list[dict[str, Any]], counts: Counter[str],
-                 devices_gone: list[dict[str, Any]]) -> None:
-    """Write ``lines``, one JSON object each, count them by type, and keep each device gone."""
+                 devices_changed: dict[str, list[dict[str, Any]]]) -> None:
+    """Write ``lines``, one JSON object each, count them by type, and keep each device added
+    (its line) and gone (its index and time) in ``devices_changed``."""
     out.writelines(json.dumps(line) + "\n" for line in lines)
     counts.update(line["type"] for line in lines)
-    devices_gone += [{"device": line["device"], "perf_time": line["perf_time"]}
-                     for line in lines if line["type"] == "device_gone"]
+    devices_changed["device_added"] += [
+        {key: value for key, value in line.items() if key != "type"}
+        for line in lines if line["type"] == "device_added"]
+    devices_changed["device_gone"] += [{"device": line["device"], "perf_time": line["perf_time"]}
+                                       for line in lines if line["type"] == "device_gone"]
 
 
 def _drain(side_lines: queue.Queue[dict[str, Any]]) -> list[dict[str, Any]]:
