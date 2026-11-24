@@ -7,7 +7,9 @@ flowchart TD
     standalone["standalone/"] --> runLayer["run.py, popup.py"]
     runLayer --> config["config/"]
     config --> adapters["adapters/"]
+    adapters --> keymaps["keymaps/"]
     adapters --> outputs["outputs/"]
+    keymaps --> inputs
     outputs --> sync["sync/"]
     sync --> save["save/"]
     config --> inputs["inputs/"]
@@ -22,7 +24,7 @@ From the top:
 1. **`standalone/`**: the commands that are not a run (rig setup, gamepad calibration, the session editor, the photodiode test, the session logger). They may import anything below them; nothing outside `standalone/` imports from it.
 2. **`run.py`, then `popup.py`**: one run's loop, and the pop-ups it opens (the pause menu, the hint).
 3. **`config/`**: the curriculum, the rig config and the run config, checked against the leaves below.
-4. **The leaves, an ordered stack**: `adapters/` over `outputs/` over `sync/` over `save/`; `inputs/` sits beside `sync/` and imports none of them. Each leaf imports only the leaves below it, so `save/` and `inputs/` can be read, tested and reused alone. `save/` only writes and reads the data: what it writes is handed to it, times included, by the layers above, which are given the run's `Logger` when they are built.
+4. **The leaves, an ordered stack**: `adapters/` over `outputs/` over `sync/` over `save/`; `keymaps/` sits beside `outputs/` and imports only `inputs/`, which sits beside `sync/` and imports none of them. Each leaf imports only the leaves below it, so `save/` and `inputs/` can be read, tested and reused alone. `save/` only writes and reads the data: what it writes is handed to it, times included, by the layers above, which are given the run's `Logger` when they are built.
 5. **Below `adapters/`**: the game engines and the `gym/` packages, which only `adapters/` imports. A `gym/` package imports no `humans` and no other `gym/` package but the one it is built on (`coom_gym` on `vizdoom_gym`). Only a `gym/` package reads `external/`, which is reached by path or compiled rather than imported by name, so the linter cannot see it and the rule is kept by review.
 
 The top-level `humans/__init__.py` imports nothing, so importing one leaf loads only that leaf and the ones below it.
@@ -38,7 +40,9 @@ What each module imports from another folder or file of `humans` (imports inside
 | `config/run.py` | `adapters` (`get_adapter`, only to build each game once at start-up), `inputs` |
 | `config/phases.py` | `inputs`, `outputs/display` (`image_line_problems`) |
 | `config/rig.py` | `inputs`, `sync/triggers` (`TriggerSettings`) |
-| `adapters/base.py` and the backends that make sound | `outputs/sound` (`Sound`) |
+| `adapters/base.py` | `keymaps` (`make_keymap`), `outputs/sound` (`Sound`) |
+| the backends that make sound | `outputs/sound` (`Sound`) |
+| `keymaps/continuous_box.py` | `inputs` (`value_range`) |
 | `outputs/audio.py` | `save/logging` (`AudioBlockLog`) |
 | `outputs/display.py` | `save/logging` (`Logger`) |
 | `sync/triggers.py` | `save/logging` (`Logger`) |

@@ -38,7 +38,7 @@ from humans.sync.clock import Clock
 def no_key_action(adapter) -> tuple:
     """The action for "no key held", if the block's keys define one.
 
-    A real-time phase must map ``""`` (see :mod:`humans.adapters.keymap`), so
+    A real-time phase must map ``""`` (see :mod:`humans.keymaps`), so
     standing still is an action like any other. A turn-based phase has no such
     entry, on purpose: nothing happens until a key is pressed, and
     ``resolve(frozenset(), {})`` raises rather than invent a step. A policy in that

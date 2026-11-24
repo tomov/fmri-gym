@@ -460,7 +460,7 @@ def _controls_problems(d: dict) -> list[str]:
     without a word; ``""`` is the no-control action. Whether the rig has the
     device is the run's check (:mod:`humans.config.run`); whether the values
     fit the env's action space is checked when the env is built
-    (:mod:`humans.adapters.keymap`).
+    (:mod:`humans.keymaps`).
     """
     controls = d.get("controls")
     if not isinstance(controls, dict) or not controls:
