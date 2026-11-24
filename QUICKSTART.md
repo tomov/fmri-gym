@@ -125,6 +125,17 @@ uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/mi
 uv run fmri-play --subject sub-01 --ses 1 --run 1 --rig configs/examples/rigs/minimal.json --curriculum configs/curricula/stk/levels/hacienda.json
 ```
 
+### NetHack Gym
+
+Install the pip package and explicitly build its bundled engine, then choose Classic or Modern mode. See [NetHack Gym installation](configs/curricula/nethack_gym/common/README.md) for setup details and checkpoint compatibility.
+
+```bash
+uv sync --extra nethack_gym
+uv run --locked nethack-gym-build
+uv run fmri-play --subject sub-test --ses 1 --run 1 --rig configs/examples/rigs/laptop.json --curriculum configs/curricula/nethack_gym/levels/modern.json --dummy-trigger --new-campaign
+```
+
+
 ## Before a real session
 
 ```bash
