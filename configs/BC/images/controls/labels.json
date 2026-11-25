@@ -111,6 +111,15 @@
       "CONTROLLER_BUTTON_B": ["move right"],
       "CONTROLLER_AXIS_TRIGGERRIGHT": [["hold 3 s: menu", "(after 3 min)"]],
       "CONTROLLER_BUTTON_Y": ["hold: show controls"]
+    },
+    "stk/stk-GMPD3-stick-nav-analog.png": {
+      "LEFT_STICK": ["left / right:", "steer", "(as far as pushed)"],
+      "CONTROLLER_AXIS_TRIGGERLEFT": ["accelerate", "(as far as pressed)"],
+      "CONTROLLER_AXIS_TRIGGERRIGHT": ["hold: show controls"],
+      "CONTROLLER_BUTTON_A": ["nitro (boost)"],
+      "CONTROLLER_BUTTON_B": ["slide (skid)"],
+      "CONTROLLER_BUTTON_X": ["fire item"],
+      "CONTROLLER_BUTTON_Y": ["rescue"]
     }
   }
 }
