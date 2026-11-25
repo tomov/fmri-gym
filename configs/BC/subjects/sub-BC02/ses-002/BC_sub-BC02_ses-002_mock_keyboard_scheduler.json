@@ -1,0 +1,124 @@
+{
+  "total_s": 7200.0,
+  "timeline_mode": "TOTAL_RECORDING_TIME",
+  "strict": true,
+  "rig": "BC/rigs/lapmac_keyboard.json",
+  "runs": [
+    {
+      "category": "VIDEO_GAME",
+      "task": "fmrigym_stk",
+      "duration_s": 605.0,
+      "parameters": {
+        "curriculum": "levels/lighthouse",
+        "rig": "session rig",
+        "play_to_end": false,
+        "loop": true,
+        "resume": true,
+        "dummy_trigger": false,
+        "skip_load_games": false
+      }
+    },
+    {
+      "category": "COGNITIVE_TASK_MRI",
+      "task": "wcst",
+      "duration_s": 450.0,
+      "parameters": {
+        "run": "01",
+        "input": "keyboard",
+        "rig": "session rig",
+        "controls": "wcst",
+        "data_dir": "/Users/psychology/GitHub/DBP/dev/fmri-gym-worktrees/BC02_ses-002_hy/data/sub-mock/ses-002/beh"
+      }
+    },
+    {
+      "category": "VIDEO_GAME",
+      "task": "fmrigym_vizdoom",
+      "duration_s": 605.0,
+      "parameters": {
+        "curriculum": "levels/deathmatch",
+        "rig": "session rig",
+        "play_to_end": false,
+        "loop": true,
+        "resume": true,
+        "dummy_trigger": false,
+        "skip_load_games": false
+      }
+    },
+    {
+      "category": "LOCALIZER_MRI",
+      "task": "mtb_set_a",
+      "duration_s": 600.0,
+      "parameters": {
+        "order": "1",
+        "run": "01",
+        "no_ttl": false,
+        "rig": "session rig",
+        "controls": "mtb"
+      }
+    },
+    {
+      "category": "VIDEO_GAME",
+      "task": "fmrigym_stk",
+      "duration_s": 605.0,
+      "parameters": {
+        "curriculum": "levels/hacienda",
+        "rig": "session rig",
+        "play_to_end": false,
+        "loop": true,
+        "resume": true,
+        "dummy_trigger": false,
+        "skip_load_games": false
+      }
+    },
+    {
+      "category": "COGNITIVE_TASK_MRI",
+      "task": "arc",
+      "duration_s": 450.0,
+      "parameters": {
+        "run": "01",
+        "input": "keyboard",
+        "rig": "session rig",
+        "controls": "arc",
+        "data_dir": "/Users/psychology/GitHub/DBP/dev/fmri-gym-worktrees/BC02_ses-002_hy/data/sub-mock/ses-002/beh"
+      }
+    },
+    {
+      "category": "VIDEO_GAME",
+      "task": "fmrigym_vizdoom",
+      "duration_s": 605.0,
+      "parameters": {
+        "curriculum": "levels/freedoom2_map01",
+        "rig": "session rig",
+        "play_to_end": false,
+        "loop": true,
+        "resume": true,
+        "dummy_trigger": false,
+        "skip_load_games": false
+      }
+    },
+    {
+      "category": "LOCALIZER_MRI",
+      "task": "mtb_set_a",
+      "duration_s": 600.0,
+      "parameters": {
+        "order": "1",
+        "run": "02",
+        "no_ttl": false,
+        "rig": "session rig",
+        "controls": "mtb"
+      }
+    },
+    {
+      "category": "COGNITIVE_TASK_MRI",
+      "task": "vcst",
+      "duration_s": 450.0,
+      "parameters": {
+        "run": "01",
+        "input": "keyboard",
+        "rig": "session rig",
+        "controls": "vcst",
+        "data_dir": "/Users/psychology/GitHub/DBP/dev/fmri-gym-worktrees/BC02_ses-002_hy/data/sub-mock/ses-002/beh"
+      }
+    }
+  ]
+}
