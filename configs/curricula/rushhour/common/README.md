@@ -1,6 +1,6 @@
 # Rush Hour curricula
 
-The `rushhour` backend's curricula: slide cars to free the red one. The 49 puzzles of `all.json` include `common/rushhour.json` (keys, rules text, settings) and state only their puzzle and title; the 392 of `extended.json` include `common/rushhour-extended.json`, which is `rushhour.json` with the session's own sentences in its text; `easy.json`, a different task, stands alone.
+The `rushhour` backend's curricula: slide cars to free the red one. The 441 puzzles of `library.json` include `common/rushhour.json` (keys, rules text, settings) and state only their puzzle and title; `easy.json`, a different task, stands alone.
 
 ## Setup
 
@@ -16,22 +16,18 @@ White triangles on the selected car show which of its two slides are legal (from
 
 | file | plays |
 |---|---|
-| `all.json` | the complete session of Rush-Hour's own program: the 49 puzzles of the library's first block |
-| `all-GMPD3-ABXY-nav.json` | the same 49 puzzles on a controller, from `common/rushhour-GMPD3-ABXY-nav.json`: LT/RT choose the car, X/B/Y/A slide it, hold LT for the pause menu |
-| `all-GMPD3-stick-nav.json` | the same on a controller's left stick, from `common/rushhour-GMPD3-stick-nav.json`: LT/RT choose the car, the stick slides it, hold X for the pause menu |
-| `extended.json` | the library's second block: its 392 puzzles, one game phase each, as in `all.json` |
-| `extended-GMPD3-ABXY-nav.json` | the same 392 puzzles on a controller, from `common/rushhour-GMPD3-ABXY-nav.json` |
-| `extended-GMPD3-stick-nav.json` | the same on a controller's left stick, from `common/rushhour-GMPD3-stick-nav.json` |
+| `library.json` | the whole puzzle library, both its blocks: 441 puzzles, one game phase each |
+| `library-GMPD3-ABXY-nav.json` | the same 441 puzzles on a controller, from `common/rushhour-GMPD3-ABXY-nav.json`: LT/RT choose the car, X/B/Y/A slide it, hold LT for the pause menu |
+| `library-GMPD3-stick-nav.json` | the same on a controller's left stick, from `common/rushhour-GMPD3-stick-nav.json`: LT/RT choose the car, the stick slides it, hold X for the pause menu |
+| `all-GMPD3-ABXY-nav.json` | the library's first block alone, its 49 puzzles, on the ABXY controller: p01-p12 in order, then p13-p49 in a fixed shuffled order (`random.Random(20260913).shuffle`) |
+| `all-GMPD3-stick-nav.json` | the same 49 puzzles in the same order on the stick controller |
 | `easy.json` | 5 min of random easy puzzles (`min_moves_range` 0-12), one after another |
 
-## `all.json`
+## `library.json`
 
-It ports the participant flow of https://github.com/chrplr/Rush-Hour `main.go`: one game phase per puzzle, each blocking (`advance_on` `["won"]`: a puzzle counts once solved, which is also the only way the engine ends one). The first 12 puzzles of the library come in its order (easiest first, what Rush-Hour's `-n` presents), then the other 37 (p13-p49) once each in a fixed shuffled order (`random.Random(20260913).shuffle`); `puzzle` names each.
+It ports the participant flow of https://github.com/chrplr/Rush-Hour `main.go` to the whole library, its `p` block (one puzzle per minimum number of moves) and its `e` block (several per minimum): one game phase per puzzle, each blocking (`advance_on` `["won"]`: a puzzle counts once solved, which is also the only way the engine ends one). The first 12 puzzles of the `p` block come in its order (one move harder each, what Rush-Hour's `-n` presents), then the other 429 once each in a fixed shuffled order (`random.Random(20261125).shuffle` over their names, sorted), so after the first 12 a puzzle's difficulty does not depend on its place. The order is the same for every subject; `puzzle` names each.
 
 Each puzzle is preceded by a blank 0.8 s message (the ITI), opens on its instructions (headed "Puzzle i of N", over the rules, until SPACE), and is followed by the block's own result screen ("Final score" and "Puzzle solved", for `show_outcome_duration` seconds, default 2; text on the plain background, not the solved board Rush-Hour holds). Each puzzle is its own block, with its own log and manifest entry; the puzzle number is the phase's place in the list, as the board carries no counter. The board is drawn like rushui (same layout, palette, white outline and arrows on the selected car), and the logged variables carry the columns of Rush-Hour's results file (`event`, `car`, `from_*` / `to_*`, `n_slides`, `solved`, `t_ms`, `trial_ms`).
 
-Rush-Hour stamps keypresses and flips on SDL's monotonic clock; here a key is timestamped when the loop processes it, within 1/`fps`, hence `fps` 60 (a turn-based block steps only on a keydown, so the rate costs nothing). `duration` is the cap on each puzzle; ESC is the experimenter's way out.
+Rush-Hour stamps keypresses and flips on SDL's monotonic clock; here a key is timestamped when the loop processes it, within 1/`fps`, hence `fps` 60 (a turn-based block steps only on a keydown, so the rate costs nothing). `duration` is the cap on each puzzle; ESC is the experimenter's way out. The session is hours long: `--resume` carries it on from the puzzle a run stopped in. The controller versions list the same puzzles in the same order, without the blanks and the closing message.
 
-## `extended.json`
-
-The same flow as `all.json` (the blank, the instructions headed "Puzzle i of N", the result screen, the closing message), over the library's `e` block: its levels in increasing order of minimum moves, and within a level its puzzles in a fixed shuffled order (`random.Random(20261123).shuffle`, level by level), so a run that stops early has played a graded prefix. The order is the same for every subject; `puzzle` names each. The session is hours long: `--resume` carries it on from the puzzle a run stopped in. The controller versions list the same puzzles in the same order, without the blanks and the closing message, like the controller versions of `all.json`.

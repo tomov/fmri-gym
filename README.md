@@ -106,7 +106,7 @@ Every game that plays has a curriculum for each of its supported levels, so any 
 ```bash
 uv run fmri-play --subject sub-01 --dummy-trigger --ses 1 --run 1 --rig configs/examples/rigs/laptop.json --curriculum configs/curricula/minihack/levels/room5x5.json
 uv run fmri-play --subject sub-01 --dummy-trigger --ses 1 --run 1 --rig configs/examples/rigs/laptop.json --curriculum configs/curricula/vizdoom/levels/freedoom1_e1m1.json
-uv run fmri-play --subject sub-01 --dummy-trigger --ses 1 --run 1 --rig configs/examples/rigs/laptop.json --curriculum configs/curricula/rushhour/all.json
+uv run fmri-play --subject sub-01 --dummy-trigger --ses 1 --run 1 --rig configs/examples/rigs/laptop.json --curriculum configs/curricula/rushhour/library.json
 ```
 
 A curriculum's path after `curricula/`, in camelCase (BIDS labels are letters and digits only), is the run's BIDS task label (`curricula/minihack/levels/room5x5.json` is `task-minihackLevelsRoom5x5`), so a level keeps its label whichever session plays it. What ships, by backend (`levels/` holds the curricula of one level each, the backend's folder those that play several):
@@ -125,7 +125,7 @@ A curriculum's path after `curricula/`, in camelCase (BIDS labels are letters an
 | `minihack/` | 22 | `levels/`: room5x5/15x15, mazewalk9x9, river, corridor, eat: the `-Allocentric-v0` twin from `minihack_levels` (view fixed on the map), each with an `_egocentric` sibling on MiniHack's own id (view centred on the agent); and the designed levels room_*, mazewalk_*, river_*; and `all`, the six standard tasks (allocentric) in a row |
 | `nethack/` | 1 | `levels/`: score (base NetHack; TTY rendered to a pixel frame) |
 | `retro/` | 1 | `levels/`: airstriker (ships with stable-retro; sound) |
-| `rushhour/` | 7 | `levels/`: easy (5 min of random easy puzzles); `all` (Rush-Hour's own program, then the rest of the library's first block: its 49 puzzles, one game phase each, with ready screens and solved feedback as message phases); `extended` (the library's second block, its 392 puzzles the same way, easiest levels first); each of `all` and `extended` also in two GMPD3 controller versions |
+| `rushhour/` | 6 | `levels/`: easy (5 min of random easy puzzles); `library` (Rush-Hour's own program over the whole library: its 441 puzzles, one game phase each, the first 12 easiest first then the rest shuffled, with ready screens and solved feedback as message phases), also in two GMPD3 controller versions; `all-GMPD3-ABXY-nav` and `all-GMPD3-stick-nav` (the library's first block alone, its 49 puzzles, on a controller) |
 | `stk/` | 15 | `levels/`: hacienda, cornfield_crossing, lighthouse, scotland, snowmountain (the race tracks the package ships; needs a real GL display), each also in a `*-GMPD3-stick-nav` controller version and a `*-GMPD3-stick-nav-analog` one |
 | `vgdl/` | 11 | `levels/`: aliens, avoidGeorge, beesAndBirds, jaws, missile_command, plaqueAttack, portals, preconditions, pushBoulders, relational (needs the VGDL checkout), and `all` |
 | `vizdoom/` | 155 | `levels/`: basic, deadly_corridor, defend_center, defend_line, health_gathering_supreme, my_way_home, predict_position, take_cover, deathmatch, freedoom1_e1m1 … freedoom1_e4m9 and freedoom2_map01 … freedoom2_map32 (every map of [Freedoom](https://freedoom.github.io/) Phase 1 and Phase 2, whose WADs ship with `vizdoom`; `VizdoomDoom*` plays the original WADs, given them); each also in a `*-GMPD3-stick-nav` controller version; and `all-GMPD3-stick-nav`, those controller versions in a row, the stock scenarios from the simplest, then Freedoom Phase 1 and Phase 2 |
@@ -304,7 +304,7 @@ Phase fields: `game` (`"game1"`…`"game10"`, plus `/level<N>` to name the level
 
 ```bash
 uv run fmri-play --subject sub-01 --dummy-trigger --ses 1 --run 1 --rig configs/examples/rigs/laptop.json --curriculum configs/curricula/rushhour/levels/easy.json      # 5 min of random easy puzzles
-uv run fmri-play --subject sub-01 --dummy-trigger --ses 1 --run 1 --rig configs/examples/rigs/laptop.json --curriculum configs/curricula/rushhour/all.json   # the program's session then the rest of the library's first block: 49 puzzles, one block each
+uv run fmri-play --subject sub-01 --dummy-trigger --ses 1 --run 1 --rig configs/examples/rigs/laptop.json --curriculum configs/curricula/rushhour/library.json   # the program's session over the whole library: 441 puzzles, one block each
 ```
 
 Controls, phase fields and the logged columns are documented in `configs/curricula/rushhour/common/README.md` and in the package's README ("A person at the board").
@@ -631,8 +631,8 @@ Above the frame, a strip shows the seconds left in the block in its left corner 
 A curriculum belongs to the subject, who works through its levels at their own pace; a run only says how much of it fits in one scanner acquisition. `--duration S` gives the run its length in seconds from the trigger, the rig's fixations included: whatever phase is on screen stops the rig's `end_fixation` before the end, mid-episode included, and the run closes on that fixation (a run that finishes the curriculum sooner ends on the same fixation, cut at the run's end). `--resume` starts where the subject's latest run of the same config file (any session) stopped, read from that run's manifest and its last block's `block_end` line (`block_did_not_finish`, `block_time_elapsed`, `num_completed_episodes`, `extra.state`): a block it cut off goes on with the time and episodes it has left, the episode it was in restored from its savestate; otherwise the run starts after the last game block played, or at the last other phase shown, from its beginning. The phases marked `"include_on_resume": true` -- only the non-game phases the curriculum opens with -- are played first. CTRL+ESCAPE keeps the place the same way. The config may change between runs as long as the game the block plays does not: `duration`, `n_episodes`, `advance_on`, `instructions`, `controls` and the like can, and any other change to that phase stops the run with the fields that changed. With no earlier run `--resume` starts at the beginning, and on a config already played to its end it refuses. `stk` keeps no savestate, so a run that stopped one of its episodes cannot be resumed into it: `--resume` refuses before the window opens, and says to start over (a block it stopped between two races carries on with the next).
 
 ```sh
-uv run fmri-play --subject sub-01 --ses "$SES" --run 1 --rig configs/examples/rigs/laptop.json --duration 600 --resume --curriculum configs/curricula/rushhour/all.json
-uv run fmri-play --subject sub-01 --ses "$SES" --run 2 --rig configs/examples/rigs/laptop.json --duration 600 --resume --curriculum configs/curricula/rushhour/all.json
+uv run fmri-play --subject sub-01 --ses "$SES" --run 1 --rig configs/examples/rigs/laptop.json --duration 600 --resume --curriculum configs/curricula/rushhour/library.json
+uv run fmri-play --subject sub-01 --ses "$SES" --run 2 --rig configs/examples/rigs/laptop.json --duration 600 --resume --curriculum configs/curricula/rushhour/library.json
 ```
 
 `--loop` plays the curriculum again from its first phase when it ends before `--duration`, and again, until `--duration` stops it; it needs `--duration`. Each pass plays the same phases with the same seeds; a block played again writes `block-NN_<backend>_<game>_2`, `_3`.... With `--resume`, a curriculum the last run played to its end starts again from its beginning instead of being refused. The manifest says `"loop"`.
