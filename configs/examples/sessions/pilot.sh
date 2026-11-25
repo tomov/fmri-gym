@@ -24,6 +24,6 @@ uv run fmri-play --subject $SUBJECT --ses $SES --run 3 --rig "$RIG" --duration $
 
 uv run fmri-play --subject $SUBJECT --ses $SES --run 4 --rig "$RIG" --duration $RUN_DURATION --loop --resume --curriculum configs/curricula/aigamestore/game8-GMPD3-stick-nav.json
 
-uv run fmri-play --subject $SUBJECT --ses $SES --run 5 --rig "$RIG" --duration $RUN_DURATION --loop --resume --curriculum configs/curricula/rushhour/all-GMPD3-stick-nav.json
+uv run fmri-play --subject $SUBJECT --ses $SES --run 5 --rig "$RIG" --duration $RUN_DURATION --loop --resume --curriculum configs/curricula/rushhour/library-GMPD3-stick-nav.json
 
 uv run fmri-play --subject $SUBJECT --ses $SES --run 6 --rig "$RIG" --duration $RUN_DURATION --loop --resume --curriculum configs/curricula/baba_auto/all-GMPD3-ABXY-nav.json
