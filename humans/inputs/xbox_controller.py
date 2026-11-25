@@ -3,7 +3,8 @@
 Read through SDL's game-controller layer, whose numbers are the same for every
 such pad, OS and connection; the raw joystick events SDL sends beside them are
 not this device's and go unread. Each analog trigger is a button, pressed past
-half its travel; each stick axis is two controls, read through its calibration.
+half its travel, whose value is how far it is pulled; each stick axis is two
+controls and the axis itself, read through its calibration.
 """
 
 from __future__ import annotations
@@ -45,12 +46,14 @@ STICK_AXES = {
     pygame.CONTROLLER_AXIS_RIGHTX: ControlNames.CONTROLLER_AXIS_RIGHTX,
     pygame.CONTROLLER_AXIS_RIGHTY: ControlNames.CONTROLLER_AXIS_RIGHTY,
 }
+#: The stick axis -> SDL's number for it.
+_SDL_AXIS_BY_NAME = {name: axis for axis, name in STICK_AXES.items()}
 #: How far a trigger is pulled to press, and let go to release, of its travel.
 _TRIGGER_ON, _TRIGGER_OFF = 0.5, 0.3
 
 
 def _scaled(value: float) -> float:
-    """A game-controller axis's reading, -32768..32767, as -1..1."""
+    """What SDL reports for a game-controller axis, -32768..32767, as its raw value, -1..1."""
     return max(-1.0, min(1.0, value / 32767))
 
 
@@ -60,7 +63,8 @@ class XBoxController(Controller):
     name = "xbox_controller"
     BUTTON_NAMES = (*BUTTONS.values(), *TRIGGERS.values())
     AXIS_NAMES = tuple(STICK_AXES.values())
-    CONTROLS = frozenset({*BUTTON_NAMES, *(c for a in AXIS_NAMES for c in AXIS_CONTROLS[a])})
+    CONTROLS = frozenset({*BUTTON_NAMES, *AXIS_NAMES,
+                          *(c for a in AXIS_NAMES for c in AXIS_CONTROLS[a])})
     HANDLE = sdl_controller.Controller
 
     @classmethod
@@ -69,16 +73,30 @@ class XBoxController(Controller):
         return is_controller
 
     def attach(self, handle: sdl_controller.Controller) -> None:
-        self.controller, self.instance_id, self.device_name = handle, handle.id, handle.name
-        for axis, axis_name in STICK_AXES.items():
-            self.axis_values[axis_name] = _scaled(handle.get_axis(axis))
+        self.device_handle, self.device_name = handle, handle.name
+        # handle.id is SDL's device index; the events carry the joystick's instance id.
+        self.instance_id = handle.as_joystick().get_instance_id()
 
-    def is_open(self) -> bool:
-        return self.controller.get_init()
+    def _read_raw_value(self, axis_name: str) -> float:
+        return _scaled(self.device_handle.get_axis(_SDL_AXIS_BY_NAME[axis_name]))
+
+    def _take_raw_values(self) -> list[InputEvent]:
+        """The sticks' raw values (:meth:`Controller._take_raw_values`), then the triggers'."""
+        return super()._take_raw_values() + [
+            e for axis, trigger in TRIGGERS.items()
+            for e in self._move_trigger(trigger, _scaled(self.device_handle.get_axis(axis)))]
+
+    def _move_trigger(self, trigger: str, raw_value: float) -> list[InputEvent]:
+        """Set a trigger's value, how far it is pulled (0..1), and press or release it by it.
+
+        A trigger has no calibration: its raw value at rest is 0, so its value is the raw value.
+        """
+        value = max(0.0, raw_value)
+        self._set(trigger, value)
+        return self._pull(trigger, value, _TRIGGER_ON, _TRIGGER_OFF)
 
     def handle(self, events: list[pygame.event.Event], now: float) -> list[InputEvent]:
-        self._reopen_if_closed()
-        out: list[InputEvent] = []
+        out = self._reopen_if_closed()
         for event in events:
             if getattr(event, "instance_id", None) != self.instance_id:
                 continue
@@ -87,12 +105,7 @@ class XBoxController(Controller):
             elif event.type == pygame.CONTROLLERBUTTONUP and event.button in BUTTONS:
                 out += self._release(BUTTONS[event.button])
             elif event.type == pygame.CONTROLLERAXISMOTION and event.axis in TRIGGERS:
-                out += self._pull(TRIGGERS[event.axis], _scaled(event.value),
-                                  _TRIGGER_ON, _TRIGGER_OFF)
+                out += self._move_trigger(TRIGGERS[event.axis], _scaled(event.value))
             elif event.type == pygame.CONTROLLERAXISMOTION and event.axis in STICK_AXES:
                 out += self._move_axis(STICK_AXES[event.axis], _scaled(event.value))
         return out
-
-    def close(self) -> None:
-        if self.controller.get_init():
-            self.controller.quit()

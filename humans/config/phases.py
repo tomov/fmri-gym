@@ -21,7 +21,8 @@ from typing import Any, ClassVar
 
 from ..adapters.base import HudSettings
 from ..outputs.display import image_line_problems
-from ..inputs import EXPERIMENTER_KEYS, ControlNames, is_control_of_any_input_device
+from ..inputs import (EXPERIMENTER_KEYS, STICK_AXIS_NAMES, ControlNames,
+                      is_control_of_any_input_device)
 
 #: An episode's possible outcomes: EnvAdapter.outcome's names, and the subject's own endings.
 OUTCOMES = frozenset({"won", "lost", "terminated", "truncated", "playing", "forfeit", "reset"})
@@ -193,8 +194,8 @@ class Message(Phase):
     def problems(d: dict) -> list[str]:
         out = _dismiss_problems("controls_to_dismiss", d.get("controls_to_dismiss"))
         control = d.get("control", ControlNames.K_SPACE)
-        if control != "any" and not _is_possible_on_any_input_device(control):
-            out.append(f'control: expected a control name ({_NAMES_ARE}) or "any", '
+        if control != "any" and not _is_pressed_on_any_input_device(control):
+            out.append(f'control: expected a control name ({_PRESSED_NAMES_ARE}) or "any", '
                        f"got {control!r}")
         if d.get("align", "center") not in ("center", "left"):
             out.append(f"align: expected 'center' or 'left', got {d['align']!r}")
@@ -273,9 +274,10 @@ class Survey(Phase):
         controls = d.get("controls", list(_SURVEY_CONTROLS))
         if not (isinstance(controls, list) and len(controls) >= 2
                 and len(set(map(str, controls))) == len(controls)
-                and all(_is_possible_on_any_input_device(c) for c in controls)):
+                and all(_is_pressed_on_any_input_device(c) for c in controls)):
             out.append(f"controls: expected a list of two or more distinct control names, one "
-                       f"per point from the lowest (names {_NAMES_ARE}), got {controls!r}")
+                       f"per point from the lowest (names {_PRESSED_NAMES_ARE}), got "
+                       f"{controls!r}")
         return out
 
 
@@ -427,6 +429,8 @@ def _bool_problems(d: dict, keys: tuple[str, ...]) -> list[str]:
 #: Where a curriculum's control names are listed, for its messages.
 _NAMES_ARE = ("as listed in humans/inputs/control_names.py, but the experimenter's keys: "
               + ", ".join(sorted(EXPERIMENTER_KEYS)))
+_PRESSED_NAMES_ARE = (_NAMES_ARE + "; a whole stick axis is never pressed, only its sides: it "
+                      "sets a dimension of a Box action")
 
 
 def _is_possible_on_any_input_device(name: Any) -> bool:
@@ -435,12 +439,17 @@ def _is_possible_on_any_input_device(name: Any) -> bool:
             and name not in EXPERIMENTER_KEYS)
 
 
+def _is_pressed_on_any_input_device(name: Any) -> bool:
+    """Whether a curriculum may wait for ``name`` to be pressed: one it may map that is held."""
+    return _is_possible_on_any_input_device(name) and name not in STICK_AXIS_NAMES
+
+
 def _dismiss_problems(where: str, controls: Any) -> list[str]:
     """``controls_to_dismiss``, if given: a non-empty list of control names."""
     if controls is None or (isinstance(controls, list) and controls
-                            and all(map(_is_possible_on_any_input_device, controls))):
+                            and all(map(_is_pressed_on_any_input_device, controls))):
         return []
-    return [f"{where}: expected a list of control names ({_NAMES_ARE}), got {controls!r}"]
+    return [f"{where}: expected a list of control names ({_PRESSED_NAMES_ARE}), got {controls!r}"]
 
 
 def _controls_problems(d: dict) -> list[str]:
@@ -451,7 +460,7 @@ def _controls_problems(d: dict) -> list[str]:
     without a word; ``""`` is the no-control action. Whether the rig has the
     device is the run's check (:mod:`humans.config.run`); whether the values
     fit the env's action space is checked when the env is built
-    (:mod:`humans.adapters.keymap`).
+    (:mod:`humans.keymaps`).
     """
     controls = d.get("controls")
     if not isinstance(controls, dict) or not controls:
@@ -568,10 +577,10 @@ def hint_problems(spec: object) -> list[str]:
 def _held_control_names_problems(field: str, names: object) -> list[str]:
     """The names in ``names`` that are no control, or the one that quits the run, as text."""
     wrong = [n for n in (names if isinstance(names, list) else []) if isinstance(n, str)
-             and not _is_possible_on_any_input_device(n.upper())]
+             and not _is_pressed_on_any_input_device(n.upper())]
     if not wrong:
         return []
-    return [f"{field}: {wrong} is no control name a curriculum may use ({_NAMES_ARE})"]
+    return [f"{field}: {wrong} is no control name a curriculum may use ({_PRESSED_NAMES_ARE})"]
 
 
 def _hold_and_after_problems(field: str, spec: dict, defaults: dict) -> list[str]:

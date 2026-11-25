@@ -8,8 +8,8 @@ from typing import Any
 import gymnasium as gym
 import numpy as np
 
+from ..keymaps import make_keymap
 from ..outputs.sound import Sound
-from .keymap import make_keymap
 
 
 @dataclass
@@ -59,7 +59,7 @@ class EnvAdapter:
 
     :ivar spec: the game-phase config dict this env was built from.
     :ivar env: the underlying ``gymnasium.Env``.
-    :ivar keymap: the phase's ``controls`` as a :class:`~.keymap.Keymap`.
+    :ivar keymap: the phase's ``controls`` as a :class:`~humans.keymaps.Keymap`.
     :ivar hud_settings: the phase's ``hud`` as :class:`HudSettings`.
     """
 
@@ -74,7 +74,7 @@ class EnvAdapter:
         :param spec: the game phase's dict (already validated for the keys this
             backend cares about).
         :raises ValueError: ``controls`` that do not fit the env's action space
-            (see :func:`~.keymap.make_keymap`).
+            (see :func:`~humans.keymaps.make_keymap`).
         """
         self.spec = spec
         self.hud_settings = HudSettings.from_dict(spec.get("hud", {}))
@@ -116,7 +116,7 @@ class EnvAdapter:
     def step(self, action: Any) -> tuple[Any, float, bool, bool, dict]:
         """Advance one frame.
 
-        The Gymnasium contract; the action comes from the :class:`~.keymap.Keymap`
+        The Gymnasium contract; the action comes from the :class:`~humans.keymaps.Keymap`
         already in the shape the space takes.
 
         :param action: action to apply (type depends on the env).

@@ -17,7 +17,7 @@ from gymnasium import spaces
 from humans.outputs.sound import Sound
 from humans.save.bids import task_label
 from humans.adapters.base import EnvAdapter, HudSettings
-from humans.adapters.keymap import make_keymap
+from humans.keymaps import ContinuousBoxKeymap, DiscreteBoxKeymap, make_keymap
 from humans.config.curriculum import (
     check_shape, game_changes, is_common_file, load_curriculum, save_curriculum,
     shared_overrides, validate_curriculum,
@@ -200,22 +200,103 @@ def test_each_code_a_line_sends_is_logged_and_none_from_a_line_that_sends_nothin
 
 def test_discrete_keymap_longest_combo_wins():
     km = make_keymap({"controls": {"": 0, "LEFT": 1, "LEFT+SPACE": 2}}, spaces.Discrete(3))
-    assert km.resolve(frozenset()) == 0
-    assert km.resolve(frozenset({"LEFT"})) == 1
-    assert km.resolve(frozenset({"LEFT", "SPACE"})) == 2
-    assert km.resolve(frozenset({"X"})) == 0
+    assert km.resolve(frozenset(), {}) == 0
+    assert km.resolve(frozenset({"LEFT"}), {}) == 1
+    assert km.resolve(frozenset({"LEFT", "SPACE"}), {}) == 2
+    assert km.resolve(frozenset({"X"}), {}) == 0
     assert km.turn_actions() == {"LEFT": 1}          # the no-key entry is not a press
 
 
 def test_multibinary_keymap_combines_held_keys():
     km = make_keymap({"controls": {"LEFT": 0, "RIGHT": 1, "SPACE": 2}}, spaces.MultiBinary(3))
-    assert list(km.resolve(frozenset({"LEFT", "SPACE"}))) == [1, 0, 1]
-    assert list(km.resolve(frozenset())) == [0, 0, 0]
+    assert list(km.resolve(frozenset({"LEFT", "SPACE"}), {})) == [1, 0, 1]
+    assert list(km.resolve(frozenset(), {})) == [0, 0, 0]
 
 
 def test_box_keymap_takes_lists():
     km = make_keymap({"controls": {"": [0.0], "RIGHT": [1.0]}}, spaces.Box(-1.0, 1.0, (1,)))
-    assert np.array_equal(km.resolve(frozenset({"RIGHT"})), np.array([1.0], dtype=np.float32))
+    assert np.array_equal(km.resolve(frozenset({"RIGHT"}), {}), np.array([1.0], dtype=np.float32))
+
+
+#: STK's continuous_full: steer, accel, brake, nitro, skid.
+_STEER_ACCEL_BRAKE = spaces.Box(np.array([-1, 0, 0, 0, 0], np.float32),
+                                np.array([1, 1, 1, 1, 1], np.float32))
+
+
+def test_a_box_phase_of_dimensions_sets_each_from_its_control_value():
+    km = make_keymap({"controls": {
+        "": [0, 0, 0, 0, 0],
+        "CONTROLLER_AXIS_LEFTX": 0,
+        "CONTROLLER_AXIS_LEFTY_UP": 1,
+        "CONTROLLER_AXIS_LEFTY_DOWN": {"dimension": 2, "range": [0, 1]},
+        "CONTROLLER_BUTTON_A": 3}}, _STEER_ACCEL_BRAKE)
+    assert isinstance(km, ContinuousBoxKeymap)
+    values = {"CONTROLLER_AXIS_LEFTX": -0.25, "CONTROLLER_AXIS_LEFTY_UP": 0.5}
+    action = km.resolve(frozenset({"CONTROLLER_BUTTON_A"}), values)   # A: no value, held
+    assert action.dtype == np.float32
+    assert action.tolist() == [-0.25, 0.5, 0.0, 1.0, 0.0]
+    assert km.resolve(frozenset(), {}).tolist() == [0, 0, 0, 0, 0]
+
+
+def test_a_value_comes_before_held():
+    km = make_keymap({"controls": {"": [0, 0, 0, 0, 0], "CONTROLLER_AXIS_TRIGGERRIGHT": 1}},
+                     _STEER_ACCEL_BRAKE)
+    trigger = "CONTROLLER_AXIS_TRIGGERRIGHT"
+    assert km.resolve(frozenset({trigger}), {trigger: 0.6}).tolist()[1] == pytest.approx(0.6)
+    assert km.resolve(frozenset({trigger}), {}).tolist()[1] == 1.0     # no value: held is 1
+
+
+def test_a_range_maps_a_control_value_onto_a_dimension_and_can_flip_it():
+    km = make_keymap({"controls": {
+        "": [0, 0, 0, 0, 0],
+        "CONTROLLER_AXIS_LEFTX": {"dimension": 0, "range": [1, -1]},   # a stick axis: -1..1
+        "LEFT": {"dimension": 1, "range": [0.5, 1]}}}, _STEER_ACCEL_BRAKE)  # a key: 0..1
+    assert km.resolve(frozenset(), {"CONTROLLER_AXIS_LEFTX": 0.5}).tolist()[:2] == [-0.5, 0.5]
+    assert km.resolve(frozenset({"LEFT"}), {}).tolist()[:2] == [0.0, 1.0]
+
+
+def test_a_dimension_value_outside_the_space_is_clipped():
+    km = make_keymap({"controls": {"": [0, 0, 0, 0, 0], "CONTROLLER_AXIS_LEFTX": 1}},
+                     _STEER_ACCEL_BRAKE)
+    assert km.resolve(frozenset(), {"CONTROLLER_AXIS_LEFTX": -0.7}).tolist()[1] == 0.0
+
+
+def test_a_dimension_is_set_over_the_held_combo_s_whole_action():
+    km = make_keymap({"controls": {"": [0, 0, 0, 0, 0], "SPACE": [0, 0, 0, 1, 1],
+                                   "CONTROLLER_AXIS_LEFTX": 0}}, _STEER_ACCEL_BRAKE)
+    action = km.resolve(frozenset({"SPACE"}), {"CONTROLLER_AXIS_LEFTX": 1.0})
+    assert action.tolist() == [1, 0, 0, 1, 1]
+    assert km.resolve(frozenset(), {}).tolist() == [0, 0, 0, 0, 0]
+
+
+def test_a_box_phase_of_whole_actions_stays_discrete():
+    km = make_keymap({"controls": {"": [0, 0, 0, 0, 0], "SPACE": [0, 0, 0, 1, 1]}},
+                     _STEER_ACCEL_BRAKE)
+    assert isinstance(km, DiscreteBoxKeymap)
+
+
+@pytest.mark.parametrize("controls, message", [
+    ({"": [0] * 5, "LEFT": 0, "RIGHT": 0}, "both set dimension 0"),
+    ({"": [0] * 5, "LEFT+UP": 0}, "set by one control"),
+    ({"": [0] * 5, "LEFT": 5}, "expected a dimension"),
+    ({"": [0] * 5, "LEFT": {"dimension": 0}}, "expected"),
+    ({"": [0] * 5, "LEFT": {"dimension": 0, "range": [0]}}, "two numbers"),
+    ({"LEFT": 0}, '"" missing'),
+])
+def test_a_box_phase_of_dimensions_refuses_a_binding_it_cannot_read(controls, message):
+    with pytest.raises(ValueError, match=message):
+        make_keymap({"controls": controls, "is_turn_based": True}, _STEER_ACCEL_BRAKE)
+
+
+@pytest.mark.parametrize("controls, space", [
+    ({"": 0, "CONTROLLER_AXIS_LEFTX": 1}, spaces.Discrete(3)),
+    ({"": 0, "CONTROLLER_AXIS_LEFTX+CONTROLLER_BUTTON_A": 1}, spaces.Discrete(3)),
+    ({"": [0] * 5, "CONTROLLER_AXIS_LEFTX": [1] * 5}, _STEER_ACCEL_BRAKE),
+    ({"CONTROLLER_AXIS_LEFTX": 0}, spaces.MultiBinary(3)),
+])
+def test_a_whole_stick_axis_only_sets_a_dimension(controls, space):
+    with pytest.raises(ValueError, match="never held"):
+        make_keymap({"controls": controls}, space)
 
 
 def test_keymap_refuses_an_action_outside_the_space():
@@ -239,6 +320,9 @@ def test_keymap_refuses_an_action_outside_the_space():
     ({**PHASE, "hint": {"text": "hi"}}, "hint.control"),
     ({**PHASE, "hint": {"control": "X", "text": "hi", "hold": -1}}, "hint.hold"),
     ({**PHASE, "hint": {"control": "X", "text": "hi", "colour": "red"}}, "colour"),
+    ({**PHASE, "hint": {"control": "CONTROLLER_AXIS_LEFTX", "text": "hi"}}, "never pressed"),
+    ({"type": "message", "text": "hi", "controls_to_dismiss": ["CONTROLLER_AXIS_LEFTY"]},
+     "never pressed"),
 ])
 def test_validate_config_refuses(phase, problem):
     problems = validate_curriculum({"curriculum": [phase]})

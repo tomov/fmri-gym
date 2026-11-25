@@ -1,9 +1,5 @@
 {
   "curriculum": [
-    {
-      "__include": "../common/stk.json",
-      "track": "scotland",
-      "instructions": {"title": "SuperTuxKart: Nessie's Pond"}
-    }
+    {"__include": "../common/stk.json", "track": "scotland", "instructions": {"title": "SuperTuxKart: Nessie's Pond"}}
   ]
 }

@@ -9,12 +9,16 @@ Why this shape: with ``render_mode="rgb_array"`` the game renders into a window
 that is created hidden (never mapped, so the window manager never resizes it), in
 an engine launched as a background app (so it never takes the keyboard and the
 controllers from the display's window), and every ``step`` brings the frame back,
-HUD included, at the requested ``screensize``; ``display.py`` scales it to the screen. With
-``action_mode="keys"`` the env's action *is* the set of keys held -- a
-``MultiBinary(8)`` over left, right, up, down, nitro, skid, fire, rescue, the
-indices a phase's ``keys`` name -- and the game's own player controller turns
-it into controls, so steering ramps and skids latch exactly as they do for a
-keyboard. The participant and a model are therefore in front of the same env.
+HUD included, at the requested ``screensize``; ``display.py`` scales it to the screen. The phase's
+``action_mode`` is the env's, which every phase states. With ``"keys"`` the env's action *is*
+the set of keys held -- a ``MultiBinary(8)`` over left, right, up, down, nitro,
+skid, fire, rescue, the indices a phase's ``controls`` name -- and the game's own
+player controller turns it into controls, so steering ramps and skids latch
+exactly as they do for a keyboard. With ``"continuous_full"`` it is a ``Box(7)``
+of the controls themselves: 0 steer (-1 left .. 1 right), 1 accelerate (0..1),
+then brake, nitro, skid, fire and rescue, each on above 0.5; the env, not the
+game's player controller, sets them. The participant and a model
+are therefore in front of the same env.
 
 Replay: a run reproduces bit for bit from a fresh launch, but a restart of the
 race in the same process leaves the physics world a little off a fresh one
@@ -82,6 +86,10 @@ class STKAdapter(EnvAdapter):
     def _make(self, spec: dict) -> gym.Env:
         import stk_gym
 
+        if spec.get("action_mode") not in stk_gym.ACTION_MODES:
+            raise ValueError(f"action_mode: expected one of {list(stk_gym.ACTION_MODES)}, got "
+                             f"{spec.get('action_mode')!r}")
+
         with _engine_launched_as_background_app():
             env = stk_gym.StkEnv(
                 track=spec.get("track", "hacienda"),
@@ -89,7 +97,7 @@ class STKAdapter(EnvAdapter):
                 num_karts=spec.get("num_karts"),
                 difficulty=spec.get("difficulty"),
                 obs_mode="vector",
-                action_mode="keys",
+                action_mode=spec["action_mode"],
                 render_mode="rgb_array",
                 frame_skip=int(spec.get("frame_skip", 2)),
                 screensize=spec.get("screensize", "640x360"),

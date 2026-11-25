@@ -80,7 +80,7 @@ def test_playable(game_phase):
     try:
         adapter.reset(seed)
         _check_frame(adapter.render())
-        pool = [adapter.keymap.resolve(combo) for combo in adapter.keymap.combos]
+        pool = [adapter.keymap.resolve(combo, {}) for combo in adapter.keymap.combos]
         assert pool, f"{path}: the phase's keys resolve to no action"
         terminated = truncated = False
         for _ in range(STEPS):

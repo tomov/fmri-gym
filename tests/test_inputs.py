@@ -91,7 +91,7 @@ def test_a_calibration_round_trips_through_its_file():
     ("stick", "LEFT_STICK", "stick: unknown key"),
     ("format", ..., "format: expected 1, got None"),
     ("format", 0, "format: expected 1, got 0"),
-    (f"axes.{LX}.drift", 0.3, f"axes.{LX}: its centre drifts 0.3, past its release point"),
+    (f"axes.{LX}.drift", 1.0, f"axes.{LX}: its centre drifts 1, as far as its stop"),
 ])
 def test_each_wrong_field_is_refused_by_its_file_and_name(tmp_path, field, value, says):
     path = tmp_path / "Scripted_20261021-141500.json"
@@ -139,20 +139,26 @@ class _FakeHandle:
     at rest.
 
     A joystick's and a game controller's handles spell these differently; this one spells both.
+    Like SDL's, ``id`` is the index it was opened at, not the instance id its events carry.
     """
 
-    def __init__(self, index: int = 0, name: str = "Scripted") -> None:
-        self.name, self.id = name, 7
+    def __init__(self, index: int = 0, name: str = "Scripted", instance_id: int = 7,
+                 axes: dict[int, float] | None = None) -> None:
+        self.name, self.id, self.instance_id = name, index, instance_id
+        self.axes = axes or {}
         self.open = True
 
     def get_name(self) -> str:
         return self.name
 
     def get_instance_id(self) -> int:
-        return self.id
+        return self.instance_id
+
+    def as_joystick(self) -> _FakeHandle:
+        return self
 
     def get_axis(self, axis: int) -> float:
-        return 0.0
+        return self.axes.get(axis, 0.0)
 
     def get_init(self) -> bool:
         return self.open
@@ -183,18 +189,20 @@ class _ScriptedController(Controller):
     HANDLE = _FakeHandle
 
     def __init__(self, handle=None, calibrated: bool = False, frames=()) -> None:
-        super().__init__(handle or _FakeHandle(), calibrated)
         self.frames = iter(frames)
+        self.axes = self.axes_at({})
+        super().__init__(handle or _FakeHandle(), calibrated)
 
     @classmethod
     def accepts(cls, joystick, is_controller: bool) -> bool:
         return True
 
     def attach(self, handle) -> None:
-        self.joystick, self.instance_id, self.device_name = handle, handle.id, handle.name
+        self.device_handle, self.device_name = handle, handle.name
+        self.instance_id = handle.get_instance_id()
 
-    def is_open(self) -> bool:
-        return self.joystick.get_init()
+    def _read_raw_value(self, axis_name: str) -> float:
+        return self.axes[axis_name]
 
     def handle(self, events, now: float) -> list[InputEvent]:
         """Take the next scripted frame as the controller's reading, ignoring the events."""
@@ -202,7 +210,8 @@ class _ScriptedController(Controller):
         if frame is None:
             pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
             frame = (self.axes_at({}), set())
-        axes, buttons = frame
+        self.axes, buttons = frame
+        axes = self.axes
         out = [e for b in self.BUTTON_NAMES
                for e in (self._press(b) if b in buttons else self._release(b))]
         return out + [e for name in self.AXIS_NAMES for e in self._move_axis(name, axes[name])]
@@ -338,11 +347,29 @@ def test_a_diagonal_push_presses_a_side_of_each_axis():
                                  _down(ControlNames.CONTROLLER_AXIS_LEFTY_DOWN)]
 
 
+def test_a_stick_axis_has_a_value_and_each_side_how_far_it_is_pushed():
+    d = _calibrated(_ScriptedController(), FILE)
+    d.frames = iter([(d.axes_at({LX: -1.0, LY: 0.0, RX: 0.3}), {"S_A"})])
+    d.handle([], 1.0)
+    values = d.values()
+    assert values[LX] == -1.0 and values[ControlNames.CONTROLLER_AXIS_LEFTX_LEFT] == 1.0
+    assert 0.0 < values[RX] < 0.3 and values[RX] == values[ControlNames.CONTROLLER_AXIS_RIGHTX_RIGHT]
+    assert "S_A" not in values                                  # a button's value is held()
+    assert values[LY] == 0.0 and values[ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT] == 0.0
+
+
+def test_a_stick_within_its_drift_of_rest_reads_zero_and_its_stops_one():
+    axis = files.AxisCalibration(rest=0.1, low=-0.9, high=0.6, drift=0.05, on=0.5, off=0.3)
+    assert axis.value(0.1) == 0.0 and axis.value(0.14) == 0.0 and axis.value(0.06) == 0.0
+    assert axis.value(0.6) == 1.0 and axis.value(-0.9) == -1.0
+    assert axis.value(0.35) == pytest.approx((0.25 / 0.5 - 0.1) / 0.9)
+
+
 def test_an_uncalibrated_axis_presses_nothing():
     d = _ScriptedController()
     d.frames = iter([(d.axes_at({LX: 1.0, LY: -1.0}), set())])
-    assert d.handle([], 1.0) == [] and d.axis_values[LX] == 1.0
-    assert d.calibrated_value(LX) is None
+    assert d.handle([], 1.0) == [] and d.raw_value(LX) == 1.0
+    assert d.values() == {}
 
 
 def test_a_controller_records_the_calibration_it_reads_through(config_home):
@@ -409,8 +436,10 @@ def test_an_xbox_controller_reads_its_mapping_and_not_the_joystick_twin():
     assert pad.handle(pull, 1.1) == [_down(ControlNames.CONTROLLER_AXIS_TRIGGERLEFT)]
     ease = [_joy(pygame.CONTROLLERAXISMOTION, axis=trigger, value=12000)]   # still past off
     assert pad.handle(ease, 1.2) == []
+    assert pad.values()[ControlNames.CONTROLLER_AXIS_TRIGGERLEFT] == 12000 / 32767
     let_go = [_joy(pygame.CONTROLLERAXISMOTION, axis=trigger, value=0)]
     assert pad.handle(let_go, 1.3) == [_up(ControlNames.CONTROLLER_AXIS_TRIGGERLEFT)]
+    assert pad.values()[ControlNames.CONTROLLER_AXIS_TRIGGERLEFT] == 0.0
 
 
 def test_an_xbox_controller_reads_each_stick_axis_through_its_calibration():
@@ -418,7 +447,8 @@ def test_an_xbox_controller_reads_each_stick_axis_through_its_calibration():
     right_x = pygame.CONTROLLER_AXIS_RIGHTX
     assert pad.handle([_joy(pygame.CONTROLLERAXISMOTION, axis=right_x, value=-20000)], 1.0) == [
         _down(ControlNames.CONTROLLER_AXIS_RIGHTX_LEFT)]
-    assert pad.calibrated_value(RX) == pytest.approx(-20000 / 32767)
+    assert pad.raw_value(RX) == pytest.approx(-20000 / 32767)
+    assert pad.values()[RX] == pytest.approx((20000 / 32767 - 0.01) / 0.99 * -1)
 
 
 def test_no_two_kinds_of_device_share_a_control_name():
@@ -544,17 +574,45 @@ def sdl(monkeypatch):
     return seen
 
 
-def test_a_controller_whose_handle_a_game_closed_is_given_a_new_one(sdl, capsys):
-    pad = _bare(CurrentDesignsGamepad3)
-    old = pad.joystick
+@pytest.mark.parametrize("cls, button_down", [
+    (CurrentDesignsGamepad3, lambda instance_id: pygame.event.Event(
+        pygame.JOYBUTTONDOWN, instance_id=instance_id, button=4)),
+    (XBoxController, lambda instance_id: pygame.event.Event(
+        pygame.CONTROLLERBUTTONDOWN, instance_id=instance_id, button=pygame.CONTROLLER_BUTTON_A)),
+])
+def test_a_controller_whose_handle_a_game_closed_is_given_a_new_one(
+        sdl, capsys, monkeypatch, cls, button_down):
+    monkeypatch.setattr(cls, "accepts", classmethod(lambda c, j, i: j.get_name() == "Scripted"))
+    monkeypatch.setattr(cls, "HANDLE", staticmethod(          # reopened: a new instance id
+        lambda index: _FakeHandle(index, sdl.names[index], instance_id=8)))
+    pad = _bare(cls)
+    old = pad.device_handle
     old.quit()                                              # what pygame.quit() does to it
-    pad.handle([], 1.0)
-    assert pad.joystick is not old and pad.is_open()
+    assert pad.handle([button_down(7)], 1.0) == []          # the closed handle's id
+    assert pad.device_handle is not old and pad.is_open()
+    assert pad.handle([button_down(8)], 1.05) == [_down(ControlNames.CONTROLLER_BUTTON_A)]
     sdl.names.clear()
-    pad.joystick.quit()
+    pad.device_handle.quit()
     pad.handle([], 1.1)
     pad.handle([], 1.2)
     assert capsys.readouterr().err.count("is gone") == 1
+
+
+def test_a_reopened_controller_forgets_its_values_and_reads_where_its_stick_is(sdl, monkeypatch):
+    pad = _calibrated(_bare(CurrentDesignsGamepad3), GMPD3_FILE)
+    pad.handle([_joy(pygame.JOYAXISMOTION, axis=0, value=0.9)], 1.0)
+    assert {name for name, value in pad.values().items() if value} == {
+        LX, ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT}
+    monkeypatch.setattr(CurrentDesignsGamepad3, "HANDLE", staticmethod(   # pushed up, no event
+        lambda index: _FakeHandle(index, sdl.names[index], axes={1: -0.9})))
+    pad.device_handle.quit()                                # what pygame.quit() does to it
+    assert pad.handle([], 1.1) == [_up(ControlNames.CONTROLLER_AXIS_LEFTX_RIGHT),
+                                   _down(ControlNames.CONTROLLER_AXIS_LEFTY_UP)]
+    assert {name for name, value in pad.values().items() if value} == {
+        LY, ControlNames.CONTROLLER_AXIS_LEFTY_UP}
+    assert pad.values()[LY] < 0 and pad.raw_value(LY) == -0.9
+    pad.close()
+    assert pad.values() == {} and pad.raw_value(LY) == 0.0
 
 
 class _SdlControllerHandle(_FakeHandle):

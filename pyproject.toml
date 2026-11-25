@@ -56,7 +56,7 @@ vizdoom = ["vizdoom", "vizdoom-gym", "replay-state-gym"]
 # COOM scenarios as a gym env, from gym/coom (see tool.uv.sources). Needs the
 # external/coom checkout too; the COOM package itself is not installed.
 coom = ["coom-gym", "vizdoom-gym", "replay-state-gym"]
-rushhour = ["rushhour-gym>=0.7.0", "replay-state-gym"]
+rushhour = ["rushhour-gym>=0.8.0", "replay-state-gym"]
 # SuperTuxKart; the package brings the game itself. It needs a real GL display,
 # because the observation is the game's own rendering.
 stk = ["supertuxkart-gym>=0.1.5"]
@@ -106,7 +106,7 @@ bids-from-logs = "humans.standalone.bids_from_logs:main"
 session-logger = "humans.standalone.session_logger:main"
 
 [tool.setuptools]
-packages = ["humans", "humans.adapters", "humans.config", "humans.inputs",
+packages = ["humans", "humans.adapters", "humans.config", "humans.inputs", "humans.keymaps",
             "humans.outputs", "humans.save", "humans.standalone",
             "humans.standalone.rig_setup", "humans.standalone.session_logger", "humans.sync"]
 py-modules = ["fmri_play"]
@@ -165,14 +165,17 @@ include_external_packages = true
 name = "humans's layers: each imports only the ones below it"
 type = "layers"
 containers = ["humans"]
-layers = ["standalone", "run", "popup", "config", "adapters", "outputs", "sync | inputs", "save"]
+layers = [
+    "standalone", "run", "popup", "config", "adapters", "keymaps | outputs", "sync | inputs",
+    "save",
+]
 
 [[tool.importlinter.contracts]]
 name = "Only the adapters import a game engine or a gym/ package"
 type = "forbidden"
 source_modules = [
     "humans.standalone", "humans.run", "humans.popup", "humans.config",
-    "humans.outputs", "humans.save", "humans.sync", "humans.inputs",
+    "humans.keymaps", "humans.outputs", "humans.save", "humans.sync", "humans.inputs",
 ]
 forbidden_modules = [
     "ale_py", "stable_retro", "vizdoom", "minihack", "nle", "crafter", "stk_gym",

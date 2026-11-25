@@ -1,9 +1,5 @@
 {
   "curriculum": [
-    {
-      "__include": "../common/stk-GMPD3-stick-nav.json",
-      "track": "snowmountain",
-      "instructions": {"title": "SuperTuxKart: Northern Resort"}
-    }
+    {"__include": "../common/stk-GMPD3-stick-nav.json", "track": "snowmountain", "instructions": {"title": "SuperTuxKart: Northern Resort"}}
   ]
 }

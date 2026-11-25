@@ -30,6 +30,8 @@ STICK_AXES = {
     0: ControlNames.CONTROLLER_AXIS_LEFTX,
     1: ControlNames.CONTROLLER_AXIS_LEFTY
 }
+#: The stick axis -> SDL's number for it.
+_SDL_AXIS_BY_NAME = {name: axis for axis, name in STICK_AXES.items()}
 
 
 class CurrentDesignsGamepad3(Controller):
@@ -38,7 +40,8 @@ class CurrentDesignsGamepad3(Controller):
     name = "current_designs_gamepad3"
     BUTTON_NAMES = tuple(BUTTONS.values())
     AXIS_NAMES = tuple(STICK_AXES.values())
-    CONTROLS = frozenset({*BUTTON_NAMES, *(c for a in AXIS_NAMES for c in AXIS_CONTROLS[a])})
+    CONTROLS = frozenset({*BUTTON_NAMES, *AXIS_NAMES,
+                          *(c for a in AXIS_NAMES for c in AXIS_CONTROLS[a])})
     HANDLE = pygame.joystick.Joystick
 
     @classmethod
@@ -48,17 +51,14 @@ class CurrentDesignsGamepad3(Controller):
                 and joystick.get_numaxes() >= len(STICK_AXES))
 
     def attach(self, handle: pygame.joystick.Joystick) -> None:
-        self.joystick, self.instance_id = handle, handle.get_instance_id()
+        self.device_handle, self.instance_id = handle, handle.get_instance_id()
         self.device_name = handle.get_name()
-        for axis, axis_name in STICK_AXES.items():
-            self.axis_values[axis_name] = handle.get_axis(axis)
 
-    def is_open(self) -> bool:
-        return self.joystick.get_init()
+    def _read_raw_value(self, axis_name: str) -> float:
+        return self.device_handle.get_axis(_SDL_AXIS_BY_NAME[axis_name])
 
     def handle(self, events: list[pygame.event.Event], now: float) -> list[InputEvent]:
-        self._reopen_if_closed()
-        out: list[InputEvent] = []
+        out = self._reopen_if_closed()
         for event in events:
             if getattr(event, "instance_id", None) != self.instance_id:
                 continue
@@ -69,7 +69,3 @@ class CurrentDesignsGamepad3(Controller):
             elif event.type == pygame.JOYAXISMOTION and event.axis in STICK_AXES:
                 out += self._move_axis(STICK_AXES[event.axis], event.value)
         return out
-
-    def close(self) -> None:
-        if self.joystick.get_init():
-            self.joystick.quit()
