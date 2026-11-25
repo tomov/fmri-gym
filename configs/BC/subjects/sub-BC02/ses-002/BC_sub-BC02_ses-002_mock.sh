@@ -28,7 +28,7 @@ trap 'exit 130' INT TERM HUP
 # Runs, one per line, each after a mark in the session's recording
 
 uv run session-logger mark "$RECORDING" "1/9 STK lighthouse (fmri-play run 1)"
-uv run fmri-play --subject $SUBJECT --ses $SES --run 1 --rig "$RIG" --duration $RUN_DURATION --loop --resume --curriculum configs/BC/curricula/stk/levels/lighthouse-GMPD3-stick-nav.json
+uv run fmri-play --subject $SUBJECT --ses $SES --run 1 --rig "$RIG" --duration $RUN_DURATION --loop --resume --curriculum configs/BC/curricula/stk/levels/lighthouse-GMPD3-stick-nav-analog.json
 
 uv run session-logger mark "$RECORDING" "2/9 WCST (CogTasks run 01)"
 (cd "$COG" && uv run python run.py WCST --subject $SUBJECT --session 002 --run 01 --input gamepad --data-dir "$BEH" --rig "$RIG" --controls controls/wcst-GMPD3.json)
@@ -40,7 +40,7 @@ uv run session-logger mark "$RECORDING" "4/9 MTB set A run 1 (order $MTB_ORDER)"
 (cd "$MTB" && uv run python run.py $SUBJECT set_a $MTB_ORDER --run 1 --data-dir "$BEH" --rig "$RIG" --controls controls/mtb-GMPD3.json)
 
 uv run session-logger mark "$RECORDING" "5/9 STK hacienda (fmri-play run 3)"
-uv run fmri-play --subject $SUBJECT --ses $SES --run 3 --rig "$RIG" --duration $RUN_DURATION --loop --resume --curriculum configs/BC/curricula/stk/levels/hacienda-GMPD3-stick-nav.json
+uv run fmri-play --subject $SUBJECT --ses $SES --run 3 --rig "$RIG" --duration $RUN_DURATION --loop --resume --curriculum configs/BC/curricula/stk/levels/hacienda-GMPD3-stick-nav-analog.json
 
 uv run session-logger mark "$RECORDING" "6/9 ARC (CogTasks run 01)"
 (cd "$COG" && uv run python run.py ARC --subject $SUBJECT --session 002 --run 01 --input gamepad --data-dir "$BEH" --rig "$RIG" --controls controls/arc-GMPD3.json)

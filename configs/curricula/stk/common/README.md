@@ -6,18 +6,7 @@ The `stk` backend's curricula: one per race track, each including `common/stk.js
 
 `uv sync --extra stk` installs [supertuxkart-gym](https://pypi.org/project/supertuxkart-gym/), which brings the game itself. It needs a real OpenGL display: the game renders into a hidden window and every frame is read back and shown here, so it does not work under `SDL_VIDEODRIVER=dummy` or with `--render-driver=vulkan`.
 
-**The `*-GMPD3-stick-nav-analog` curricula need a supertuxkart-gym that is not released yet**, the one in [chrplr/stk-code#6](https://github.com/chrplr/stk-code/pull/6), whose `continuous_full` has fire and rescue (Box(7)). The released 0.1.5 has Box(5), and refuses these curricula when the env is built: their `""` action has 7 values. Until a release has it, install the package from that branch over the released one; the game itself is unchanged, so the engine 0.1.5 fetched into `~/.cache/supertuxkart-gym` serves it. On a Mac or on Linux, from the fmri-gym checkout:
-
-```bash
-uv sync --extra stk                       # the released 0.1.5, and its engine on first use
-git clone --filter=blob:none --no-checkout --branch gym-continuous-full-fire-rescue \
-    https://github.com/tomov/stk-code.git ../stk-code-gym
-git -C ../stk-code-gym sparse-checkout set python && git -C ../stk-code-gym checkout
-uv pip install --no-deps --reinstall ../stk-code-gym/python
-uv run --no-sync python -c "import stk_gym.actions as a; print(a.space_for('continuous_full'))"   # (7,)
-```
-
-Two traps. The install must not be editable (`-e`): an editable `stk_gym` finds the checkout around it and asks for an engine built there, not the one in the cache. And every `uv sync`, and every `uv run` without `--no-sync`, puts the released 0.1.5 back: run with `uv run --no-sync`, and after a sync rerun the `uv pip install` line. The other STK curricula play on either version.
+The `*-GMPD3-stick-nav-analog` curricula need supertuxkart-gym 0.1.6 or later, whose `continuous_full` has fire and rescue (Box(7)); 0.1.5's is Box(5) and refuses them when the env is built, because their `""` action has 7 values. `pyproject.toml` asks for 0.1.6, so `uv sync --extra stk` installs one that plays them all.
 
 ## Tracks
 

@@ -59,7 +59,7 @@ coom = ["coom-gym", "vizdoom-gym", "replay-state-gym"]
 rushhour = ["rushhour-gym>=0.8.0", "replay-state-gym"]
 # SuperTuxKart; the package brings the game itself. It needs a real GL display,
 # because the observation is the game's own rendering.
-stk = ["supertuxkart-gym>=0.1.5"]
+stk = ["supertuxkart-gym>=0.1.6"]
 # `gym` backend families beyond classic_control / toy_text (which ship with gymnasium):
 # `Box2D` is the module gymnasium's box2d envs import. gymnasium[box2d] would
 # get it from box2d-py, an sdist-only 2018 release that must compile (swig +
