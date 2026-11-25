@@ -13,16 +13,16 @@
     ]
   },
   "action_mode": "continuous_full",
-  "controls": {"": [0, 0, 0, 0, 0, 0, 0], "CONTROLLER_AXIS_LEFTX": 0, "CONTROLLER_AXIS_TRIGGERLEFT": 1, "CONTROLLER_BUTTON_B": 3, "CONTROLLER_BUTTON_X": 4, "CONTROLLER_BUTTON_A": 5, "CONTROLLER_AXIS_TRIGGERRIGHT": 6},
+  "controls": {"": [0, 0, 0, 0, 0, 0, 0], "CONTROLLER_AXIS_LEFTX": 0, "CONTROLLER_AXIS_TRIGGERLEFT": 1, "CONTROLLER_BUTTON_A": 3, "CONTROLLER_BUTTON_B": 4, "CONTROLLER_BUTTON_X": 5, "CONTROLLER_BUTTON_Y": 6},
   "hint": {
-    "control": "CONTROLLER_BUTTON_Y", "hold": 0.0, "after": 0.0,
+    "control": "CONTROLLER_AXIS_TRIGGERRIGHT", "hold": 0.0, "after": 0.0,
     "text": [
       "![controls](BC/images/controls/stk/stk-GMPD3-stick-nav-analog.png)",
       "",
-      "Let go of Y to go back to the game."
+      "Let go of RT to go back to the game."
     ]
   },
   "hud": {"show_score": false, "show_time_remaining": false},
-  "laps": 3, "num_karts": 4, "difficulty": 1, "screensize": "640x360", "frame_skip": 2, "seed": 1, "mode": "duration", "duration": 300.0,
+  "laps": 3, "num_karts": 4, "difficulty": 1, "screensize": "640x360", "frame_skip": 2, "seed": 1, "mode": "duration", "duration": 3600.0,
   "fps": 60
 }
