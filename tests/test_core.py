@@ -392,9 +392,9 @@ def test_an_image_line_is_drawn_as_its_image_between_the_text(monkeypatch):
     display = Display(size=(400, 300), vsync=False)
     try:
         display.draw_text("above\n![pad](images/controllers/xbox-controller-labelled.png)\nbelow")
-        assert pygame.transform.average_color(display.canvas)[0] > 50     # the white diagram
+        assert pygame.transform.average_color(display.canvas)[0] > 140    # the white diagram
         display.draw_text("![pad] (images/controllers/xbox-controller-labelled.png)")
-        assert pygame.transform.average_color(display.canvas)[0] < 50     # a line of text
+        assert pygame.transform.average_color(display.canvas)[0] < 128    # a line of text
     finally:
         display.close()
 

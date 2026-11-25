@@ -51,24 +51,22 @@ if TYPE_CHECKING:
     from ..save.logging import Logger
 
 #: A line of a screen's text that is only Markdown's ``![alt](path)`` shows the image at
-#: ``path``, from :data:`IMAGES_ROOT`, in its place. Transparent pixels show the black screen.
+#: ``path``, from :data:`IMAGES_ROOT`, in its place. Transparent pixels show the screen's grey.
 IMAGE_LINE = re.compile(r"^\s*!\[[^\]]*\]\((?P<path>[^)]+)\)\s*$")
 IMAGES_ROOT = Path(__file__).resolve().parents[2] / "configs"
 IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg")
 
-BG_COLOR = (0, 0, 0)
-TEXT_COLOR = (220, 220, 220)
-FIX_COLOR = (255, 255, 255)
-HUD_COLOR = (235, 235, 235)
-# Text drawn ON a frame, where gray would read as part of the picture. Light
-# sky blue: bright over both dark and light art, and cool enough not to be
-# mistaken for the red a game may reserve.
-OVERLAY_COLOR = (150, 215, 255)
+#: Black on mid-grey, the grey of PsychoPy's default window.
+BG_COLOR = (128, 128, 128)
+TEXT_COLOR = (0, 0, 0)
+FIX_COLOR = (0, 0, 0)
+HUD_COLOR = (0, 0, 0)
 #: Seconds the window is given to receive the keyboard focus once raised.
 FOCUS_WAIT_S = 1.0
 #: The corners a photodiode patch can be in: bottom right, bottom left, top right, top left.
 PHOTODIODE_CORNERS = ("br", "bl", "tr", "tl")
-PHOTODIODE_LIT_COLOR = (255, 255, 255)
+#: Full contrast whatever the background, so each flip is the same edge in the diode's signal.
+PHOTODIODE_LIT_COLOR, PHOTODIODE_DARK_COLOR = (255, 255, 255), (0, 0, 0)
 
 
 @dataclass(frozen=True, slots=True)
@@ -246,7 +244,7 @@ class Display:
         """
         self.screen.blit(self.canvas, (0, 0))
         if self.photodiode_patch is not None:
-            self.screen.fill(PHOTODIODE_LIT_COLOR if self._is_photodiode_patch_lit else BG_COLOR,
+            self.screen.fill(PHOTODIODE_LIT_COLOR if self._is_photodiode_patch_lit else PHOTODIODE_DARK_COLOR,
                              self.photodiode_patch.rect(self.size))
         pygame.display.flip()
         t = time.perf_counter()
@@ -300,7 +298,7 @@ class Display:
         hud: list[str] | None = None,
         overlay: tuple[list[str], float] | None = None,
     ) -> float:
-        """Blit an RGB frame, aspect-fit and centered with black pad.
+        """Blit an RGB frame, aspect-fit and centered on the background.
 
         With a ``hud``, the frame is fit below a strip above it where the lines
         are drawn (see :meth:`_draw_hud`), so the text never covers a pixel the
@@ -368,7 +366,7 @@ class Display:
     def _draw_overlay(
         self, overlay: tuple[list[str], float], rect: pygame.Rect
     ) -> None:
-        """Draw lines over the frame on a black backdrop, horizontally centered.
+        """Draw lines over the frame on a backdrop of the background, horizontally centered.
 
         The counterpart of :meth:`_draw_hud`, and the opposite trade: the strip
         is the right place for something the subject reads now and then, and
@@ -385,7 +383,7 @@ class Display:
         :param rect: the rect the frame was blitted into.
         """
         lines, y_frac = overlay
-        surfs = [self.hud_font.render(line, True, OVERLAY_COLOR) for line in lines]
+        surfs = [self.hud_font.render(line, True, TEXT_COLOR) for line in lines]
         if not surfs:
             return
         total_h = sum(s.get_height() for s in surfs)
@@ -522,7 +520,7 @@ class Display:
         return rows
 
     def draw_fixation(self) -> float:
-        """Draw a centered white ``+`` fixation cross.
+        """Draw a centered ``+`` fixation cross.
 
         :return: ``perf_counter`` of the flip that showed it.
         """
