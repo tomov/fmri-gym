@@ -25,8 +25,13 @@ import numpy as np  # noqa: E402
 import pygame  # noqa: E402
 
 from humans.inputs.control_names import ControlNames  # noqa: E402
+from humans.outputs.display import BG_COLOR, TEXT_COLOR  # noqa: E402
 
-PAPER, TEXT, LEADER = (255, 255, 255), (25, 25, 25), (70, 70, 70)
+#: the paper is transparent, so the drawing sits on the screen with no border at any scale,
+#: and its outline's antialiased edge is drawn against the screen's color
+PAPER, TEXT, LEADER = BG_COLOR, TEXT_COLOR, TEXT_COLOR
+#: how bright a pixel of the underlay's white paper is at least
+PAPER_LUMINANCE = 235
 #: the part of the underlay that is the controller, and its scale in the image
 CROP, SCALE = pygame.Rect(50, 50, 1180, 800), 0.75
 #: room for the labels on each side of the controller, and under it
@@ -37,8 +42,7 @@ LABEL_GAP, EDGE = 46, 10
 
 
 #: what an unused control fades to: its pixels keep this share of their contrast with
-#: the body's grey around it (this one when none is around), and lose their colour;
-#: the white around the drawing stays white
+#: the body's grey around it (this one when none is around), and lose their colour
 GREYED_OUT_CONTRAST, GREYED_OUT_GREY = 0.2, 205
 
 
@@ -132,6 +136,39 @@ def _grey_out(pixels: np.ndarray, area: pygame.Rect | list[tuple[int, int]],
     body = np.median(luminance[edge]) if edge.any() else GREYED_OUT_GREY
     faded = body + (luminance - body) * GREYED_OUT_CONTRAST
     region[inside] = np.round(faded[inside])[:, None]
+
+
+def _onto_paper(controller: pygame.Surface) -> None:
+    """Make the white around the drawing transparent, its outline's edge as if on :data:`PAPER`.
+
+    The white is the bright pixels joined to the image's edge, so the white body inside the
+    outline stays white; the edge is scaled as dark ink over white paper would be.
+    """
+    pixels = pygame.surfarray.pixels3d(controller)
+    is_bright = pixels @ np.array([0.299, 0.587, 0.114]) >= PAPER_LUMINANCE
+    paper = np.zeros_like(is_bright)
+    paper[[0, -1], :], paper[:, [0, -1]] = is_bright[[0, -1], :], is_bright[:, [0, -1]]
+    while True:
+        grown = _grow(paper) & is_bright
+        if (grown == paper).all():
+            break
+        paper = grown
+    edge = _grow(_grow(paper)) & ~paper
+    white = np.median(pixels[paper], axis=0)
+    pixels[edge] = np.clip(pixels[edge] * (np.array(PAPER) / white), 0, PAPER).round()
+    pixels[paper] = PAPER
+    del pixels
+    pygame.surfarray.pixels_alpha(controller)[paper] = 0
+
+
+def _grow(mask: np.ndarray) -> np.ndarray:
+    """``mask`` and its pixels' four neighbors."""
+    grown = mask.copy()
+    grown[1:] |= mask[:-1]
+    grown[:-1] |= mask[1:]
+    grown[:, 1:] |= mask[:, :-1]
+    grown[:, :-1] |= mask[:, 1:]
+    return grown
 
 
 def _paint_over(pixels: np.ndarray, rect: pygame.Rect) -> None:
@@ -252,8 +289,10 @@ def write_controls_image(underlay: pygame.Surface, labels: dict[str, list[str | 
     controller = drawing.subsurface(CROP).copy()
     size = (round(CROP.width * SCALE), round(CROP.height * SCALE))
     controller = pygame.transform.smoothscale(controller, size)
-    canvas = pygame.Surface((size[0] + 2 * MARGIN, size[1] + BELOW))
-    canvas.fill(controller.get_at((0, 0)))     # smoothscale leaves the white a shade darker
+    controller = controller.convert_alpha()
+    _onto_paper(controller)
+    canvas = pygame.Surface((size[0] + 2 * MARGIN, size[1] + BELOW), pygame.SRCALPHA)
+    canvas.fill((*PAPER, 0))
     canvas.blit(controller, (MARGIN, 0))
     font = pygame.font.Font(pygame.font.get_default_font(), 42)
     draw_labels(canvas, font, labels)

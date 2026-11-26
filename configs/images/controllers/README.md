@@ -1,6 +1,6 @@
 # Controller layouts
 
-Images a screen's text can show, each flattened onto white so its black outlines read on the black screen.
+Images a screen's text can show, each flattened onto white so its black outlines read on the grey screen.
 
 | File | Shows | Source | Licence |
 |---|---|---|---|
