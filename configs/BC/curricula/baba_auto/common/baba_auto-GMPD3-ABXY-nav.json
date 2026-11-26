@@ -12,7 +12,7 @@
   },
   "controls": {"CONTROLLER_AXIS_TRIGGERLEFT": 0, "CONTROLLER_BUTTON_Y": 1, "CONTROLLER_BUTTON_A": 2, "CONTROLLER_BUTTON_X": 3, "CONTROLLER_BUTTON_B": 4},
   "menu": {
-    "control": "CONTROLLER_AXIS_TRIGGERRIGHT", "hold": 3.0, "after": 480.0, "options": ["reset", "forfeit", "resume"], "move": ["CONTROLLER_BUTTON_Y", "CONTROLLER_BUTTON_A"], "confirm": "CONTROLLER_AXIS_TRIGGERLEFT",
+    "control": "CONTROLLER_AXIS_TRIGGERRIGHT", "hold": 3.0, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["CONTROLLER_BUTTON_Y", "CONTROLLER_BUTTON_A"], "confirm": "CONTROLLER_AXIS_TRIGGERLEFT",
     "text": [
       "   Y / A   choose",
       "   LT      select"

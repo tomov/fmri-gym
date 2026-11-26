@@ -15,7 +15,7 @@
   "env_kwargs": {"max_buttons_pressed": 0, "render_hud": true, "render_minimal_hud": false, "render_weapon": true, "render_crosshair": true, "render_messages": true, "audio_buffer_enabled": true},
   "controls": {"CONTROLLER_AXIS_LEFTY_UP": 2, "CONTROLLER_AXIS_LEFTX_LEFT": 0, "CONTROLLER_AXIS_LEFTX_RIGHT": 1, "CONTROLLER_BUTTON_X": 3, "CONTROLLER_BUTTON_B": 4},
   "menu": {
-    "control": "CONTROLLER_AXIS_TRIGGERRIGHT", "hold": 3.0, "after": 180.0, "options": ["reset", "forfeit", "resume"], "move": ["CONTROLLER_AXIS_LEFTY_UP", "CONTROLLER_AXIS_LEFTY_DOWN"], "confirm": "CONTROLLER_BUTTON_A",
+    "control": "CONTROLLER_AXIS_TRIGGERRIGHT", "hold": 3.0, "after": 0.0, "options": ["reset", "forfeit", "resume"], "move": ["CONTROLLER_AXIS_LEFTY_UP", "CONTROLLER_AXIS_LEFTY_DOWN"], "confirm": "CONTROLLER_BUTTON_A",
     "text": [
       "   stick up / down   choose",
       "   A                 select"
